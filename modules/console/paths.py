@@ -12,7 +12,7 @@ from pathlib import Path
 PREPARING_DIRNAME = "preparing"
 DEFAULT_GROK_ROOT = Path(r"D:\0Grok")  # frozen lab default; GROK_ROOT overrides
 STAGE_ROOT_NAMES = (
-    "polishing", "submitting", "reseived",
+    "polishing", "submitting", "accepted",
 )
 
 
