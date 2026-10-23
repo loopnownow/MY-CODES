@@ -1,0 +1,12 @@
+# Python 3.10+ (lab runner is 3.13)
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.3
+statsmodels>=0.14
+matplotlib>=3.7
+joblib>=1.3
+openpyxl>=3.1
+# optional analyses
+shap>=0.44
+pytest>=7.4

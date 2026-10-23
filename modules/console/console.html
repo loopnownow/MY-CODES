@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="console-token" content="__CONSOLE_TOKEN__"/>
+<title>console.html · RAD 统计控制台</title>
+<link rel="stylesheet" href="console.css"/>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand">
+    <h1>console.html</h1>
+    <div class="sub lockline" title="工作表、ID 列和姓名列在起始页选定。本页改分析设置。">
+      <span><b>项目</b> <span id="lockProject">—</span></span>
+      <span><b>数据</b> <span id="lockData">—</span></span>
+      <span><b>外验</b> <span id="lockExt">—</span></span>
+      <span><b>settings</b> <span id="lockSettings">—</span></span>
+      <span><b>modules</b> <span id="lockModules">—</span></span>
+    </div>
+    <p class="hint" id="loadHint">由起始页加载后进入。工作表、ID 列和姓名列在起始页选定。</p>
+  </div>
+  <nav class="tabs">
+    <button type="button" class="tab on" id="tabBtnConfig" data-tip="配置页：改分析设置。右侧运行统计、日志和结果。">配置</button>
+    <button type="button" class="tab" id="tabBtnPreview" data-tip="数据预览 / QC。载入后看 sheet、例数、结局分布、排除名单和 ICC。只预览，不建模。">数据预览</button>
+    <button type="button" class="tab" id="tabBtnFlow" data-tip="STROBE / 流程图。按当前课题打开，不跑统计。">流程图</button>
+  </nav>
+  <span class="pill" data-tip="本机 console.py 是否连上。绿=空闲，橙=正在跑，红=出错或未启动。"><i id="statusDot"></i><span id="srv">检测服务…</span></span>
+</header>
+<main id="paneConfig">
+  <section class="col left" id="palCol">
+    <div class="col-inner">
+    <div class="card" id="palCard">
+      <h2 data-tip="投稿配色。主色给 Combined / RadScore / Clinical / Reader / Age；辅色给其余曲线和 KM。多结局时公共页改默认色，各结局页可单独覆盖。写入 FIG_PALETTE。">画图颜色 <span class="inh" id="palInherit" hidden>用默认</span> <button type="button" class="unov" id="palUnov" hidden>恢复默认</button></h2>
+      <p class="hint">上：颜色模式分列点选。下：主色 / 辅色预览，可微调。主色 Combined · RadScore · Clinical · Reader · Age。未改=用 ini 默认。</p>
+      <div id="palList" class="pal-list"></div>
+      <p class="hint" id="palHint"></p>
+      <div class="pal-preview">
+        <div>
+          <div class="subh">主色预览</div>
+          <div class="swatches" id="palMain"></div>
+        </div>
+        <div>
+          <div class="subh">辅色预览</div>
+          <div class="swatches" id="palAux"></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+  <div id="ioCard" hidden>
+    <select id="project" hidden></select>
+    <input id="data" type="hidden"/>
+    <input id="settings" type="hidden"/>
+    <input id="modulesDir" type="hidden"/>
+    <input id="ioData" type="hidden"/>
+    <input id="ioExtSplit" type="checkbox" checked hidden/>
+    <div id="extRows" hidden></div>
+    <datalist id="xlsxList"></datalist>
+    <span id="ioMsg" hidden></span>
+  </div>
+  <section class="col mid">
+    <div class="col-inner">
+    <div class="banner" id="diffBanner">数据已在起始页加载。工作表和 ID 列在起始页选定。</div>
+    <div id="outcomeTabBar" class="outcome-tabs" hidden></div>
+    <div id="pairTabBar" class="outcome-tabs pair-tabs" hidden></div>
+    <div id="formRoot"></div>
+    <div id="grpCardPark" hidden>
+    <div class="card" id="grpCard">
+      <h2 data-tip="自动识别当前列的全部组。每一行：组（下拉）→ 展示名 → 阴性 / 阳性 / 不选。表头和图例用展示名。阳性=1，阴性=0。不选的组仍留在总表，不进二分类。">分组 <label class="title-sw" title="关=结果不写总表。不影响队列、拆分和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="doBaselineAll" data-key="DO_BASELINE_ALL"/> 总表</label> <label class="title-sw" title="关=结果不写 Table 1（Train vs Test）。不影响队列、拆分和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="doBaselineTt" data-key="DO_BASELINE_TRAIN_TEST"/> Table 1</label> <span class="inh" id="grpInherit" hidden>用默认</span> <button type="button" class="unov" id="grpUnov" hidden>恢复默认</button></h2>
+      <div class="grp-grid">
+        <div id="grpSubBlock">
+          <div class="row"><label class="k" data-tip="亚组列，可空白。空白=不做分层评估。选 histology 等时：主模型仍用全队列结局训练；检出水平只决定评估哪些层。不重训。">亚组</label>
+            <select id="grpSubCol" class="grow" data-tip="可空白。空白或不选分层=不做亚组评估。与结局不同的列=用锁死列线图评估该层 ROC。"></select></div>
+        </div>
+        <div id="grpLevelsBlock" class="grp-span">
+          <div class="row" style="align-items:flex-start"><label class="k" data-tip="自动识别的组。下拉是列值，接着填展示名，再选阴性、阳性或不选。表头用展示名。">分组</label>
+            <div id="grpChips" class="grow"></div></div>
+        </div>
+      </div>
+      <p class="hint grp-span" id="grpHint"></p>
+    </div>
+    </div>
+    </div>
+  </section>
+
+  <section class="col right" id="runCol" hidden>
+    <div class="col-inner">
+    <div class="card">
+      <h2 data-tip="载入后才能跑。保存把本页写入 settings.ini（先备份为 settings.ini.bak）。干跑和运行用本页配置覆盖 ini（不改文件）。">运行统计</h2>
+      <p class="hint" id="runScopeHint">配置载入后才可运行。公共页=全部结局；子结局页=只跑当前结局。</p>
+      <div class="run-actions">
+        <button class="btn" id="btnWrite" data-tip="把当前页写入 settings.ini；没有则新建。现有 ini 先备份为 settings.ini.bak（再次保存会覆盖这份备份）。">保存</button>
+        <button class="btn" id="btnDry" data-tip="只检查数据、分组、两两比较阳/阴、展示名目录和开关，不建模、不写图。">干跑</button>
+        <button class="btn warn" id="btnRun" data-tip="公共页依次跑全部结局；子结局页只跑当前结局。用本页配置覆盖 ini，不改源文件。">运行</button>
+        <button class="btn sec" id="btnRestart" data-tip="停掉当前统计（若在跑），然后重启本控制台服务并刷新页面。改完 console.py / html 后用这个。">重启</button>
+      </div>
+      <p class="hint" id="runHint"></p>
+    </div>
+    <div class="card">
+      <h2 data-tip="本次运行的控制台输出。跑完后可在此核对报错、例数和写出路径。">日志
+        <button type="button" class="btn sec" id="btnCopyLog" data-tip="把当前运行日志全文复制到剪贴板。">复制运行日志</button>
+        <span class="inh" id="copyLogHint" hidden>已复制</span>
+      </h2>
+      <pre class="log" id="log" data-tip="实时日志。干跑或运行统计时在此滚动。">等待运行…</pre>
+    </div>
+    <div class="card">
+      <h2 data-tip="工程 ref/qc.html、ref/qc-ext-*.html 与各结局目录里的 Results子项目.html。单选一项再点「打开所选」，不是链接。">结果 HTML</h2>
+      <div class="btns" style="margin-bottom:6px">
+        <button class="btn sec" id="btnResults" data-tip="扫描该课题 ref/ 下的 qc.html、qc-ext-*.html，以及各结局/队列子目录的 Results子项目.html。旧的 *-results.html 仍会列出。不扫 output/。">刷新结果列表</button>
+        <button type="button" class="btn" id="btnOpenResult" data-tip="在新标签打开当前选中的结果页。">打开所选</button>
+      </div>
+      <div id="resultsBox" class="hint">跑完后在此单选 ref/qc.html、ref/qc-ext-*.html 或 {子项目}/Results子项目.html，再点「打开所选」。</div>
+    </div>
+    </div>
+  </section>
+</main>
+<div id="panePreview" hidden>
+  <div class="preview-page">
+    <div class="card" id="previewCard">
+      <div class="row" style="align-items:center;margin:0 0 8px;gap:8px;flex-wrap:wrap">
+        <h2 style="margin:0;flex:1" data-tip="载入后看 sheet、例数、结局分布、排除名单和 ICC。外验预览在主表预览的下方，格式相同。只预览，不建模。">数据预览</h2>
+        <button type="button" class="btn" id="btnDataQc" data-tip="对整体数据做 QC（临床缺失、组学矩阵、ID 对齐、结局完整、ICC、影像质控）。主表写 ref/qc.html；每条外验写 ref/qc-ext.html 或 ref/qc-ext-{名称}.html。不覆盖主表 qc.html。不建模。">整体 QC</button>
+      </div>
+      <p class="hint" id="qcHint"></p>
+      <div id="previewBox" class="hint">载入后显示 sheet、n、结局分布、排除名单、ICC。</div>
+      <div id="extPreviewBox" hidden></div>
+    </div>
+  </div>
+</div>
+<div id="paneFlow" hidden>
+  <iframe id="flowFrame" title="流程图"></iframe>
+</div>
+</div>
+<div id="tipPop"></div>
+<script src="console_schema.js"></script>
+<script src="console_api.js"></script>
+<script src="console_ui.js"></script>
+</body>
+</html>

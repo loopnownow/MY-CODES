@@ -1,0 +1,1513 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>RAD 起始页</title>
+<style>
+:root{
+  --bg:#f4f1ea; --paper:#fffcf6; --ink:#1c2421; --muted:#5c6b66;
+  --line:#d7d0c4; --accent:#0f4c5c; --accent2:#e07a3d; --ok:#2f6f4e;
+  --warn:#9a6b12; --err:#9b2c2c; --chip:#e8efe9; --focus:#0f4c5c;
+  --sans:"Segoe UI","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;
+  --mono:"Cascadia Mono","Consolas","Sarasa Mono SC",ui-monospace,monospace;
+  --r:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font:16px/1.5 var(--sans)}
+code{font-family:var(--mono);font-size:.88em}
+a{color:var(--accent)}
+a:hover{text-decoration:underline}
+.shell{min-height:100vh;display:flex;flex-direction:column}
+header{
+  background:var(--accent);color:#f4f1ea;padding:20px 24px 18px;
+  border-bottom:3px solid #0a323c;
+}
+.header-inner{width:min(1080px,100%);margin:0 auto}
+header .kicker{opacity:.72;font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 6px;font-weight:500}
+header h1{margin:0;font-size:1.7rem;font-weight:600;letter-spacing:.03em}
+header .lead{margin:8px 0 0;opacity:.88;font-size:14px;max-width:44em}
+.flow{
+  display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none;
+}
+.flow li{
+  display:flex;align-items:center;gap:8px;
+  background:#0a323c;color:#d7eee8;border-radius:999px;padding:4px 12px 4px 6px;
+  font-size:12px;font-weight:500;
+}
+.flow .n{
+  width:1.35em;height:1.35em;border-radius:50%;background:#fff;color:var(--accent);
+  display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:11px;
+}
+main{flex:1;width:min(1080px,100%);margin:0 auto;padding:28px 20px 40px}
+.banner{
+  background:#fff6e8;color:#8a4a12;border-radius:var(--r);padding:12px 16px;margin:0 0 18px;
+  box-shadow:inset 0 0 0 1px #ead9b8;font-size:14px;
+}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;align-items:stretch}
+.card{
+  background:var(--paper);border-radius:16px;padding:20px 20px 18px;
+  box-shadow:inset 0 0 0 1px var(--line);
+  display:flex;flex-direction:column;min-width:0;overflow:visible;
+}
+.card h2{
+  margin:0 0 16px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px;
+}
+.card h2 .n{
+  width:1.5em;height:1.5em;border-radius:50%;background:var(--accent);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:0;
+}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0;margin:0 0 14px}
+.fld:last-of-type{margin-bottom:0}
+.lab{font-weight:600;font-size:12px;color:#3d4a46}
+.hint{color:var(--muted);font-size:13px;margin:0 0 12px}
+.pick-row{display:flex;gap:8px;align-items:center}
+.pick-row input{flex:1 1 auto;min-width:0}
+input[type=number],input[type=text],select{
+  border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;
+  font:inherit;color:inherit;background:#fbfaf7;width:100%;
+}
+input[type=number]{width:96px;flex:0 0 96px}
+select{min-width:0}
+button,input,select{font:inherit}
+button, a.btn{
+  border:1px solid var(--accent);background:#fff;color:var(--accent);
+  border-radius:var(--r);padding:7px 12px;cursor:pointer;white-space:nowrap;font-weight:500;
+  text-decoration:none;
+}
+#protoGo{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+button:hover, a.btn:hover{background:var(--chip)}
+button.pri,a.pri{
+  background:var(--accent);color:#fff;border-color:#0a323c;
+  text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--r);padding:8px 16px;font-weight:600;
+}
+button.pri:hover,a.pri:hover{background:#0c3d4a;text-decoration:none}
+:focus-visible{
+  outline:2px solid var(--focus);outline-offset:2px;
+}
+.rad-switch{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin:0 0 14px;padding:10px 12px;border-radius:var(--r);
+  background:#f0ebe3;box-shadow:inset 0 0 0 1px var(--line);
+}
+.rad-switch .rad-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rad-switch .rad-title{font-weight:600;font-size:14px;color:var(--ink)}
+.rad-switch .rad-sub{font-size:12px;color:var(--muted)}
+.rad-switch input{position:absolute;opacity:0;width:1px;height:1px}
+.rad-switch .rad-track{
+  position:relative;width:52px;height:28px;flex:0 0 auto;
+  background:#c5c0b6;border-radius:999px;cursor:pointer;transition:background .2s;
+}
+.rad-switch .rad-track::after{
+  content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+  background:#fff;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.18);
+}
+.rad-switch input:checked + .rad-track{background:var(--ok)}
+.rad-switch input:checked + .rad-track::after{transform:translateX(24px)}
+.rad-switch input:focus-visible + .rad-track{outline:2px solid var(--focus);outline-offset:2px}
+.tri{display:flex;align-items:center;gap:10px;margin:0 0 16px}
+.tri-cap{
+  border:0;background:transparent;color:#8a918d;font:inherit;font-size:13px;font-weight:600;
+  padding:0;cursor:pointer;
+}
+.tri-track{
+  position:relative;width:84px;height:30px;flex:0 0 auto;
+  background:#c5c0b6;border-radius:999px;cursor:pointer;touch-action:none;
+}
+.tri-track:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.tri-knob{
+  position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+  background:#fff;transform:translateX(27px);transition:transform .2s;pointer-events:none;
+}
+.tri[data-side="-1"] .tri-knob{transform:translateX(0)}
+.tri[data-side="1"] .tri-knob{transform:translateX(54px)}
+.svc-port{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.port-picks{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.port-picks button{font-size:12px;padding:4px 8px}
+.port-picks button.live{border-color:var(--ok);color:var(--ok)}
+.port-picks button.stuck{border-color:var(--warn);color:var(--warn)}
+.port-picks button.sel{background:var(--chip)}
+#portRow{flex-wrap:nowrap}
+#scanRange{width:9em;flex:0 0 9em}
+.links{margin-top:auto;padding-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;border-top:1px dashed var(--line)}
+#msg{min-height:1.4em}
+#msg.ok{color:var(--ok)} #msg.err{color:var(--err)} #msg.warn{color:var(--warn)}
+.save-row{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.sheet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(8em,1fr));gap:12px;margin:0 0 16px}
+.sheet-grid .fld{margin:0}
+.id-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10em,1fr));gap:12px;margin:0 0 4px}
+.id-grid .fld{margin:0}
+.meta-chips{display:flex;flex-wrap:wrap;gap:4px}
+.meta-chips:empty{display:none}
+.meta-chips label{
+  display:flex;gap:4px;align-items:center;background:var(--chip);
+  border-radius:4px;padding:2px 7px;font-size:13px;font-weight:500;cursor:pointer;
+}
+#dataBlock{margin-top:16px}
+#dataBlock[hidden],#sheetBlock[hidden]{display:none !important}
+#dataBlock .sublab{
+  font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);margin:16px 0 8px;
+}
+#dataBlock .sublab:first-of-type{margin-top:4px}
+.check{
+  display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;
+}
+.ext-wrap{overflow-x:auto;margin:0 0 4px}
+.ext-head,.ext-row{
+  display:grid;
+  grid-template-columns:minmax(4.5em,.55fr) minmax(8em,1.4fr) auto minmax(7em,1fr) minmax(7em,1fr) minmax(8em,1fr) auto;
+  gap:8px;align-items:center;margin:6px 0;min-width:52em;
+}
+.ext-head{margin:0 0 4px;color:var(--muted);font-size:12px;font-weight:500}
+.ext-row input,.ext-row select{width:100%;min-width:0}
+a.pri.disabled,button.pri:disabled{opacity:.45;pointer-events:none}
+footer{
+  width:min(1080px,100%);margin:0 auto;padding:0 20px 28px;
+  color:var(--muted);font-size:12px;
+}
+@media (max-width:720px){
+  .grid{grid-template-columns:1fr}
+  .sheet-grid,.id-grid{grid-template-columns:1fr}
+  .ext-head,.ext-row{grid-template-columns:1fr;min-width:0}
+  .ext-head{display:none}
+  header{padding:16px 16px 14px}
+  main{padding:20px 16px 32px}
+}
+@media (prefers-reduced-motion:reduce){
+  .tri-knob{transition:none}
+}
+@media print{
+  header,.banner,.links,footer,button,a.btn,.tri{display:none !important}
+  .card{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+  <div class="header-inner">
+    <p class="kicker">RAD 统计控制台</p>
+    <h1 id="projTitle">通用模板</h1>
+    <p class="lead">先开服务，再加载数据，然后选 sheet。项目 / 数据 / 外验在本页。进控制台不强制写 ini。</p>
+    <ol class="flow" aria-label="操作顺序">
+      <li><span class="n">1</span> 课题路径</li>
+      <li><span class="n">2</span> 开服务</li>
+      <li><span class="n">3</span> 加载数据</li>
+      <li><span class="n">4</span> 进入配置</li>
+    </ol>
+  </div>
+</header>
+<main>
+  <div id="tplBanner" class="banner" hidden>
+    这是 <code>stats-analysis/modules/project.html</code> 金版。复制到课题目录（如 <code>D:\0Grok\submitting\wkl_UGIB</code>），可改名为 <code>课题名.html</code>，或保持此文件名由文件夹识别课题。
+  </div>
+  <div class="grid">
+    <section class="card" aria-labelledby="h-cfg">
+      <h2 id="h-cfg"><span class="n">1</span> 配置</h2>
+      <div class="fld"><span class="lab" title="优先 ?project=，其次本文件名，再次所在文件夹。">课题</span>
+        <input id="projectName" type="text" placeholder="如 wkl_UGIB" value=""/>
+      </div>
+      <div class="fld"><span class="lab" title="可空=工程 ref/settings.ini">settings</span>
+        <div class="pick-row">
+          <input id="settingsFile" type="text" placeholder="可空，默认工程 ref/settings.ini" value=""/>
+          <input id="settingsFilePick" type="file" accept=".ini,.py" hidden/>
+          <button type="button" id="btnSetPick">选择</button>
+        </div></div>
+      <div class="fld"><span class="lab" title="共享算法库路径（必填，写回 settings.ini 的 MODULES_DIR）。">modules</span>
+        <div class="pick-row">
+          <input id="modulesDir" type="text" placeholder="必填，如 D:\0Grok\0doc\_code\04-analysis\stats-analysis\modules" value="D:\0Grok\0doc\_code\04-analysis\stats-analysis\modules"/>
+          <input id="modulesDirPick" type="file" webkitdirectory hidden/>
+          <button type="button" id="btnModPick">选择</button>
+        </div></div>
+      <div class="save-row">
+        <button type="button" id="btnSaveIni" title="可选：把 settings / modules 路径写入 ini。先备份 bak。须先开服务。">保存 ini</button>
+        <span class="hint" style="margin:0">可选手动写回；进入配置不强制写 ini</span>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="h-svc">
+      <h2 id="h-svc"><span class="n">2</span> 服务</h2>
+      <label class="rad-switch" for="radToggle" title="打开或关闭本机 radconsole（Python 控制台服务）">
+        <span class="rad-meta">
+          <span class="rad-title">radconsole</span>
+          <span class="rad-sub" id="radToggleHint">关 = 停服务；开 = 启动端口上的控制台</span>
+        </span>
+        <input id="radToggle" type="checkbox" role="switch" aria-checked="false"/>
+        <span class="rad-track" aria-hidden="true"></span>
+      </label>
+      <div class="tri" id="svcTri" data-side="0">
+        <button type="button" class="tri-cap" data-go="-1">关闭</button>
+        <div class="tri-track" id="svcTrack" role="slider" tabindex="0" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" aria-label="关闭或开启所选端口">
+          <span class="tri-knob" id="svcKnob"></span>
+        </div>
+        <button type="button" class="tri-cap" data-go="1">开启</button>
+      </div>
+      <div class="svc-port">
+        <span class="lab" title="填 8765，或 8765-8776。">探测</span>
+        <input id="scanRange" type="text" value="8765" spellcheck="false" autocomplete="off"/>
+        <button type="button" id="btnScan">探测</button>
+      </div>
+      <div id="portScan" class="port-picks" hidden></div>
+      <div class="svc-port" id="portRow">
+        <span class="lab" title="探测结果里点中的端口。确认、开启、关闭都用这一个。">端口</span>
+        <input id="port" type="number" min="1024" max="65535" step="1" value="8765"/>
+        <button type="button" id="btnConfirm" class="btn">确认 8765</button>
+      </div>
+      <a id="protoGo" href="about:blank"></a>
+      <p id="msg" class="hint">确认在手填端口旁边，用来查看该端口目前的服务。滑块停在中间；向左关闭，向右开启。</p>
+      <div class="links">
+        <a id="go" class="pri disabled" href="http://127.0.0.1:8765/">进入配置</a>
+        <a id="goFlow" href="http://127.0.0.1:8765/?tab=flow">流程图</a>
+      </div>
+    </section>
+  </div>
+  <section id="dataBlock" class="card" hidden aria-labelledby="h-data">
+    <h2 id="h-data"><span class="n">3</span> 项目 / 数据 / 外部验证</h2>
+    <p class="hint">服务已开。选 Excel 和外验后点「加载数据」，再选 sheet。</p>
+    <div class="fld"><span class="lab" title="工程根下的 Excel。可空=默认与课题同名。">数据</span>
+      <div class="pick-row">
+        <input id="dataFile" type="text" list="xlsxList" placeholder="默认 课题名.xlsx" value="" autocomplete="off" spellcheck="false"/>
+        <datalist id="xlsxList"></datalist>
+        <button type="button" id="btnDataPick" title="打开本 html 所在文件夹选 Excel。须先开服务。">选择</button>
+      </div></div>
+    <div class="sublab">外部验证</div>
+    <p class="hint">可多条。填了文件且临床、组学 sheet 都有才启用。多条横拼，一条不拼。</p>
+    <div class="ext-wrap">
+    <div class="ext-head">
+      <span>名称</span><span>文件</span><span>选择</span><span>临床 sheet</span><span>组学 sheet</span><span>组学 ID</span><span></span>
+    </div>
+    <div id="extRows"></div>
+    </div>
+    <div class="save-row">
+      <button type="button" id="btnExtAdd">+ 外验</button>
+      <label class="check" title="已有外验时是否仍做内部训练/验证。">
+        <input type="checkbox" id="extSplit" checked/>
+        有外验仍做内拆
+      </label>
+    </div>
+    <div class="save-row">
+      <button type="button" class="pri" id="btnLoadData">加载数据</button>
+      <span class="hint" id="loadMsg" style="margin:0">先开服务，再点加载。</span>
+      <button type="button" id="btnClearBad" hidden title="把报错的设置项写成空字符串。先备份 settings.ini.bak，再重新加载。">清空报错键</button>
+    </div>
+    <div id="sheetBlock" hidden>
+      <div class="sublab">工作表</div>
+      <p class="hint">加载后从工作簿读取。空=本次不做该项。一行四个下拉。</p>
+      <div class="sheet-grid">
+        <div class="fld"><span class="lab">组学 sheet</span>
+          <select id="radSheet"></select></div>
+        <div class="fld"><span class="lab">临床 sheet</span>
+          <select id="clinSheet"></select></div>
+        <div class="fld"><span class="lab">质控 sheet</span>
+          <select id="qcSheet"></select></div>
+        <div class="fld"><span class="lab">ICC sheet</span>
+          <select id="iccSheet"></select></div>
+      </div>
+      <div class="sublab">ID 列</div>
+      <div class="id-grid">
+        <div class="fld"><span class="lab" title="组学表里的受试者 ID，用来和临床表对接。">组学 ID 列</span>
+          <select id="radId"></select></div>
+        <div class="fld"><span class="lab" title="临床表里的受试者 ID，用来和组学表对齐。不是姓名。">临床 ID 列（对齐）</span>
+          <select id="clinId"></select></div>
+        <div class="fld"><span class="lab" title="错分表和图上显示的姓名。可空。没有单独姓名列时可以和 ID 同列。">展示姓名列</span>
+          <select id="labelCol"></select></div>
+        <div class="fld"><span class="lab" title="组学表里不是特征的列，不会进 LASSO。">组学非特征列</span>
+          <div class="meta-chips" id="radMetaChips"></div>
+          <select id="radMetaAdd"></select></div>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>金版起始页 · 与控制台同一套色板。不强制写 ini。</footer>
+</div>
+<script>
+const GENERIC_STEMS = {
+  index: 1, console: 1, project: 1, rad: 1,
+  flow_chart: 1, strobe: 1, qc: 1, "": 1,
+};
+const GENERIC_FOLDERS = {
+  modules: 1, console: 1, strobe: 1, stats: 1, utils: 1, config: 1,
+  "0script": 1, "0del": 1, ref: 1, "0grok": 1,
+  preparing: 1, polishing: 1, submitting: 1, reseived: 1, der: 1, "00ds": 1,
+};
+const PORT_KEY = "rad-console-port";
+const MOD_KEY = "rad-modules-dir";
+const DEFAULT_MODULES = "D:\\0Grok\\0doc\\_code\\04-analysis\\stats-analysis\\modules";
+const IO_DEFAULTS = {
+  RAD_SHEET: "rad",
+  CLIN_SHEET: "cln",
+  QC_SHEET: "qc",
+  ICC_SHEET: "icc",
+  RAD_ID_COL: "Patient_ID",
+  CLIN_ID_COL: "Patient_ID",
+  LABEL_COL: "",
+};
+const PORT_LO = 8765;
+const PORT_HI = 8776;
+const portEl = document.getElementById("port");
+const modEl = document.getElementById("modulesDir");
+const setEl = document.getElementById("settingsFile");
+const dataEl = document.getElementById("dataFile");
+const radSheetEl = document.getElementById("radSheet");
+const clinSheetEl = document.getElementById("clinSheet");
+const qcSheetEl = document.getElementById("qcSheet");
+const iccSheetEl = document.getElementById("iccSheet");
+const radIdEl = document.getElementById("radId");
+const clinIdEl = document.getElementById("clinId");
+const labelColEl = document.getElementById("labelCol");
+const radMetaChipsEl = document.getElementById("radMetaChips");
+const radMetaAddEl = document.getElementById("radMetaAdd");
+const dataBlock = document.getElementById("dataBlock");
+const projEl = document.getElementById("projectName");
+const msg = document.getElementById("msg");
+const go = document.getElementById("go");
+const goFlow = document.getElementById("goFlow");
+const loadMsg = document.getElementById("loadMsg");
+const sheetBlock = document.getElementById("sheetBlock");
+const extSplitEl = document.getElementById("extSplit");
+let PROJECT = "";
+let DATA_LOADED = false;
+let SHEET_OPTS = [];
+let RAD_ID_OPTS = [];
+let CLIN_ID_OPTS = [];
+let RAD_META_OPTS = [];
+let RAD_META_PICKED = [];
+let radMetaTouched = false;
+let radMetaFromLock = false;
+
+function decodePath(s) {
+  try { return decodeURIComponent(s || ""); } catch (e) { return s || ""; }
+}
+function fileParts() {
+  let path = decodePath(location.pathname || "");
+  path = path.replace(/\\/g, "/");
+  if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
+  path = path.replace(/^\/+/, "");
+  const segs = path.split("/").filter(Boolean);
+  const file = segs.length ? segs[segs.length - 1] : "";
+  const stem = file.replace(/\.html?$/i, "");
+  const folder = segs.length >= 2 ? segs[segs.length - 2] : "";
+  const dirWin = segs.length >= 2 ? segs.slice(0, -1).join("\\") : "";
+  return {stem: stem, folder: folder, dir: dirWin, file: file};
+}
+function isGeneric(name) {
+  const k = String(name || "").trim().toLowerCase();
+  return !k || !!GENERIC_STEMS[k] || !!GENERIC_FOLDERS[k];
+}
+function inferProject() {
+  const q = new URLSearchParams(location.search).get("project");
+  if (q && q.trim()) return q.trim();
+  const p = fileParts();
+  if (!isGeneric(p.stem)) return p.stem;
+  if (!isGeneric(p.folder)) return p.folder;
+  return "";
+}
+function isTemplateHere() {
+  const p = fileParts();
+  return String(p.folder || "").toLowerCase() === "modules"
+    && (isGeneric(p.stem) || p.stem.toLowerCase() === "project");
+}
+function fileDir() {
+  if (location.protocol !== "file:") return "";
+  const p = fileParts();
+  return isTemplateHere() ? "" : (p.dir || "");
+}
+function dataKey() { return "rad-data-file:" + PROJECT; }
+function setKey() { return "rad-settings-file:" + PROJECT; }
+function ioLockKey() { return "rad-io-lock:" + PROJECT; }
+
+function port() {
+  const n = parseInt(portEl.value, 10);
+  return (n >= 1024 && n <= 65535) ? n : PORT_LO;
+}
+function host(p) { return "http://127.0.0.1:" + (p || port()); }
+function dataFile() {
+  const typed = ((dataEl && dataEl.value) || "").trim();
+  if (typed) return typed;
+  if (!PROJECT) return "";
+  return (localStorage.getItem(dataKey()) || "").trim() || (PROJECT + ".xlsx");
+}
+function modulesDir() {
+  return ((modEl && modEl.value) || "").trim();
+}
+function modulesDirError() {
+  if (modulesDir()) return "";
+  return "错误：MODULES_DIR 未填写。请在 modules 栏填写共享算法库路径（如 " + DEFAULT_MODULES + "）。";
+}
+function settingsPath() {
+  let v = ((setEl && setEl.value) || "").trim();
+  if (!v || v.toLowerCase() === "settings.ini") return "ref/settings.ini";
+  return v;
+}
+function sheetVal(el, fallback) {
+  const v = ((el && el.value) || "").trim();
+  return v || fallback;
+}
+function ioOverlay() {
+  return {
+    RAD_SHEET: sheetVal(radSheetEl, IO_DEFAULTS.RAD_SHEET),
+    CLIN_SHEET: sheetVal(clinSheetEl, IO_DEFAULTS.CLIN_SHEET),
+    QC_SHEET: sheetVal(qcSheetEl, IO_DEFAULTS.QC_SHEET),
+    ICC_SHEET: sheetVal(iccSheetEl, IO_DEFAULTS.ICC_SHEET),
+    RAD_ID_COL: sheetVal(radIdEl, IO_DEFAULTS.RAD_ID_COL),
+    CLIN_ID_COL: sheetVal(clinIdEl, IO_DEFAULTS.CLIN_ID_COL),
+    LABEL_COL: labelColEl ? String(labelColEl.value || "") : "",
+    RAD_ID_COLS: uniq(RAD_META_PICKED),
+    USE_INTERNAL_SPLIT_WHEN_EXTERNAL: !!(extSplitEl && extSplitEl.checked),
+    EXTERNAL_TESTS: readExtRows(),
+  };
+}
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+}
+function idPickList(items, keep) {
+  const all = uniq(items);
+  const cur = String(keep || "").trim();
+  const idish = all.filter((s) => {
+    const t = String(s);
+    return /(_id|-id)$/i.test(t) || /编号|姓名|病案|患者/.test(t)
+      || /patient|pateint|subject/i.test(t);
+  });
+  const use = (all.length > 12 && idish.length) ? idish : all;
+  const out = [];
+  if (cur && all.indexOf(cur) >= 0 && use.indexOf(cur) < 0) out.push(cur);
+  use.forEach((s) => { if (out.indexOf(s) < 0) out.push(s); });
+  return out;
+}
+function uniq(list) {
+  const out = [];
+  (list || []).forEach((x) => {
+    const s = String(x == null ? "" : x).trim();
+    if (s && out.indexOf(s) < 0) out.push(s);
+  });
+  return out;
+}
+function listFrom(v) {
+  if (Array.isArray(v)) return uniq(v);
+  const s = String(v == null ? "" : v).trim();
+  if (!s) return [];
+  try {
+    const p = JSON.parse(s);
+    if (Array.isArray(p)) return uniq(p);
+  } catch (e) {}
+  return uniq(s.split(","));
+}
+function storedIoLock() {
+  if (!PROJECT) return null;
+  try {
+    const raw = localStorage.getItem(ioLockKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function renderRadMeta() {
+  if (!radMetaChipsEl || !radMetaAddEl) return;
+  const have = uniq(RAD_META_PICKED);
+  RAD_META_PICKED = have;
+  radMetaChipsEl.innerHTML = have.map((s) =>
+    `<label class="chip"><input type="checkbox" data-radmeta="${esc(s)}" checked/> ${esc(s)}</label>`
+  ).join("");
+  const rest = RAD_META_OPTS.filter((s) => have.indexOf(s) < 0);
+  let html = "<option value=\"\">+ 选择…</option>";
+  rest.forEach((s) => { html += "<option value=\"" + esc(s) + "\">" + esc(s) + "</option>"; });
+  radMetaAddEl.innerHTML = html;
+  radMetaAddEl.value = "";
+}
+function pickExisting(name, have, fallback) {
+  const raw = String(name || "").trim();
+  const list = have || [];
+  if (raw && list.indexOf(raw) >= 0) return raw;
+  const low = raw.toLowerCase();
+  const hit = list.find((s) => String(s).toLowerCase() === low);
+  if (hit) return hit;
+  if (fallback && list.indexOf(fallback) >= 0) return fallback;
+  const fb = list.find((s) => String(s).toLowerCase() === String(fallback || "").toLowerCase());
+  return fb || "";
+}
+function fillSelect(el, items, keep, fallback) {
+  if (!el) return;
+  const have = uniq(items);
+  let cur = keep != null ? String(keep) : String(el.value || "");
+  if (!cur && fallback) cur = String(fallback);
+  if (cur && have.indexOf(cur) < 0) cur = pickExisting(cur, have, fallback);
+  let html = "<option value=\"\">（空）</option>";
+  have.forEach((s) => { html += "<option value=\"" + esc(s) + "\">" + esc(s) + "</option>"; });
+  if (cur && have.indexOf(cur) < 0) html += "<option value=\"" + esc(cur) + "\">" + esc(cur) + "</option>";
+  el.innerHTML = html;
+  el.value = cur || "";
+}
+function emptyExtRow() {
+  return {
+    name: "", file: "",
+    clin_sheet: IO_DEFAULTS.CLIN_SHEET,
+    rad_sheet: IO_DEFAULTS.RAD_SHEET,
+    rad_id_col: IO_DEFAULTS.RAD_ID_COL,
+  };
+}
+function readExtRows() {
+  const box = document.getElementById("extRows");
+  const out = [];
+  if (!box) return out;
+  box.querySelectorAll("[data-ext-row]").forEach((row) => {
+    const val = (sel) => ((row.querySelector(sel) || {}).value || "").trim();
+    const file = val("[data-ext=file]");
+    if (!file) return;
+    out.push({
+      name: val("[data-ext=name]"),
+      file: file,
+      clin_sheet: val("[data-ext=clin]") || IO_DEFAULTS.CLIN_SHEET,
+      rad_sheet: val("[data-ext=rad]") || IO_DEFAULTS.RAD_SHEET,
+      rad_id_col: val("[data-ext=radid]") || IO_DEFAULTS.RAD_ID_COL,
+    });
+  });
+  return out.filter((r) => r.clin_sheet && r.rad_sheet);
+}
+function bindExtRowEvents() {
+  const box = document.getElementById("extRows");
+  if (!box) return;
+  box.querySelectorAll("input,select").forEach((el) => {
+    el.addEventListener("change", () => { markDataStale(); syncLinks(); });
+  });
+  box.querySelectorAll("[data-ext-pick]").forEach((btn) => {
+    btn.onclick = () => {
+      const row = btn.closest("[data-ext-row]");
+      const dest = row && row.querySelector("[data-ext=file]");
+      if (dest) pickXlsx(dest, "选择外验 Excel");
+    };
+  });
+  box.querySelectorAll("[data-ext-del]").forEach((btn) => {
+    btn.onclick = () => {
+      const row = btn.closest("[data-ext-row]");
+      if (row) row.remove();
+      const box2 = document.getElementById("extRows");
+      if (box2 && !box2.querySelector("[data-ext-row]")) renderExtRows([emptyExtRow()]);
+      markDataStale();
+      syncLinks();
+    };
+  });
+}
+function renderExtRows(list) {
+  const box = document.getElementById("extRows");
+  if (!box) return;
+  const rows = (Array.isArray(list) && list.length) ? list : [emptyExtRow()];
+  box.innerHTML = rows.map((r, i) => {
+    const name = (r && r.name) || "";
+    const file = (r && (r.file || r.EXTERNAL_FILE)) || "";
+    return `<div class="ext-row" data-ext-row="${i}">
+      <input data-ext="name" type="text" placeholder="名称，可空" value="${esc(name)}"/>
+      <input data-ext="file" type="text" list="xlsxList" placeholder="文件，可空" autocomplete="off" spellcheck="false" value="${esc(file)}"/>
+      <button type="button" data-ext-pick title="打开本 html 所在文件夹选 Excel。须先开服务。">选择</button>
+      <select data-ext="clin"></select>
+      <select data-ext="rad"></select>
+      <select data-ext="radid"></select>
+      <button type="button" data-ext-del title="删这一条">删</button>
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-ext-row]").forEach((row, i) => {
+    const r = rows[i] || emptyExtRow();
+    fillSelect(row.querySelector("[data-ext=clin]"), SHEET_OPTS, r.clin_sheet || r.EXTERNAL_CLIN_SHEET, IO_DEFAULTS.CLIN_SHEET);
+    fillSelect(row.querySelector("[data-ext=rad]"), SHEET_OPTS, r.rad_sheet || r.EXTERNAL_RAD_SHEET, IO_DEFAULTS.RAD_SHEET);
+    fillSelect(row.querySelector("[data-ext=radid]"), RAD_ID_OPTS, r.rad_id_col || r.EXTERNAL_RAD_ID_COL, IO_DEFAULTS.RAD_ID_COL);
+  });
+  bindExtRowEvents();
+}
+function setGoEnabled(on) {
+  if (!go) return;
+  go.classList.toggle("disabled", !on);
+}
+function markDataStale() {
+  DATA_LOADED = false;
+  setGoEnabled(false);
+  if (sheetBlock) sheetBlock.hidden = true;
+}
+function pageUrl(p) {
+  const q = new URLSearchParams();
+  if (PROJECT) q.set("project", PROJECT);
+  const data = dataFile();
+  if (data) q.set("data", data);
+  if (settingsPath()) q.set("settings", settingsPath());
+  if (modulesDir()) q.set("modules", modulesDir());
+  const io = ioOverlay();
+  q.set("rad_sheet", io.RAD_SHEET);
+  q.set("clin_sheet", io.CLIN_SHEET);
+  q.set("qc_sheet", io.QC_SHEET);
+  q.set("icc_sheet", io.ICC_SHEET);
+  q.set("rad_id", io.RAD_ID_COL);
+  q.set("clin_id", io.CLIN_ID_COL);
+  q.set("label_col", io.LABEL_COL == null ? "" : String(io.LABEL_COL));
+  q.set("rad_id_cols", JSON.stringify(io.RAD_ID_COLS || []));
+  q.set("ext_split", io.USE_INTERNAL_SPLIT_WHEN_EXTERNAL ? "1" : "0");
+  if (io.EXTERNAL_TESTS && io.EXTERNAL_TESTS.length) {
+    q.set("ext_tests", JSON.stringify(io.EXTERNAL_TESTS));
+  }
+  const dir = fileDir();
+  if (dir) q.set("dir", dir);
+  const qs = q.toString();
+  return host(p) + "/?" + qs;
+}
+function protoUrl(p) {
+  let u = "radconsole://serve?port=" + (p || port())
+    + "&exact=1&modules=" + encodeURIComponent(modulesDir());
+  if (PROJECT) u += "&project=" + encodeURIComponent(PROJECT);
+  const data = dataFile();
+  if (data) u += "&data=" + encodeURIComponent(data);
+  const dir = fileDir();
+  if (dir) u += "&dir=" + encodeURIComponent(dir);
+  return u;
+}
+function setDataBlockVisible(on) {
+  if (dataBlock) dataBlock.hidden = !on;
+}
+function persistIoPrefs() {
+  if (!PROJECT) return;
+  const data = dataFile();
+  try {
+    if (data) localStorage.setItem(dataKey(), data.split(/[/\\]/).pop() || data);
+  } catch (e) {}
+  try {
+    localStorage.setItem(ioLockKey(), JSON.stringify(ioOverlay()));
+  } catch (e) {}
+}
+function hydrateIoFields() {
+  let lock = null;
+  if (PROJECT) {
+    try {
+      const raw = localStorage.getItem(ioLockKey());
+      lock = raw ? JSON.parse(raw) : null;
+    } catch (e) { lock = null; }
+  }
+  const setIf = (el, v, fallback) => {
+    if (!el) return;
+    const cur = (el.value || "").trim();
+    if (cur && cur !== fallback) return;
+    el.value = (v != null && String(v).trim()) ? String(v).trim() : fallback;
+  };
+  setIf(radSheetEl, lock && lock.RAD_SHEET, IO_DEFAULTS.RAD_SHEET);
+  setIf(clinSheetEl, lock && lock.CLIN_SHEET, IO_DEFAULTS.CLIN_SHEET);
+  setIf(qcSheetEl, lock && lock.QC_SHEET, IO_DEFAULTS.QC_SHEET);
+  setIf(iccSheetEl, lock && lock.ICC_SHEET, IO_DEFAULTS.ICC_SHEET);
+  setIf(radIdEl, lock && lock.RAD_ID_COL, IO_DEFAULTS.RAD_ID_COL);
+  setIf(clinIdEl, lock && lock.CLIN_ID_COL, IO_DEFAULTS.CLIN_ID_COL);
+  if (labelColEl && lock && Object.prototype.hasOwnProperty.call(lock, "LABEL_COL")) {
+    const ready = labelColEl.options && labelColEl.options.length > 1;
+    if (!ready) labelColEl.value = String(lock.LABEL_COL == null ? "" : lock.LABEL_COL);
+  }
+  if (lock && Array.isArray(lock.RAD_ID_COLS) && !radMetaTouched) {
+    RAD_META_PICKED = uniq(lock.RAD_ID_COLS);
+    radMetaFromLock = true;
+    renderRadMeta();
+  }
+  if (dataEl) {
+    const saved = PROJECT ? (localStorage.getItem(dataKey()) || "") : "";
+    if (!(dataEl.value || "").trim()) {
+      dataEl.value = (saved || "").trim() || (PROJECT ? (PROJECT + ".xlsx") : "");
+    }
+  }
+  if (extSplitEl && lock && lock.USE_INTERNAL_SPLIT_WHEN_EXTERNAL != null) {
+    extSplitEl.checked = !!lock.USE_INTERNAL_SPLIT_WHEN_EXTERNAL;
+  }
+  renderExtRows((lock && lock.EXTERNAL_TESTS) || [emptyExtRow()]);
+}
+function applyProject(name, fromInput) {
+  PROJECT = String(name || "").trim();
+  document.title = PROJECT || "RAD 起始页";
+  const h = document.getElementById("projTitle");
+  if (h) h.textContent = PROJECT || "通用模板";
+  if (projEl && !fromInput) projEl.value = PROJECT;
+  const banner = document.getElementById("tplBanner");
+  if (banner) banner.hidden = !isTemplateHere();
+  const savedSet = PROJECT ? localStorage.getItem(setKey()) : "";
+  if (setEl && savedSet) {
+    setEl.value = (savedSet.toLowerCase() === "settings.ini") ? "ref/settings.ini" : savedSet;
+  }
+  hydrateIoFields();
+  syncLinks();
+}
+function syncLinks() {
+  const modErr = modulesDirError();
+  if (modErr) msg.textContent = modErr;
+  go.href = pageUrl();
+  goFlow.href = pageUrl() + "&tab=flow";
+  localStorage.setItem(PORT_KEY, String(port()));
+  localStorage.setItem(MOD_KEY, modulesDir());
+  if (PROJECT) {
+    try { localStorage.setItem(setKey(), settingsPath()); } catch (e) {}
+    persistIoPrefs();
+  }
+  const confirmBtn = document.getElementById("btnConfirm");
+  if (confirmBtn) confirmBtn.textContent = "确认 " + port();
+}
+
+const saved = parseInt(localStorage.getItem(PORT_KEY) || "", 10);
+if (saved >= 1024 && saved <= 65535) portEl.value = saved;
+const savedMod = localStorage.getItem(MOD_KEY);
+if (savedMod !== null && modEl) modEl.value = savedMod;
+applyProject(inferProject());
+portEl.addEventListener("change", () => {
+  syncLinks();
+  if (lastScanRows && lastScanRows.length) paintPorts(lastScanRows);
+  if (svcSide !== 0) {
+    svcJob++;
+    setSide(0);
+  }
+});
+if (modEl) {
+  modEl.addEventListener("input", syncLinks);
+  modEl.addEventListener("change", syncLinks);
+}
+if (setEl) {
+  setEl.addEventListener("input", syncLinks);
+  setEl.addEventListener("change", syncLinks);
+}
+[dataEl, radSheetEl, clinSheetEl, qcSheetEl, iccSheetEl, radIdEl, clinIdEl, labelColEl].forEach((el) => {
+  if (!el) return;
+  el.addEventListener("input", syncLinks);
+  el.addEventListener("change", syncLinks);
+});
+if (radMetaChipsEl) {
+  radMetaChipsEl.addEventListener("change", (e) => {
+    const inp = e.target;
+    const name = inp && inp.getAttribute && inp.getAttribute("data-radmeta");
+    if (!name || inp.checked) return;
+    RAD_META_PICKED = RAD_META_PICKED.filter((x) => x !== name);
+    radMetaTouched = true;
+    renderRadMeta();
+    syncLinks();
+  });
+}
+if (radMetaAddEl) {
+  radMetaAddEl.addEventListener("change", () => {
+    const v = String(radMetaAddEl.value || "").trim();
+    if (!v) return;
+    if (RAD_META_PICKED.indexOf(v) < 0) RAD_META_PICKED.push(v);
+    radMetaTouched = true;
+    renderRadMeta();
+    syncLinks();
+  });
+}
+if (projEl) {
+  projEl.addEventListener("input", () => applyProject(projEl.value, true));
+  projEl.addEventListener("change", () => applyProject(projEl.value, true));
+}
+function bindFilePick(btnId, inpId, destId, kind) {
+  const btn = document.getElementById(btnId);
+  const inp = document.getElementById(inpId);
+  const dest = document.getElementById(destId);
+  if (!btn || !inp || !dest) return;
+  btn.onclick = () => inp.click();
+  inp.addEventListener("change", () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    if (kind === "settings") {
+      dest.value = (String(f.name).toLowerCase() === "settings.ini") ? "ref/settings.ini" : f.name;
+    } else if (kind === "modules") {
+      const top = String(f.webkitRelativePath || "").split(/[/\\\\]/)[0];
+      dest.value = (top && top.toLowerCase() === "modules") ? DEFAULT_MODULES : (top || DEFAULT_MODULES);
+    } else {
+      dest.value = f.name;
+    }
+    syncLinks();
+  });
+}
+bindFilePick("btnSetPick", "settingsFilePick", "settingsFile", "settings");
+bindFilePick("btnModPick", "modulesDirPick", "modulesDir", "modules");
+async function pickXlsx(dest, title) {
+  const p = await ensureLive();
+  if (!p) {
+    if (loadMsg) loadMsg.textContent = "请先开启 Python 服务，再选文件。";
+    return;
+  }
+  const dir = fileDir();
+  if (loadMsg) loadMsg.textContent = "已打开文件对话框（" + dir + "）…";
+  try {
+    const headers = {"Content-Type": "application/json"};
+    if (pageToken) headers["X-Console-Token"] = pageToken;
+    const r = await fetch(host(p) + "/api/pick-file", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({dir: dir, title: title}),
+    });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    if (!j.path) {
+      if (loadMsg) loadMsg.textContent = "未选文件。";
+      return;
+    }
+    dest.value = j.rel;
+    markDataStale();
+    syncLinks();
+    if (loadMsg) loadMsg.textContent = "已选 " + j.rel + "。点「加载数据」。";
+  } catch (e) {
+    if (loadMsg) loadMsg.textContent = "选择失败：" + (e && e.message ? e.message : e);
+  }
+}
+const btnDataPick = document.getElementById("btnDataPick");
+if (btnDataPick) btnDataPick.onclick = () => pickXlsx(dataEl, "选择数据 Excel");
+if (dataEl) {
+  dataEl.addEventListener("input", () => { markDataStale(); syncLinks(); });
+  dataEl.addEventListener("change", () => { markDataStale(); syncLinks(); });
+}
+
+function probe(p) {
+  const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 1200) : 0;
+  const opts = ctrl ? {signal: ctrl.signal} : {};
+  return fetch(host(p) + "/api/health", opts).then(r => r.ok ? r.json() : null).catch(() => null).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+async function ensureLive() {
+  const p = port();
+  if (await noteLive(p)) return p;
+  return 0;
+}
+function fillXlsxList(list) {
+  const dl = document.getElementById("xlsxList");
+  if (!dl) return;
+  dl.innerHTML = "";
+  (list || []).forEach((name) => {
+    const n = String(name || "").trim();
+    if (!n) return;
+    const opt = document.createElement("option");
+    opt.value = n;
+    dl.appendChild(opt);
+  });
+}
+async function hydrateSettings(p) {
+  if (!PROJECT) return;
+  try {
+    const pr = await fetch(host(p) + "/api/projects").then(r => r.json());
+    const hit = ((pr && pr.projects) || []).find(x => x.name === PROJECT);
+    if (hit && hit.settings && setEl && !(setEl.value || "").trim()) {
+      const s = String(hit.settings).replace(/\\/g, "/");
+      setEl.value = /\/ref\/settings\.ini$/i.test(s) ? "ref/settings.ini" : (s.split("/").pop() || "");
+    }
+    if (hit) {
+      const xs = Array.isArray(hit.xlsx) ? hit.xlsx.slice() : [];
+      if (hit.default_xlsx && xs.indexOf(hit.default_xlsx) < 0) xs.unshift(hit.default_xlsx);
+      fillXlsxList(xs.map(x => {
+        const s = String(x || "");
+        const parts = s.split(/[/\\\\]/);
+        return parts[parts.length - 1] || s;
+      }));
+      if (dataEl && !(dataEl.value || "").trim() && (hit.default_xlsx || xs[0])) {
+        const raw = hit.default_xlsx || xs[0];
+        const parts = String(raw).split(/[/\\\\]/);
+        dataEl.value = parts[parts.length - 1] || raw;
+      }
+    }
+    syncLinks();
+  } catch (e) {}
+}
+function onServiceReady(p) {
+  setSide(1);
+  setDataBlockVisible(true);
+  markDataStale();
+  syncLinks();
+  hydrateSettings(p);
+  occupant = null;
+  noteLive(p);
+  msg.textContent = PROJECT
+    ? "服务已开。选数据后点「加载数据」，再选 sheet。"
+    : "服务已开。填写课题名后再加载数据。";
+}
+function keysFromSettingsError(msg) {
+  const text = String(msg || "");
+  const found = [];
+  const add = (k) => {
+    if (!/^[A-Z][A-Z0-9_]*$/.test(k) || found.indexOf(k) >= 0) return;
+    found.push(k);
+  };
+  const eq = /(?<![A-Za-z0-9_])([A-Z][A-Z0-9_]*)\s*=/g;
+  const unk = /未知 tdROC 字段\s+([A-Z][A-Z0-9_]*)/g;
+  const must = /(?<![A-Za-z0-9_])([A-Z][A-Z0-9_]*)(?=\s*须)/g;
+  let m;
+  while ((m = eq.exec(text))) add(m[1]);
+  while ((m = unk.exec(text))) add(m[1]);
+  if (!found.length) while ((m = must.exec(text))) add(m[1]);
+  return found;
+}
+function showClearBad(keys) {
+  const btn = document.getElementById("btnClearBad");
+  if (!btn) return;
+  const list = (keys || []).map((k) => String(k || "").trim()).filter(Boolean);
+  btn.hidden = !list.length;
+  btn.dataset.keys = list.join(",");
+  btn.title = list.length
+    ? ("把 " + list.join("、") + " 写成空字符串。先备份为 settings.ini.bak，再重新加载。")
+    : "把报错的设置项写成空字符串。先备份 settings.ini.bak，再重新加载。";
+}
+async function clearBadKeys() {
+  const btn = document.getElementById("btnClearBad");
+  const keys = ((btn && btn.dataset.keys) || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!keys.length) return;
+  const p = await ensureLive();
+  if (!p) {
+    if (loadMsg) loadMsg.textContent = "请先开启 Python 服务。";
+    return;
+  }
+  if (loadMsg) loadMsg.textContent = "正在清空 " + keys.join("、") + "…";
+  try {
+    const headers = {"Content-Type": "application/json"};
+    if (pageToken) headers["X-Console-Token"] = pageToken;
+    const body = {project: PROJECT, settings: settingsPath(), keys: keys};
+    const dir = fileDir();
+    if (dir) body.dir = dir;
+    const r = await fetch(host(p) + "/api/settings/clear-keys", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    const cleared = (j.cleared && j.cleared.length) ? j.cleared : keys;
+    if (loadMsg) loadMsg.textContent = "已清空 " + cleared.join("、") + "，正在重新加载…";
+    await loadWorkbook();
+  } catch (e) {
+    if (loadMsg) loadMsg.textContent = "清空失败：" + (e && e.message ? e.message : e);
+  }
+}
+async function loadWorkbook() {
+  if (!PROJECT) {
+    if (loadMsg) loadMsg.textContent = "请先填写课题名。";
+    return;
+  }
+  const p = await ensureLive();
+  if (!p) {
+    if (loadMsg) loadMsg.textContent = "请先开启 Python 服务。";
+    return;
+  }
+  const data = dataFile();
+  if (loadMsg) loadMsg.textContent = "正在加载 " + data + "…";
+  showClearBad([]);
+  try {
+    const q = new URLSearchParams({
+      project: PROJECT,
+      data: data,
+      settings: settingsPath(),
+    });
+    const dir = fileDir();
+    if (dir) q.set("dir", dir);
+    const j = await fetch(host(p) + "/api/settings?" + q.toString()).then((r) => r.json());
+    if (!j || j.ok === false) {
+      const msgText = (j && j.error) || "加载失败";
+      const err = new Error(msgText);
+      const fromApi = j && Array.isArray(j.bad_keys) ? j.bad_keys : [];
+      err.badKeys = fromApi.length ? fromApi : keysFromSettingsError(msgText);
+      throw err;
+    }
+    const prev = j.preview || {};
+    if (prev.error) throw new Error(prev.error);
+    SHEET_OPTS = prev.sheets || [];
+    const vals = j.values || {};
+    const typed = (el) => ((el && el.value) || "").trim();
+    const lock = ioOverlay();
+    const radKeep = typed(radIdEl) || String(vals.RAD_ID_COL || "").trim();
+    const clinKeep = typed(clinIdEl) || String(vals.CLIN_ID_COL || "").trim();
+    RAD_ID_OPTS = idPickList(prev.rad_id_cols || prev.id_options || [], radKeep);
+    CLIN_ID_OPTS = idPickList(prev.clin_cols || prev.id_options || [], clinKeep);
+    fillSelect(radSheetEl, SHEET_OPTS, lock.RAD_SHEET, IO_DEFAULTS.RAD_SHEET);
+    fillSelect(clinSheetEl, SHEET_OPTS, lock.CLIN_SHEET, IO_DEFAULTS.CLIN_SHEET);
+    fillSelect(qcSheetEl, SHEET_OPTS, lock.QC_SHEET, IO_DEFAULTS.QC_SHEET);
+    fillSelect(iccSheetEl, SHEET_OPTS, lock.ICC_SHEET, IO_DEFAULTS.ICC_SHEET);
+    fillSelect(radIdEl, RAD_ID_OPTS, radKeep, IO_DEFAULTS.RAD_ID_COL);
+    fillSelect(clinIdEl, CLIN_ID_OPTS.length ? CLIN_ID_OPTS : RAD_ID_OPTS, clinKeep, IO_DEFAULTS.CLIN_ID_COL);
+    const stored = storedIoLock();
+    const labelReady = !!(labelColEl && labelColEl.options && labelColEl.options.length > 1);
+    let labelKeep = "";
+    if (labelReady) labelKeep = String(labelColEl.value || "");
+    else if (stored && Object.prototype.hasOwnProperty.call(stored, "LABEL_COL")) {
+      labelKeep = String(stored.LABEL_COL == null ? "" : stored.LABEL_COL);
+    } else {
+      labelKeep = String(vals.LABEL_COL == null ? "" : vals.LABEL_COL);
+    }
+    fillSelect(labelColEl, uniq(prev.clin_cols || []), labelKeep, "");
+    if (!(radMetaTouched || radMetaFromLock)) RAD_META_PICKED = listFrom(vals.RAD_ID_COLS);
+    RAD_META_OPTS = uniq((prev.rad_meta_cols || []).concat(RAD_META_PICKED));
+    renderRadMeta();
+    renderExtRows(lock.EXTERNAL_TESTS && lock.EXTERNAL_TESTS.length ? lock.EXTERNAL_TESTS : [emptyExtRow()]);
+    DATA_LOADED = true;
+    if (sheetBlock) sheetBlock.hidden = false;
+    setGoEnabled(true);
+    syncLinks();
+    const n = prev.n_after_exclude_est != null ? prev.n_after_exclude_est : "—";
+    if (loadMsg) loadMsg.textContent = "已加载 · sheet " + SHEET_OPTS.join(" / ") + " · n=" + n + "。请选 sheet 后进入配置。";
+    msg.textContent = "数据已加载。选 sheet 后点「进入配置」。";
+  } catch (e) {
+    markDataStale();
+    if (loadMsg) loadMsg.textContent = "加载失败：" + (e && e.message ? e.message : e);
+    showClearBad((e && e.badKeys) || []);
+  }
+}
+async function saveIni() {
+  syncLinks();
+  if (!PROJECT) {
+    msg.textContent = "请先填写课题名，或把本页放到课题目录再打开。";
+    return;
+  }
+  const p = await ensureLive();
+  if (!p) {
+    msg.textContent = "请先开启 Python 服务，再写回 ini。";
+    return;
+  }
+  const modErr = modulesDirError();
+  if (modErr) {
+    msg.textContent = modErr;
+    return;
+  }
+  msg.textContent = "正在写回 settings.ini…";
+  try {
+    const io = ioOverlay();
+    const r = await fetch(host(p) + "/api/writeback", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        project: PROJECT,
+        data: dataFile(),
+        settings: settingsPath(),
+        overlay: Object.assign({INPUT: dataFile(), MODULES_DIR: modulesDir()}, io),
+        only_keys: ["INPUT", "MODULES_DIR", "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET", "RAD_ID_COL", "CLIN_ID_COL", "LABEL_COL", "RAD_ID_COLS"],
+      }),
+    });
+    const j = await r.json();
+    if (!j || !j.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    const n = (j.updated || []).length + (j.appended || []).length;
+    msg.textContent = "已写回 settings.ini · " + n + " 项 · 备份 " + (j.backup || "settings.ini.bak");
+  } catch (e) {
+    msg.textContent = "写回失败：" + (e && e.message ? e.message : e);
+  }
+}
+async function enterConsole(e) {
+  if (e) e.preventDefault();
+  syncLinks();
+  if (!PROJECT) {
+    msg.textContent = "请先填写课题名，或把本页放到课题目录再打开。";
+    return;
+  }
+  const p = await ensureLive();
+  if (!p) {
+    msg.textContent = "请先开启 Python 服务，再进入配置。";
+    return;
+  }
+  if (!DATA_LOADED) {
+    msg.textContent = "请先点「加载数据」，再选 sheet 后进入配置。";
+    return;
+  }
+  persistIoPrefs();
+  holdForConsole = true;
+  msg.textContent = "正在进入控制台…";
+  location.href = pageUrl(p);
+}
+document.getElementById("btnSaveIni").onclick = () => saveIni();
+go.addEventListener("click", enterConsole);
+if (goFlow) goFlow.addEventListener("click", () => { holdForConsole = true; });
+document.getElementById("btnLoadData").onclick = () => loadWorkbook();
+const btnClearBad = document.getElementById("btnClearBad");
+if (btnClearBad) btnClearBad.onclick = () => clearBadKeys();
+document.getElementById("btnExtAdd").onclick = () => {
+  const cur = readExtRows();
+  cur.push(emptyExtRow());
+  renderExtRows(cur.length ? cur : [emptyExtRow()]);
+  markDataStale();
+  syncLinks();
+};
+if (extSplitEl) extSplitEl.addEventListener("change", syncLinks);
+const CHECK_PORT = 8780;
+let holdForConsole = false;
+let pagePort = 0;
+let pageToken = "";
+let occupant = null;
+let svcPollFrom = 0;
+let svcWant = 0;
+let svcSide = 0;
+let svcJob = 0;
+
+function setSide(side) {
+  svcSide = side;
+  const tri = document.getElementById("svcTri");
+  const track = document.getElementById("svcTrack");
+  if (tri) tri.dataset.side = String(side);
+  if (track) track.setAttribute("aria-valuenow", String(side));
+  const tog = document.getElementById("radToggle");
+  if (tog) {
+    const on = side > 0;
+    tog.checked = on;
+    tog.setAttribute("aria-checked", on ? "true" : "false");
+  }
+  const hint = document.getElementById("radToggleHint");
+  if (hint) {
+    hint.textContent = side > 0
+      ? "已请求开启；浏览器若弹窗请点允许"
+      : (side < 0 ? "已请求关闭" : "关 = 停服务；开 = 启动端口上的控制台");
+  }
+}
+function knobX(side) {
+  if (side < 0) return 0;
+  if (side > 0) return 54;
+  return 27;
+}
+function sideFromX(track, clientX) {
+  const r = track.getBoundingClientRect();
+  const x = Math.min(Math.max(clientX - r.left, 0), r.width);
+  if (x < r.width / 3) return -1;
+  if (x > r.width * 2 / 3) return 1;
+  return 0;
+}
+function serviceText(info) {
+  if (!info) return "";
+  return info.service || info.name || (info.console ? "本控制台" : "");
+}
+function serviceLine(info, p) {
+  if (!info) return "端口 " + p + " 没有健康应答，也没有收到 radconsole 回执。请允许打开 radconsole 后再确认，或向右开启。";
+  const name = serviceText(info);
+  const pid = info.pid ? ("，PID " + info.pid) : "";
+  if (info.listening && info.console) return "端口 " + p + " 目前提供：" + (name || "本控制台") + pid + "。";
+  if (info.listening) return "端口 " + p + " 目前提供：" + (name || "其他程序") + pid + "。不是本控制台，不会关闭。";
+  return "端口 " + p + " 目前没有服务。可向右开启。";
+}
+function rememberOccupant(info) {
+  occupant = (info && info.listening) ? info : null;
+}
+async function noteLive(p) {
+  const h = await probe(p);
+  if (!(h && h.ok)) return false;
+  pagePort = p;
+  if (h.token) pageToken = h.token;
+  return true;
+}
+const SCAN_KEY = "rad-console-scan-range";
+function scanSpan() {
+  const el = document.getElementById("scanRange");
+  const text = ((el && el.value) || "").trim() || "8765";
+  const m = text.match(/^(\d+)\s*[-~–—到至]\s*(\d+)$/);
+  let a = m ? parseInt(m[1], 10) : parseInt(text, 10);
+  let b = m ? parseInt(m[2], 10) : a;
+  if (!(a >= 1024 && a <= 65535)) a = 8765;
+  if (!(b >= 1024 && b <= 65535)) b = a;
+  if (a > b) { const t = a; a = b; b = t; }
+  if (b - a > 32) b = a + 32;
+  return {lo: a, hi: b, text: a === b ? String(a) : (a + "-" + b)};
+}
+const scanRangeEl = document.getElementById("scanRange");
+if (scanRangeEl) {
+  const savedScan = localStorage.getItem(SCAN_KEY) || "";
+  if (!String(scanRangeEl.value || "").trim()) scanRangeEl.value = "8765";
+  if (savedScan) scanRangeEl.value = savedScan;
+  scanRangeEl.addEventListener("change", () => {
+    const span = scanSpan();
+    scanRangeEl.value = span.text;
+    try { localStorage.setItem(SCAN_KEY, span.text); } catch (e) {}
+  });
+}
+async function probeDetail(p) {
+  const j = await probe(p);
+  if (j && j.ok) return {port: p, state: "console", token: j.token || ""};
+  return {port: p, state: "down"};
+}
+let lastScanRows = null;
+function paintPorts(rows) {
+  const box = document.getElementById("portScan");
+  if (!box) return;
+  lastScanRows = rows || [];
+  box.hidden = !lastScanRows.length;
+  box.innerHTML = "";
+  const selected = port();
+  lastScanRows.forEach((row) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    const label = row.state === "console" ? "本控制台" : "无应答";
+    b.textContent = row.port + " " + label;
+    if (row.state === "console") b.classList.add("live");
+    else b.classList.add("stuck");
+    if (row.port === selected) b.classList.add("sel");
+    b.onclick = () => {
+      portEl.value = String(row.port);
+      syncLinks();
+      paintPorts(lastScanRows);
+      if (svcSide !== 0) {
+        svcJob++;
+        setSide(0);
+      }
+    };
+    box.appendChild(b);
+  });
+}
+async function renderPortScan(quiet) {
+  const span = scanSpan();
+  if (!quiet) msg.textContent = "正在探测 " + span.text + "…";
+  const jobs = [];
+  for (let p = span.lo; p <= span.hi; p++) jobs.push(probeDetail(p));
+  const rows = await Promise.all(jobs);
+  paintPorts(rows);
+  if (!quiet) {
+    const live = rows.filter((r) => r.state === "console").map((r) => r.port);
+    const down = rows.filter((r) => r.state !== "console").map((r) => r.port);
+    let text = span.text + "：";
+    if (live.length) text += "本控制台 " + live.join("、") + "。";
+    if (down.length) text += "无健康应答 " + down.join("、") + "。点其中一个填入端口，再点旁边的确认。";
+    msg.textContent = text;
+  }
+  return rows;
+}
+document.getElementById("btnScan").onclick = () => renderPortScan(false);
+
+function launchProto(url) {
+  const a = document.getElementById("protoGo");
+  if (!a) return;
+  a.href = url;
+  a.click();
+}
+function startSvc() {
+  launchProto(protoUrl());
+}
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+async function readCheckOnce() {
+  const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 2500) : 0;
+  try {
+    const r = await fetch("http://127.0.0.1:" + CHECK_PORT + "/", ctrl ? {signal: ctrl.signal} : {});
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+async function readCheck(p, ms) {
+  const until = Date.now() + (ms == null ? 12000 : ms);
+  while (Date.now() < until) {
+    const j = await readCheckOnce();
+    if (j && Number(j.port) === Number(p)) return j;
+    await sleep(300);
+  }
+  return null;
+}
+
+const radToggle = document.getElementById("radToggle");
+if (radToggle) {
+  radToggle.addEventListener("change", () => {
+    if (radToggle.checked) {
+      setSide(1);
+      beginStart();
+    } else {
+      setSide(-1);
+      beginClose();
+    }
+  });
+}
+
+const btnConfirm = document.getElementById("btnConfirm");
+if (btnConfirm) btnConfirm.addEventListener("click", () => {
+  const p = port();
+  msg.textContent = "正在查看端口 " + p + " 的服务…";
+  // Must launch protocol inside the click gesture; await would drop it.
+  launchProto("radconsole://check?port=" + p);
+  (async () => {
+    const health = await probe(p);
+    if (health && health.ok) {
+      const info = {
+        ok: true, port: p, listening: true, console: true,
+        pid: 0, name: "console.py", service: "本控制台",
+      };
+      rememberOccupant(info);
+      pagePort = p;
+      if (health.token) pageToken = health.token;
+      setDataBlockVisible(true);
+      markDataStale();
+      syncLinks();
+      hydrateSettings(p);
+      msg.textContent = serviceLine(info, p);
+      return;
+    }
+    const info = await readCheck(p, 12000);
+    rememberOccupant(info);
+    let text = serviceLine(info, p);
+    if (info && info.listening && info.console) text += " 没有健康应答。";
+    msg.textContent = text;
+  })();
+});
+function markClosed(p) {
+  occupant = null;
+  setSide(0);
+  setDataBlockVisible(false);
+  pagePort = 0;
+  pageToken = "";
+  msg.textContent = "已关闭端口 " + p + "。";
+  renderPortScan(true);
+}
+async function finishClose(p, had) {
+  const infoPromise = readCheck(p);
+  if (had) {
+    const until = Date.now() + 8000;
+    while (Date.now() < until) {
+      const health = await probe(p);
+      if (!(health && health.ok)) {
+        markClosed(p);
+        return;
+      }
+      await sleep(400);
+    }
+  }
+  const info = await infoPromise;
+  setSide(0);
+  if (info && info.killed) {
+    markClosed(p);
+    return;
+  }
+  if (info && info.listening === false) {
+    occupant = null;
+    msg.textContent = "端口 " + p + " 目前没有服务。";
+  } else if (info && info.listening && !info.console) {
+    rememberOccupant(info);
+    msg.textContent = serviceLine(info, p);
+  } else if (!info) {
+    msg.textContent = "关闭请求没有返回。请允许打开 radconsole 后再向左关一次。";
+  } else {
+    msg.textContent = info.error || ("已请求关闭端口 " + p + "。请再确认一次。");
+  }
+  renderPortScan(true);
+}
+function beginStart() {
+  const job = ++svcJob;
+  occupant = null;
+  svcWant = port();
+  msg.textContent = "正在开启端口 " + svcWant + "…";
+  svcPollFrom = Date.now();
+  startSvc();
+  pollSvc(job);
+}
+function beginClose() {
+  const p = port();
+  svcJob++;
+  svcWant = 0;
+  const had = Number(pagePort) === Number(p) && !!pageToken;
+  if (had) {
+    fetch(host(p) + "/api/shutdown?token=" + encodeURIComponent(pageToken), {keepalive: true}).catch(() => {});
+  }
+  launchProto("radconsole://stop?port=" + p);
+  msg.textContent = "正在关闭端口 " + p + "…";
+  finishClose(p, had);
+}
+function commitSide(side, force) {
+  const p = port();
+  if (side === -1 && occupant && Number(occupant.port) === Number(p) && occupant.listening && !occupant.console) {
+    setSide(0);
+    msg.textContent = serviceLine(occupant, p);
+    return;
+  }
+  if (side === 1 && !PROJECT) {
+    setSide(0);
+    msg.textContent = "请先填写课题名，或把本页放到课题目录再打开。";
+    return;
+  }
+  const changed = side !== svcSide;
+  setSide(side);
+  if (!changed && !force) return;
+  if (side === 1) beginStart();
+  else if (side === -1) beginClose();
+  else {
+    svcJob++;
+    svcWant = 0;
+  }
+}
+function bindTri() {
+  const track = document.getElementById("svcTrack");
+  const knob = document.getElementById("svcKnob");
+  if (!track) return;
+  let drag = null;
+  track.addEventListener("pointerdown", (ev) => {
+    drag = {id: ev.pointerId, x: ev.clientX, moved: false};
+    track.setPointerCapture(ev.pointerId);
+  });
+  track.addEventListener("pointermove", (ev) => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    if (Math.abs(ev.clientX - drag.x) > 4) drag.moved = true;
+    if (knob) knob.style.transform = "translateX(" + knobX(sideFromX(track, ev.clientX)) + "px)";
+  });
+  track.addEventListener("pointerup", (ev) => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    const side = sideFromX(track, ev.clientX);
+    const force = !drag.moved && side !== 0;
+    drag = null;
+    commitSide(side, force);
+    if (knob) knob.style.transform = "";
+  });
+  track.addEventListener("pointercancel", (ev) => {
+    if (!drag || ev.pointerId !== drag.id) return;
+    drag = null;
+    if (knob) knob.style.transform = "";
+  });
+  track.addEventListener("keydown", (ev) => {
+    if (ev.key === "ArrowLeft") {
+      commitSide(Math.max(-1, svcSide - 1), false);
+      ev.preventDefault();
+    } else if (ev.key === "ArrowRight") {
+      commitSide(Math.min(1, svcSide + 1), false);
+      ev.preventDefault();
+    }
+  });
+  document.querySelectorAll(".tri-cap").forEach((btn) => {
+    btn.addEventListener("click", () => commitSide(Number(btn.dataset.go), true));
+  });
+}
+bindTri();
+async function pollSvc(job) {
+  if (job !== svcJob || svcSide !== 1) return;
+  const want = svcWant || port();
+  if (await noteLive(want)) {
+    if (job !== svcJob || svcSide !== 1) return;
+    onServiceReady(want);
+    return;
+  }
+  if (job !== svcJob || svcSide !== 1) return;
+  const info = await readCheckOnce();
+  if (job !== svcJob || svcSide !== 1) return;
+  if (info && Number(info.port) === Number(want) && info.ok === false) {
+    setSide(0);
+    setDataBlockVisible(false);
+    rememberOccupant(info);
+    let text = "端口 " + want + " 开不了。" + serviceLine(info, want);
+    if (info.console && info.listening) text += " 向左可关闭这一个。";
+    msg.textContent = text;
+    return;
+  }
+  if (Date.now() - svcPollFrom > 25000) {
+    setSide(0);
+    setDataBlockVisible(false);
+    msg.textContent = "端口 " + want + " 没有打开。请允许打开 radconsole 后再向右开启，或点端口旁边的确认。";
+    return;
+  }
+  setTimeout(() => pollSvc(job), 400);
+}
+window.addEventListener("pagehide", (ev) => {
+  if (ev.persisted || holdForConsole || !pagePort) return;
+  const p = pagePort;
+  const tok = pageToken;
+  pagePort = 0;
+  const headers = tok ? {"X-Console-Token": tok} : {};
+  const q = tok ? ("?token=" + encodeURIComponent(tok)) : "";
+  fetch(host(p) + "/api/shutdown" + q, {headers, keepalive: true}).catch(() => {});
+});
+
+(async () => {
+  const rows = await renderPortScan(false);
+  const p = port();
+  const row = (rows || []).find((r) => r.port === p);
+  setSide(0);
+  if (row && row.state === "console" && await noteLive(p)) {
+    setDataBlockVisible(true);
+    markDataStale();
+    syncLinks();
+    hydrateSettings(p);
+    msg.textContent = "端口 " + p + " 已有本控制台。点旁边的确认可查看服务。";
+    return;
+  }
+  setDataBlockVisible(false);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2942 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script>
+try {
+  if (new URLSearchParams(location.search).has("project")) {
+    document.documentElement.classList.add("from-console");
+  }
+} catch (e) {}
+</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SCI Figure 1 · 研究流程图</title>
+  <style>
+    :root {
+      --bg: #e8edf2;
+      --panel: #ffffff;
+      --ink: #1a2330;
+      --muted: #5b6775;
+      --line: #d3dae3;
+      --soft: #f4f7fa;
+      --accent: #1d4f6e;
+      --accent-2: #2b6f90;
+      --warn: #8a4a12;
+      --warn-bg: #fff6e8;
+      --err: #8b2430;
+      --err-bg: #fdecee;
+      --ok: #1c6848;
+      --shadow: 0 1px 2px rgba(20, 32, 48, 0.06), 0 8px 24px rgba(20, 32, 48, 0.06);
+      --form-w: 400px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    body {
+      font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+    }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 18px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; flex-direction: column; min-width: 220px; }
+    .brand h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+    .seg {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+    .seg button {
+      border: 0;
+      background: transparent;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .seg button.on {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+    .btn:hover { border-color: #b7c2ce; }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-2); }
+    .btn-ghost { background: transparent; }
+    .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+    .layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: var(--form-w) minmax(0, 1fr);
+      min-height: 0;
+      overflow: hidden;
+    }
+    .form-col {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      overflow: auto;
+      min-height: 0;
+      padding: 14px 16px 28px;
+    }
+    .preview-col {
+      overflow: auto;
+      min-height: 0;
+      min-width: 0;
+      padding: 16px 18px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .map {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 14px;
+      line-height: 1.45;
+    }
+    .map b { color: var(--ink); font-weight: 600; }
+
+    .sec { margin-bottom: 16px; }
+    .sec-h {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .sec-h h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .hint { font-size: 11px; color: var(--muted); }
+    label.field { display: block; font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 7px 9px;
+      background: #fff;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: 2px solid rgba(29, 79, 110, 0.22);
+      border-color: var(--accent-2);
+    }
+    ::placeholder { color: #8b96a3; opacity: 1; }
+    textarea { min-height: 56px; resize: vertical; line-height: 1.45; }
+    .btn[disabled], .btn-primary[disabled] {
+      opacity: 1;
+      background: #c5ccd4;
+      border-color: #c5ccd4;
+      color: #6b7380;
+    }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { min-width: 0; }
+    .grow { flex: 1; }
+    .n-input { width: 88px; flex: 0 0 88px; }
+    .list { display: flex; flex-direction: column; gap: 6px; }
+    .item {
+      display: grid;
+      grid-template-columns: 22px 1fr auto;
+      gap: 6px;
+      align-items: start;
+    }
+    .item .idx {
+      font-size: 12px;
+      color: var(--muted);
+      padding-top: 8px;
+      text-align: right;
+    }
+    .icon-btns { display: flex; flex-direction: column; gap: 2px; }
+    .icon-btns button {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 5px;
+      width: 26px;
+      height: 22px;
+      padding: 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .add {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--accent);
+      background: none;
+      border: 0;
+      padding: 0;
+    }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 12px;
+    }
+    .chip.on { background: #e5eef4; border-color: #9bb8c9; color: var(--accent); }
+
+    .qc {
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      margin: 0 0 14px;
+    }
+    .qc.warn { background: var(--warn-bg); color: var(--warn); }
+    .qc.err { background: var(--err-bg); color: var(--err); }
+    .qc.ok { background: #e8f6ef; color: var(--ok); }
+    .qc.empty { background: var(--soft); color: var(--muted); }
+
+    .preview-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .preview-bar h2 { margin: 0; font-size: 13px; font-weight: 650; }
+    .zoom-btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .zoom-btns .pct {
+      min-width: 48px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .stage {
+      position: relative;
+      background: #f7f9fb;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      flex: 1 1 auto;
+      min-height: 240px;
+      min-width: 0;
+      overflow: hidden;
+      touch-action: none;
+      cursor: grab;
+    }
+    .stage.panning { cursor: grabbing; }
+    .stage.moving { cursor: move; }
+    .stage.empty-mode { cursor: default; background: #fff; }
+    .stage svg.board {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #fff;
+    }
+    .stage .hit { pointer-events: stroke; }
+    .empty-preview {
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      line-height: 1.6;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .edit-hint {
+      position: absolute;
+      left: 10px;
+      bottom: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.88);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 3px 8px;
+      pointer-events: none;
+      max-width: calc(100% - 20px);
+    }
+    .inplace {
+      position: absolute;
+      z-index: 5;
+      margin: 0;
+      padding: 4px 6px;
+      border: 1px solid var(--accent);
+      border-radius: 2px;
+      background: #fff;
+      box-shadow: 0 4px 16px rgba(20,32,48,0.12);
+      resize: none;
+      min-height: 0;
+      line-height: 1.35;
+      overflow: hidden;
+    }
+    .legend-box {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .legend-box h3 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .legend-box textarea {
+      min-height: 78px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    footer {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 10px 18px;
+      background: var(--panel);
+      border-top: 1px solid var(--line);
+    }
+    footer .note { font-size: 12px; color: var(--muted); margin-right: auto; }
+    .hidden { display: none !important; }
+    input[type="file"] { display: none; }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+      }
+      .preview-col { order: -1; padding: 10px 12px 12px; min-width: 0; overflow: visible; }
+      .form-col {
+        border-right: 0;
+        border-top: 1px solid var(--line);
+        max-height: none;
+      }
+      .stage { min-height: 360px; overflow: hidden; }
+      .legend-box textarea { min-height: 56px; }
+      html, body { height: auto; min-height: 100%; }
+      .layout { flex: none; }
+      header { padding: 8px 12px; }
+      .header-actions { margin-left: 0; }
+      footer { position: sticky; bottom: 0; z-index: 2; }
+    }
+    html.from-console #flow-steps { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>SCI Figure 1 · 研究流程图</h1>
+      <p>实际出图的框、人数和步骤只来自稿件 Materials and Methods。左侧示例只看版式，不写入论文图。</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn" id="btn-example">看版式示例</button>
+      <button type="button" class="btn" id="btn-import">导入 JSON</button>
+      <button type="button" class="btn" id="btn-clear">清空</button>
+      <input id="file-json" type="file" accept="application/json,.json" />
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="form-col">
+      <div class="map">
+        <div><b>1</b> 时段 + 筛查 n</div>
+        <div><b>2</b> 纳入 | 排除</div>
+        <div><b>3</b> 最终纳入（阳 | 阴）</div>
+        <div><b>4</b> Training / Test / Validation</div>
+        <div>downsample 或 SMOTE，只挂训练集</div>
+        <div>没做的模型和分析不画</div>
+      </div>
+      <div id="qc" class="qc empty">填写筛查或纳入分析后，右侧会实时出图。</div>
+
+      <section class="sec">
+        <div class="sec-h">
+          <h2>1. 收集</h2>
+          <span class="hint">时段与筛查人数</span>
+        </div>
+        <input id="period" type="text" placeholder="1 August 2024 to 1 August 2026" />
+        <input id="screened-n" type="number" min="0" placeholder="筛查 n" style="margin-top:6px" />
+      </section>
+
+      <section class="sec">
+        <div class="sec-h">
+          <h2>2. 纳入标准</h2>
+          <span class="hint">最多 6 条</span>
+        </div>
+        <div id="inclusion-list" class="list"></div>
+        <button type="button" class="add" id="add-inclusion">+ 添加纳入项</button>
+      </section>
+
+      <section class="sec">
+        <div class="sec-h">
+          <h2>3. 排除标准</h2>
+          <span class="hint">每条带人数，如 Lesion &lt; 1 cm (n=40)</span>
+        </div>
+        <div id="exclusion-list" class="list"></div>
+        <button type="button" class="add" id="add-exclusion">+ 添加排除项</button>
+      </section>
+
+      <section class="sec">
+        <div class="sec-h">
+          <h2>4. 最终纳入</h2>
+          <span class="hint">阳性 + 阴性 = 总人数</span>
+        </div>
+        <input id="included-n" type="number" min="0" placeholder="总 n" />
+        <input id="included-pos" type="number" min="0" placeholder="阳性 n" style="margin-top:6px" />
+        <input id="included-neg" type="number" min="0" placeholder="阴性 n" style="margin-top:6px" />
+      </section>
+
+      <section class="sec">
+        <div class="sec-h">
+          <h2>5. 队列</h2>
+          <span class="hint">Test 与外验也标阳性、阴性</span>
+        </div>
+        <p class="hint">Training Cohort</p>
+        <input id="tr-n" type="number" min="0" placeholder="n" />
+        <input id="tr-pos" type="number" min="0" placeholder="阳性" style="margin-top:6px" />
+        <input id="tr-neg" type="number" min="0" placeholder="阴性" style="margin-top:6px" />
+        <p class="hint" style="margin-top:8px">Test Cohort</p>
+        <input id="te-n" type="number" min="0" placeholder="n" />
+        <input id="te-pos" type="number" min="0" placeholder="阳性" style="margin-top:6px" />
+        <input id="te-neg" type="number" min="0" placeholder="阴性" style="margin-top:6px" />
+        <label class="hint" style="display:block;margin-top:8px"><input id="ext-on" type="checkbox" /> Validation Cohort（外验）</label>
+        <input id="va-n" type="number" min="0" placeholder="n" style="margin-top:6px" />
+        <input id="va-pos" type="number" min="0" placeholder="阳性" style="margin-top:6px" />
+        <input id="va-neg" type="number" min="0" placeholder="阴性" style="margin-top:6px" />
+      </section>
+
+      <section class="sec">
+        <div class="sec-h">
+          <h2>6. 只画做过的步骤</h2>
+        </div>
+        <label class="hint"><input type="radio" name="balance" value="" checked /> 无重采样</label>
+        <label class="hint"><input type="radio" name="balance" value="downsample" /> downsample</label>
+        <label class="hint"><input type="radio" name="balance" value="smote" /> SMOTE</label>
+        <div id="flow-steps">
+        <label class="hint" style="display:block;margin-top:6px"><input id="opt-lasso" type="checkbox" /> LASSO</label>
+        <label class="hint"><input id="opt-clinical" type="checkbox" /> Clinical</label>
+        <label class="hint"><input id="opt-radiomics" type="checkbox" /> Radiomics</label>
+        <label class="hint"><input id="opt-nomogram" type="checkbox" /> Nomogram</label>
+        <label class="hint" style="display:block;margin-top:6px"><input id="opt-roc" type="checkbox" /> ROC AUC</label>
+        <label class="hint"><input id="opt-calibration" type="checkbox" /> Calibration</label>
+        <label class="hint"><input id="opt-dca" type="checkbox" /> DCA</label>
+        <label class="hint"><input id="opt-nri" type="checkbox" /> NRI</label>
+        <label class="hint"><input id="opt-idi" type="checkbox" /> IDI</label>
+        <label class="hint" style="display:block;margin-top:6px"><input id="opt-dag" type="checkbox" /> DAG</label>
+        <label class="hint"><input id="opt-mediation" type="checkbox" /> Mediation</label>
+        </div>
+      </section>
+
+      <section class="sec">
+        <div class="sec-h"><h2>导出文件名</h2></div>
+        <input id="filename" type="text" value="Figure1_flow" />
+      </section>
+
+    </aside>
+
+    <main class="preview-col">
+      <div class="preview-bar">
+        <h2>交互预览</h2>
+        <div class="zoom-btns">
+          <button type="button" class="btn" id="btn-zoom-out" title="缩小">−</button>
+          <span class="pct" id="zoom-pct">100%</span>
+          <button type="button" class="btn" id="btn-zoom-in" title="放大">+</button>
+          <button type="button" class="btn" id="btn-fit">适应</button>
+          <button type="button" class="btn" id="btn-relayout">重置版式</button>
+          <span class="hint" id="size-hint">导出 PNG · 约 16 cm · 300 dpi</span>
+        </div>
+      </div>
+      <div class="stage empty-mode" id="stage">
+        <div class="empty-preview">请在左侧填写内容。<br />至少需要「筛查」或「纳入分析」其中一项。</div>
+      </div>
+      <div class="legend-box">
+        <h3>图注（可改，点下方复制）</h3>
+        <textarea id="legend"></textarea>
+      </div>
+    </main>
+  </div>
+
+  <footer>
+    <div class="note">滚轮缩放 · 拖空白平移 · 拖框 / 拖边 / 拖箭头 · 双击改文字。接近水平或垂直会自动对齐；箭头可拖到框的其他边。导出 PNG 不含辅助手柄。</div>
+    <button type="button" class="btn" id="btn-json">下载 JSON</button>
+    <button type="button" class="btn" id="btn-legend">复制图注</button>
+    <button type="button" class="btn btn-primary" id="btn-png">下载 PNG</button>
+  </footer>
+
+<script>
+(function () {
+  const STORE = "strobe-flowchart-v2";
+  const FS = 12;
+  const FS_SMALL = 8.0;
+  const LW = 1.05;
+  const MAX_EXC = 6;
+  const MAX_SPLIT = 3;
+  const MAX_PIPE = 4;
+  const WIDTH_IN = 10.4;
+  const SPINE = 2.95;
+
+  const EX = {
+    screened: "Retrospective review of 375 cases of cervical adenocarcinoma between 1 August 2024 and 1 August 2026",
+    exclusion: [
+      "Lesion diameter less than 1 cm",
+      "Nondiagnostic images",
+      "Neoadjuvant radiotherapy or chemotherapy"
+    ],
+    analyzed: "310 patients included in this study",
+    splits: [
+      { name: "Training Cohort", n: "216" },
+      { name: "Validation Cohort", n: "94" }
+    ],
+    pipeline: [
+      "Multiparametric MRI",
+      "Habitat mapping and radiomics extraction",
+      "LASSO RadScore, nomogram, and statistical analysis"
+    ]
+  };
+
+  const SPLIT_PRESET = [
+    { name: "Training Cohort", n: "" },
+    { name: "Validation Cohort", n: "" },
+    { name: "Test Cohort", n: "" }
+  ];
+
+  const state = {
+    period: "",
+    screenedN: "",
+    inclusion: [""],
+    exclusion: [""],
+    includedN: "",
+    includedPos: "",
+    includedNeg: "",
+    trN: "", trPos: "", trNeg: "",
+    teN: "", tePos: "", teNeg: "",
+    extOn: false,
+    vaN: "", vaPos: "", vaNeg: "",
+    balance: "downsample",
+    lasso: true,
+    models: { clinical: true, radiomics: true, nomogram: true },
+    metrics: { roc: true, calibration: true, dca: true, nri: true, idi: true },
+    explain: { dag: false, mediation: false },
+    filename: "Figure1_flow",
+    legendTouched: false,
+    manual: false,
+    structKey: ""
+  };
+
+  const view = { scale: 80, ox: 24, oy: 24 };
+  const scene = { boxes: [], connectors: [], guides: { barY: 0 } };
+  const sel = { type: null, id: null };
+  let boardBound = false;
+  let booted = false;
+  let pendingSteps = null;
+
+  const els = {
+    period: document.getElementById("period"),
+    screenedN: document.getElementById("screened-n"),
+    includedN: document.getElementById("included-n"),
+    includedPos: document.getElementById("included-pos"),
+    includedNeg: document.getElementById("included-neg"),
+    filename: document.getElementById("filename"),
+    inclusion: document.getElementById("inclusion-list"),
+    exclusion: document.getElementById("exclusion-list"),
+    stage: document.getElementById("stage"),
+    qc: document.getElementById("qc"),
+    legend: document.getElementById("legend"),
+    file: document.getElementById("file-json"),
+    size: document.getElementById("size-hint")
+  };
+
+  const measure = document.createElement("canvas").getContext("2d");
+
+  function figureFont() {
+    return '"Times New Roman", Times, "Microsoft YaHei", serif';
+  }
+
+  function hasCJK(s) {
+    return /[\u3400-\u9FFF]/.test(String(s || ""));
+  }
+
+  function figureIsCJK() {
+    const bits = [state.period].concat(state.exclusion || []).concat(state.inclusion || [])
+      .concat((state.splits || []).map(function (s) { return s && s.name; }))
+      .concat(state.pipeline || []);
+    return bits.some(hasCJK);
+  }
+
+  function exclusionTitle() {
+    return figureIsCJK() ? "排除标准：" : "Exclusion criteria:";
+  }
+
+  function visualLen(s) {
+    let n = 0;
+    for (const ch of String(s)) n += /[\u3400-\u9FFF\uF900-\uFAFF]/.test(ch) ? 2 : 1;
+    return n;
+  }
+
+  function wrap(text, width) {
+    text = String(text || "").replace(/\s+/g, " ").trim();
+    if (!text) return "";
+    const cjk = /[\u3400-\u9FFF]/.test(text);
+    const lines = [];
+    if (cjk) {
+      const tokens = [];
+      let buf = "";
+      const chars = Array.from(text);
+      chars.forEach(function (ch, i) {
+        const prev = chars[i - 1];
+        const nextBreak = prev && (
+          /[\s，。；：、,;:]/.test(prev) ||
+          (!/[\u3400-\u9FFF]/.test(prev) && /[\u3400-\u9FFF]/.test(ch)) ||
+          (/[\u3400-\u9FFF]/.test(prev) && /[0-9]/.test(ch))
+        );
+        if (nextBreak && buf) {
+          tokens.push(buf);
+          buf = ch;
+        } else buf += ch;
+      });
+      if (buf) tokens.push(buf);
+      let line = "";
+      tokens.forEach(function (tok) {
+        if (visualLen(line + tok) <= width) {
+          line += tok;
+        } else if (visualLen(tok.trim()) <= width) {
+          if (line) lines.push(line.replace(/\s+$/, ""));
+          line = tok.replace(/^\s+/, "");
+        } else {
+          if (line) {
+            lines.push(line.replace(/\s+$/, ""));
+            line = "";
+          }
+          for (const ch of tok) {
+            if (visualLen(line + ch) > width && line) {
+              lines.push(line);
+              line = ch === " " ? "" : ch;
+            } else line += ch;
+          }
+        }
+      });
+      if (line) lines.push(line.replace(/\s+$/, ""));
+      if (lines.length >= 2 && visualLen(lines[lines.length - 1]) < width * 0.5) {
+        const prev = lines[lines.length - 2];
+        const sp = prev.lastIndexOf(" ");
+        if (sp > 0 && visualLen(prev.slice(0, sp)) >= width * 0.35) {
+          lines[lines.length - 2] = prev.slice(0, sp);
+          lines[lines.length - 1] = prev.slice(sp + 1) + " " + lines[lines.length - 1];
+        }
+      }
+      return lines.join("\n");
+    }
+    const words = text.split(" ");
+    let line = "";
+    words.forEach(function (w) {
+      const next = line ? line + " " + w : w;
+      if (next.length > width && line) {
+        lines.push(line);
+        line = w;
+      } else line = next;
+    });
+    if (line) lines.push(line);
+    return lines.join("\n");
+  }
+
+  function lineW(line, fs) {
+    measure.font = "400 " + fs + "pt " + figureFont();
+    return Math.max(0.06, measure.measureText(line || " ").width / 96);
+  }
+
+  function boxWH(text, fs, padX, padY, minW, maxW) {
+    padX = padX == null ? 0.36 : padX;
+    padY = padY == null ? 0.12 : padY;
+    minW = minW == null ? 1.45 : minW;
+    maxW = maxW == null ? 6.2 : maxW;
+    const lines = String(text || " ").split("\n");
+    const w = Math.min(maxW, Math.max(minW, Math.max.apply(null, lines.map(function (ln) { return lineW(ln, fs); })) + padX));
+    const h = Math.max(0.36, 2 * padY + (fs / 72) * 1.42 * lines.length);
+    return [w, h];
+  }
+
+  function fit(text, maxChars, fs) {
+    const t = text ? wrap(text, maxChars) : "";
+    const wh = boxWH(t, fs || FS);
+    return [t, wh[0], wh[1]];
+  }
+
+  function numbered(title, items, width) {
+    const lines = [title];
+    items.slice(0, MAX_EXC).forEach(function (item, i) {
+      lines.push(wrap((i + 1) + ". " + item, width));
+    });
+    return lines.join("\n");
+  }
+
+  function splitLabel(s) {
+    const name = (s.name || "").trim();
+    const n = String(s.n || "").trim();
+    if (name && n) return name + " (n = " + n + ")";
+    return name || (n ? "n = " + n : "");
+  }
+
+  function cleanList(arr) {
+    return (arr || []).map(function (x) { return String(x || "").trim(); }).filter(Boolean);
+  }
+
+  function numOrNull(v) {
+    if (v === "" || v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function cohortOrNull(n, pos, neg) {
+    if (n === "" && pos === "" && neg === "") return null;
+    return { n: numOrNull(n), positive: numOrNull(pos), negative: numOrNull(neg) };
+  }
+
+  function checked(id) {
+    const el = document.getElementById(id);
+    return !!(el && el.checked);
+  }
+
+  function specFromState() {
+    const balanceEl = document.querySelector('input[name="balance"]:checked');
+    const inclusion = cleanList(state.inclusion);
+    const exclusion = cleanList(state.exclusion).map(function (text) {
+      return { reason: text, n: extractN(text) };
+    });
+    const validation = state.extOn ? cohortOrNull(state.vaN, state.vaPos, state.vaNeg) : null;
+    const models = ["clinical", "radiomics", "nomogram"].filter(function (k) { return state.models[k]; });
+    const metrics = ["roc", "calibration", "dca", "nri", "idi"].filter(function (k) { return state.metrics[k]; });
+    const explain = ["dag", "mediation"].filter(function (k) { return state.explain[k]; });
+    return {
+      kind: "study",
+      period: (state.period || "").trim(),
+      screened_n: numOrNull(state.screenedN),
+      inclusion: inclusion,
+      exclusion: exclusion,
+      included_n: numOrNull(state.includedN),
+      included_positive: numOrNull(state.includedPos),
+      included_negative: numOrNull(state.includedNeg),
+      training: cohortOrNull(state.trN, state.trPos, state.trNeg),
+      test: cohortOrNull(state.teN, state.tePos, state.teNeg),
+      validation: validation,
+      balance: balanceEl ? balanceEl.value : state.balance,
+      lasso: !!state.lasso,
+      models: models,
+      metrics: metrics,
+      explain: explain,
+      screened: state.period ? (state.period + "\n" + state.screenedN + " patients screened") : "",
+      analyzed: state.includedN ? ("Patients included (n = " + state.includedN + ")") : "",
+      splits: [],
+      pipeline: []
+    };
+  }
+
+  function extractN(text) {
+    const s = String(text || "");
+    let m = s.match(/n\s*=\s*(\d[\d,]*)/i);
+    if (m) return parseInt(m[1].replace(/,/g, ""), 10);
+    m = s.match(/(\d[\d,]*)\s*(?:patients|cases|subjects|例(?:患者)?)/i);
+    if (m) return parseInt(m[1].replace(/,/g, ""), 10);
+    m = s.match(/(?:筛查|回顾|review of)\s*.*?(\d[\d,]*)/i);
+    return m ? parseInt(m[1].replace(/,/g, ""), 10) : null;
+  }
+
+  function defaultLegend(spec) {
+    const bits = ["Figure 1. Flowchart of patient selection and study design."];
+    if (spec.included_n != null) bits.push(spec.included_n + " patients were included.");
+    if (spec.validation) bits.push("Validation Cohort is the external cohort.");
+    return bits.join(" ");
+  }
+
+  function cohortLines(title, raw) {
+    if (!raw || raw.n == null) return "";
+    return title + "\n(n = " + raw.n + ")\npositive n = " + raw.positive + "\nnegative n = " + raw.negative;
+  }
+
+  function layoutStudy(spec) {
+    if (spec.screened_n == null && spec.included_n == null) return null;
+    const boxes = [];
+    const arrows = [];
+    const lines = [];
+    function addBox(id, x, y, w, h, text) {
+      const b = { id: id, x: x, y: y, w: w, h: h, text: text, align: "center", fs: FS, raw: text };
+      boxes.push(b);
+      return b;
+    }
+    const gapX = 0.32;
+    const gapY = 0.46;
+    let y = 0.2;
+    const topText = (spec.period ? spec.period + "\n" : "") + (spec.screened_n != null ? spec.screened_n + " patients screened" : "");
+    const topWH = boxWH(topText, FS, 0.36, 0.14, 2.2, 8.8);
+    let top = null;
+    if (topText.trim()) {
+      top = addBox("screened", 0, y, topWH[0], topWH[1], topText);
+      y += topWH[1] + gapY;
+    }
+    const incText = spec.inclusion.length ? numbered("Inclusion criteria:", spec.inclusion, 32) : "";
+    const excText = spec.exclusion.length ? numbered("Exclusion criteria:", spec.exclusion.map(function (x) {
+      const reason = x.reason || String(x);
+      return x.n != null && !/n\s*=/.test(reason) ? reason + " (n=" + x.n + ")" : reason;
+    }), 32) : "";
+    const incWH = incText ? boxWH(incText, FS, 0.28, 0.14, 2.2, 5.2) : [0, 0];
+    const excWH = excText ? boxWH(excText, FS, 0.28, 0.14, 2.2, 5.2) : [0, 0];
+    let inc = null;
+    let exc = null;
+    if (incText || excText) {
+      const pair = incWH[0] + (incText && excText ? gapX : 0) + excWH[0];
+      let x = 0;
+      if (incText) {
+        inc = addBox("inclusion", x, y, incWH[0], incWH[1], incText);
+        inc.align = "left";
+        x += incWH[0] + gapX;
+      }
+      if (excText) exc = addBox("exclusion", x, y, excWH[0], excWH[1], excText);
+      y += Math.max(incWH[1], excWH[1]) + gapY;
+    }
+    const anaText = spec.included_n == null ? "" : (
+      "Patients included\n(n = " + spec.included_n + ")\npositive n = " + spec.included_positive + "\nnegative n = " + spec.included_negative
+    );
+    const anaWH = anaText ? boxWH(anaText, FS, 0.36, 0.14, 2.4, 6) : [0, 0];
+    const ana = anaText ? addBox("included", 0, y, anaWH[0], anaWH[1], anaText) : null;
+    if (ana) y += anaWH[1] + gapY;
+    const cohortSrc = [];
+    if (spec.training) cohortSrc.push(["cohort-training", cohortLines("Training Cohort", spec.training)]);
+    if (spec.test) cohortSrc.push(["cohort-test", cohortLines("Test Cohort", spec.test)]);
+    if (spec.validation) cohortSrc.push(["cohort-validation", cohortLines("Validation Cohort", spec.validation)]);
+    const cohortBoxes = cohortSrc.map(function (item) {
+      const wh = boxWH(item[1], FS, 0.36, 0.14, 2.2, 4.2);
+      const b = addBox(item[0], 0, y, wh[0], wh[1], item[1]);
+      return b;
+    });
+    if (cohortBoxes.length) y += Math.max.apply(null, cohortBoxes.map(function (b) { return b.h; })) + gapY;
+    let stemId = "cohort-training";
+    if (spec.balance === "downsample" || spec.balance === "smote") {
+      const label = spec.balance === "smote" ? "SMOTE" : "Downsample";
+      const wh = boxWH(label, FS, 0.36, 0.14, 1.8, 3.2);
+      addBox("balance", 0, y, wh[0], wh[1], label);
+      y += wh[1] + gapY;
+      stemId = "balance";
+    }
+    if (spec.lasso) {
+      const wh = boxWH("LASSO", FS, 0.36, 0.14, 1.6, 2.6);
+      addBox("lasso", 0, y, wh[0], wh[1], "LASSO");
+      y += wh[1] + gapY;
+      stemId = "lasso";
+    }
+    const modelNames = { clinical: "Clinical model", radiomics: "Radiomics model", nomogram: "Nomogram" };
+    (spec.models || []).forEach(function (id) {
+      const label = modelNames[id];
+      const wh = boxWH(label, FS, 0.36, 0.14, 1.8, 3.4);
+      addBox("model-" + id, 0, y, wh[0], wh[1], label);
+    });
+    const modelBoxes = boxes.filter(function (b) { return b.id.indexOf("model-") === 0; });
+    if (modelBoxes.length) y += modelBoxes[0].h + gapY;
+    const metricNames = { roc: "ROC AUC", calibration: "Calibration", dca: "DCA", nri: "NRI", idi: "IDI" };
+    (spec.metrics || []).forEach(function (id) {
+      const label = metricNames[id];
+      const wh = boxWH(label, FS, 0.36, 0.14, 1.5, 2.8);
+      addBox("metric-" + id, 0, y + 0.7, wh[0], wh[1], label);
+    });
+    const metricBoxes = boxes.filter(function (b) { return b.id.indexOf("metric-") === 0; });
+    if (metricBoxes.length) y = metricBoxes[0].y + metricBoxes[0].h + gapY;
+    const explainNames = { dag: "DAG", mediation: "Mediation" };
+    (spec.explain || []).forEach(function (id) {
+      const label = explainNames[id];
+      const wh = boxWH(label, FS, 0.36, 0.14, 1.5, 2.8);
+      addBox("explain-" + id, 0, y, wh[0], wh[1], label);
+    });
+    function rowPack(list) {
+      if (!list.length) return;
+      const total = list.reduce(function (a, b) { return a + b.w; }, 0) + gapX * (list.length - 1);
+      let x = 0;
+      list.forEach(function (b) { b.x = x; x += b.w + gapX; });
+      const shift = Math.max(0, (Math.max(total, 8) - total) / 2);
+      list.forEach(function (b) { b.x += shift; });
+    }
+    if (top) top.x = 3;
+    rowPack([inc, exc].filter(Boolean));
+    if (ana) ana.x = 3;
+    rowPack(cohortBoxes);
+    const train = boxes.filter(function (b) { return b.id === "cohort-training"; })[0];
+    function centerOn(id, cx) {
+      const b = boxes.filter(function (x) { return x.id === id; })[0];
+      if (b && cx != null) b.x = cx - b.w / 2;
+    }
+    if (train) {
+      centerOn("balance", train.x + train.w / 2);
+      centerOn("lasso", train.x + train.w / 2);
+      const models = boxes.filter(function (b) { return b.id.indexOf("model-") === 0; });
+      if (models.length) {
+        const total = models.reduce(function (a, b) { return a + b.w; }, 0) + gapX * (models.length - 1);
+        let x = train.x + train.w / 2 - total / 2;
+        const test = boxes.filter(function (b) { return b.id === "cohort-test"; })[0];
+        if (test) x = Math.min(x, test.x - 0.36 - total);
+        x = Math.max(0.2, x);
+        models.forEach(function (b) { b.x = x; x += b.w + gapX; });
+      }
+    }
+    rowPack(metricBoxes);
+    rowPack(boxes.filter(function (b) { return b.id.indexOf("explain-") === 0; }));
+    let minX = Infinity, maxX = -Infinity, maxY = -Infinity;
+    boxes.forEach(function (b) {
+      minX = Math.min(minX, b.x);
+      maxX = Math.max(maxX, b.x + b.w);
+      maxY = Math.max(maxY, b.y + b.h);
+    });
+    const pad = 0.3;
+    const width = Math.max(8, maxX - minX + pad * 2);
+    const dx = pad - minX;
+    boxes.forEach(function (b) { b.x += dx; });
+    return { width: width, height: maxY + pad, boxes: boxes, arrows: arrows, lines: lines };
+  }
+
+  function layout(spec) {
+    return layoutStudy(spec);
+  }
+
+  function boxById(id) {
+    for (let i = 0; i < scene.boxes.length; i++) if (scene.boxes[i].id === id) return scene.boxes[i];
+    return null;
+  }
+
+  function connById(id) {
+    for (let i = 0; i < scene.connectors.length; i++) if (scene.connectors[i].id === id) return scene.connectors[i];
+    return null;
+  }
+
+  function portXY(b, side, t) {
+    t = Math.max(0, Math.min(1, t == null ? 0.5 : t));
+    if (side === "top") return [b.x + b.w * t, b.y];
+    if (side === "bottom") return [b.x + b.w * t, b.y + b.h];
+    if (side === "left") return [b.x, b.y + b.h * t];
+    return [b.x + b.w, b.y + b.h * t];
+  }
+
+  function resolvePt(pt, stack) {
+    stack = stack || [];
+    if (!pt) return [0, 0];
+    if (pt.type === "port") {
+      const b = boxById(pt.boxId);
+      return b ? portXY(b, pt.side, pt.t) : [0, 0];
+    }
+    if (pt.type === "on") {
+      if (stack.indexOf(pt.connId) >= 0) return [0, 0];
+      const c = connById(pt.connId);
+      if (!c) return [0, 0];
+      stack.push(pt.connId);
+      const a = resolvePt(c.a, stack);
+      const b = resolvePt(c.b, stack);
+      const t = pt.t == null ? 0.5 : pt.t;
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    }
+    if (pt.type === "bar") {
+      const b = boxById(pt.boxId);
+      return b ? [b.x + b.w / 2, scene.guides.barY] : [0, scene.guides.barY];
+    }
+    if (pt.type === "bar-min" || pt.type === "bar-max" || pt.type === "bar-mid") {
+      const xs = scene.boxes.filter(function (b) {
+        return b.id.indexOf("metric-") === 0 || b.id.indexOf("model-") === 0 || b.id === "cohort-test" || b.id === "cohort-validation" || b.id.indexOf("split-") === 0;
+      }).map(function (b) { return b.x + b.w / 2; });
+      if (!xs.length) return [0, scene.guides.barY];
+      const mn = Math.min.apply(null, xs), mx = Math.max.apply(null, xs);
+      const x = pt.type === "bar-min" ? mn : pt.type === "bar-max" ? mx : (mn + mx) / 2;
+      return [x, scene.guides.barY];
+    }
+    return [pt.x || 0, pt.y || 0];
+  }
+
+  function studyConnectors(boxes) {
+    const has = function (id) { return boxes.some(function (b) { return b.id === id; }); };
+    const of = function (prefix) { return boxes.filter(function (b) { return b.id.indexOf(prefix) === 0; }); };
+    const conns = [];
+    function port(id, side) { return { type: "port", boxId: id, side: side, t: 0.5 }; }
+    function link(id, kind, a, b) { conns.push({ id: id, kind: kind, a: a, b: b }); }
+    if (has("screened") && has("inclusion")) link("to-inc", "arrow", port("screened", "bottom"), port("inclusion", "top"));
+    if (has("screened") && has("exclusion")) link("to-exc", "arrow", port("screened", "bottom"), port("exclusion", "top"));
+    if (has("inclusion") && has("included")) link("inc-in", "arrow", port("inclusion", "bottom"), port("included", "top"));
+    if (has("exclusion") && has("included")) link("exc-in", "arrow", port("exclusion", "bottom"), port("included", "top"));
+    if (has("screened") && has("included") && !has("inclusion") && !has("exclusion")) {
+      link("scr-in", "arrow", port("screened", "bottom"), port("included", "top"));
+    }
+    ["cohort-training", "cohort-test", "cohort-validation"].forEach(function (id) {
+      if (has("included") && has(id)) link("to-" + id, "arrow", port("included", "bottom"), port(id, "top"));
+    });
+    let stem = has("cohort-training") ? "cohort-training" : "";
+    if (has("balance") && stem) { link("to-bal", "arrow", port(stem, "bottom"), port("balance", "top")); stem = "balance"; }
+    if (has("lasso") && stem) { link("to-las", "arrow", port(stem, "bottom"), port("lasso", "top")); stem = "lasso"; }
+    const models = of("model-");
+    models.forEach(function (b) {
+      if (stem) link("to-" + b.id, "arrow", port(stem, "bottom"), port(b.id, "top"));
+    });
+    const metrics = of("metric-");
+    if (metrics.length) {
+      const sources = models.length ? models : (has(stem) ? [{ id: stem }] : []);
+      sources.forEach(function (b) { link("drop-" + b.id, "line", port(b.id, "bottom"), { type: "bar", boxId: b.id }); });
+      ["cohort-test", "cohort-validation"].forEach(function (id) {
+        if (has(id)) link("drop-" + id, "line", port(id, "bottom"), { type: "bar", boxId: id });
+      });
+      if (metrics.length > 1 || sources.length) {
+        link("bus", "line", { type: "bar-min" }, { type: "bar-max" });
+      }
+      metrics.forEach(function (b) {
+        link("into-" + b.id, "arrow", { type: "bar", boxId: b.id }, port(b.id, "top"));
+      });
+    }
+    const explain = of("explain-");
+    if (explain.length && metrics.length) {
+      const mid = metrics[Math.floor(metrics.length / 2)];
+      explain.forEach(function (b) { link("ex-" + b.id, "arrow", port(mid.id, "bottom"), port(b.id, "top")); });
+    }
+    return conns;
+  }
+
+  function defaultConnectors(boxes) {
+    if (boxes.some(function (b) { return b.id === "included" || b.id === "cohort-training"; })) return studyConnectors(boxes);
+    const has = function (id) { return boxes.some(function (b) { return b.id === id; }); };
+    const splits = boxes.filter(function (b) { return b.id.indexOf("split-") === 0; });
+    const pipes = boxes.filter(function (b) { return b.id.indexOf("pipe-") === 0; });
+    const conns = [];
+    if (has("screened") && has("analyzed") && has("exclusion")) {
+      conns.push({
+        id: "stem", kind: "line",
+        a: { type: "port", boxId: "screened", side: "bottom", t: 0.5 },
+        b: { type: "port", boxId: "analyzed", side: "top", t: 0.5 }
+      });
+      conns.push({
+        id: "exc", kind: "arrow",
+        a: { type: "on", connId: "stem", t: 0.5 },
+        b: { type: "port", boxId: "exclusion", side: "left", t: 0.5 }
+      });
+    } else if (has("screened") && has("analyzed")) {
+      conns.push({
+        id: "stem", kind: "arrow",
+        a: { type: "port", boxId: "screened", side: "bottom", t: 0.5 },
+        b: { type: "port", boxId: "analyzed", side: "top", t: 0.5 }
+      });
+    } else if (has("analyzed") && has("exclusion")) {
+      conns.push({
+        id: "exc", kind: "arrow",
+        a: { type: "port", boxId: "analyzed", side: "right", t: 0.5 },
+        b: { type: "port", boxId: "exclusion", side: "left", t: 0.5 }
+      });
+    } else if (has("screened") && has("exclusion")) {
+      conns.push({
+        id: "exc", kind: "arrow",
+        a: { type: "port", boxId: "screened", side: "right", t: 0.5 },
+        b: { type: "port", boxId: "exclusion", side: "left", t: 0.5 }
+      });
+    }
+    if (has("analyzed") && splits.length) {
+      splits.forEach(function (s) {
+        conns.push({
+          id: "fork-" + s.id, kind: "arrow",
+          a: { type: "port", boxId: "analyzed", side: "bottom", t: 0.5 },
+          b: { type: "port", boxId: s.id, side: "top", t: 0.5 }
+        });
+      });
+    }
+    if (pipes.length && splits.length) {
+      splits.forEach(function (s) {
+        conns.push({
+          id: "barv-" + s.id, kind: "line",
+          a: { type: "port", boxId: s.id, side: "bottom", t: 0.5 },
+          b: { type: "bar", boxId: s.id }
+        });
+      });
+      if (splits.length > 1) {
+        conns.push({ id: "barh", kind: "line", a: { type: "bar-min" }, b: { type: "bar-max" } });
+      }
+      const t0 = pipes[0];
+      conns.push({
+        id: "pipe-in", kind: "arrow",
+        a: { type: "bar-mid" },
+        b: { type: "port", boxId: t0.id, side: "top", t: 0.5 }
+      });
+    } else if (pipes.length && has("analyzed") && !splits.length) {
+      conns.push({
+        id: "pipe-in", kind: "arrow",
+        a: { type: "port", boxId: "analyzed", side: "bottom", t: 0.5 },
+        b: { type: "port", boxId: pipes[0].id, side: "top", t: 0.5 }
+      });
+    }
+    for (let i = 0; i < pipes.length - 1; i++) {
+      conns.push({
+        id: "pipe-" + i + "-" + (i + 1), kind: "arrow",
+        a: { type: "port", boxId: pipes[i].id, side: "right", t: 0.5 },
+        b: { type: "port", boxId: pipes[i + 1].id, side: "left", t: 0.5 }
+      });
+    }
+    return conns;
+  }
+
+  function structureKey(spec) {
+    if (spec && spec.kind === "study") {
+      return [
+        spec.period, spec.screened_n, (spec.inclusion || []).join("~"),
+        (spec.exclusion || []).map(function (x) { return (x.reason || "") + (x.n || ""); }).join("~"),
+        spec.included_n, spec.included_positive, spec.included_negative,
+        spec.balance, spec.lasso ? 1 : 0,
+        (spec.models || []).join(","), (spec.metrics || []).join(","), (spec.explain || []).join(","),
+        spec.validation ? 1 : 0,
+        spec.training && spec.training.n, spec.test && spec.test.n
+      ].join("|");
+    }
+    return [
+      spec.screened ? 1 : 0,
+      spec.exclusion.length ? 1 : 0,
+      spec.analyzed ? 1 : 0,
+      spec.splits.length,
+      spec.pipeline.length
+    ].join("|");
+  }
+
+  function wrapToWidth(raw, box) {
+    const pad = box.align === "left" ? 0.28 : 0.36;
+    const avg = Math.max(0.05, lineW("n", box.fs));
+    const maxChars = Math.max(8, Math.floor((box.w - pad) / avg));
+    if (box.id === "exclusion") {
+      const title = exclusionTitle();
+      const items = String(raw || "").split(/\n/).map(function (s) { return s.replace(/^\d+\.\s*/, "").trim(); }).filter(Boolean);
+      return numbered(title, items, Math.max(12, maxChars - 2));
+    }
+    return wrap(raw, maxChars);
+  }
+
+  function cloneBox(b) {
+    return { id: b.id, x: b.x, y: b.y, w: b.w, h: b.h, text: b.text, raw: b.raw, align: b.align, fs: b.fs };
+  }
+
+  function placeNewBox(nb, extra) {
+    const pool = scene.boxes.concat(extra || []);
+    if (nb.id.indexOf("pipe-") === 0) {
+      const pipes = pool.filter(function (b) { return b.id.indexOf("pipe-") === 0; })
+        .sort(function (a, b) { return a.x - b.x; });
+      if (pipes.length) {
+        const last = pipes[pipes.length - 1];
+        nb.x = last.x + last.w + 0.22;
+        nb.y = last.y;
+        nb.h = Math.max(nb.h, last.h);
+        return;
+      }
+      const splits = pool.filter(function (b) { return b.id.indexOf("split-") === 0; });
+      const ana = pool.filter(function (b) { return b.id === "analyzed"; })[0];
+      const ref = splits[0] || ana;
+      if (ref) {
+        const xs = splits.map(function (s) { return s.x + s.w / 2; });
+        const mid = xs.length
+          ? (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2
+          : ref.x + ref.w / 2;
+        nb.x = mid - nb.w / 2;
+        nb.y = (splits[0] || ref).y + (splits[0] || ref).h + 0.48;
+      }
+      return;
+    }
+    if (nb.id.indexOf("split-") === 0) {
+      const splits = pool.filter(function (b) { return b.id.indexOf("split-") === 0; })
+        .sort(function (a, b) { return a.x - b.x; });
+      if (splits.length) {
+        const last = splits[splits.length - 1];
+        nb.x = last.x + last.w + 0.18;
+        nb.y = last.y;
+        nb.h = last.h;
+        return;
+      }
+      const ana = pool.filter(function (b) { return b.id === "analyzed"; })[0];
+      if (ana) {
+        nb.x = ana.x + ana.w / 2 - nb.w / 2;
+        nb.y = ana.y + ana.h + 0.40;
+      }
+      return;
+    }
+    if (nb.id === "exclusion") {
+      const ref = pool.filter(function (b) { return b.id === "screened" || b.id === "analyzed"; })[0];
+      if (ref) {
+        nb.x = ref.x + ref.w + 0.45;
+        nb.y = ref.y;
+      }
+      return;
+    }
+    if (nb.id === "analyzed") {
+      const scr = pool.filter(function (b) { return b.id === "screened"; })[0];
+      if (scr) {
+        nb.x = scr.x + scr.w / 2 - nb.w / 2;
+        nb.y = scr.y + scr.h + 0.55;
+      }
+      return;
+    }
+    if (nb.id === "screened") {
+      const ana = pool.filter(function (b) { return b.id === "analyzed"; })[0];
+      if (ana) {
+        nb.x = ana.x + ana.w / 2 - nb.w / 2;
+        nb.y = Math.max(0.18, ana.y - nb.h - 0.55);
+      }
+    }
+  }
+
+  function endStillValid(pt, ids) {
+    if (!pt) return false;
+    if (pt.type === "port") return !!ids[pt.boxId];
+    if (pt.type === "bar") return !pt.boxId || !!ids[pt.boxId];
+    if (pt.type === "on") return true;
+    return true;
+  }
+
+  function mergeScene(L, spec) {
+    const oldById = {};
+    scene.boxes.forEach(function (b) { oldById[b.id] = b; });
+    const next = [];
+    L.boxes.forEach(function (src) {
+      const old = oldById[src.id];
+      if (old) {
+        old.raw = src.raw;
+        old.align = src.align;
+        old.fs = src.fs;
+        old.text = wrapToWidth(src.raw, old);
+        if (old.id === "exclusion") {
+          const wh = boxWH(old.text, old.fs, 0.28, 0.12, 1.45, Math.max(old.w, 4.8));
+          if (wh[1] > old.h) old.h = wh[1];
+          if (wh[0] > old.w) old.w = wh[0];
+        }
+        next.push(old);
+      } else {
+        const nb = cloneBox(src);
+        placeNewBox(nb, next);
+        next.push(nb);
+      }
+    });
+    const ids = {};
+    next.forEach(function (b) { ids[b.id] = true; });
+    const defaults = defaultConnectors(next);
+    const oldConn = {};
+    scene.connectors.forEach(function (c) { oldConn[c.id] = c; });
+    scene.boxes = next;
+    scene.connectors = defaults.map(function (d) {
+      const old = oldConn[d.id];
+      if (old && endStillValid(old.a, ids) && endStillValid(old.b, ids)) return old;
+      return d;
+    });
+    const splits = next.filter(function (b) { return b.id.indexOf("split-") === 0; });
+    if (!splits.length) scene.guides.barY = 0;
+    else if (!scene.guides.barY) scene.guides.barY = splits[0].y + splits[0].h + 0.16;
+    updateSceneText(spec);
+  }
+
+  function applyLayout(spec, force) {
+    const key = structureKey(spec);
+    const L = layout(spec);
+    if (!L) {
+      scene.boxes = [];
+      scene.connectors = [];
+      state.structKey = "";
+      return null;
+    }
+    if (!force && state.manual && scene.boxes.length) {
+      if (state.structKey === key) updateSceneText(spec);
+      else mergeScene(L, spec);
+      state.structKey = key;
+      return scene;
+    }
+    if (!force && state.structKey === key && scene.boxes.length) {
+      updateSceneText(spec);
+      return scene;
+    }
+    scene.boxes = L.boxes.map(cloneBox);
+    const metrics = scene.boxes.filter(function (b) { return b.id.indexOf("metric-") === 0; });
+    const splits = scene.boxes.filter(function (b) { return b.id.indexOf("split-") === 0; });
+    scene.guides.barY = metrics.length ? metrics[0].y - 0.28 : (splits.length ? splits[0].y + splits[0].h + 0.16 : 0);
+    scene.connectors = defaultConnectors(scene.boxes);
+    state.structKey = key;
+    state.manual = false;
+    return scene;
+  }
+
+  function updateSceneText(spec) {
+    const map = {
+      screened: spec.screened,
+      analyzed: spec.analyzed
+    };
+    spec.splits.forEach(function (s, i) { map["split-" + i] = s.label; });
+    spec.pipeline.forEach(function (t, i) { map["pipe-" + i] = t; });
+    scene.boxes.forEach(function (b) {
+      if (b.id === "exclusion" || b.id === "inclusion") {
+        const items = (b.id === "inclusion" ? spec.inclusion : spec.exclusion) || [];
+        const lines = items.map(function (x) { return typeof x === "string" ? x : (x.reason || ""); }).filter(Boolean);
+        const title = b.id === "inclusion" ? "Inclusion criteria:" : "Exclusion criteria:";
+        b.raw = lines.join("\n");
+        b.text = numbered(title, lines, 32);
+      } else if (map[b.id] != null) {
+        b.raw = map[b.id];
+        b.text = wrapToWidth(b.raw, b);
+      }
+    });
+  }
+
+  function contentBounds() {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    function acc(x, y) {
+      minX = Math.min(minX, x); minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+    }
+    scene.boxes.forEach(function (b) {
+      acc(b.x, b.y); acc(b.x + b.w, b.y + b.h);
+    });
+    scene.connectors.forEach(function (c) {
+      const a = resolvePt(c.a), b = resolvePt(c.b);
+      acc(a[0], a[1]); acc(b[0], b[1]);
+    });
+    if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 8, maxY: 5, width: 8, height: 5 };
+    const pad = 0.22;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    return { minX: minX, minY: minY, maxX: maxX, maxY: maxY, width: maxX - minX, height: maxY - minY };
+  }
+
+  function drawList() {
+    const arrows = [];
+    const lines = [];
+    scene.connectors.forEach(function (c) {
+      const a = resolvePt(c.a), b = resolvePt(c.b);
+      const seg = [a[0], a[1], b[0], b[1]];
+      if (c.kind === "arrow") arrows.push(seg);
+      else lines.push(seg);
+    });
+    return { boxes: scene.boxes, arrows: arrows, lines: lines };
+  }
+
+  function arrowHead(x1, y1, x2, y2, size) {
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    const s = size || 0.11;
+    return [
+      [x2, y2],
+      [x2 - s * Math.cos(ang - 0.42), y2 - s * Math.sin(ang - 0.42)],
+      [x2 - s * Math.cos(ang + 0.42), y2 - s * Math.sin(ang + 0.42)]
+    ];
+  }
+
+  function shorten(x1, y1, x2, y2, a, b) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    return [
+      x1 + dx / len * a,
+      y1 + dy / len * a,
+      x2 - dx / len * b,
+      y2 - dy / len * b
+    ];
+  }
+
+  function paintCanvas(draw, bounds, dpi, widthCm) {
+    dpi = dpi || 300;
+    widthCm = widthCm || 16;
+    const scale = (widthCm / 2.54 / bounds.width) * dpi;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bounds.width * scale);
+    canvas.height = Math.round(bounds.height * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(scale, scale);
+    ctx.translate(-bounds.minX, -bounds.minY);
+    ctx.strokeStyle = "#000";
+    ctx.fillStyle = "#000";
+    ctx.lineWidth = LW / 72;
+    ctx.lineJoin = "miter";
+    ctx.lineCap = "butt";
+
+    function strokeSeg(a) {
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(a[2], a[3]);
+      ctx.stroke();
+    }
+    draw.lines.forEach(strokeSeg);
+    draw.arrows.forEach(function (a) {
+      const s = shorten(a[0], a[1], a[2], a[3], 0.008, 0.008);
+      strokeSeg(s);
+      const hd = arrowHead(s[0], s[1], s[2], s[3], 0.10);
+      ctx.beginPath();
+      ctx.moveTo(hd[0][0], hd[0][1]);
+      ctx.lineTo(hd[1][0], hd[1][1]);
+      ctx.lineTo(hd[2][0], hd[2][1]);
+      ctx.closePath();
+      ctx.fill();
+    });
+    draw.boxes.forEach(function (b) {
+      ctx.fillStyle = "#fff";
+      ctx.strokeStyle = "#000";
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = "#000";
+      ctx.font = "400 " + (b.fs / 72) + "px " + figureFont();
+      ctx.textAlign = b.align === "left" ? "left" : "center";
+      ctx.textBaseline = "middle";
+      const lines = String(b.text).split("\n");
+      const lh = (b.fs / 72) * 1.28;
+      const x = b.align === "left" ? b.x + 0.14 : b.x + b.w / 2;
+      const y0 = b.y + b.h / 2 - (lh * (lines.length - 1)) / 2;
+      lines.forEach(function (ln, i) {
+        ctx.fillText(ln, x, y0 + i * lh);
+      });
+    });
+    return canvas;
+  }
+
+  function svgNS() { return "http://www.w3.org/2000/svg"; }
+
+  function elNS(name, attrs) {
+    const n = document.createElementNS(svgNS(), name);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+
+  function worldEl() {
+    const svg = els.stage.querySelector("svg.board");
+    return svg ? svg.querySelector(".world") : null;
+  }
+
+  function applyView() {
+    const g = worldEl();
+    if (!g) return;
+    g.setAttribute("transform", "translate(" + view.ox + "," + view.oy + ") scale(" + view.scale + ")");
+    const pct = document.getElementById("zoom-pct");
+    if (pct) pct.textContent = Math.round(view.scale / 80 * 100) + "%";
+  }
+
+  function clientToWorld(ev) {
+    const svg = els.stage.querySelector("svg.board");
+    const r = svg.getBoundingClientRect();
+    return [(ev.clientX - r.left - view.ox) / view.scale, (ev.clientY - r.top - view.oy) / view.scale];
+  }
+
+  function fitView() {
+    const svg = els.stage.querySelector("svg.board");
+    if (!svg || !scene.boxes.length) return;
+    const b = contentBounds();
+    const r = svg.getBoundingClientRect();
+    if (r.width < 40 || r.height < 40) return;
+    const pad = 20;
+    view.scale = Math.max(28, Math.min(220, Math.min((r.width - pad * 2) / b.width, (r.height - pad * 2) / b.height)));
+    view.ox = (r.width - b.width * view.scale) / 2 - b.minX * view.scale;
+    view.oy = (r.height - b.height * view.scale) / 2 - b.minY * view.scale;
+    applyView();
+  }
+
+  function zoomAt(cx, cy, factor) {
+    const svg = els.stage.querySelector("svg.board");
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const wx = (cx - r.left - view.ox) / view.scale;
+    const wy = (cy - r.top - view.oy) / view.scale;
+    view.scale = Math.max(28, Math.min(260, view.scale * factor));
+    view.ox = cx - r.left - wx * view.scale;
+    view.oy = cy - r.top - wy * view.scale;
+    applyView();
+    if (sel.type) drawOverlay();
+  }
+
+  function handleSize() {
+    return 7 / view.scale;
+  }
+
+  function clampT(t) {
+    return Math.max(0.08, Math.min(0.92, t));
+  }
+
+  function snapTCenter(t, hold) {
+    const z = hold ? 0.22 : 0.14;
+    return Math.abs(t - 0.5) <= z ? 0.5 : clampT(t);
+  }
+
+  function boxCenter(b) {
+    return [b.x + b.w / 2, b.y + b.h / 2];
+  }
+
+  function sideMids(b) {
+    const c = boxCenter(b);
+    return [
+      { side: "top", t: 0.5, px: c[0], py: b.y },
+      { side: "bottom", t: 0.5, px: c[0], py: b.y + b.h },
+      { side: "left", t: 0.5, px: b.x, py: c[1] },
+      { side: "right", t: 0.5, px: b.x + b.w, py: c[1] }
+    ];
+  }
+
+  function snapPortCenter(pt) {
+    if (!pt || pt.type !== "port") return;
+    pt.t = snapTCenter(pt.t, Math.abs(pt.t - 0.5) < 0.04);
+  }
+
+  function isBarConn(c) {
+    if (!c) return false;
+    return c.id.indexOf("bar") === 0 || c.id === "pipe-in" ||
+      (c.a && c.a.type && c.a.type.indexOf("bar") === 0) ||
+      (c.b && c.b.type && c.b.type.indexOf("bar") === 0);
+  }
+
+  function closestOnBox(b, x, y) {
+    const tx = b.w ? (x - b.x) / b.w : 0.5;
+    const ty = b.h ? (y - b.y) / b.h : 0.5;
+    const cand = [
+      { side: "top", t: tx, px: b.x + Math.max(0, Math.min(1, tx)) * b.w, py: b.y },
+      { side: "bottom", t: tx, px: b.x + Math.max(0, Math.min(1, tx)) * b.w, py: b.y + b.h },
+      { side: "left", t: ty, px: b.x, py: b.y + Math.max(0, Math.min(1, ty)) * b.h },
+      { side: "right", t: ty, px: b.x + b.w, py: b.y + Math.max(0, Math.min(1, ty)) * b.h }
+    ];
+    let best = cand[0], bestD = Infinity;
+    cand.forEach(function (p) {
+      const d = Math.hypot(x - p.px, y - p.py);
+      if (d < bestD) { bestD = d; best = p; }
+    });
+    const mids = sideMids(b);
+    mids.forEach(function (p) {
+      const d = Math.hypot(x - p.px, y - p.py);
+      if (d < 0.40 && d - 0.18 < bestD) {
+        bestD = d - 0.18;
+        best = p;
+      }
+    });
+    const c = boxCenter(b);
+    const dc = Math.hypot(x - c[0], y - c[1]);
+    if (dc < 0.46) {
+      let mid = mids[0], md = Infinity;
+      mids.forEach(function (p) {
+        const d = Math.hypot(x - p.px, y - p.py);
+        if (d < md) { md = d; mid = p; }
+      });
+      if (dc - 0.22 < bestD) {
+        bestD = dc - 0.22;
+        best = mid;
+      }
+    }
+    return {
+      side: best.side,
+      t: best.t === 0.5 ? 0.5 : snapTCenter(clampT(best.t)),
+      d: Math.max(0, bestD),
+      px: best.px,
+      py: best.py
+    };
+  }
+
+  function nearestPort(x, y, preferBoxId, maxDist) {
+    maxDist = maxDist == null ? 0.32 : maxDist;
+    let best = null, bestD = maxDist;
+    scene.boxes.forEach(function (b) {
+      const lim = b.id === preferBoxId ? maxDist * 2.2 : maxDist;
+      const hit = closestOnBox(b, x, y);
+      if (hit.d <= lim && hit.d <= bestD) {
+        bestD = hit.d;
+        best = { type: "port", boxId: b.id, side: hit.side, t: hit.t };
+      }
+    });
+    return best;
+  }
+
+  function almostHV(x1, y1, x2, y2, hold) {
+    const dx = Math.abs(x2 - x1), dy = Math.abs(y2 - y1);
+    if (dx < 1e-4 && dy < 1e-4) return null;
+    const lim = (hold ? 32 : 20) * Math.PI / 180;
+    const delta = hold ? 0.30 : 0.18;
+    const angH = Math.atan2(dy, Math.max(dx, 1e-6));
+    const angV = Math.atan2(dx, Math.max(dy, 1e-6));
+    const nearH = dy <= delta || angH < lim;
+    const nearV = dx <= delta || angV < lim;
+    if (nearH && (!nearV || dy <= dx)) return "h";
+    if (nearV) return "v";
+    return null;
+  }
+
+  function tOnSide(box, side, x, y) {
+    const t = (side === "top" || side === "bottom")
+      ? (box.w ? (x - box.x) / box.w : 0.5)
+      : (box.h ? (y - box.y) / box.h : 0.5);
+    return snapTCenter(clampT(t));
+  }
+
+  function distToSeg(x1, y1, x2, y2, px, py) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  function makePort(box, side, t) {
+    return { type: "port", boxId: box.id, side: side, t: clampT(t) };
+  }
+
+  function snapConnOrtho(conn) {
+    if (!conn || isBarConn(conn)) return;
+    if (conn.a.type === "on" && conn.b.type === "port") {
+      const host = connById(conn.a.connId);
+      if (!host) return;
+      const p = resolvePt(host.a), q = resolvePt(host.b);
+      const bb = boxById(conn.b.boxId);
+      if (!bb) return;
+      if (almostHV(p[0], p[1], q[0], q[1]) === "v") {
+        const mid = resolvePt(conn.a);
+        if (conn.b.side === "top" || conn.b.side === "bottom") {
+          conn.b.side = mid[0] <= bb.x + bb.w / 2 ? "left" : "right";
+        }
+        conn.b.t = snapTCenter(clampT((mid[1] - bb.y) / bb.h));
+      }
+      snapPortCenter(conn.b);
+      return;
+    }
+    const p1 = resolvePt(conn.a), p2 = resolvePt(conn.b);
+    const hold = Math.abs(p1[1] - p2[1]) < 0.03 || Math.abs(p1[0] - p2[0]) < 0.03;
+    const hv = almostHV(p1[0], p1[1], p2[0], p2[1], hold);
+    if (!hv) return;
+    if (conn.a.type === "port" && conn.b.type === "port") {
+      const ba = boxById(conn.a.boxId), bb = boxById(conn.b.boxId);
+      if (!ba || !bb) return;
+      if (hv === "h") {
+        if (conn.a.side === "top" || conn.a.side === "bottom") {
+          conn.a.side = ba.x + ba.w / 2 <= bb.x + bb.w / 2 ? "right" : "left";
+        }
+        if (conn.b.side === "top" || conn.b.side === "bottom") {
+          conn.b.side = bb.x + bb.w / 2 <= ba.x + ba.w / 2 ? "right" : "left";
+        }
+        const y = (p1[1] + p2[1]) / 2;
+        conn.a.t = snapTCenter(clampT((y - ba.y) / ba.h));
+        conn.b.t = snapTCenter(clampT((y - bb.y) / bb.h));
+      } else {
+        if (conn.a.side === "left" || conn.a.side === "right") {
+          conn.a.side = ba.y + ba.h / 2 <= bb.y + bb.h / 2 ? "bottom" : "top";
+        }
+        if (conn.b.side === "left" || conn.b.side === "right") {
+          conn.b.side = bb.y + bb.h / 2 <= ba.y + ba.h / 2 ? "bottom" : "top";
+        }
+        const x = (p1[0] + p2[0]) / 2;
+        conn.a.t = snapTCenter(clampT((x - ba.x) / ba.w));
+        conn.b.t = snapTCenter(clampT((x - bb.x) / bb.w));
+      }
+      snapPortCenter(conn.a);
+      snapPortCenter(conn.b);
+      return;
+    }
+    if (hv === "h") {
+      if (conn.a.type === "xy") conn.a.y = p2[1];
+      if (conn.b.type === "xy") conn.b.y = p1[1];
+    } else {
+      if (conn.a.type === "xy") conn.a.x = p2[0];
+      if (conn.b.type === "xy") conn.b.x = p1[0];
+    }
+  }
+
+  function bestAttachment(ba, bb, px, py) {
+    const sides = ["top", "bottom", "left", "right"];
+    const lr = { left: 1, right: 1 };
+    const tb = { top: 1, bottom: 1 };
+    let best = null, bestScore = Infinity;
+
+    function consider(sa, sb, p1, p2, bonus) {
+      const score = distToSeg(p1[0], p1[1], p2[0], p2[1], px, py) - (bonus || 0);
+      if (score < bestScore) {
+        bestScore = score;
+        best = {
+          a: makePort(ba, sa, tOnSide(ba, sa, p1[0], p1[1])),
+          b: makePort(bb, sb, tOnSide(bb, sb, p2[0], p2[1]))
+        };
+      }
+    }
+
+    sides.forEach(function (sa) {
+      if (!lr[sa]) return;
+      sides.forEach(function (sb) {
+        if (!lr[sb]) return;
+        const yMin = Math.max(ba.y + ba.h * 0.08, bb.y + bb.h * 0.08);
+        const yMax = Math.min(ba.y + ba.h * 0.92, bb.y + bb.h * 0.92);
+        if (yMin <= yMax) {
+          const y = Math.max(yMin, Math.min(yMax, py));
+          consider(sa, sb, portXY(ba, sa, (y - ba.y) / ba.h), portXY(bb, sb, (y - bb.y) / bb.h), 0.28);
+        }
+      });
+    });
+    sides.forEach(function (sa) {
+      if (!tb[sa]) return;
+      sides.forEach(function (sb) {
+        if (!tb[sb]) return;
+        const xMin = Math.max(ba.x + ba.w * 0.08, bb.x + bb.w * 0.08);
+        const xMax = Math.min(ba.x + ba.w * 0.92, bb.x + bb.w * 0.92);
+        if (xMin <= xMax) {
+          const x = Math.max(xMin, Math.min(xMax, px));
+          consider(sa, sb, portXY(ba, sa, (x - ba.x) / ba.w), portXY(bb, sb, (x - bb.x) / bb.w), 0.28);
+        }
+      });
+    });
+    sides.forEach(function (sa) {
+      sides.forEach(function (sb) {
+        const ta = tOnSide(ba, sa, px, py);
+        const tb2 = tOnSide(bb, sb, px, py);
+        consider(sa, sb, portXY(ba, sa, ta), portXY(bb, sb, tb2), 0);
+      });
+    });
+    sides.forEach(function (sa) {
+      sides.forEach(function (sb) {
+        consider(sa, sb, portXY(ba, sa, 0.5), portXY(bb, sb, 0.5), 0.16);
+      });
+    });
+    return best;
+  }
+
+  function drawBoard() {
+    const g = worldEl();
+    if (!g) return;
+    g.innerHTML = "";
+    const edges = elNS("g", { "class": "edges" });
+    const nodes = elNS("g", { "class": "nodes" });
+    const overlay = elNS("g", { "class": "overlay" });
+    const sw = LW / 72;
+    scene.connectors.forEach(function (c) {
+      const a = resolvePt(c.a), b = resolvePt(c.b);
+      const s = shorten(a[0], a[1], b[0], b[1], 0.01, 0.01);
+      const line = elNS("line", {
+        x1: s[0], y1: s[1], x2: s[2], y2: s[3],
+        stroke: "#000", "stroke-width": sw
+      });
+      edges.appendChild(line);
+      if (c.kind === "arrow") {
+        const hd = arrowHead(s[0], s[1], s[2], s[3], 0.10);
+        edges.appendChild(elNS("polygon", {
+          points: hd.map(function (p) { return p[0] + "," + p[1]; }).join(" "),
+          fill: "#000"
+        }));
+      }
+      const hit = elNS("line", {
+        x1: a[0], y1: a[1], x2: b[0], y2: b[1],
+        stroke: "transparent", "stroke-width": 0.16,
+        "class": "hit", "data-kind": "conn", "data-id": c.id
+      });
+      hit.style.cursor = "grab";
+      edges.appendChild(hit);
+    });
+    scene.boxes.forEach(function (b) {
+      const gBox = elNS("g", { "data-kind": "box", "data-id": b.id });
+      gBox.style.cursor = "move";
+      const rec = elNS("rect", {
+        x: b.x, y: b.y, width: b.w, height: b.h,
+        fill: "#fff", stroke: sel.type === "box" && sel.id === b.id ? "#2b6f90" : "#000",
+        "stroke-width": sel.type === "box" && sel.id === b.id ? sw * 1.7 : sw
+      });
+      gBox.appendChild(rec);
+      const lines = String(b.text || "").split("\n");
+      const fsIn = b.fs / 72;
+      const lh = fsIn * 1.28;
+      const total = lh * lines.length;
+      let y0 = b.y + b.h / 2 - total / 2 + lh * 0.78;
+      const x = b.align === "left" ? b.x + 0.14 : b.x + b.w / 2;
+      const anchor = b.align === "left" ? "start" : "middle";
+      lines.forEach(function (ln) {
+        const t = elNS("text", {
+          x: x, y: y0, "text-anchor": anchor,
+          "font-family": figureFont().replace(/"/g, "'"),
+          "font-size": fsIn, fill: "#000"
+        });
+        t.textContent = ln;
+        t.style.pointerEvents = "none";
+        gBox.appendChild(t);
+        y0 += lh;
+      });
+      nodes.appendChild(gBox);
+    });
+    g.appendChild(edges);
+    g.appendChild(nodes);
+    g.appendChild(overlay);
+    drawOverlay();
+    applyView();
+  }
+
+  function drawOverlay() {
+    const g = worldEl();
+    if (!g) return;
+    const overlay = g.querySelector(".overlay");
+    if (!overlay) return;
+    overlay.innerHTML = "";
+    const hs = handleSize();
+    if (sel.type === "box") {
+      const b = boxById(sel.id);
+      if (!b) return;
+      const handles = [
+        ["nw", b.x, b.y], ["n", b.x + b.w / 2, b.y], ["ne", b.x + b.w, b.y],
+        ["w", b.x, b.y + b.h / 2], ["e", b.x + b.w, b.y + b.h / 2],
+        ["sw", b.x, b.y + b.h], ["s", b.x + b.w / 2, b.y + b.h], ["se", b.x + b.w, b.y + b.h]
+      ];
+      const cursors = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize" };
+      handles.forEach(function (h) {
+        const r = elNS("rect", {
+          x: h[1] - hs / 2, y: h[2] - hs / 2, width: hs, height: hs,
+          fill: "#fff", stroke: "#2b6f90", "stroke-width": hs / 7,
+          "data-kind": "handle", "data-id": b.id, "data-corner": h[0]
+        });
+        r.style.cursor = cursors[h[0]];
+        overlay.appendChild(r);
+      });
+    } else if (sel.type === "conn") {
+      const c = connById(sel.id);
+      if (!c) return;
+      const a = resolvePt(c.a), b = resolvePt(c.b);
+      [[a, "a"], [b, "b"], [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, "m"]].forEach(function (p) {
+        const x = p[0][0] != null ? p[0][0] : p[0];
+        const y = p[0][1] != null ? p[0][1] : p[1];
+        const end = p[0][0] != null ? p[1] : p[2];
+        const circ = elNS("circle", {
+          cx: x, cy: y, r: hs * 0.62,
+          fill: end === "m" ? "#fff" : "#2b6f90",
+          stroke: "#2b6f90", "stroke-width": hs / 8,
+          "data-kind": "end", "data-id": c.id, "data-end": end
+        });
+        circ.style.cursor = "grab";
+        overlay.appendChild(circ);
+      });
+    }
+  }
+
+  function setHint(text) {
+    const el = els.stage.querySelector(".edit-hint");
+    if (el) el.textContent = text;
+  }
+
+  function ensureBoard() {
+    if (els.stage.querySelector("svg.board")) return;
+    els.stage.classList.remove("empty-mode");
+    els.stage.innerHTML =
+      '<svg class="board" aria-label="Figure 1 flowchart"><g class="world"></g></svg>' +
+      '<div class="edit-hint">拖箭头可换边 · 接近水平/垂直自动对齐 · 双击改文字</div>' +
+      '<textarea class="inplace hidden" id="inplace"></textarea>';
+    bindBoard();
+  }
+
+  function showEmpty() {
+    els.stage.classList.add("empty-mode");
+    els.stage.innerHTML = '<div class="empty-preview">请在左侧填写内容。<br />至少需要「筛查」或「纳入分析」其中一项。</div>';
+    boardBound = false;
+    sel.type = null;
+  }
+
+  function commitBoxText(box, raw) {
+    raw = String(raw || "").replace(/\r/g, "");
+    if (box.id === "screened") {
+      state.period = raw.trim().split("\n")[0] || "";
+      if (els.period) els.period.value = state.period;
+    } else if (box.id === "included") {
+      state.includedN = (raw.match(/n\s*=\s*(\d+)/) || [])[1] || state.includedN;
+    } else if (box.id === "exclusion") {
+      const items = raw.split(/\n/).map(function (s) {
+        return s.replace(/^(排除标准：|Exclusion criteria:)\s*/i, "").replace(/^\d+\.\s*/, "").trim();
+      }).filter(Boolean).slice(0, MAX_EXC);
+      state.exclusion = items.length ? items : [""];
+      renderForm();
+    } else if (box.id.indexOf("split-") === 0) {
+      const i = Number(box.id.slice(6));
+      const m = raw.trim().match(/^(.*?)(?:\s*\(n\s*=\s*(\d+)\s*\))?$/i);
+      if (!state.splits[i]) state.splits[i] = { name: "", n: "" };
+      state.splits[i].name = m && m[1] ? m[1].trim() : raw.trim();
+      state.splits[i].n = m && m[2] ? m[2] : "";
+      renderForm();
+    } else if (box.id.indexOf("pipe-") === 0) {
+      const i = Number(box.id.slice(5));
+      state.pipeline[i] = raw.trim();
+      renderForm();
+    }
+    box.raw = raw.trim();
+    box.text = wrapToWidth(box.raw, box);
+    if (!state.legendTouched) els.legend.value = defaultLegend(specFromState());
+  }
+
+  function openEditor(box) {
+    const ta = document.getElementById("inplace");
+    const svg = els.stage.querySelector("svg.board");
+    if (!ta || !svg) return;
+    const r = svg.getBoundingClientRect();
+    const sr = els.stage.getBoundingClientRect();
+    ta.classList.remove("hidden");
+    ta.value = box.id === "exclusion"
+      ? (box.raw || "").split(/\n/).map(function (s, i) { return (i + 1) + ". " + s; }).join("\n")
+      : (box.raw || box.text || "");
+    ta.style.left = (r.left - sr.left + view.ox + box.x * view.scale) + "px";
+    ta.style.top = (r.top - sr.top + view.oy + box.y * view.scale) + "px";
+    ta.style.width = Math.max(80, box.w * view.scale) + "px";
+    ta.style.height = Math.max(36, box.h * view.scale) + "px";
+    ta.style.fontFamily = figureFont();
+    ta.style.fontSize = Math.max(11, (box.fs / 72) * view.scale) + "px";
+    ta.style.textAlign = box.align === "left" ? "left" : "center";
+    ta.focus();
+    ta.select();
+    function close() {
+      commitBoxText(box, ta.value);
+      ta.classList.add("hidden");
+      ta.onblur = null;
+      drawBoard();
+      persist();
+    }
+    ta.onblur = close;
+    ta.onkeydown = function (e) {
+      if (e.key === "Escape") { ta.value = box.raw || ""; ta.blur(); }
+      if (e.key === "Enter" && !e.shiftKey && box.id !== "exclusion" && box.id !== "screened") {
+        e.preventDefault();
+        ta.blur();
+      }
+    };
+  }
+
+  function bindBoard() {
+    if (boardBound) return;
+    const svg = els.stage.querySelector("svg.board");
+    if (!svg) return;
+    boardBound = true;
+    const pointers = new Map();
+    let drag = null;
+    let pinch = null;
+
+    svg.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 0.9 : 1.11);
+    }, { passive: false });
+
+    svg.addEventListener("dblclick", function (e) {
+      const w = clientToWorld(e);
+      const box = hitBox(w[0], w[1]);
+      if (box) openEditor(box);
+    });
+
+    svg.addEventListener("pointerdown", function (e) {
+      if (e.button === 2) return;
+      const inplace = document.getElementById("inplace");
+      if (inplace && !inplace.classList.contains("hidden")) inplace.blur();
+      svg.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const pts = Array.from(pointers.values());
+        pinch = {
+          dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+          scale: view.scale,
+          cx: (pts[0].x + pts[1].x) / 2,
+          cy: (pts[0].y + pts[1].y) / 2
+        };
+        drag = null;
+        return;
+      }
+      const t = e.target;
+      const kind = t.getAttribute && t.getAttribute("data-kind");
+      const w = clientToWorld(e);
+      if (kind === "handle") {
+        const box = boxById(t.getAttribute("data-id"));
+        drag = { mode: "resize", box: box, corner: t.getAttribute("data-corner"), x0: w[0], y0: w[1], ox: box.x, oy: box.y, ow: box.w, oh: box.h };
+        els.stage.classList.add("moving");
+      } else if (kind === "end") {
+        const c0 = connById(t.getAttribute("data-id"));
+        const end0 = t.getAttribute("data-end");
+        const pt0 = c0 && (end0 === "a" ? c0.a : end0 === "b" ? c0.b : null);
+        drag = {
+          mode: "end", conn: c0, end: end0, x0: w[0], y0: w[1],
+          preferBoxId: pt0 && pt0.type === "port" ? pt0.boxId : null
+        };
+      } else if (kind === "conn") {
+        sel.type = "conn";
+        sel.id = t.getAttribute("data-id");
+        const c = connById(sel.id);
+        drag = { mode: "shaft", conn: c, x0: w[0], y0: w[1], t0: c && c.a && c.a.t, barY0: scene.guides.barY };
+        drawBoard();
+      } else {
+        const box = hitBox(w[0], w[1]);
+        if (box) {
+          sel.type = "box";
+          sel.id = box.id;
+          drag = { mode: "pending-box", box: box, x0: w[0], y0: w[1], cx0: e.clientX, cy0: e.clientY, ox: box.x, oy: box.y };
+          drawBoard();
+        } else {
+          sel.type = null;
+          drag = { mode: "pending-pan", x0: e.clientX, y0: e.clientY, ox: view.ox, oy: view.oy };
+          drawOverlay();
+        }
+      }
+    });
+
+    svg.addEventListener("pointermove", function (e) {
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch && pointers.size >= 2) {
+        const pts = Array.from(pointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        if (pinch.dist > 4) zoomAt(pinch.cx, pinch.cy, dist / pinch.dist);
+        pinch.dist = dist;
+        return;
+      }
+      if (!drag) return;
+      const w = clientToWorld(e);
+      if (drag.mode === "pending-pan") {
+        if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 4) return;
+        drag.mode = "pan";
+        els.stage.classList.add("panning");
+      }
+      if (drag.mode === "pan") {
+        view.ox = drag.ox + (e.clientX - drag.x0);
+        view.oy = drag.oy + (e.clientY - drag.y0);
+        applyView();
+        return;
+      }
+      if (drag.mode === "pending-box") {
+        if (Math.hypot(e.clientX - drag.cx0, e.clientY - drag.cy0) < 4) return;
+        drag.mode = "move";
+        els.stage.classList.add("moving");
+      }
+      if (drag.mode === "move") {
+        drag.box.x = drag.ox + (w[0] - drag.x0);
+        drag.box.y = drag.oy + (w[1] - drag.y0);
+        state.manual = true;
+        scene.connectors.forEach(snapConnOrtho);
+        drawBoard();
+        return;
+      }
+      if (drag.mode === "resize") {
+        resizeBox(drag, w[0], w[1]);
+        state.manual = true;
+        drawBoard();
+        return;
+      }
+      if (drag.mode === "end") {
+        moveEndpoint(drag.conn, drag.end, w[0], w[1], drag.preferBoxId);
+        state.manual = true;
+        drawBoard();
+        return;
+      }
+      if (drag.mode === "shaft") {
+        moveShaft(drag, w[0], w[1]);
+        state.manual = true;
+        drawBoard();
+      }
+    });
+
+    function endPtr(e) {
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size === 0) {
+        if (drag && (drag.mode === "end" || drag.mode === "shaft" || drag.mode === "move" || drag.mode === "resize")) {
+          if (drag.conn) snapConnOrtho(drag.conn);
+          else scene.connectors.forEach(snapConnOrtho);
+          drawBoard();
+        }
+        drag = null;
+        els.stage.classList.remove("panning", "moving");
+        persist();
+      }
+    }
+    svg.addEventListener("pointerup", endPtr);
+    svg.addEventListener("pointercancel", endPtr);
+  }
+
+  function hitBox(x, y) {
+    for (let i = scene.boxes.length - 1; i >= 0; i--) {
+      const b = scene.boxes[i];
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return b;
+    }
+    return null;
+  }
+
+  function resizeBox(drag, x, y) {
+    const minW = 0.85, minH = 0.32;
+    let x0 = drag.ox, y0 = drag.oy, x1 = drag.ox + drag.ow, y1 = drag.oy + drag.oh;
+    const c = drag.corner;
+    if (c.indexOf("w") >= 0) x0 = Math.min(x, x1 - minW);
+    if (c.indexOf("e") >= 0) x1 = Math.max(x, x0 + minW);
+    if (c.indexOf("n") >= 0) y0 = Math.min(y, y1 - minH);
+    if (c.indexOf("s") >= 0) y1 = Math.max(y, y0 + minH);
+    drag.box.x = x0;
+    drag.box.y = y0;
+    drag.box.w = x1 - x0;
+    drag.box.h = y1 - y0;
+    drag.box.text = wrapToWidth(drag.box.raw, drag.box);
+  }
+
+  function moveEndpoint(conn, end, x, y, preferBoxId) {
+    if (!conn) return;
+    if (end === "m") {
+      moveShaft({ conn: conn, x0: resolvePt(conn.a)[0], y0: resolvePt(conn.a)[1], t0: conn.a.t, barY0: scene.guides.barY }, x, y);
+      return;
+    }
+    const pt = end === "a" ? conn.a : conn.b;
+    const other = end === "a" ? conn.b : conn.a;
+    if (pt.type === "on") {
+      const c = connById(pt.connId);
+      if (!c) return;
+      const a = resolvePt(c.a), b = resolvePt(c.b);
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len2 = dx * dx + dy * dy || 1;
+      pt.t = clampT(((x - a[0]) * dx + (y - a[1]) * dy) / len2);
+      snapConnOrtho(conn);
+      return;
+    }
+    if (pt.type === "bar" || pt.type === "bar-mid" || pt.type === "bar-min" || pt.type === "bar-max") {
+      scene.guides.barY = y;
+      return;
+    }
+    const op = resolvePt(other);
+    const cur = resolvePt(pt);
+    const hold = almostHV(op[0], op[1], cur[0], cur[1]) != null;
+    const hv = almostHV(op[0], op[1], x, y, hold);
+    let sx = x, sy = y;
+    if (hv === "h") sy = op[1];
+    if (hv === "v") sx = op[0];
+    const prefer = preferBoxId || (pt.type === "port" ? pt.boxId : null);
+    const snapped = nearestPort(sx, sy, prefer, 0.38);
+    if (snapped) {
+      const box = boxById(snapped.boxId);
+      if (box && hv === "h") {
+        if (snapped.side === "top" || snapped.side === "bottom") {
+          snapped.side = sx <= box.x + box.w / 2 ? "left" : "right";
+        }
+        snapped.t = clampT((op[1] - box.y) / box.h);
+      } else if (box && hv === "v") {
+        if (snapped.side === "left" || snapped.side === "right") {
+          snapped.side = sy <= box.y + box.h / 2 ? "top" : "bottom";
+        }
+        snapped.t = clampT((op[0] - box.x) / box.w);
+      }
+      if (end === "a") conn.a = snapped;
+      else conn.b = snapped;
+    } else {
+      const free = { type: "xy", x: sx, y: sy };
+      if (end === "a") conn.a = free;
+      else conn.b = free;
+    }
+    snapConnOrtho(conn);
+  }
+
+  function moveShaft(drag, x, y) {
+    const c = drag.conn;
+    if (!c) return;
+    const a = c.a, b = c.b;
+    if (isBarConn(c)) {
+      scene.guides.barY = y;
+      return;
+    }
+    if (a.type === "on") {
+      const host = connById(a.connId);
+      if (host) {
+        const p = resolvePt(host.a), q = resolvePt(host.b);
+        const dx = q[0] - p[0], dy = q[1] - p[1];
+        const len2 = dx * dx + dy * dy || 1;
+        a.t = clampT(((x - p[0]) * dx + (y - p[1]) * dy) / len2);
+      }
+      if (b.type === "port") {
+        const bb = boxById(b.boxId);
+        if (bb) {
+          const hit = closestOnBox(bb, x, y);
+          b.side = hit.side;
+          b.t = hit.t;
+        }
+      }
+      snapConnOrtho(c);
+      return;
+    }
+    if (a.type === "port" && b.type === "port") {
+      const ba = boxById(a.boxId), bb = boxById(b.boxId);
+      if (!ba || !bb) return;
+      if (ba.id === bb.id) {
+        const ha = closestOnBox(ba, x, y);
+        a.side = ha.side;
+        a.t = ha.t;
+        snapConnOrtho(c);
+        return;
+      }
+      const att = bestAttachment(ba, bb, x, y);
+      if (att) {
+        c.a = att.a;
+        c.b = att.b;
+        snapConnOrtho(c);
+      }
+      return;
+    }
+    if (a.type === "port" || b.type === "port") {
+      const portEnd = a.type === "port" ? "a" : "b";
+      const box = boxById((portEnd === "a" ? a : b).boxId);
+      if (box) {
+        const hit = closestOnBox(box, x, y);
+        const np = makePort(box, hit.side, hit.t);
+        if (portEnd === "a") c.a = np;
+        else c.b = np;
+      }
+      snapConnOrtho(c);
+    }
+  }
+
+  function validate(spec) {
+    const msgs = [];
+    let level = "ok";
+    if (spec.kind === "study") {
+      if (spec.screened_n == null && spec.included_n == null) {
+        return { level: "empty", msgs: ["填写筛查人数或最终纳入人数后即可出图。"] };
+      }
+      const msgs = [];
+      let level = "ok";
+      if (spec.included_positive != null && spec.included_negative != null && spec.included_n != null && spec.included_positive + spec.included_negative !== spec.included_n) {
+        level = "err";
+        msgs.push("最终纳入的阳性与阴性之和不等于总人数。");
+      }
+      const cohorts = [spec.training, spec.test].concat(spec.validation ? [spec.validation] : []);
+      if (cohorts.every(function (c) { return c && c.n != null; }) && spec.included_n != null) {
+        const sum = cohorts.reduce(function (a, c) { return a + c.n; }, 0);
+        if (sum !== spec.included_n) {
+          level = "err";
+          msgs.push("各队列人数之和 (" + sum + ") 与最终纳入 (" + spec.included_n + ") 不一致。");
+        }
+      }
+      if (!msgs.length) msgs.push("示例以外的人数只填本研究结果。downsample 与 SMOTE 只选一个，只挂在 Training Cohort 下。");
+      return { level: level, msgs: msgs };
+    }
+    if (!spec.screened && !spec.analyzed) {
+      return { level: "empty", msgs: ["填写筛查或纳入分析后即可出图。"] };
+    }
+    const sn = extractN(spec.screened);
+    const an = extractN(spec.analyzed);
+    const splitNs = spec.splits.map(function (s) { return extractN(s.label); });
+    if (sn != null && an != null && sn < an) {
+      level = "err";
+      msgs.push("筛查人数 (" + sn + ") 小于纳入人数 (" + an + ")。");
+    }
+    if (splitNs.length && splitNs.every(function (n) { return n != null; }) && an != null) {
+      const sum = splitNs.reduce(function (a, b) { return a + b; }, 0);
+      if (sum !== an) {
+        if (level !== "err") level = "warn";
+        msgs.push("分组人数之和 (" + sum + ") 与纳入人数 (" + an + ") 不一致。");
+      }
+    }
+    if (spec.splits.length && !spec.pipeline.length) {
+      if (level !== "err") level = "warn";
+      msgs.push("已有训练/验证分组，但还没有分析行；分组将悬空。建议补上成像/处理/模型。");
+    }
+    if (spec.exclusion.some(function (x) { return /纳入|inclusion/i.test(x); })) {
+      if (level !== "err") level = "warn";
+      msgs.push("实验室版式不画纳入标准。请只保留排除项。");
+    }
+    if (!msgs.length) {
+      const bits = [];
+      if (sn != null) bits.push("筛查 n = " + sn);
+      if (an != null) bits.push("纳入 n = " + an);
+      if (splitNs.filter(function (n) { return n != null; }).length) {
+        bits.push("分组 " + splitNs.map(function (n) { return n == null ? "?" : n; }).join(" / "));
+      }
+      msgs.push(bits.length ? bits.join(" · ") + "。数字与连线已按实验室规则绘制。" : "版式按实验室 Figure 1 规则绘制。");
+    }
+    return { level: level, msgs: msgs };
+  }
+
+  function applySaved(d) {
+    if (!d || typeof d !== "object") return;
+    const spec = d.spec && typeof d.spec === "object" ? d.spec : null;
+    const study = !!(spec && (spec.kind === "study" || spec.included_n != null || spec.screened_n != null || spec.period != null));
+    const src = study ? spec : d;
+    function has(obj, key) {
+      return !!(obj && Object.prototype.hasOwnProperty.call(obj, key) && obj[key] != null);
+    }
+    function put(stateKey, keys) {
+      for (let i = 0; i < keys.length; i++) {
+        if (has(src, keys[i])) {
+          state[stateKey] = String(src[keys[i]]);
+          return;
+        }
+      }
+    }
+    function textItem(x) {
+      if (x && typeof x === "object") {
+        const reason = String(x.reason || "");
+        if (x.n != null && !/n\s*=/.test(reason)) return reason + " (n=" + x.n + ")";
+        return reason;
+      }
+      return String(x == null ? "" : x);
+    }
+    function putCohort(prefix, raw) {
+      if (!raw || typeof raw !== "object") return;
+      if (raw.n != null) state[prefix + "N"] = String(raw.n);
+      if (raw.positive != null) state[prefix + "Pos"] = String(raw.positive);
+      if (raw.negative != null) state[prefix + "Neg"] = String(raw.negative);
+    }
+    function putFlags(group, keys) {
+      const raw = src[group];
+      if (Array.isArray(raw)) {
+        keys.forEach(function (k) { state[group][k] = raw.indexOf(k) >= 0; });
+      } else if (raw && typeof raw === "object") {
+        keys.forEach(function (k) { if (has(raw, k)) state[group][k] = !!raw[k]; });
+      }
+    }
+    put("period", ["period"]);
+    put("screenedN", ["screenedN", "screened_n"]);
+    put("includedN", ["includedN", "included_n"]);
+    put("includedPos", ["includedPos", "included_positive"]);
+    put("includedNeg", ["includedNeg", "included_negative"]);
+    if (Array.isArray(src.inclusion) && src.inclusion.length) {
+      state.inclusion = src.inclusion.map(textItem).slice(0, MAX_EXC);
+    }
+    if (Array.isArray(src.exclusion) && src.exclusion.length) {
+      state.exclusion = src.exclusion.map(textItem).slice(0, MAX_EXC);
+    }
+    if (src.training && typeof src.training === "object") putCohort("tr", src.training);
+    else {
+      put("trN", ["trN"]);
+      put("trPos", ["trPos"]);
+      put("trNeg", ["trNeg"]);
+    }
+    if (src.test && typeof src.test === "object") putCohort("te", src.test);
+    else {
+      put("teN", ["teN"]);
+      put("tePos", ["tePos"]);
+      put("teNeg", ["teNeg"]);
+    }
+    if (has(src, "extOn")) state.extOn = !!src.extOn;
+    else if (has(src, "validation")) state.extOn = !!src.validation;
+    if (src.validation && typeof src.validation === "object") putCohort("va", src.validation);
+    else {
+      put("vaN", ["vaN"]);
+      put("vaPos", ["vaPos"]);
+      put("vaNeg", ["vaNeg"]);
+    }
+    if (has(src, "balance")) state.balance = String(src.balance);
+    if (has(src, "lasso")) state.lasso = !!src.lasso;
+    putFlags("models", ["clinical", "radiomics", "nomogram"]);
+    putFlags("metrics", ["roc", "calibration", "dca", "nri", "idi"]);
+    putFlags("explain", ["dag", "mediation"]);
+    put("filename", ["filename"]);
+    if (typeof d.legend === "string") {
+      els.legend.value = d.legend;
+      state.legendTouched = has(d, "legendTouched") ? !!d.legendTouched : true;
+    } else if (has(d, "legendTouched")) {
+      state.legendTouched = !!d.legendTouched;
+    }
+    const geom = d.scene || d.geom;
+    if (geom && geom.boxes && geom.boxes.length) {
+      scene.boxes = geom.boxes;
+      scene.connectors = geom.connectors || [];
+      scene.guides = geom.guides || { barY: 0 };
+      state.manual = has(d, "manual") ? !!d.manual : true;
+      state.structKey = d.structKey || "";
+    }
+    if (d.view && d.view.scale) {
+      view.scale = d.view.scale;
+      view.ox = d.view.ox;
+      view.oy = d.view.oy;
+    }
+  }
+
+  function persist() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        period: state.period,
+        screenedN: state.screenedN,
+        inclusion: state.inclusion,
+        exclusion: state.exclusion,
+        includedN: state.includedN,
+        includedPos: state.includedPos,
+        includedNeg: state.includedNeg,
+        trN: state.trN, trPos: state.trPos, trNeg: state.trNeg,
+        teN: state.teN, tePos: state.tePos, teNeg: state.teNeg,
+        extOn: state.extOn, vaN: state.vaN, vaPos: state.vaPos, vaNeg: state.vaNeg,
+        balance: state.balance, lasso: state.lasso,
+        models: state.models, metrics: state.metrics, explain: state.explain,
+        filename: state.filename,
+        legend: els.legend.value,
+        legendTouched: state.legendTouched,
+        manual: state.manual,
+        structKey: state.structKey,
+        scene: state.manual ? { boxes: scene.boxes, connectors: scene.connectors, guides: scene.guides } : null,
+        view: view
+      }));
+    } catch (e) {}
+  }
+
+  function restore() {
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (!raw) return false;
+      applySaved(JSON.parse(raw));
+      return !!(String(state.includedN || "").trim() || String(state.screenedN || "").trim() || String(state.period || "").trim());
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function applyConsoleSteps(data) {
+    if (!data) return;
+    state.lasso = !!data.lasso;
+    state.models.clinical = !!data.clinical;
+    state.models.radiomics = !!data.radiomics;
+    state.models.nomogram = !!data.nomogram;
+    state.metrics.roc = !!data.roc;
+    state.metrics.calibration = !!data.calibration;
+    state.metrics.dca = !!data.dca;
+    state.metrics.nri = !!data.nri;
+    state.metrics.idi = !!data.idi;
+    state.explain.dag = !!data.dag;
+    state.explain.mediation = !!data.mediation;
+  }
+
+  function itemRow(kind, idx, value, extra) {
+    const wrapEl = document.createElement("div");
+    wrapEl.className = "item";
+    const n = document.createElement("div");
+    n.className = "idx";
+    n.textContent = (idx + 1) + ".";
+    wrapEl.appendChild(n);
+    if (kind === "split") {
+      const row = document.createElement("div");
+      row.className = "row";
+      const name = document.createElement("input");
+      name.type = "text";
+      name.className = "grow";
+      name.placeholder = "Training Cohort";
+      name.value = value.name || "";
+      name.addEventListener("input", function () {
+        state.splits[idx].name = name.value;
+        refresh();
+      });
+      const num = document.createElement("input");
+      num.type = "text";
+      num.className = "n-input";
+      num.inputMode = "numeric";
+      num.placeholder = "n";
+      num.value = value.n || "";
+      num.addEventListener("input", function () {
+        state.splits[idx].n = num.value.replace(/[^\d]/g, "");
+        if (num.value !== state.splits[idx].n) num.value = state.splits[idx].n;
+        refresh();
+      });
+      row.appendChild(name);
+      row.appendChild(num);
+      wrapEl.appendChild(row);
+    } else {
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.value = value;
+      inp.placeholder = extra || "";
+      inp.addEventListener("input", function () {
+        if (kind === "exc") state.exclusion[idx] = inp.value;
+        if (kind === "inc") state.inclusion[idx] = inp.value;
+        refresh();
+      });
+      wrapEl.appendChild(inp);
+    }
+    const btns = document.createElement("div");
+    btns.className = "icon-btns";
+    function mk(txt, title, fn) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = txt;
+      b.title = title;
+      b.addEventListener("click", fn);
+      return b;
+    }
+    btns.appendChild(mk("↑", "上移", function () { moveItem(kind, idx, -1); }));
+    btns.appendChild(mk("↓", "下移", function () { moveItem(kind, idx, 1); }));
+    btns.appendChild(mk("×", "删除", function () { removeItem(kind, idx); }));
+    wrapEl.appendChild(btns);
+    return wrapEl;
+  }
+
+  function moveItem(kind, idx, dir) {
+    const arr = kind === "exc" ? state.exclusion : kind === "inc" ? state.inclusion : [];
+    const j = idx + dir;
+    if (j < 0 || j >= arr.length) return;
+    const tmp = arr[idx];
+    arr[idx] = arr[j];
+    arr[j] = tmp;
+    renderForm();
+    refresh();
+  }
+
+  function removeItem(kind, idx) {
+    if (kind === "exc") {
+      state.exclusion.splice(idx, 1);
+      if (!state.exclusion.length) state.exclusion = [""];
+    } else if (kind === "inc") {
+      state.inclusion.splice(idx, 1);
+      if (!state.inclusion.length) state.inclusion = [""];
+    }
+    renderForm();
+    refresh();
+  }
+
+  function setChecks() {
+    const bal = document.querySelector('input[name="balance"][value="' + (state.balance || "") + '"]');
+    if (bal) bal.checked = true;
+    ["lasso"].forEach(function (k) {
+      const el = document.getElementById("opt-" + k);
+      if (el) el.checked = !!state[k];
+    });
+    Object.keys(state.models).forEach(function (k) {
+      const el = document.getElementById("opt-" + k);
+      if (el) el.checked = !!state.models[k];
+    });
+    Object.keys(state.metrics).forEach(function (k) {
+      const el = document.getElementById("opt-" + k);
+      if (el) el.checked = !!state.metrics[k];
+    });
+    Object.keys(state.explain).forEach(function (k) {
+      const el = document.getElementById("opt-" + k);
+      if (el) el.checked = !!state.explain[k];
+    });
+    const ext = document.getElementById("ext-on");
+    if (ext) ext.checked = !!state.extOn;
+  }
+
+  function renderForm() {
+    els.period.value = state.period;
+    els.screenedN.value = state.screenedN;
+    els.includedN.value = state.includedN;
+    els.includedPos.value = state.includedPos;
+    els.includedNeg.value = state.includedNeg;
+    els.filename.value = state.filename;
+    document.getElementById("tr-n").value = state.trN;
+    document.getElementById("tr-pos").value = state.trPos;
+    document.getElementById("tr-neg").value = state.trNeg;
+    document.getElementById("te-n").value = state.teN;
+    document.getElementById("te-pos").value = state.tePos;
+    document.getElementById("te-neg").value = state.teNeg;
+    document.getElementById("va-n").value = state.vaN;
+    document.getElementById("va-pos").value = state.vaPos;
+    document.getElementById("va-neg").value = state.vaNeg;
+    setChecks();
+    els.inclusion.innerHTML = "";
+    state.inclusion.forEach(function (v, i) {
+      els.inclusion.appendChild(itemRow("inc", i, v, "Pathologically confirmed adenocarcinoma"));
+    });
+    els.exclusion.innerHTML = "";
+    state.exclusion.forEach(function (v, i) {
+      els.exclusion.appendChild(itemRow("exc", i, v, "Lesion diameter less than 1 cm (n=40)"));
+    });
+  }
+
+  function applyPreset(n) {
+    if (n === 0) {
+      state.splits = [];
+    } else {
+      state.splits = SPLIT_PRESET.slice(0, n).map(function (s) {
+        return { name: s.name, n: s.n };
+      });
+    }
+    renderForm();
+    refresh();
+  }
+
+  function loadExample(resetLegend) {
+    state.period = "1 August 2024 to 1 August 2026";
+    state.screenedN = "375";
+    state.inclusion = ["Pathologically confirmed adenocarcinoma", "Preoperative MRI"];
+    state.exclusion = [
+      "Lesion diameter less than 1 cm (n=40)",
+      "Nondiagnostic images (n=15)",
+      "Neoadjuvant therapy (n=10)"
+    ];
+    state.includedN = "310";
+    state.includedPos = "80";
+    state.includedNeg = "230";
+    state.trN = "216"; state.trPos = "56"; state.trNeg = "160";
+    state.teN = "94"; state.tePos = "24"; state.teNeg = "70";
+    state.extOn = false;
+    state.vaN = ""; state.vaPos = ""; state.vaNeg = "";
+    state.balance = "downsample";
+    state.lasso = true;
+    state.models = { clinical: true, radiomics: true, nomogram: true };
+    state.metrics = { roc: true, calibration: true, dca: true, nri: true, idi: true };
+    state.explain = { dag: true, mediation: true };
+    if (resetLegend !== false) state.legendTouched = false;
+    state.manual = false;
+    state.structKey = "";
+    renderForm();
+    refresh(true);
+  }
+
+  function clearAll() {
+    state.period = "";
+    state.screenedN = "";
+    state.inclusion = [""];
+    state.exclusion = [""];
+    state.includedN = "";
+    state.includedPos = "";
+    state.includedNeg = "";
+    state.trN = ""; state.trPos = ""; state.trNeg = "";
+    state.teN = ""; state.tePos = ""; state.teNeg = "";
+    state.extOn = false;
+    state.vaN = ""; state.vaPos = ""; state.vaNeg = "";
+    state.balance = "";
+    state.lasso = false;
+    state.models = { clinical: false, radiomics: false, nomogram: false };
+    state.metrics = { roc: false, calibration: false, dca: false, nri: false, idi: false };
+    state.explain = { dag: false, mediation: false };
+    state.legendTouched = false;
+    state.manual = false;
+    state.structKey = "";
+    scene.boxes = [];
+    scene.connectors = [];
+    els.legend.value = "";
+    renderForm();
+    refresh(true);
+  }
+
+  function download(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 800);
+  }
+
+  function exportJSON() {
+    const spec = specFromState();
+    const payload = {
+      spec: spec,
+      meta: {
+        screened_n: extractN(spec.screened),
+        analyzed_n: extractN(spec.analyzed),
+        split_n: spec.splits.map(function (s) { return extractN(s.label); })
+      },
+      legend: els.legend.value,
+      geom: state.manual ? { boxes: scene.boxes, connectors: scene.connectors, guides: scene.guides } : null
+    };
+    const name = (state.filename || "Figure1_flow").replace(/\.json$/i, "") + "_spec.json";
+    download(name, new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+  }
+
+  function importJSON(obj) {
+    const spec = obj && obj.spec && typeof obj.spec === "object" ? obj.spec : obj;
+    if (spec && (spec.kind === "study" || spec.included_n != null || spec.period != null || spec.includedN != null || spec.screenedN != null)) {
+      applySaved(obj);
+      renderForm();
+      refresh(!state.manual);
+      return;
+    }
+    state.screened = spec.screened || "";
+    state.exclusion = (spec.exclusion && spec.exclusion.length) ? spec.exclusion.slice(0, MAX_EXC) : [""];
+    state.analyzed = spec.analyzed || "";
+    state.pipeline = (spec.pipeline && spec.pipeline.length) ? spec.pipeline.slice(0, MAX_PIPE) : [];
+    state.splits = (spec.splits || []).slice(0, MAX_SPLIT).map(function (s) {
+      const label = (s && s.label) ? s.label : String(s || "");
+      const m = label.match(/^(.*?)(?:\s*\(n\s*=\s*(\d+)\s*\))?$/i);
+      return { name: (m && m[1] ? m[1].trim() : label).trim(), n: m && m[2] ? m[2] : "" };
+    });
+    if (obj.legend) {
+      els.legend.value = obj.legend;
+      state.legendTouched = true;
+    } else state.legendTouched = false;
+    if (obj.geom && obj.geom.boxes) {
+      scene.boxes = obj.geom.boxes;
+      scene.connectors = obj.geom.connectors || [];
+      scene.guides = obj.geom.guides || { barY: 0 };
+      state.manual = true;
+      state.structKey = structureKey(specFromState());
+    } else {
+      state.manual = false;
+      state.structKey = "";
+    }
+    renderForm();
+    refresh(!obj.geom);
+  }
+
+  function exportPNG() {
+    if (!scene.boxes.length) return;
+    const bounds = contentBounds();
+    const canvas = paintCanvas(drawList(), bounds, 300, 16);
+    const name = (state.filename || "Figure1_flow").replace(/\.png$/i, "") + ".png";
+    canvas.toBlob(function (blob) {
+      if (!blob) return;
+      download(name, blob);
+    }, "image/png");
+  }
+
+  function copyLegend() {
+    const t = els.legend.value;
+    if (!t) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t);
+    } else {
+      els.legend.select();
+      document.execCommand("copy");
+    }
+    const btn = document.getElementById("btn-legend");
+    const old = btn.textContent;
+    btn.textContent = "已复制";
+    setTimeout(function () { btn.textContent = old; }, 1200);
+  }
+
+  function refresh(forceLayout) {
+    if (document.activeElement !== document.getElementById("inplace")) {
+      state.period = els.period.value;
+      state.screenedN = els.screenedN.value;
+      state.includedN = els.includedN.value;
+      state.includedPos = els.includedPos.value;
+      state.includedNeg = els.includedNeg.value;
+      state.trN = document.getElementById("tr-n").value;
+      state.trPos = document.getElementById("tr-pos").value;
+      state.trNeg = document.getElementById("tr-neg").value;
+      state.teN = document.getElementById("te-n").value;
+      state.tePos = document.getElementById("te-pos").value;
+      state.teNeg = document.getElementById("te-neg").value;
+      state.vaN = document.getElementById("va-n").value;
+      state.vaPos = document.getElementById("va-pos").value;
+      state.vaNeg = document.getElementById("va-neg").value;
+      state.extOn = document.getElementById("ext-on").checked;
+      const bal = document.querySelector('input[name="balance"]:checked');
+      state.balance = bal ? bal.value : "";
+      state.lasso = document.getElementById("opt-lasso").checked;
+      ["clinical", "radiomics", "nomogram"].forEach(function (k) { state.models[k] = document.getElementById("opt-" + k).checked; });
+      ["roc", "calibration", "dca", "nri", "idi"].forEach(function (k) { state.metrics[k] = document.getElementById("opt-" + k).checked; });
+      ["dag", "mediation"].forEach(function (k) { state.explain[k] = document.getElementById("opt-" + k).checked; });
+    }
+    state.filename = els.filename.value.trim() || "Figure1_flow";
+    const spec = specFromState();
+    const v = validate(spec);
+    els.qc.className = "qc " + v.level;
+    els.qc.textContent = v.msgs.join(" ");
+    if (!state.legendTouched) els.legend.value = spec.screened || spec.analyzed ? defaultLegend(spec) : "";
+    const had = scene.boxes.length;
+    const L = applyLayout(spec, !!forceLayout);
+    if (!L || !scene.boxes.length) {
+      showEmpty();
+      document.getElementById("btn-png").disabled = true;
+      els.size.textContent = "导出 PNG · 约 16 cm · 300 dpi";
+    } else {
+      ensureBoard();
+      drawBoard();
+      if (forceLayout || !had) fitView();
+      document.getElementById("btn-png").disabled = false;
+      const b = contentBounds();
+      const hcm = (16 * b.height / b.width).toFixed(1);
+      const pxW = Math.round(16 / 2.54 * 300);
+      const pxH = Math.round(pxW * b.height / b.width);
+      els.size.textContent = "导出 " + pxW + " × " + pxH + " px · 约 16 × " + hcm + " cm · 300 dpi";
+    }
+    persist();
+  }
+
+  ["period", "screened-n", "included-n", "included-pos", "included-neg", "tr-n", "tr-pos", "tr-neg", "te-n", "te-pos", "te-neg", "va-n", "va-pos", "va-neg"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", refresh);
+  });
+  document.getElementById("ext-on").addEventListener("change", refresh);
+  document.querySelectorAll('input[name="balance"]').forEach(function (el) { el.addEventListener("change", refresh); });
+  document.querySelectorAll('#opt-lasso,#opt-clinical,#opt-radiomics,#opt-nomogram,#opt-roc,#opt-calibration,#opt-dca,#opt-nri,#opt-idi,#opt-dag,#opt-mediation').forEach(function (el) {
+    el.addEventListener("change", refresh);
+  });
+  els.filename.addEventListener("input", refresh);
+  els.legend.addEventListener("input", function () {
+    state.legendTouched = true;
+    persist();
+  });
+  document.getElementById("add-exclusion").addEventListener("click", function () {
+    if (state.exclusion.length >= MAX_EXC) return;
+    state.exclusion.push("");
+    renderForm();
+    const inputs = els.exclusion.querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+    refresh();
+  });
+  document.getElementById("add-inclusion").addEventListener("click", function () {
+    if (state.inclusion.length >= MAX_EXC) return;
+    state.inclusion.push("");
+    renderForm();
+    const inputs = els.inclusion.querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length - 1].focus();
+    refresh();
+  });
+  document.getElementById("btn-example").addEventListener("click", function () { loadExample(true); });
+  document.getElementById("btn-clear").addEventListener("click", clearAll);
+  document.getElementById("btn-import").addEventListener("click", function () { els.file.click(); });
+  els.file.addEventListener("change", function () {
+    const f = els.file.files && els.file.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try { importJSON(JSON.parse(String(reader.result))); }
+      catch (e) { alert("JSON 无法解析。"); }
+    };
+    reader.readAsText(f, "utf-8");
+    els.file.value = "";
+  });
+  document.getElementById("btn-json").addEventListener("click", exportJSON);
+  document.getElementById("btn-png").addEventListener("click", exportPNG);
+  document.getElementById("btn-legend").addEventListener("click", copyLegend);
+  document.getElementById("btn-zoom-in").addEventListener("click", function () {
+    const r = els.stage.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1.18);
+  });
+  document.getElementById("btn-zoom-out").addEventListener("click", function () {
+    const r = els.stage.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0.85);
+  });
+  document.getElementById("btn-fit").addEventListener("click", fitView);
+  document.getElementById("btn-relayout").addEventListener("click", function () {
+    state.manual = false;
+    state.structKey = "";
+    refresh(true);
+  });
+  window.addEventListener("resize", function () {
+    if (scene.boxes.length) applyView();
+  });
+  window.addEventListener("message", function (ev) {
+    if (ev.data === "fit-flow" && scene.boxes.length) fitView();
+    const data = ev.data;
+    if (!data || data.type !== "console-flow-steps") return;
+    pendingSteps = data;
+    if (!booted) return;
+    applyConsoleSteps(data);
+    renderForm();
+    refresh();
+  });
+  if (window.ResizeObserver && els.stage) {
+    let lastKey = "";
+    new ResizeObserver(function (entries) {
+      const r = entries[0] && entries[0].contentRect;
+      if (!r || r.width < 40 || r.height < 40) return;
+      const key = Math.round(r.width) + "x" + Math.round(r.height);
+      if (key === lastKey) return;
+      const first = !lastKey;
+      lastKey = key;
+      if (!scene.boxes.length) return;
+      if (first) fitView();
+      else applyView();
+    }).observe(els.stage);
+  }
+  document.addEventListener("keydown", function (e) {
+    if (document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        exportPNG();
+      }
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      exportPNG();
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      document.getElementById("btn-zoom-in").click();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+      e.preventDefault();
+      document.getElementById("btn-zoom-out").click();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+      e.preventDefault();
+      fitView();
+    }
+    if (e.key === "Escape") {
+      sel.type = null;
+      drawOverlay();
+    }
+    if (sel.type === "box" && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].indexOf(e.key) >= 0) {
+      e.preventDefault();
+      const b = boxById(sel.id);
+      if (!b) return;
+      const step = e.shiftKey ? 0.12 : 0.04;
+      if (e.key === "ArrowLeft") b.x -= step;
+      if (e.key === "ArrowRight") b.x += step;
+      if (e.key === "ArrowUp") b.y -= step;
+      if (e.key === "ArrowDown") b.y += step;
+      state.manual = true;
+      scene.connectors.forEach(snapConnOrtho);
+      drawBoard();
+      persist();
+    }
+  });
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
+  window.addEventListener("drop", function (e) {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f || !/\.json$/i.test(f.name)) return;
+    e.preventDefault();
+    const reader = new FileReader();
+    reader.onload = function () {
+      try { importJSON(JSON.parse(String(reader.result))); }
+      catch (err) { alert("JSON 无法解析。"); }
+    };
+    reader.readAsText(f, "utf-8");
+  });
+
+  const qs = new URLSearchParams(location.search);
+  function afterPaint() {
+    refresh();
+    if (qs.get("select")) {
+      sel.type = "box";
+      sel.id = qs.get("select");
+      drawBoard();
+    }
+    if (qs.get("shot") === "png" || qs.get("shot") === "dataurl") {
+      if (!scene.boxes.length) return;
+      const canvas = paintCanvas(drawList(), contentBounds(), 300, 16);
+      const data = canvas.toDataURL("image/png");
+      if (qs.get("shot") === "dataurl") {
+        document.body.textContent = data;
+        return;
+      }
+      document.body.innerHTML = "";
+      document.body.style.margin = "0";
+      document.body.style.background = "#fff";
+      const img = document.createElement("img");
+      img.src = data;
+      img.style.display = "block";
+      img.style.width = "100%";
+      img.style.height = "auto";
+      document.body.appendChild(img);
+    }
+  }
+  function paintNow() {
+    if (pendingSteps) applyConsoleSteps(pendingSteps);
+    booted = true;
+    renderForm();
+    afterPaint();
+  }
+  function paintWhenReady() {
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(paintNow);
+    else paintNow();
+  }
+  const hadStore = qs.get("example") === "1" ? false : restore();
+  if (qs.get("example") === "1") {
+    loadExample(true);
+    booted = true;
+  } else if (!hadStore && qs.get("project")) {
+    fetch("/files/" + encodeURIComponent(qs.get("project")) + "/ref/Figure1_flow.json", { cache: "no-store" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) applySaved(d); })
+      .catch(function () {})
+      .then(paintWhenReady);
+  } else {
+    paintWhenReady();
+  }
+})();
+</script>
+</body>
+</html>
