@@ -37,10 +37,17 @@ python D:\0Grok\0doc\_code\_infra\sync\sync_modules.py --promote --apply
 ## 校验
 
 ```powershell
-python -B D:\0Grok\0doc\_code\04-analysis\stats-analysis\modules\tests\smoke_test.py
+cd D:\0Grok\0doc\_code\04-analysis\stats-analysis
+$env:PYTHONDONTWRITEBYTECODE='1'   # 别在树里留 pyc
+$env:PYTHONPATH='D:\0Grok\0doc\_code\_infra\manuscript-body'
+python -B -m pytest modules\tests -q -p no:cacheprovider
 ```
 
-`ALL SMOKE OK` 才算可用。项目侧一致性用 `sync_modules.py --check`（应全部 OK）。
+2026-10-23 实测：**159 passed / 1 failed**。失败项
+`test_dry_run_and_shutdown.py::test_icc_panel_hint_present` 是**既有**问题
+（测试要 `modules.console.setting_meta.ICC_PANEL_HINT`，该常量不存在），与本次迁移无关，未擅自改测试。
+
+项目侧一致性用 `sync_modules.py --check`（44 个项目应全部 OK）。
 
 ## 纪律
 
