@@ -559,7 +559,7 @@ def load_ini_namespace(path: Path) -> types.ModuleType:
 
 
 def resolve_project_dir(proj: Path | None = None) -> Path:
-    """当前子工程根（如 D:\\0Grok\\preparing\\yt_RDL），不是 0Grok 仓库根。
+    """当前子工程根（如 D:\\0Grok\\drafting\\yt_RDL），不是 0Grok 仓库根。
 
     优先级：显式路径 > 环境变量 RAD_PROJECT > cwd。
     """

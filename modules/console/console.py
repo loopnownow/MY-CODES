@@ -45,11 +45,11 @@ from modules.console import paths as _paths
 STAGE_ROOT_NAMES = _paths.STAGE_ROOT_NAMES
 
 
-def _grok_and_preparing(modules_root: Path) -> tuple[Path, Path]:
-    return _paths.grok_and_preparing(modules_root)
+def _grok_and_drafting(modules_root: Path) -> tuple[Path, Path]:
+    return _paths.grok_and_drafting(modules_root)
 
 
-GROK_ROOT, RAD_ROOT = _grok_and_preparing(MODULES_ROOT)
+GROK_ROOT, RAD_ROOT = _grok_and_drafting(MODULES_ROOT)
 EXTRA_PROJECT_ROOTS = tuple(GROK_ROOT / n for n in STAGE_ROOT_NAMES)
 HTML_PATH = CONSOLE_DIR / "console.html"
 CSS_PATH = CONSOLE_DIR / "console.css"

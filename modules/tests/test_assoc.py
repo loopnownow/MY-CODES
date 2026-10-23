@@ -539,7 +539,7 @@ def test_clear_selected_heatmap_removes_stale_png(tmp_path, monkeypatch):
 
 
 def test_project_roi_ancova_runs_when_workbook_present():
-    book = Path(r"D:\0Grok\polishing\jfl_SSD_ASL\jfl_SSD_ASL.xlsx")
+    book = Path(r"D:\0Grok\pre-submit\jfl_SSD_ASL\jfl_SSD_ASL.xlsx")
     if not book.is_file():
         pytest.skip("project workbook not on this machine")
     clin = pd.read_excel(book, sheet_name="cln")

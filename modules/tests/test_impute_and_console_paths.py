@@ -57,19 +57,19 @@ def test_extra_project_roots_current_stages():
     from modules.console import console as cons
 
     names = {p.name.lower() for p in cons.EXTRA_PROJECT_ROOTS}
-    assert names == {"polishing", "submitting", "reseived"}
-    assert cons.RAD_ROOT.name == "preparing"
+    assert names == {"pre-submit", "in-review", "accepted"}
+    assert cons.RAD_ROOT.name == "drafting"
 
 
 def test_project_dir_explicit_dir(tmp_path, monkeypatch):
     from modules.console import console as cons
 
     monkeypatch.setattr(cons, "GROK_ROOT", tmp_path)
-    submitting = tmp_path / "submitting" / "tyt_DSI"
-    submitting.mkdir(parents=True)
-    (submitting / "tyt_DSI.xlsx").write_bytes(b"xx")
-    got = cons.project_dir("tyt_DSI", str(submitting))
-    assert got == submitting.resolve()
+    in_review = tmp_path / "in-review" / "tyt_DSI"
+    in_review.mkdir(parents=True)
+    (in_review / "tyt_DSI.xlsx").write_bytes(b"xx")
+    got = cons.project_dir("tyt_DSI", str(in_review))
+    assert got == in_review.resolve()
 
 
 def test_fig_palettes_ten_named_plus_custom():
@@ -118,7 +118,7 @@ def test_open_result_folder_project_only(tmp_path, monkeypatch):
     from modules.console import console as cons
 
     monkeypatch.setattr(cons, "GROK_ROOT", tmp_path)
-    proj = tmp_path / "submitting" / "tyt_DSI"
+    proj = tmp_path / "in-review" / "tyt_DSI"
     proj.mkdir(parents=True)
     html = proj / "MCI" / "ResultsMCI.html"
     html.parent.mkdir()

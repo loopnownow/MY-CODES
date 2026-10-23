@@ -9,15 +9,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-PREPARING_DIRNAME = "preparing"
+# Live stage folder under GROK_ROOT (was PREPARING_DIRNAME / "preparing").
+DRAFTING_DIRNAME = "drafting"
+PREPARING_DIRNAME = DRAFTING_DIRNAME  # back-compat alias; prefer DRAFTING_DIRNAME
 DEFAULT_GROK_ROOT = Path(r"D:\0Grok")  # frozen lab default; GROK_ROOT overrides
 STAGE_ROOT_NAMES = (
-    "polishing", "submitting", "accepted",
+    "pre-submit", "in-review", "accepted",
 )
 
 
 def grok_root(modules_root: Path) -> Path:
-    """<grok> root that holds the stage folders (preparing/polishing/...).
+    """<grok> root that holds the stage folders (drafting/pre-submit/...).
 
     Order: ``GROK_ROOT`` env -> legacy ``<grok>/0script/<coarse>/modules``
     -> frozen lab default. Never raises: the package may live outside
@@ -32,13 +34,17 @@ def grok_root(modules_root: Path) -> Path:
     return DEFAULT_GROK_ROOT
 
 
-def grok_and_preparing(modules_root: Path) -> tuple[Path, Path]:
+def grok_and_drafting(modules_root: Path) -> tuple[Path, Path]:
     grok = grok_root(modules_root)
-    preparing = grok / PREPARING_DIRNAME
-    if not preparing.is_dir():
-        raise FileNotFoundError(f"准备中课题根不存在，应为: {preparing}")
-    return grok, preparing
+    drafting = grok / DRAFTING_DIRNAME
+    if not drafting.is_dir():
+        raise FileNotFoundError(f"准备中课题根不存在，应为: {drafting}")
+    return grok, drafting
 
+
+def grok_and_preparing(modules_root: Path) -> tuple[Path, Path]:
+    """Back-compat wrapper; prefer ``grok_and_drafting``."""
+    return grok_and_drafting(modules_root)
 
 def resolve_path(p: str | Path) -> Path:
     return Path(p).expanduser().resolve()
