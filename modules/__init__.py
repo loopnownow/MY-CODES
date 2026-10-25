@@ -1,6 +1,6 @@
 """RAD 共享算法库（本目录即包）。
 
-PYTHONPATH=D:\\0Grok\\0doc\\_code\\04-analysis\\stats-analysis 后: python -m modules.pipeline
+PYTHONPATH=D:\\0Grok\\0doc\\GitHub\\stats-analysis 后: python -m modules.pipeline
 可用 RAD_MODULES 或 settings.ini 的 MODULES_DIR 指向另一份拷贝。
 """
 from __future__ import annotations

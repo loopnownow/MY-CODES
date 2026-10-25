@@ -446,7 +446,7 @@ def write_ini(path: Path, data: dict[str, Any]) -> None:
     lines = [
         "# RAD 工程配置（只改本文件）",
         "# 值用 JSON：true/false/null、数字、字符串带引号、列表/对象。",
-        "# 运行: <工程名>.html   配置: ref/settings.ini   算法: D:\\0Grok\\0doc\\_code\\04-analysis\\stats-analysis\\modules",
+        "# 运行: <工程名>.html   配置: ref/settings.ini   算法: D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules",
         "",
     ]
     for sid, title, _keys in INI_SECTIONS:

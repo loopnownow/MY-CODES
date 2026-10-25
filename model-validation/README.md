@@ -21,10 +21,10 @@
 
 ```bat
 set PYTHONDONTWRITEBYTECODE=1
-set PYTHONPATH=D:\0Grok\0doc\_code\04-analysis\stats-analysis
+set PYTHONPATH=D:\0Grok\0doc\GitHub\stats-analysis
 
-python D:\0Grok\0doc\_code\04-analysis\stats-analysis\model-validation\compare_val_modes.py
-python D:\0Grok\0doc\_code\04-analysis\stats-analysis\model-validation\downsample_train.py
+python D:\0Grok\0doc\GitHub\stats-analysis\model-validation\compare_val_modes.py
+python D:\0Grok\0doc\GitHub\stats-analysis\model-validation\downsample_train.py
 ```
 
 改课题根目录用同名环境变量，或改脚本顶部 CONFIG。`downsample_train.py` 默认 `DRY_RUN=True`。

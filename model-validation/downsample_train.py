@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Train-only 1:2 downsample of Pseudo_progress-Negative.
 
-归属 ``0doc/_code/04-analysis/stats-analysis/model-validation``（建模队列构建，非 tidy 清洗）。
+归属 ``0doc/GitHub/stats-analysis/model-validation``（建模队列构建，非 tidy 清洗）。
 Replicates patient-level split (data_io.load_data), then keeps:
   all Positive, all test Negative, and a histology×sex-stratified
   sample of train Negative at 1:2 vs train Positive.
@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 _STAT = Path(__file__).resolve().parent
-_IMPORT = Path(os.environ.get("STATS_ROOT", r"D:\0Grok\0doc\_code\04-analysis\stats-analysis"))
+_IMPORT = Path(os.environ.get("STATS_ROOT", r"D:\0Grok\0doc\GitHub\stats-analysis"))
 _TIDY = Path(os.environ.get(
     "CLEAN_DATA_ROOT",
     str(_IMPORT.parent.parent / "02-data-processing" / "base" / "clean-data"),

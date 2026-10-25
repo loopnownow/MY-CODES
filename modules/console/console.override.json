@@ -11,7 +11,7 @@
     "SPLIT_COL": "",
     "DO_IO": true,
     "INPUT": "jfl_SSD_ASL.xlsx",
-    "MODULES_DIR": "D:\\0Grok\\0doc\\_code\\04-analysis\\stats-analysis\\modules",
+    "MODULES_DIR": "D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules",
     "RAD_SHEET": "rad",
     "CLIN_SHEET": "cln",
     "QC_SHEET": "",

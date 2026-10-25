@@ -1,6 +1,6 @@
 """三种 VAL_MODE 验证对比（默认 zyp_OV）。
 
-归属 ``0doc/_code/04-analysis/stats-analysis/model-validation``（统计/验证 CLI，非 tidy 清洗主链）。
+归属 ``0doc/GitHub/stats-analysis/model-validation``（统计/验证 CLI，非 tidy 清洗主链）。
 路径与开关置顶软编码。
 """
 from __future__ import annotations
@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 _STAT = Path(__file__).resolve().parent
-_IMPORT = Path(os.environ.get("STATS_ROOT", r"D:\0Grok\0doc\_code\04-analysis\stats-analysis"))
+_IMPORT = Path(os.environ.get("STATS_ROOT", r"D:\0Grok\0doc\GitHub\stats-analysis"))
 _TIDY = Path(os.environ.get(
     "CLEAN_DATA_ROOT",
     str(_IMPORT.parent.parent / "02-data-processing" / "base" / "clean-data"),

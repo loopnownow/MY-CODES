@@ -23,7 +23,7 @@ def grok_root(modules_root: Path) -> Path:
 
     Order: ``GROK_ROOT`` env -> legacy ``<grok>/0script/<coarse>/modules``
     -> frozen lab default. Never raises: the package may live outside
-    ``0script`` (e.g. ``0doc/_code/04-analysis/stats-analysis``).
+    ``0script`` (e.g. ``0doc/GitHub/stats-analysis``).
     """
     env = os.environ.get("GROK_ROOT")
     if env:

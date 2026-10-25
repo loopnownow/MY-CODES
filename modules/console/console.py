@@ -707,7 +707,7 @@ HINTS: dict[str, str] = {
     "FIG_PALETTE": "画图配色：20 套命名色板 + custom。npg 默认；okabe/aaas/nejm/lancet/jama/jco/frontiers/bmj 期刊风；tol/tolbright 色盲安全；radiology 本组；ibm/tableau 投影；d3/set1/dark2/paired 多模型；uchicago 学术；gray 黑白印刷。",
     "FIG_COLORS_MAIN": "5 个主色，依次给 Combined、RadScore、Clinical、Reader、Age。",
     "FIG_COLORS_AUX": "5 个辅色，给其余曲线、KM 分层和未点名的模型。",
-    "MODULES_DIR": "共享算法库 modules 的文件夹。默认 D:\\0Grok\\0doc\\_code\\04-analysis\\stats-analysis\\modules。换盘或拷贝算法库时改这里。",
+    "MODULES_DIR": "共享算法库 modules 的文件夹。默认 D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules。换盘或拷贝算法库时改这里。",
 }
 
 from modules.console.setting_meta import merge_icc_tips  # noqa: E402

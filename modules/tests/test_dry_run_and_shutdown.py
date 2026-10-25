@@ -58,7 +58,7 @@ def test_stop_console_ports_kills_only_console(monkeypatch):
     calls = []
     monkeypatch.setattr(cons, "_listen_map", lambda: {8765: 111, 8766: 222, 80: 333})
     monkeypatch.setattr(cons, "_command_lines", lambda pids: {
-        111: r"D:\anaconda3\python.exe D:\0Grok\0doc\_code\04-analysis\stats-analysis\modules\console\console.py serve --port 8765",
+        111: r"D:\anaconda3\python.exe D:\0Grok\0doc\GitHub\stats-analysis\modules\console\console.py serve --port 8765",
         222: r"python other.py",
     })
 
@@ -108,7 +108,7 @@ def test_describe_port_names_console(monkeypatch):
     monkeypatch.setattr(cons, "_listen_pid", lambda port: 7 if int(port) == 8765 else None)
     monkeypatch.setattr(
         cons, "_command_lines",
-        lambda pids: {7: r'"D:\anaconda3\python.exe" D:\0Grok\0doc\_code\04-analysis\stats-analysis\modules\console\console.py serve'},
+        lambda pids: {7: r'"D:\anaconda3\python.exe" D:\0Grok\0doc\GitHub\stats-analysis\modules\console\console.py serve'},
     )
     info = cons.describe_port(8765)
     assert info["console"] is True and info["name"] == "console.py" and info["pid"] == 7

@@ -1,6 +1,6 @@
 # stats-analysis（算法库主库）
 
-2026-10-23 由 `0doc\_code\04-analysis\stats-analysis\` 提升为**独立主库**（用户方案 P1）。
+2026-10-23 由 `0doc\GitHub\stats-analysis\` 提升为**独立主库**（用户方案 P1）。
 只做**本地 git**，**未配远端**（不联网、不推送）。
 
 ## 内容
@@ -10,44 +10,33 @@
 | `modules\` | 可复用算法库：`config` / `console` / `stats` / `strobe` / `tests` / `utils` |
 | `model-validation\` | 模型验证（校准 / DCA / NRI 等）流程与脚本 |
 
-## 两者的关系（单向）
+## 与 `_code` 的关系（2026-10-25 起：本仓即唯一真源）
 
 ```
-D:\0Grok\0doc\_code\04-analysis\stats-analysis\modules     ← 工程参考副本（GOLD）
-                    │  sync_modules.py --promote
-                    ▼
-D:\0Grok\0doc\GitHub\stats-analysis\modules                 ← 本仓（主库快照）
+D:\0Grok\0doc\GitHub\stats-analysis\modules              ← 运行时真源 + 本地 git（唯一）
+D:\0Grok\0doc\_code\02-data-processing\stats-analysis\   ← 已退役，只留指针 README
+                                                             （原 80 文件 → D:\0del\...\stats-analysis-mirror\）
 ```
 
-- **GOLD 是运行时的唯一真源**：44 个分析项目的 `settings.py` 里写死的 `MODULES_DIR`
-  仍指向 `_code\04-analysis\stats-analysis\modules`，**本次迁移未改任何项目**。
-- 改算法 → 改 GOLD → 跑 `--promote` 把差异同步到本仓 → 在本仓 `git commit`。
-- 反向不自动：本仓手改不会被 GOLD 吸收（要落回 GOLD 再 promote，避免双份分叉）。
-
-## 同步命令
-
-```powershell
-# 只看差异（不写）
-python D:\0Grok\0doc\_code\_infra\sync\sync_modules.py --promote
-
-# 写入（被替换/多余的文件移到 D:\0del\modules_master_bak\<时间戳>\，不删）
-python D:\0Grok\0doc\_code\_infra\sync\sync_modules.py --promote --apply
-```
+- **本仓是运行时的唯一真源**：22 个课题的 `ref\settings.ini` 里 `MODULES_DIR` 全部指向
+  `D:\0Grok\0doc\GitHub\stats-analysis\modules`（2026-10-25 全量改写）。`MODULES_DIR` 不是目录时
+  console 与 `import modules` 直接报错，不回退。
+- 改算法 → 直接改本仓 → 在本仓 `git commit`（只本地，无远端）。
+- **不再有 `--promote` / 镜像同步**：旧 `sync_modules.py --promote` 已删除（`_code` 副本不存在，无双份可同步）。
 
 ## 校验
 
 ```powershell
-cd D:\0Grok\0doc\_code\04-analysis\stats-analysis
+cd D:\0Grok\0doc\GitHub\stats-analysis
 $env:PYTHONDONTWRITEBYTECODE='1'   # 别在树里留 pyc
-$env:PYTHONPATH='D:\0Grok\0doc\_code\_infra\manuscript-body'
 python -B -m pytest modules\tests -q -p no:cacheprovider
 ```
 
-2026-10-23 实测：**159 passed / 1 failed**。失败项
+2026-10-23 实测基线：**159 passed / 1 failed**。失败项
 `test_dry_run_and_shutdown.py::test_icc_panel_hint_present` 是**既有**问题
-（测试要 `modules.console.setting_meta.ICC_PANEL_HINT`，该常量不存在），与本次迁移无关，未擅自改测试。
+（测试要 `modules.console.setting_meta.ICC_PANEL_HINT`，该常量不存在），与迁移无关，未擅自改测试。
 
-项目侧一致性用 `sync_modules.py --check`（44 个项目应全部 OK）。
+项目侧一致性用 `python D:\0Grok\0doc\_code\02-data-processing\_shared\sync\sync_modules.py --check`（22 个项目应全部 OK）。
 
 ## 纪律
 

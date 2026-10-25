@@ -1,15 +1,15 @@
 """docx_extract: text extraction, normalization, and error paths."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import docx
 import pytest
 
-# docx_extract.py lives at manuscript-body\docx_extract.py.
-_SCRIPT_ROOT = Path(__file__).resolve().parents[3]
-_MS_BODY = _SCRIPT_ROOT / "manuscript-body"
+# docx_extract.py 现在在 _code\05-manuscript\write-paper\（原 0script\manuscript-body 已 rehome）
+_MS_BODY = Path(os.environ.get("ODOC_CODE", r"D:\0Grok\0doc\_code")) / "05-manuscript" / "write-paper"
 if str(_MS_BODY) not in sys.path:
     sys.path.insert(0, str(_MS_BODY))
 

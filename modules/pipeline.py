@@ -17,7 +17,7 @@ modules.pipeline — 主管线
     python -m modules.pipeline --no-log
 
 配置：工程根目录 settings.ini
-算法：D:\\0Grok\\0doc\\_code\\04-analysis\\stats-analysis\\modules
+算法：D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules
 ═══════════════════════════════════════════════════════════════════
 """
 
