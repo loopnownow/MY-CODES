@@ -335,7 +335,7 @@ def test_roc_rows_and_time_options_come_from_clinical_columns():
     assert by["TD_IPCW_HORIZONS"]["options"] == [3, 6, 12, 24]
     assert "时间依赖性 ROC（IPCW）" in js
     assert 'data-sec="surv"' in js
-    proj = (ROOT / "modules" / "project.html").read_text(encoding="utf-8")
+    proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
     assert "function fileDir()" in proj
     assert '/api/pick-file' in proj
     assert "dir: dir" in proj or 'dir: dir,' in proj
