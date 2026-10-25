@@ -186,7 +186,8 @@ const FIELD_BUNDLES = [
       "RAD_COR_CUTOFF",
       "ICC_THRESHOLD", "ICC_FEATURE_COL", "ICC_INTRA_COL", "ICC_INTER_COL",
     ],
-    title: "",
+    title: "ICC 组学稳定性",
+    hint: "组学特征稳定性过滤：intra 与 inter 都≥阈值才保留。在 TRAIN 上、交叉验证前执行，不使用分析结局（outcome-blind）。",
     cls: "icc",
   },
   {

@@ -10,6 +10,12 @@ from typing import Any
 # Re-export shells filled by console.py at import time if needed; tips below
 # are the ones edited for QC / medical notes.
 
+# ICC 面板提示（组学稳定性整块）；与 console_schema.js 的 icc 组 hint 保持同一文案。
+ICC_PANEL_HINT: str = (
+    "组学特征稳定性过滤：intra 与 inter 都≥阈值才保留。"
+    "在 TRAIN 上、交叉验证前执行，不使用分析结局（outcome-blind）。"
+)
+
 ICC_KEY_TIPS: dict[str, str] = {
     "DO_ICC_FILTER": (
         "intra 与 inter 都≥阈值才保留该组学特征。"

@@ -32,9 +32,12 @@ $env:PYTHONDONTWRITEBYTECODE='1'   # 别在树里留 pyc
 python -B -m pytest modules\tests -q -p no:cacheprovider
 ```
 
-2026-10-23 实测基线：**159 passed / 1 failed**。失败项
-`test_dry_run_and_shutdown.py::test_icc_panel_hint_present` 是**既有**问题
-（测试要 `modules.console.setting_meta.ICC_PANEL_HINT`，该常量不存在），与迁移无关，未擅自改测试。
+2026-10-25 实测基线：**160 passed / 0 failed**。
+
+2026-10-23 曾记为**既有失败**的 `test_dry_run_and_shutdown.py::test_icc_panel_hint_present`
+（测试要 `modules.console.setting_meta.ICC_PANEL_HINT`，该常量当时不存在）已于 2026-10-25 修复：
+在 `setting_meta.py` 补 `ICC_PANEL_HINT`（面板级 outcome-blind 文案），并在 `console_schema.js`
+的 `icc` 组接上 `title` / `hint`（该组此前是全套唯一无 title 无 hint 的组）。未改动测试断言。
 
 项目侧一致性用 `python D:\0Grok\0doc\_code\02-data-processing\_shared\sync\sync_modules.py --check`（22 个项目应全部 OK）。
 
