@@ -7,7 +7,7 @@
 
 | 目录 | 角色 |
 |---|---|
-| `modules\` | 可复用算法库：`config` / `console` / `stats` / `strobe` / `tests` / `utils` |
+| `modules\` | 可复用算法库：`config` / `console`（含 `strobe/` 页）/ `stats` / `tests` / `utils` |
 | `model-validation\` | 模型验证（校准 / DCA / NRI 等）流程与脚本 |
 
 ## 与 `_code` 的关系（2026-10-25 起：本仓即唯一真源）

@@ -60,7 +60,7 @@ JS_ASSETS = {
     "/console_app.js": CONSOLE_DIR / "console_app.js",  # shim
 }
 JS_PATH = JS_ASSETS["/console_ui.js"]
-STROBE_PATH = CONSOLE_DIR.parent / "strobe" / "index.html"
+STROBE_PATH = CONSOLE_DIR / "strobe" / "index.html"
 _HTTPD = None
 OVERRIDE_PATH = CONSOLE_DIR / "console.override.json"
 DEFAULT_PROJECT = "xlm_LG"
