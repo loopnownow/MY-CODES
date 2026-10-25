@@ -21,16 +21,18 @@ STAGE_ROOT_NAMES = (
 def grok_root(modules_root: Path) -> Path:
     """<grok> root that holds the stage folders (drafting/pre-submit/...).
 
-    Order: ``GROK_ROOT`` env -> legacy ``<grok>/0script/<coarse>/modules``
-    -> frozen lab default. Never raises: the package may live outside
-    ``0script`` (e.g. ``0doc/GitHub/stats-analysis``).
+    Order: ``GROK_ROOT`` env -> frozen lab default ``DEFAULT_GROK_ROOT``.
+
+    The package lives under ``0doc/GitHub/stats-analysis`` (lab-paths
+    ``{code_stats}``). The former ``0script`` tree was retired 2026-10-23;
+    do **not** hard-code ``D:\\0Grok\\0script`` or revive a
+    ``parent.name == "0script"`` probe. ``modules_root`` is kept for API
+    stability (callers pass it) but is unused for root resolution.
     """
+    _ = modules_root  # API stability; layout probe retired with 0script
     env = os.environ.get("GROK_ROOT")
     if env:
         return Path(env).expanduser().resolve()
-    script_root = modules_root.parent.parent
-    if script_root.name == "0script":
-        return script_root.parent
     return DEFAULT_GROK_ROOT
 
 
