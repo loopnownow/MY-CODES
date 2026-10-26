@@ -2,7 +2,7 @@
 vif_analysis.py — Variance Inflation Factor (共线性)
 """
 from __future__ import annotations
-from typing import List, Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 import pandas as pd

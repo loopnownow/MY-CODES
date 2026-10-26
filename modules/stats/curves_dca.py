@@ -18,7 +18,6 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve
 
 from modules import config as cfg
 

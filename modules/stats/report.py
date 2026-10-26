@@ -34,7 +34,6 @@ from modules.stats.curves_calibration import HL_METRICS
 _HEADER_MAP = {
     "feature": "Variable",
     "variable": "Variable",
-    "term": "Variable",
     "model": "Model",
     "or": "OR",
     "ci": "95% CI",
@@ -82,7 +81,6 @@ _HEADER_MAP = {
     "df2": "df2",
     "outcome": "Outcome",
     "term": "Term",
-    "contrast": "Contrast",
     "β": "β",
     "fdr p": "FDR P",
     "fwer p": "FWER P",
@@ -847,7 +845,6 @@ def _clean_table1_df(clin_res) -> Optional[pd.DataFrame]:
         return None
     t1["Variable"] = t1["Variable"].astype(str)
     if "P value" in t1.columns:
-        sig = t1["Significance"] if "Significance" in t1.columns else ""
         if "Significance" in t1.columns:
             t1["P value"] = [
                 f"{'' if pd.isna(p) else str(p)}{'' if pd.isna(s) or str(s).strip()=='' else str(s)}"
@@ -1160,7 +1157,7 @@ def _table1_multiheader_html(
     def _rowspan_headers(cols) -> str:
         return "".join(f'<th rowspan="3">{_format_header(c)}</th>' for c in cols)
 
-    r1 = f'<th rowspan="3" class="col-first">Variable</th>'
+    r1 = '<th rowspan="3" class="col-first">Variable</th>'
     if n_tr:
         r1 += f'<th colspan="{n_tr}">Train</th>'
     if n_te:
@@ -1193,7 +1190,7 @@ def _table1_multiheader_html(
 
     def _td_vals(row, cols):
         if row is None:
-            return [f"<td></td>" for _ in cols]
+            return ["<td></td>" for _ in cols]
         out = []
         for c in cols:
             val = row[c] if c in row.index else ""

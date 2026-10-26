@@ -6,8 +6,6 @@ free names resolve inside ``http_impl`` without ``exec``.
 """
 from __future__ import annotations
 
-import sys
-from types import ModuleType
 from typing import Any
 
 

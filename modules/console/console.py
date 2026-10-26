@@ -15,7 +15,6 @@ import ast
 import hashlib
 import importlib.util
 import inspect
-import io
 import json
 import os
 import secrets
@@ -27,10 +26,10 @@ import time
 import traceback
 import types
 import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, urlparse
 
 if TYPE_CHECKING:  # 运行期由文件末尾 http_server.install(globals()) 导出
     from modules.console.http_impl import ConsoleServer, Handler

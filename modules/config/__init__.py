@@ -1,9 +1,7 @@
 """modules.config — 工程根目录 settings.ini + 本目录 style / outcome。"""
 from __future__ import annotations
 
-import os
-
-from .defaults import DEFAULT_SETTINGS, merged_settings
+from .defaults import DEFAULT_SETTINGS, merged_settings  # noqa: F401
 from .ini_io import apply_to_globals, find_settings_ini, read_ini
 
 _ini = find_settings_ini()

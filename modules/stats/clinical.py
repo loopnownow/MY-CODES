@@ -16,7 +16,7 @@ modules.stats.clinical — Table1 + 临床特征选择（单变量 → 多变量
 
 from __future__ import annotations
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Sequence
 
 import numpy as np
@@ -185,7 +185,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
     rows = []
     for v in clin.columns:
         x = clin[v]
-        n_unique = x.dropna().nunique()
         is_categorical = _is_categorical_col(str(v), x)
 
         if is_categorical:

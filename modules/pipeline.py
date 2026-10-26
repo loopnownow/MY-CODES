@@ -26,7 +26,6 @@ import argparse
 import io
 import os
 import sys
-from pathlib import Path
 from typing import Dict, List, Optional, TextIO
 
 import numpy as np
@@ -2098,9 +2097,9 @@ def _run_external_eval(
             print(f"  {name}: n={n} (y1={n1})")
         row["splits"]["ext"] = rec
         row["panels"] = {
-            "roc": f"panel_roc_ext.png" if len(layers) >= 2 else rec.get("panel"),
-            "cal": f"panel_cal_ext.png" if len(layers) >= 2 else rec.get("cal"),
-            "dca": f"panel_dca_ext.png" if len(layers) >= 2 else rec.get("dca"),
+            "roc": "panel_roc_ext.png" if len(layers) >= 2 else rec.get("panel"),
+            "cal": "panel_cal_ext.png" if len(layers) >= 2 else rec.get("cal"),
+            "dca": "panel_dca_ext.png" if len(layers) >= 2 else rec.get("dca"),
         }
         out.append(row)
     if len(tokens) >= 2:

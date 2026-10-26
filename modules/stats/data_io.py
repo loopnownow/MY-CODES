@@ -1139,7 +1139,6 @@ def _align_clin_to_rad(
         exact = remaining.index[remaining["_align_id"] == rid].tolist()
         if len(exact) >= 1:
             pick = exact[0]
-            how = "exact"
         else:
             nrid = _norm_patient_id(rid)
             fuzzy = remaining.index[
@@ -1151,7 +1150,6 @@ def _align_clin_to_rad(
                 print(f"  ⚠ 归一化后多条临床记录匹配 {rid!r}，取第一条: "
                       f"{remaining.loc[fuzzy, '_align_id'].tolist()}")
             pick = fuzzy[0]
-            how = "fuzzy"
             fuzzy_pairs.append((rid, remaining.at[pick, "_align_id"]))
 
         aligned_rows.append(remaining.loc[pick])

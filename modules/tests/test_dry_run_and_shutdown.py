@@ -197,8 +197,8 @@ def test_shutdown_requires_token_http():
     """Local HTTP: health returns token; shutdown without it is 403."""
     import json
     import threading
-    import urllib.error
-    import urllib.request
+
+
     from http.client import HTTPConnection
 
     from modules.console import console as cons

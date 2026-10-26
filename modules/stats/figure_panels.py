@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence
 
 from modules import config as cfg
 

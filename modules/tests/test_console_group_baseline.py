@@ -48,7 +48,6 @@ def test_pair_mode_zongbiao_keeps_all_levels_and_lsd(monkeypatch):
     assert _baseline_display_names(["MCI", "CN-ESRD", "HC"]) == ["MCI", "CN-ESRD", "HC"]
 
     rng = np.random.RandomState(0)
-    n = 30
     groups = (["MCI"] * 10) + (["CN-ESRD"] * 10) + (["HC"] * 10)
     clin = pd.DataFrame({
         "Age": np.concatenate([
