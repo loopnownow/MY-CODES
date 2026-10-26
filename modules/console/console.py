@@ -36,13 +36,47 @@ if TYPE_CHECKING:  # 运行期由文件末尾 http_server.install(globals()) 导
 
 # ── CONFIG ─────────────────────────────────────────────────────
 # Protocol handler launches this file directly; bootstrap import root first.
-CONSOLE_DIR = Path(__file__).resolve().parent
-MODULES_ROOT = CONSOLE_DIR.parent
-_IMPORT_ROOT = MODULES_ROOT.parent
+_IMPORT_ROOT = Path(__file__).resolve().parents[2]
 if str(_IMPORT_ROOT) not in sys.path:
     sys.path.insert(0, str(_IMPORT_ROOT))
 
-from modules.console import paths as _paths
+from modules.console import paths as _paths  # noqa: E402  bootstrap 之后才能 import
+
+from modules.console.const import (  # noqa: E402,F401  bootstrap 之后才能 import
+    CHECK_PORT,
+    CLIN_COL_SINGLE_KEYS,
+    CONSOLE_DEFAULTS,
+    CONSOLE_DIR,
+    CSS_PATH,
+    DEFAULT_PORT,
+    DEFAULT_PROJECT,
+    EXCLUDE_EMPTY_LABELS,
+    EXCLUDE_SELECT_KEYS,
+    EXTRA_PROJECT_ROOTS,
+    GROK_ROOT,
+    HOST,
+    HTML_PATH,
+    JS_ASSETS,
+    JS_PATH,
+    LIST_FROM_CLIN,
+    LIST_FROM_MODELS,
+    LIST_FROM_RAD_META,
+    MODULES_ROOT,
+    OVERRIDE_PATH,
+    PORT_FILE,
+    PORT_HI,
+    PORT_LO,
+    RAD_COL_SINGLE_KEYS,
+    RAD_ROOT,
+    SET_OUTCOME_DERIVED,
+    SHEET_KEYS,
+    SKIP_SETTING_KEYS,
+    STAGE_ROOT_NAMES,
+    STROBE_PATH,
+    TUPLE_LIST_KEYS,
+    _RAD_FEAT_PREFIX,
+    _TOKEN_SAFE_GET,
+)
 
 # 叶层实现在 ops.py；此处保留同名绑定给 console 命名空间与旧调用点
 from modules.console.ops import (  # noqa: F401
@@ -57,170 +91,13 @@ from modules.console.ops import (  # noqa: F401
     write_project_overlay,
 )
 
-STAGE_ROOT_NAMES = _paths.STAGE_ROOT_NAMES
 
-def _grok_and_drafting(modules_root: Path) -> tuple[Path, Path]:
-    return _paths.grok_and_drafting(modules_root)
-
-GROK_ROOT, RAD_ROOT = _grok_and_drafting(MODULES_ROOT)
-EXTRA_PROJECT_ROOTS = tuple(GROK_ROOT / n for n in STAGE_ROOT_NAMES)
-HTML_PATH = CONSOLE_DIR / "console.html"
-CSS_PATH = CONSOLE_DIR / "console.css"
-JS_ASSETS = {
-    "/console_schema.js": CONSOLE_DIR / "console_schema.js",
-    "/console_api.js": CONSOLE_DIR / "console_api.js",
-    "/console_ui.js": CONSOLE_DIR / "console_ui.js",
-    "/console_app.js": CONSOLE_DIR / "console_app.js",  # shim
-}
-JS_PATH = JS_ASSETS["/console_ui.js"]
-STROBE_PATH = CONSOLE_DIR / "strobe" / "index.html"
+# ── 运行期可变状态 ─────────────────────────────────────────────
 _HTTPD = None
-OVERRIDE_PATH = CONSOLE_DIR / "console.override.json"
-DEFAULT_PROJECT = "demo_study"
-DEFAULT_PORT = 8765
-PORT_LO = 8765
-PORT_HI = 8776
-CHECK_PORT = 8780
-PORT_FILE = CONSOLE_DIR / "console.port.json"
-HOST = "127.0.0.1"
 _SERVE_PORT: int | None = None
 _CONSOLE_TOKEN = secrets.token_urlsafe(24)
-_TOKEN_SAFE_GET = {
-    "/", "/console.html", "/xlm_console.html",
-    "/console.css",
-    "/console_schema.js", "/console_api.js", "/console_ui.js", "/console_app.js",
-    "/api/health", "/api/port",
-    # 工程 html 从 file:// 列课题/载入预览；关服务改走 token（health 本机回传）
-    "/api/projects", "/api/settings",
-}
 
-SKIP_SETTING_KEYS = {
-    "os", "copy", "List", "Optional", "Dict", "Any", "annotations",
-    "PNG_DIR", "GROUP_SOURCE_COL", "OUT_DIR_BASE",
-}
-TUPLE_LIST_KEYS = {"DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT"}
-SET_OUTCOME_DERIVED = {
-    "GROUP_SOURCE_COL", "OUT_DIR", "PNG_DIR",
-    "GROUP_DISPLAY_POS", "GROUP_DISPLAY_NEG",
-    "SEED", "TRAIN_RATIO",
-    # 样本排除为工程级（不进结局覆盖）；勿列入，否则 overlay 写不进 cfg
-    "READER_COMPARE_COL", "FORCE_INTER_FEATURES", "FORCE_MODEL_FEATURES",
-    "FORCE_REMOVE_FEATURES",
-    "SUBGROUP_COL",
-    "SKIP_CLIN_FEATURES",
-    "GROUP_KEEP", "PAIRWISE_GROUPS", "PAIRWISE_ALL",
-    "GROUP_FROM_ID", "GROUP_FROM_ID_SEP", "POSITIVE_GROUP_LABEL",
-    "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE",
-    "DO_DCA", "DCA_CURVES",
-    "DO_NRI", "NRI_CUTOFF", "NRI_MODEL_OLD", "NRI_MODEL_NEW",
-    "CORR_PREDICTORS", "CORR_REFS", "CORR_E_REF", "CORR_F_REF",
-    "DO_DAG", "DO_SHAP", "DO_MEDIATION",
-    "DAG_NODES", "DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT", "MEDIATION_PATHS",
-    "FIG_PALETTE", "FIG_COLORS_MAIN", "FIG_COLORS_AUX",
-}
-SHEET_KEYS = {
-    "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET",
-}
-EXCLUDE_SELECT_KEYS = (
-    "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW",
-)
-EXCLUDE_EMPTY_LABELS = {
-    "EXCLUDE_FILE": "（空＝默认 false_classification.xlsx）",
-    "EXCLUDE_SHEET": "（空＝默认 exc）",
-    "EXCLUDE_COL": "（空＝默认 exc）",
-    "EXCLUDE_ROW": "（空＝整列当 ID）",
-}
-CLIN_COL_SINGLE_KEYS = {
-    "CLIN_ID_COL", "LABEL_COL",
-    "POSITIVE_GROUP_LABEL", "SUBGROUP_COL",
-    "SURVIVAL_TIME_COL", "SPLIT_COL", "NRI_OLD_COL", "NRI_NEW_COL",
-}
-CONSOLE_DEFAULTS = {
-    "DO_SURVIVAL": False,
-    "SURVIVAL_TIME_COL": "",
-    "SURVIVAL_TIME_UNIT": "months",
-    "DO_SURVIVAL_BY_RISK": True,
-    "DO_COX": False,
-    "GROUP_KEEP": [],
-    "PAIRWISE_GROUPS": [],
-    "PAIRWISE_ALL": False,
-    "GROUP_FROM_ID": False,
-    "GROUP_FROM_ID_SEP": "_",
-    "DO_PLOT": False,
-    "DO_PLOT_TIFF": False,
-    "DO_PLOT_PDF": False,
-    "DO_LANDMARK_ROC": False,
-    "RAD_MARKER_SIDE": "both",
-    "RAD_MARKER_MIN_N": 5,
-    "DO_ROC": True,
-    "DO_HEATMAP": True,
-    "FIG_PALETTE": "npg",
-    "FIG_COLORS_MAIN": ["#D55E00", "#B2182B", "#2166AC", "#762A83", "#117733"],
-    "FIG_COLORS_AUX": ["#44AA99", "#DDCC77", "#EE8866", "#AA4499", "#332288"],
-    "VAL_MODE": "refit",
-    "SUBGROUP_VAL_MODE": "",
-    "EXTERNAL_VAL_MODE": "refit",
-    "RAD_SHEET": "rad",
-    "CLIN_SHEET": "cln",
-    "QC_SHEET": "qc",
-    "ICC_SHEET": "icc",
-    "RAD_ID_COL": "Patient_ID",
-    "CLIN_ID_COL": "Patient_ID",
-    "LABEL_COL": "",
-    "OUTCOME_COLS": [],
-    "SKIP_CLIN_FEATURES": [],
-    "RAD_ID_COLS": [],
-    "GROUP_DISPLAY_POS": "",
-    "GROUP_DISPLAY_NEG": "",
-    "POSITIVE_GROUP_LABEL": "",
-    "EXTERNAL_FILE": "",
-    "EXTERNAL_CLIN_SHEET": "cln",
-    "EXTERNAL_RAD_SHEET": "rad",
-    "EXTERNAL_TESTS": [],
-    "USE_INTERNAL_SPLIT_WHEN_EXTERNAL": True,
-    "SPLIT_COL": "",
-    "CORR_REFS": [],
-    "DCA_CURVES": ["Clinical", "RadScore", "Combined"],
-    "OUTCOME_OVERRIDES": {},
-    "PAIRWISE_OVERRIDES": {},
-    "GROUP_LEVEL_DISPLAY": {},
-    "SUBGROUP_COL": "",
-    "FORCE_REMOVE_FEATURES": [],
-    "FORCE_INTER_FEATURES": [],
-    "FORCE_MODEL_FEATURES": [],
-    "OUTCOME_OUT_SUBDIR": True,
-    "DO_EXCLUDE_SAMPLES": False,
-    "EXCLUDE_FILE": "",
-    "EXCLUDE_SHEET": "",
-    "EXCLUDE_COL": "",
-    "EXCLUDE_ROW": "",
-    "SUBPROJECT_BY_OUTCOME": {},
-    "READER_VALUE_MAP": {},
-    "OUTCOME_BINARIZE": {},
-    "RAD_FEATURE_DISPLAY_STRIP": [],
-    "RAD_FEATURE_PREFIX_EXCLUDE": [],
-    "RAD_FEATURE_PREFIX_GROUP": {"names": [], "assign": {}},
-}
-RAD_COL_SINGLE_KEYS = {"RAD_ID_COL", "ICC_FEATURE_COL", "ICC_INTRA_COL", "ICC_INTER_COL"}
-LIST_FROM_CLIN = {
-    "OUTCOME_COLS", "READER_COLS", "FORCE_REMOVE_FEATURES",
-    "FORCE_CLIN_FOR_ROC",
-    "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
-    "FORCE_INTER_FEATURES", "FORCE_MODEL_FEATURES",
-}
-LIST_FROM_RAD_META = {"RAD_ID_COLS"}
-_RAD_FEAT_PREFIX = (
-    "h0_", "h1_", "h2_", "h3_", "original_", "wavelet_", "log-", "log_",
-    "diagnostics_",
-)
-LIST_FROM_MODELS = {
-    "ROC_PLOT_EXCLUDE": ["Clinical", "RadScore", "Combined"],
-    "CORR_PREDICTORS": ["RadScore", "Clinical", "Combined"],
-    "CORR_REFS": ["Age", "Group"],
-    "DCA_CURVES": ["Clinical", "RadScore", "Combined"],
-    "NRI_MODEL_OLD": ["clinical", "combined", "radscore"],
-    "NRI_MODEL_NEW": ["clinical", "combined", "radscore"],
-}
+
 SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("repro", "可重复性", ["DO_REPRO", "SEED", "TRAIN_RATIO", "SPLIT_COL"]),
     ("io", "数据与路径", ["DO_IO",
