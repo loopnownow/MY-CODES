@@ -55,34 +55,37 @@ from modules.console.schema_ui import (
     hydrate_console_settings,
     public_settings,
 )
+# 设置/路径/会话层：真 import（B4c2 起从 console 搬出，不进注入表）
+from modules.console.settings_layer import (
+    discover_projects,
+    find_results,
+    load_preferred_port,
+    load_session,
+    load_settings_module,
+    normalize_overlay,
+    open_result_folder,
+    pick_file_dialog,
+    project_dir,
+    read_project_overlay,
+    save_preferred_port,
+    save_session,
+    under_project,
+    unwrap_overlay_file,
+    writeback_settings,
+)
 
 if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
     from modules.console.console import (
-        discover_projects,
         dry_run_text,
         exclude_select_options,
-        find_results,
-        load_preferred_port,
-        load_session,
-        load_settings_module,
-        normalize_overlay,
-        open_result_folder,
-        pick_file_dialog,
         preview_workbook,
-        project_dir,
         read_log,
-        read_project_overlay,
         run_project_data_qc,
         run_status,
-        save_preferred_port,
-        save_session,
         spawn_successor,
         start_run,
         start_run_bat,
         stop_run,
-        under_project,
-        unwrap_overlay_file,
-        writeback_settings,
         xlsx_meta,
     )
 
@@ -91,16 +94,11 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
 # 这里只剩仍住在 console 的函数。
 # http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
 _INJECTED: frozenset[str] = frozenset({
-    # 读 console 可变状态的函数
-    "discover_projects", "find_results", "load_settings_module", "open_result_folder",
-    "preview_workbook", "project_dir", "read_log", "run_project_data_qc",
-    "run_status", "start_run", "start_run_bat", "stop_run", "under_project",
-    "writeback_settings",
+    # 读 / 写 console 可变状态的函数
+    "preview_workbook", "read_log", "run_project_data_qc", "run_status",
+    "spawn_successor", "start_run", "start_run_bat", "stop_run",
     # 纯函数
-    "dry_run_text", "exclude_select_options", "load_preferred_port",
-    "load_session", "normalize_overlay", "pick_file_dialog",
-    "read_project_overlay", "save_preferred_port", "save_session",
-    "spawn_successor", "unwrap_overlay_file", "xlsx_meta",
+    "dry_run_text", "exclude_select_options", "xlsx_meta",
 })
 
 def __getattr__(name: str) -> Any:
