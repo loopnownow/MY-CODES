@@ -1,12 +1,15 @@
-"""控制台注入契约：_INJECTED / 静态视图 / ops 叶层三方必须对齐。"""
+"""控制台零注入契约：http_impl 只做真 import，无 _INJECTED / __getattr__ / http_server 垫片。"""
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
 
 import pytest
 
 CONSOLE_DIR = Path(__file__).resolve().parents[1] / "console"
+# B4c1–B4c6 从 console.py 搬出的模块：谁都不许反向 import console。
+MOVED_MODULES = ("schema_ui", "settings_layer", "preview", "dryrun", "run", "serve")
 
 
 def _imported(source: str, module: str) -> set[str]:
@@ -21,55 +24,26 @@ def _http_impl_source() -> str:
     return (CONSOLE_DIR / "http_impl.py").read_text(encoding="utf-8-sig")
 
 
-def test_injected_matches_type_checking_view():
+def test_http_impl_has_no_injection_machinery():
     from modules.console import http_impl
 
-    assert set(http_impl._INJECTED) == _imported(
-        _http_impl_source(), "modules.console.console"
-    )
+    assert not hasattr(http_impl, "_INJECTED")
+    assert not hasattr(http_impl, "__getattr__")
+    assert "from modules.console.console import" not in _http_impl_source()
+
+
+def test_http_server_shim_is_gone():
+    assert importlib.util.find_spec("modules.console.http_server") is None
+    assert not (CONSOLE_DIR / "http_server.py").exists()
 
 
 def test_ops_owned_matches_real_imports():
-    from modules.console import http_server, ops
+    from modules.console import http_impl, ops
 
     imported = _imported(_http_impl_source(), "modules.console.ops")
-    assert set(http_server._OPS_OWNED) == imported
+    assert set(http_impl._OPS_OWNED) == imported
     for name in sorted(imported):
         assert hasattr(ops, name), f"ops 缺 {name}"
-
-
-def test_injected_and_ops_do_not_overlap():
-    from modules.console import http_impl, http_server
-
-    assert set(http_impl._INJECTED).isdisjoint(http_server._OPS_OWNED)
-
-
-def test_install_binds_every_injected_name():
-    from modules.console import console, http_impl
-
-    for name in sorted(http_impl._INJECTED):
-        assert hasattr(http_impl, name), f"未注入 {name}"
-        assert getattr(http_impl, name) is getattr(console, name), name
-
-
-def test_missing_injection_is_loud():
-    from modules.console import http_impl
-
-    name = "project_dir"
-    original = getattr(http_impl, name)
-    delattr(http_impl, name)
-    try:
-        with pytest.raises(RuntimeError, match=name):
-            getattr(http_impl, name)
-    finally:
-        setattr(http_impl, name, original)
-
-
-def test_unknown_attribute_still_raises_attribute_error():
-    from modules.console import http_impl
-
-    with pytest.raises(AttributeError):
-        http_impl.no_such_console_symbol
 
 
 def test_const_layer_is_static_not_injected():
@@ -77,9 +51,29 @@ def test_const_layer_is_static_not_injected():
 
     imported = _imported(_http_impl_source(), "modules.console.const")
     assert imported, "http_impl 未静态 import 常量层"
-    assert imported.isdisjoint(http_impl._INJECTED)
     for name in sorted(imported):
         assert getattr(http_impl, name) is getattr(const, name), name
+
+
+def test_console_imports_handler_from_http_impl():
+    from modules.console import console, http_impl
+
+    assert console.Handler is http_impl.Handler
+    assert console.ConsoleServer is http_impl.ConsoleServer
+
+
+def test_moved_modules_never_import_console():
+    for name in MOVED_MODULES:
+        src = (CONSOLE_DIR / f"{name}.py").read_text(encoding="utf-8-sig")
+        assert "from modules.console.console import" not in src, name
+        assert "modules.console import console" not in src, name
+
+
+def test_unknown_attribute_raises_attribute_error():
+    from modules.console import http_impl
+
+    with pytest.raises(AttributeError):
+        http_impl.console_has_no_such_symbol
 
 
 def test_mutable_state_has_one_home():
@@ -89,7 +83,5 @@ def test_mutable_state_has_one_home():
     assert console._RUN_LOCK is state.RUN_LOCK
     assert console._PREVIEW_CACHE is state.PREVIEW_CACHE
     assert console._CONSOLE_TOKEN is state.CONSOLE_TOKEN
-    assert "_CONSOLE_TOKEN" not in http_impl._INJECTED
     assert http_impl.CONSOLE_TOKEN is state.CONSOLE_TOKEN
-
-
+    assert http_impl._state is state
