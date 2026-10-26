@@ -27,22 +27,25 @@ from modules.console.ops import (  # 叶层：真实 import，不再依赖注入
     sync_external_tests,
     write_project_overlay,
 )
+# 常量层：真实 import（与 modules.console.const 同源，不经注入）
+from modules.console.const import (  # noqa: F401
+    CONSOLE_DEFAULTS,
+    CSS_PATH,
+    DEFAULT_PROJECT,
+    HTML_PATH,
+    JS_ASSETS,
+    MODULES_ROOT,
+    OVERRIDE_PATH,
+    PORT_HI,
+    PORT_LO,
+    RAD_ROOT,
+    STROBE_PATH,
+    _TOKEN_SAFE_GET,
+)
 
 if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
     from modules.console.console import (
-        CONSOLE_DEFAULTS,
-        CSS_PATH,
-        DEFAULT_PROJECT,
-        HTML_PATH,
-        JS_ASSETS,
-        MODULES_ROOT,
-        OVERRIDE_PATH,
-        PORT_HI,
-        PORT_LO,
-        RAD_ROOT,
-        STROBE_PATH,
         _CONSOLE_TOKEN,
-        _TOKEN_SAFE_GET,
         apply_label_col_suggestion,
         build_schema,
         discover_projects,
@@ -75,13 +78,12 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
         xlsx_meta,
     )
 
-# 注入契约（SSOT）：http_impl 从 console 命名空间读取的全部自由名。
+# 注入契约（SSOT）：http_impl 仍需要 console 提供的自由名。
+# 常量层已改为静态 import（modules.console.const），这里只剩运行期状态。
 # http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
 _INJECTED: frozenset[str] = frozenset({
-    # 常量
-    "CONSOLE_DEFAULTS", "CSS_PATH", "DEFAULT_PROJECT", "HTML_PATH", "JS_ASSETS",
-    "MODULES_ROOT", "OVERRIDE_PATH", "PORT_HI", "PORT_LO", "RAD_ROOT",
-    "STROBE_PATH", "_CONSOLE_TOKEN", "_TOKEN_SAFE_GET",
+    # 运行期状态
+    "_CONSOLE_TOKEN",
     # 读 console 可变状态的函数
     "discover_projects", "find_results", "load_settings_module", "open_result_folder",
     "preview_workbook", "project_dir", "read_log", "run_project_data_qc",

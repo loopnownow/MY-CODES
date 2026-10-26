@@ -70,3 +70,14 @@ def test_unknown_attribute_still_raises_attribute_error():
 
     with pytest.raises(AttributeError):
         http_impl.no_such_console_symbol
+
+
+def test_const_layer_is_static_not_injected():
+    from modules.console import const, http_impl
+
+    imported = _imported(_http_impl_source(), "modules.console.const")
+    assert imported, "http_impl 未静态 import 常量层"
+    assert imported.isdisjoint(http_impl._INJECTED)
+    for name in sorted(imported):
+        assert getattr(http_impl, name) is getattr(const, name), name
+
