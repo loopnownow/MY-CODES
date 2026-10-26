@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,9 @@ from modules.stats.curves_roc import (
     roc_split_title,
     roc_time_token,
 )
+
+if TYPE_CHECKING:  # 仅用于返回注解（本模块有 from __future__ import annotations）
+    from matplotlib.figure import Figure
 
 IPCW_ROC_METRICS: Dict[str, pd.DataFrame] = {}
 MIN_RISK_SET = 10
@@ -233,7 +236,7 @@ def plot_ipcw_roc(
     ipcw: Dict,
     dataset_label: str = "all",
     seed: Optional[int] = None,
-) -> Optional[plt.Figure]:
+) -> Optional[Figure]:
     from modules.utils import dry_run as _dry
     label = str(dataset_label or "all")
     print(f"\n═══ IPCW TIME-DEPENDENT ROC [{label}] ═══")

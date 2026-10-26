@@ -29,8 +29,11 @@ import types
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, unquote, urlparse
+
+if TYPE_CHECKING:  # 运行期由文件末尾 http_server.install(globals()) 导出
+    from modules.console.http_impl import ConsoleServer, Handler
 
 # ── CONFIG ─────────────────────────────────────────────────────
 # Protocol handler launches this file directly; bootstrap import root first.
