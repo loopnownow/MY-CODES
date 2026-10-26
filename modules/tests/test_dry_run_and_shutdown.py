@@ -53,11 +53,14 @@ def test_radconsole_stop_action_and_port_band():
 
 
 def test_stop_console_ports_kills_only_console(monkeypatch):
+
     from modules.console import console as cons
 
+    from modules.console import serve as srv
+
     calls = []
-    monkeypatch.setattr(cons, "_listen_map", lambda: {8765: 111, 8766: 222, 80: 333})
-    monkeypatch.setattr(cons, "_command_lines", lambda pids: {
+    monkeypatch.setattr(srv, "_listen_map", lambda: {8765: 111, 8766: 222, 80: 333})
+    monkeypatch.setattr(srv, "_command_lines", lambda pids: {
         111: r"C:\Python\python.exe C:\lab\stats-analysis\modules\console\console.py serve --port 8765",
         222: r"python other.py",
     })
@@ -65,7 +68,7 @@ def test_stop_console_ports_kills_only_console(monkeypatch):
     def fake_run(cmd, **_kw):
         calls.append(list(cmd))
 
-    monkeypatch.setattr(cons.subprocess, "run", fake_run)
+    monkeypatch.setattr(srv.subprocess, "run", fake_run)
     out = cons.stop_console_ports(1, 99999)
     assert out["lo"] == 8765 and out["hi"] == 8776
     assert out["killed"] == [{"port": 8765, "pid": 111}]
@@ -103,11 +106,14 @@ def test_publish_local_repeats_get():
 
 
 def test_describe_port_names_console(monkeypatch):
+
     from modules.console import console as cons
 
-    monkeypatch.setattr(cons, "_listen_pid", lambda port: 7 if int(port) == 8765 else None)
+    from modules.console import serve as srv
+
+    monkeypatch.setattr(srv, "_listen_pid", lambda port: 7 if int(port) == 8765 else None)
     monkeypatch.setattr(
-        cons, "_command_lines",
+        srv, "_command_lines",
         lambda pids: {7: r'"C:\Python\python.exe" C:\lab\stats-analysis\modules\console\console.py serve'},
     )
     info = cons.describe_port(8765)
@@ -121,11 +127,14 @@ def test_describe_port_names_console(monkeypatch):
 
 
 def test_stop_from_query_is_one_port(monkeypatch):
+
     from modules.console import console as cons
+
+    from modules.console import serve as srv
 
     calls = []
     monkeypatch.setattr(
-        cons, "stop_console_port",
+        srv, "stop_console_port",
         lambda port: calls.append(port) or {"ok": True, "port": port, "killed": True},
     )
     missing = cons.stop_from_query({})
@@ -137,14 +146,17 @@ def test_stop_from_query_is_one_port(monkeypatch):
 
 
 def test_stop_console_port_refuses_other_program(monkeypatch):
+
     from modules.console import console as cons
 
-    monkeypatch.setattr(cons, "describe_port", lambda port: {
+    from modules.console import serve as srv
+
+    monkeypatch.setattr(srv, "describe_port", lambda port: {
         "ok": True, "port": port, "listening": True, "console": False,
         "pid": 9, "name": "svchost.exe", "error": "",
     })
     calls = []
-    monkeypatch.setattr(cons.subprocess, "run", lambda *args, **kwargs: calls.append(args))
+    monkeypatch.setattr(srv.subprocess, "run", lambda *args, **kwargs: calls.append(args))
     out = cons.stop_console_port(8765)
     assert out["killed"] is False and out["console"] is False and calls == []
     outside = cons.stop_console_port(80)

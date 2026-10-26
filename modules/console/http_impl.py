@@ -1,10 +1,8 @@
-"""RAD console HTTP Handler / ConsoleServer (normal module).
+﻿"""RAD console HTTP Handler / ConsoleServer（普通模块，零注入）。
 
-Imported by console.py after helpers exist; console then injects the names in
-``_INJECTED`` (functions that still read console's own state).  Constants come
-from ``modules.console.const``, mutable run/serve state from
-``modules.console.state`` and the schema tables from ``modules.console.schema``
-— those three are real imports, not injection.
+console.py 直接真 import 本模块的 Handler / ConsoleServer；依赖全部来自
+modules.console 的叶层模块（const / state / schema / schema_ui / settings_layer /
+preview / dryrun / run / serve），没有 _INJECTED 注入表，也没有 __getattr__ 兜底。
 """
 from __future__ import annotations
 
@@ -16,7 +14,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from modules.console.ops import (  # 叶层：真实 import，不再依赖注入
@@ -48,67 +46,63 @@ from modules.console.const import (  # noqa: F401
 # 运行期状态：与 console 同一份对象（不进注入表）
 from modules.console import state as _state
 from modules.console.state import CONSOLE_TOKEN
+# UI schema 层：真 import（B4c1 起从 console 搬出，不进注入表）
+from modules.console.schema_ui import (
+    apply_label_col_suggestion,
+    build_schema,
+    hydrate_console_settings,
+    public_settings,
+)
+# 设置/路径/会话层：真 import（B4c2 起从 console 搬出，不进注入表）
+from modules.console.settings_layer import (
+    discover_projects,
+    find_results,
+    load_preferred_port,
+    load_session,
+    load_settings_module,
+    normalize_overlay,
+    open_result_folder,
+    pick_file_dialog,
+    project_dir,
+    read_project_overlay,
+    save_preferred_port,
+    save_session,
+    under_project,
+    unwrap_overlay_file,
+    writeback_settings,
+)
+# 工作簿预览层：真 import（B4c3 起从 console 搬出，不进注入表）
+from modules.console.preview import (
+    exclude_select_options,
+    preview_workbook,
+    xlsx_meta,
+)
+# dry-run 预览层：真 import（B4c4 起从 console 搬出，不进注入表）
+from modules.console.dryrun import dry_run_text
+# 运行层：真 import（B4c5 起从 console 搬出，不进注入表）
+from modules.console.run import (
+    read_log,
+    run_project_data_qc,
+    run_status,
+    start_run,
+    start_run_bat,
+    stop_run,
+)
+# 端口 / 服务层：真 import（B4c6 起从 console 搬出，注入表随之清空）
+from modules.console.serve import spawn_successor
 
-if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
-    from modules.console.console import (
-        apply_label_col_suggestion,
-        build_schema,
-        discover_projects,
-        dry_run_text,
-        exclude_select_options,
-        find_results,
-        hydrate_console_settings,
-        load_preferred_port,
-        load_session,
-        load_settings_module,
-        normalize_overlay,
-        open_result_folder,
-        pick_file_dialog,
-        preview_workbook,
-        project_dir,
-        public_settings,
-        read_log,
-        read_project_overlay,
-        run_project_data_qc,
-        run_status,
-        save_preferred_port,
-        save_session,
-        spawn_successor,
-        start_run,
-        start_run_bat,
-        stop_run,
-        under_project,
-        unwrap_overlay_file,
-        writeback_settings,
-        xlsx_meta,
-    )
-
-# 注入契约（SSOT）：http_impl 仍需要 console 提供的自由名。
-# 常量层（modules.console.const）与运行期状态（modules.console.state）都是真 import，
-# 这里只剩仍住在 console 的函数。
-# http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
-_INJECTED: frozenset[str] = frozenset({
-    # 读 console 可变状态的函数
-    "discover_projects", "find_results", "load_settings_module", "open_result_folder",
-    "preview_workbook", "project_dir", "read_log", "run_project_data_qc",
-    "run_status", "start_run", "start_run_bat", "stop_run", "under_project",
-    "writeback_settings",
-    # 纯函数
-    "apply_label_col_suggestion", "build_schema", "dry_run_text",
-    "exclude_select_options", "hydrate_console_settings", "load_preferred_port",
-    "load_session", "normalize_overlay", "pick_file_dialog", "public_settings",
-    "read_project_overlay", "save_preferred_port", "save_session",
-    "spawn_successor", "unwrap_overlay_file", "xlsx_meta",
+# 由 modules.console.ops 静态 import 的叶层符号：契约自检用（测试断言二者一致）。
+_OPS_OWNED = frozenset({
+    "_overlay_path",
+    "allow_browser_origin",
+    "clear_project_overlay",
+    "jsonable",
+    "project_settings",
+    "resolve_meta_xlsx",
+    "resolve_run_outcome",
+    "sync_external_tests",
+    "write_project_overlay",
 })
-
-def __getattr__(name: str) -> Any:
-    """未注入就报错：比裸 NameError 多一句「谁没注入」。"""
-    if name in _INJECTED:
-        raise RuntimeError(
-            f"http_impl 未注入 modules.console.console.{name}；"
-            "检查 modules.console.http_server.install(console_globals)"
-        )
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _require_project(value: Any) -> str:
@@ -864,6 +858,3 @@ class Handler(BaseHTTPRequestHandler):
     def _do_DELETE(self) -> None:
         u = urlparse(self.path)
         self._err(404, u.path)
-
-
-
