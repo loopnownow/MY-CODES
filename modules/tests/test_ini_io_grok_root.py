@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from modules.config.ini_io import _lab_grok_root, find_settings_ini
+from modules.console.paths import DEFAULT_GROK_ROOT
 
-LAB_ROOT = Path(r"D:\0Grok")
+LAB_ROOT = DEFAULT_GROK_ROOT
 
 
 def _make_project(root: Path) -> Path:

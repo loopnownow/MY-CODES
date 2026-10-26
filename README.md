@@ -38,7 +38,7 @@ $env:PYTHONDONTWRITEBYTECODE='1'
 python -B -m pytest modules\tests -q -p no:cacheprovider
 ```
 
-2026-10-26 实测基线：**169 passed / 1 skipped / 0 failed**（可有 1 条 statsmodels 警告）。
+2026-10-26 实测基线：**177 passed / 1 skipped / 0 failed**（可有 1 条 statsmodels 警告）。
 
 项目侧一致性用 `_code` 下的 `sync_modules.py --check`（各项目应全部 OK）。
 

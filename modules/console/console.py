@@ -17,7 +17,6 @@ import importlib.util
 import inspect
 import json
 import os
-import secrets
 import shutil
 import subprocess
 import sys
@@ -36,13 +35,47 @@ if TYPE_CHECKING:  # 运行期由文件末尾 http_server.install(globals()) 导
 
 # ── CONFIG ─────────────────────────────────────────────────────
 # Protocol handler launches this file directly; bootstrap import root first.
-CONSOLE_DIR = Path(__file__).resolve().parent
-MODULES_ROOT = CONSOLE_DIR.parent
-_IMPORT_ROOT = MODULES_ROOT.parent
+_IMPORT_ROOT = Path(__file__).resolve().parents[2]
 if str(_IMPORT_ROOT) not in sys.path:
     sys.path.insert(0, str(_IMPORT_ROOT))
 
-from modules.console import paths as _paths
+from modules.console import paths as _paths  # noqa: E402  bootstrap 之后才能 import
+
+from modules.console.const import (  # noqa: E402,F401  bootstrap 之后才能 import
+    CHECK_PORT,
+    CLIN_COL_SINGLE_KEYS,
+    CONSOLE_DEFAULTS,
+    CONSOLE_DIR,
+    CSS_PATH,
+    DEFAULT_PORT,
+    DEFAULT_PROJECT,
+    EXCLUDE_EMPTY_LABELS,
+    EXCLUDE_SELECT_KEYS,
+    EXTRA_PROJECT_ROOTS,
+    GROK_ROOT,
+    HOST,
+    HTML_PATH,
+    JS_ASSETS,
+    JS_PATH,
+    LIST_FROM_CLIN,
+    LIST_FROM_MODELS,
+    LIST_FROM_RAD_META,
+    MODULES_ROOT,
+    OVERRIDE_PATH,
+    PORT_FILE,
+    PORT_HI,
+    PORT_LO,
+    RAD_COL_SINGLE_KEYS,
+    RAD_ROOT,
+    SET_OUTCOME_DERIVED,
+    SHEET_KEYS,
+    SKIP_SETTING_KEYS,
+    STAGE_ROOT_NAMES,
+    STROBE_PATH,
+    TUPLE_LIST_KEYS,
+    _RAD_FEAT_PREFIX,
+    _TOKEN_SAFE_GET,
+)
 
 # 叶层实现在 ops.py；此处保留同名绑定给 console 命名空间与旧调用点
 from modules.console.ops import (  # noqa: F401
@@ -57,684 +90,36 @@ from modules.console.ops import (  # noqa: F401
     write_project_overlay,
 )
 
-STAGE_ROOT_NAMES = _paths.STAGE_ROOT_NAMES
 
-def _grok_and_drafting(modules_root: Path) -> tuple[Path, Path]:
-    return _paths.grok_and_drafting(modules_root)
+# ── 运行期可变状态：单一之家在 modules.console.state ──────────
+from modules.console import state as _state
 
-GROK_ROOT, RAD_ROOT = _grok_and_drafting(MODULES_ROOT)
-EXTRA_PROJECT_ROOTS = tuple(GROK_ROOT / n for n in STAGE_ROOT_NAMES)
-HTML_PATH = CONSOLE_DIR / "console.html"
-CSS_PATH = CONSOLE_DIR / "console.css"
-JS_ASSETS = {
-    "/console_schema.js": CONSOLE_DIR / "console_schema.js",
-    "/console_api.js": CONSOLE_DIR / "console_api.js",
-    "/console_ui.js": CONSOLE_DIR / "console_ui.js",
-    "/console_app.js": CONSOLE_DIR / "console_app.js",  # shim
-}
-JS_PATH = JS_ASSETS["/console_ui.js"]
-STROBE_PATH = CONSOLE_DIR / "strobe" / "index.html"
-_HTTPD = None
-OVERRIDE_PATH = CONSOLE_DIR / "console.override.json"
-DEFAULT_PROJECT = "demo_study"
-DEFAULT_PORT = 8765
-PORT_LO = 8765
-PORT_HI = 8776
-CHECK_PORT = 8780
-PORT_FILE = CONSOLE_DIR / "console.port.json"
-HOST = "127.0.0.1"
-_SERVE_PORT: int | None = None
-_CONSOLE_TOKEN = secrets.token_urlsafe(24)
-_TOKEN_SAFE_GET = {
-    "/", "/console.html", "/xlm_console.html",
-    "/console.css",
-    "/console_schema.js", "/console_api.js", "/console_ui.js", "/console_app.js",
-    "/api/health", "/api/port",
-    # 工程 html 从 file:// 列课题/载入预览；关服务改走 token（health 本机回传）
-    "/api/projects", "/api/settings",
-}
+# 兼容别名（同一对象 / 同一字符串）：真值在 _state，此处只为少改调用点。
+_CONSOLE_TOKEN = _state.CONSOLE_TOKEN
 
-SKIP_SETTING_KEYS = {
-    "os", "copy", "List", "Optional", "Dict", "Any", "annotations",
-    "PNG_DIR", "GROUP_SOURCE_COL", "OUT_DIR_BASE",
-}
-TUPLE_LIST_KEYS = {"DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT"}
-SET_OUTCOME_DERIVED = {
-    "GROUP_SOURCE_COL", "OUT_DIR", "PNG_DIR",
-    "GROUP_DISPLAY_POS", "GROUP_DISPLAY_NEG",
-    "SEED", "TRAIN_RATIO",
-    # 样本排除为工程级（不进结局覆盖）；勿列入，否则 overlay 写不进 cfg
-    "READER_COMPARE_COL", "FORCE_INTER_FEATURES", "FORCE_MODEL_FEATURES",
-    "FORCE_REMOVE_FEATURES",
-    "SUBGROUP_COL",
-    "SKIP_CLIN_FEATURES",
-    "GROUP_KEEP", "PAIRWISE_GROUPS", "PAIRWISE_ALL",
-    "GROUP_FROM_ID", "GROUP_FROM_ID_SEP", "POSITIVE_GROUP_LABEL",
-    "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE",
-    "DO_DCA", "DCA_CURVES",
-    "DO_NRI", "NRI_CUTOFF", "NRI_MODEL_OLD", "NRI_MODEL_NEW",
-    "CORR_PREDICTORS", "CORR_REFS", "CORR_E_REF", "CORR_F_REF",
-    "DO_DAG", "DO_SHAP", "DO_MEDIATION",
-    "DAG_NODES", "DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT", "MEDIATION_PATHS",
-    "FIG_PALETTE", "FIG_COLORS_MAIN", "FIG_COLORS_AUX",
-}
-SHEET_KEYS = {
-    "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET",
-}
-EXCLUDE_SELECT_KEYS = (
-    "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW",
+
+from modules.console.schema import (  # noqa: E402
+    HINTS,
+    HOT_KEYS,
+    LABELS,
+    SECTION_DEFS,
+    _ADDSELECT_LABEL,
+    _COLUMN_MULTI,
+    _LABEL_DISPLAY_CANDS,
+    _MODEL_CHOICES,
+    _PICK_XLSX_SCRIPT,
+    _PREVIEW_HEAD_MAX_COLS,
+    _RESULT_SKIP_DIRS,
+    _SHEET_ALIASES,
 )
-EXCLUDE_EMPTY_LABELS = {
-    "EXCLUDE_FILE": "（空＝默认 false_classification.xlsx）",
-    "EXCLUDE_SHEET": "（空＝默认 exc）",
-    "EXCLUDE_COL": "（空＝默认 exc）",
-    "EXCLUDE_ROW": "（空＝整列当 ID）",
-}
-CLIN_COL_SINGLE_KEYS = {
-    "CLIN_ID_COL", "LABEL_COL",
-    "POSITIVE_GROUP_LABEL", "SUBGROUP_COL",
-    "SURVIVAL_TIME_COL", "SPLIT_COL", "NRI_OLD_COL", "NRI_NEW_COL",
-}
-CONSOLE_DEFAULTS = {
-    "DO_SURVIVAL": False,
-    "SURVIVAL_TIME_COL": "",
-    "SURVIVAL_TIME_UNIT": "months",
-    "DO_SURVIVAL_BY_RISK": True,
-    "DO_COX": False,
-    "GROUP_KEEP": [],
-    "PAIRWISE_GROUPS": [],
-    "PAIRWISE_ALL": False,
-    "GROUP_FROM_ID": False,
-    "GROUP_FROM_ID_SEP": "_",
-    "DO_PLOT": False,
-    "DO_PLOT_TIFF": False,
-    "DO_PLOT_PDF": False,
-    "DO_LANDMARK_ROC": False,
-    "RAD_MARKER_SIDE": "both",
-    "RAD_MARKER_MIN_N": 5,
-    "DO_ROC": True,
-    "DO_HEATMAP": True,
-    "FIG_PALETTE": "npg",
-    "FIG_COLORS_MAIN": ["#D55E00", "#B2182B", "#2166AC", "#762A83", "#117733"],
-    "FIG_COLORS_AUX": ["#44AA99", "#DDCC77", "#EE8866", "#AA4499", "#332288"],
-    "VAL_MODE": "refit",
-    "SUBGROUP_VAL_MODE": "",
-    "EXTERNAL_VAL_MODE": "refit",
-    "RAD_SHEET": "rad",
-    "CLIN_SHEET": "cln",
-    "QC_SHEET": "qc",
-    "ICC_SHEET": "icc",
-    "RAD_ID_COL": "Patient_ID",
-    "CLIN_ID_COL": "Patient_ID",
-    "LABEL_COL": "",
-    "OUTCOME_COLS": [],
-    "SKIP_CLIN_FEATURES": [],
-    "RAD_ID_COLS": [],
-    "GROUP_DISPLAY_POS": "",
-    "GROUP_DISPLAY_NEG": "",
-    "POSITIVE_GROUP_LABEL": "",
-    "EXTERNAL_FILE": "",
-    "EXTERNAL_CLIN_SHEET": "cln",
-    "EXTERNAL_RAD_SHEET": "rad",
-    "EXTERNAL_TESTS": [],
-    "USE_INTERNAL_SPLIT_WHEN_EXTERNAL": True,
-    "SPLIT_COL": "",
-    "CORR_REFS": [],
-    "DCA_CURVES": ["Clinical", "RadScore", "Combined"],
-    "OUTCOME_OVERRIDES": {},
-    "PAIRWISE_OVERRIDES": {},
-    "GROUP_LEVEL_DISPLAY": {},
-    "SUBGROUP_COL": "",
-    "FORCE_REMOVE_FEATURES": [],
-    "FORCE_INTER_FEATURES": [],
-    "FORCE_MODEL_FEATURES": [],
-    "OUTCOME_OUT_SUBDIR": True,
-    "DO_EXCLUDE_SAMPLES": False,
-    "EXCLUDE_FILE": "",
-    "EXCLUDE_SHEET": "",
-    "EXCLUDE_COL": "",
-    "EXCLUDE_ROW": "",
-    "SUBPROJECT_BY_OUTCOME": {},
-    "READER_VALUE_MAP": {},
-    "OUTCOME_BINARIZE": {},
-    "RAD_FEATURE_DISPLAY_STRIP": [],
-    "RAD_FEATURE_PREFIX_EXCLUDE": [],
-    "RAD_FEATURE_PREFIX_GROUP": {"names": [], "assign": {}},
-}
-RAD_COL_SINGLE_KEYS = {"RAD_ID_COL", "ICC_FEATURE_COL", "ICC_INTRA_COL", "ICC_INTER_COL"}
-LIST_FROM_CLIN = {
-    "OUTCOME_COLS", "READER_COLS", "FORCE_REMOVE_FEATURES",
-    "FORCE_CLIN_FOR_ROC",
-    "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
-    "FORCE_INTER_FEATURES", "FORCE_MODEL_FEATURES",
-}
-LIST_FROM_RAD_META = {"RAD_ID_COLS"}
-_RAD_FEAT_PREFIX = (
-    "h0_", "h1_", "h2_", "h3_", "original_", "wavelet_", "log-", "log_",
-    "diagnostics_",
-)
-LIST_FROM_MODELS = {
-    "ROC_PLOT_EXCLUDE": ["Clinical", "RadScore", "Combined"],
-    "CORR_PREDICTORS": ["RadScore", "Clinical", "Combined"],
-    "CORR_REFS": ["Age", "Group"],
-    "DCA_CURVES": ["Clinical", "RadScore", "Combined"],
-    "NRI_MODEL_OLD": ["clinical", "combined", "radscore"],
-    "NRI_MODEL_NEW": ["clinical", "combined", "radscore"],
-}
-SECTION_DEFS: list[tuple[str, str, list[str]]] = [
-    ("repro", "可重复性", ["DO_REPRO", "SEED", "TRAIN_RATIO", "SPLIT_COL"]),
-    ("io", "数据与路径", ["DO_IO",
-        "INPUT", "MODULES_DIR", "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET",
-        "RAD_ID_COL", "CLIN_ID_COL", "CLIN_PATH",
-        "RAD_PATH", "LABEL_COL", "OUT_DIR",
-        "OUTCOME_OUT_SUBDIR",
-        "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
-        "USE_INTERNAL_SPLIT_WHEN_EXTERNAL",
-        "OUTCOME_COLS", "OUTCOME_OVERRIDES", "PAIRWISE_OVERRIDES",
-        "RAD_ID_COLS",
-        "SUBPROJECT_BY_OUTCOME", "GROUP_COL_KEYWORD",
-        "POSITIVE_GROUP_LABEL", "GROUP_DISPLAY_POS", "GROUP_DISPLAY_NEG",
-        "DO_BASELINE_ALL", "DO_BASELINE_TRAIN_TEST",
-        "EXTERNAL_TESTS",
-        "READER_VALUE_MAP", "OUTCOME_BINARIZE",
-        "GROUP_KEEP", "PAIRWISE_GROUPS", "PAIRWISE_ALL",
-        "GROUP_FROM_ID", "GROUP_FROM_ID_SEP", "GROUP_LEVEL_DISPLAY",
-        "SUBGROUP_COL",
-    ]),
-    ("exclude", "样本排除名单", [
-        "DO_EXCLUDE_SAMPLES",
-        "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS",
-    ]),
-    ("valmode", "内部验证 / 亚组验证 / 外部验证", [
-        "VAL_MODE", "SUBGROUP_VAL_MODE", "EXTERNAL_VAL_MODE",
-    ]),
-    ("clinprep", "临床 / 预处理", [
-        "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
-        "ORDINAL_MAX_LEVELS",
-    ]),
-    ("clin", "临床筛选", [
-        "DO_CLIN",
-        "DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE",
-        "TABLE1_P_THRESHOLD", "DO_FIRTH",
-        "FORCE_REMOVE_FEATURES", "FORCE_INTER_FEATURES",
-        "READER_COLS",
-    ]),
-    ("roc", "ROC", [
-        "DO_ROC",
-        "ROC_MV_P_THRESHOLD",
-        "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE",
-        "OUTCOME_READER_COMPARE", "READER_COMPARE_COL", "READER_ALL_IN_ROC",
-    ]),
-    ("surv", "生存曲线", [
-        "DO_SURVIVAL", "SURVIVAL_TIME_COL", "SURVIVAL_TIME_UNIT",
-        "DO_SURVIVAL_BY_RISK", "DO_COX",
-        "DO_TIME_DEPENDENT_ROC",
-        "TD_IPCW_TIME_COL", "TD_IPCW_STATUS_COL", "TD_IPCW_HORIZONS",
-        "DO_LANDMARK_ROC",
-        "TD_ROC_TIMES", "TD_ROC_STATUS_COLS",
-    ]),
-    ("ancova", "协方差分析", [
-        "DO_ANCOVA",
-        "ANCOVA_OUTCOMES", "ANCOVA_GROUP", "ANCOVA_COVARIATES",
-    ]),
-    ("mlr", "多元线性回归", [
-        "DO_MLR",
-        "MLR_OUTCOMES", "MLR_GROUP", "MLR_COVARIATES",
-    ]),
-    ("switch", "开关", [
-        "DO_FALSE_CLASS", "DO_FDR", "DO_FWER",
-        "VIF_THRESHOLD_WARN", "BOOTSTRAP_N",
-    ]),
-    ("nomo", "列线图", [
-        "DO_NOMOGRAM", "DO_CALIBRATION",
-        "FORCE_MODEL_FEATURES",
-    ]),
-    ("dca", "DCA", [
-        "DO_DCA", "DCA_CURVES",
-    ]),
-    ("nri", "NRI / IDI", [
-        "DO_NRI", "NRI_CUTOFF", "NRI_MODEL_OLD", "NRI_MODEL_NEW",
-        "NRI_OLD_COL", "NRI_NEW_COL",
-    ]),
-    ("corr", "相关热图", [
-        "DO_HEATMAP",
-        "HEATMAP_COLS",
-        "CORR_GROUP",
-    ]),
-    ("pcorr", "相关/偏相关分析", [
-        "DO_PARTIAL",
-        "PARTIAL_X", "PARTIAL_Y", "PARTIAL_METHOD", "PARTIAL_CONTROLS",
-        "PARTIAL_GROUP",
-        "DO_CORR",
-        "CORR_PREDICTORS", "CORR_REFS", "CORR_E_REF", "CORR_F_REF",
-    ]),
-    ("advanced", "高级分析", [
-        "DO_ADVANCED",
-        "DO_DAG", "DO_SHAP", "DO_MEDIATION",
-        "SHAP_MAX_SAMPLES",
-        "DAG_NODES", "DAG_EDGES",
-        "DAG_MEDIATION_HIGHLIGHT", "MEDIATION_PATHS",
-    ]),
-    ("radprep", "组学 / 预处理", [
-        "DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE", "RAD_COR_CUTOFF",
-        "ICC_THRESHOLD", "ICC_FEATURE_COL", "ICC_INTRA_COL", "ICC_INTER_COL",
-    ]),
-    ("rad", "组学 / LASSO", [
-        "DO_LASSO",
-        "RAD_FEATURE_SOURCE", "ALPHA", "LASSO_NFOLDS",
-        "LASSO_N_LAMBDAS", "LASSO_MAX_ITER", "LASSO_N_JOBS", "LASSO_C_MAX",
-        "LASSO_C_MIN", "LASSO_TOL", "LASSO_PREFILTER_TOPK", "LASSO_PLOT_PATH",
-    ]),
-    ("radlog", "组学 / Logistic", [
-        "DO_RAD_LOGISTIC",
-        "RAD_LOGIT_UNI_P", "RAD_LOGIT_MV_P", "DO_RAD_FIRTH",
-    ]),
-    ("fig", "图与显示", [
-        "DO_FIGURE_PANELS",
-        "DO_PLOT_TIFF", "DO_PLOT_PDF",
-        "FIGURE_PANEL_DPI", "FIGURE_PANEL_MEDIATION_NCOLS",
-        "FIGURE_PANEL_LABEL_POS", "FIGURE_PANEL_LABELS", "FIGURE_PANEL_GAP_PX",
-        "FIG_FONT_SIZE", "FIG_PALETTE", "FIG_COLORS_MAIN", "FIG_COLORS_AUX",
-    ]),
-    ("radmark", "前缀 / 筛选 / 分类 / 剥离", [
-        "RAD_MARKER_SIDE", "RAD_MARKER_MIN_N",
-        "RAD_FEATURE_PREFIX_EXCLUDE", "RAD_FEATURE_DISPLAY_STRIP",
-        "RAD_FEATURE_PREFIX_GROUP",
-    ]),
-]
+
 SECTION_OF: dict[str, tuple[str, str]] = {}
 for _sid, _title, _keys in SECTION_DEFS:
     for _k in _keys:
         SECTION_OF[_k] = (_sid, _title)
 
-LABELS = {
-    "INPUT": "数据文件",
-    "RAD_SHEET": "组学 sheet（可空）",
-    "CLIN_SHEET": "临床 sheet（可空）",
-    "QC_SHEET": "质控 sheet（可空）",
-    "ICC_SHEET": "ICC sheet（可空）",
-    "RAD_ID_COL": "组学 ID 列",
-    "CLIN_ID_COL": "临床 ID 列（对齐）",
-    "CLIN_PATH": "临床另文件（可空）",
-    "RAD_PATH": "组学另文件（可空）",
-    "LABEL_COL": "展示姓名列",
-    "OUT_DIR": "输出目录",
-    "OUTCOME_OUT_SUBDIR": "按结局分子目录",
-    "OUTCOME_COLS": "结局列（多选）",
-    "OUTCOME_OVERRIDES": "按结局覆盖",
-    "PAIRWISE_OVERRIDES": "按对子覆盖",
-    "SUBPROJECT_BY_OUTCOME": "结局 / 子工程命名",
-    "GROUP_COL_KEYWORD": "Group 列关键词",
-    "POSITIVE_GROUP_LABEL": "阳性标签",
-    "EXTERNAL_FILE": "外部验证文件",
-    "EXTERNAL_CLIN_SHEET": "外验临床 sheet",
-    "EXTERNAL_RAD_SHEET": "外验组学 sheet",
-    "EXTERNAL_TESTS": "外部验证文件",
-    "USE_INTERNAL_SPLIT_WHEN_EXTERNAL": "有外验仍做内拆",
-    "DO_EXCLUDE_SAMPLES": "启用样本排除",
-    "EXCLUDE_FILE": "排除名单文件",
-    "EXCLUDE_SHEET": "排除 sheet",
-    "EXCLUDE_COL": "排除列",
-    "EXCLUDE_ROW": "排除内容",
-    "EXCLUDE_IDS": "额外排除 ID",
-    "GROUP_DISPLAY_POS": "阳性展示名",
-    "GROUP_DISPLAY_NEG": "阴性展示名",
-    "GROUP_LEVEL_DISPLAY": "组水平展示名",
-    "SUBGROUP_COL": "亚组列",
-    "SUBGROUP_VAL_MODE": "亚组验证",
-    "EXTERNAL_VAL_MODE": "外部验证",
-    "READER_VALUE_MAP": "文本编码",
-    "OUTCOME_BINARIZE": "文本编码（结局）",
-    "TABLE1_P_THRESHOLD": "Table1 筛选 p",
-    "ORDINAL_MAX_LEVELS": "计数/计量等级",
-    "CLIN_FORCE_CONTINUOUS": "强制计量",
-    "CLIN_FORCE_CATEGORICAL": "强制计数",
-    "FORCE_INTER_FEATURES": "强制进入交互",
-    "FORCE_MODEL_FEATURES": "列线图变量",
-    "FORCE_REMOVE_FEATURES": "强制剔除",
-    "READER_COLS": "Reader 列（不进 nomogram）",
-    "SKIP_CLIN_FEATURES": "临床跳过列",
-    "RAD_ID_COLS": "组学非特征列",
-    "FORCE_CLIN_FOR_ROC": "额外对照列",
-    "SEED": "随机种子",
-    "TRAIN_RATIO": "训练比例",
-    "SPLIT_COL": "分组列",
-    "DO_PLOT": "写出 TIFF / PDF",
-    "DO_PLOT_TIFF": "写出 TIFF",
-    "DO_PLOT_PDF": "写出 PDF",
-    "DO_ROC": "画 ROC",
-    "DO_HEATMAP": "画相关热图",
-    "HEATMAP_COLS": "热图列（多选）",
-    "DO_FALSE_CLASS": "错误分类表",
-    "DO_FDR": "FDR",
-    "DO_FWER": "FWER",
-    "DO_FIRTH": "Firth 惩罚 Logistic",
-    "DO_REPRO": "启用",
-    "DO_IO": "启用",
-    "DO_CLIN": "启用",
-    "DO_ANCOVA": "启用",
-    "DO_MLR": "启用",
-    "DO_PARTIAL": "偏相关",
-    "DO_CORR": "相关表",
-    "DO_BASELINE_ALL": "总表",
-    "DO_BASELINE_TRAIN_TEST": "Table 1",
-    "DO_UNI_LOGISTIC_TABLE": "单因素表",
-    "DO_MV_LOGISTIC_TABLE": "多因素表",
-    "DO_ADVANCED": "启用",
-    "DO_LASSO": "启用",
-    "DO_RAD_LOGISTIC": "启用",
-    "RAD_LOGIT_UNI_P": "单因素 p",
-    "RAD_LOGIT_MV_P": "多因素 p",
-    "DO_RAD_FIRTH": "Firth 惩罚 Logistic",
-    "ENABLE_CORR_FILTER": "相关过滤",
-    "DO_FIGURE_PANELS": "图与显示总闸",
-    "DO_QC_REPORT": "QC HTML",
-    "QC_HTML": "质控 HTML（默认 ref/qc.html）",
-    "DO_ICC_FILTER": "ICC 预筛选",
-    "LASSO_CACHE": "LASSO 缓存",
-    "ICC_THRESHOLD": "ICC 阈值",
-    "ICC_FEATURE_COL": "ICC 特征列",
-    "ICC_INTRA_COL": "intra ICC 列",
-    "ICC_INTER_COL": "inter ICC 列",
-    "ICC_REQUIRE_ROW": "无 ICC 行则丢弃",
-    "ROC_MV_P_THRESHOLD": "ROC 多因素 p",
-    "VAL_MODE": "内部验证",
-    "DO_COMBINED_MODEL": "联合模型",
-    "DO_CALIBRATION": "校准曲线",
-    "DO_DCA": "DCA",
-    "DCA_CURVES": "DCA 曲线指标",
-    "DO_NOMOGRAM": "列线图",
-    "DO_NRI": "NRI / IDI",
-    "NRI_CUTOFF": "NRI 切点",
-    "NRI_MODEL_OLD": "NRI 旧模型",
-    "NRI_MODEL_NEW": "NRI 新模型",
-    "OUTCOME_READER_COMPARE": "结局→Reader 对照",
-    "READER_COMPARE_COL": "当前 Reader 对照列",
-    "CORR_PREDICTORS": "预测因子",
-    "CORR_GROUP": "分析组别",
-    "CORR_REFS": "参考变量",
-    "CORR_E_REF": "相关 E 参考",
-    "CORR_F_REF": "相关 F 参考",
-    "ROC_PLOT_EXCLUDE": "ROC 图不画的模型",
-    "BOOTSTRAP_N": "Bootstrap次数",
-    "DO_LANDMARK_ROC": "Landmark",
-    "DO_TIME_DEPENDENT_ROC": "IPCW",
-    "TD_ROC_TIMES": "Landmark 时间列",
-    "TD_IPCW_TIME_COL": "IPCW 时间列",
-    "TD_IPCW_STATUS_COL": "状态",
-    "TD_IPCW_HORIZONS": "评估月",
-    "RAD_MARKER_SIDE": "标记侧",
-    "RAD_MARKER_MIN_N": "最少列数",
-    "TD_ROC_STATUS_COLS": "编码后状态",
-    "ANCOVA_OUTCOMES": "因变量（多选）",
-    "ANCOVA_GROUP": "分组变量",
-    "ANCOVA_COVARIATES": "协变量（多选）",
-    "MLR_OUTCOMES": "因变量（多选）",
-    "MLR_GROUP": "组别",
-    "MLR_COVARIATES": "协变量（多选）",
-    "PARTIAL_X": "连续变量 1（多选）",
-    "PARTIAL_Y": "连续变量 2（多选）",
-    "PARTIAL_CONTROLS": "控制变量（多选）",
-    "PARTIAL_METHOD": "方法",
-    "PARTIAL_GROUP": "分析组别",
-    "DO_DAG": "DAG",
-    "DO_SHAP": "SHAP",
-    "DO_MEDIATION": "中介分析",
-    "DO_SURVIVAL": "KM",
-    "SURVIVAL_TIME_COL": "时间",
-    "SURVIVAL_TIME_UNIT": "单位",
-    "DO_SURVIVAL_BY_RISK": "高低危",
-    "DO_COX": "Cox",
-    "READER_ALL_IN_ROC": "全部 Reader 进 ROC",
-    "NRI_OLD_COL": "NRI 旧对照列",
-    "NRI_NEW_COL": "NRI 新对照列",
-    "GROUP_KEEP": "只保留这些组（行筛选）",
-    "PAIRWISE_GROUPS": "两两比较 [[阳,阴], ...]",
-    "PAIRWISE_ALL": "全部两两比较（默认关）",
-    "GROUP_FROM_ID": "从 ID 前缀推断分组",
-    "GROUP_FROM_ID_SEP": "ID 分组分隔符",
-    "VIF_THRESHOLD_WARN": "VIF警告阈值",
-    "SHAP_MAX_SAMPLES": "SHAP 最大样本",
-    "DAG_NODES": "DAG 节点",
-    "DAG_EDGES": "DAG 边",
-    "DAG_MEDIATION_HIGHLIGHT": "中介高亮边",
-    "MEDIATION_PATHS": "中介路径",
-    "RAD_FEATURE_SOURCE": "组学来源标签",
-    "RAD_COR_CUTOFF": "组学相关阈值",
-    "ALPHA": "LASSO α",
-    "LASSO_NFOLDS": "LASSO 折数",
-    "LASSO_N_LAMBDAS": "λ 个数",
-    "LASSO_MAX_ITER": "LASSO 最大迭代",
-    "LASSO_N_JOBS": "LASSO 并行",
-    "LASSO_C_MAX": "LASSO C 最大",
-    "LASSO_C_MIN": "LASSO C 最小",
-    "LASSO_TOL": "LASSO 容差",
-    "LASSO_PREFILTER_TOPK": "LASSO 预筛 TopK",
-    "LASSO_PLOT_PATH": "画 LASSO 路径",
-    "RAD_FEATURE_PREFIX_EXCLUDE": "前缀 /筛选/ 剥离",
-    "RAD_FEATURE_PREFIX_GROUP": "前缀分类",
-    "RAD_FEATURE_DISPLAY_STRIP": "前缀 / 剥离",
-    "FIGURE_PANEL_DPI": "拼板 DPI",
-    "FIGURE_PANEL_MEDIATION_NCOLS": "中介拼板列数",
-    "FIGURE_PANEL_LABEL_POS": "拼板字母位置",
-    "FIGURE_PANEL_LABELS": "拼板字母",
-    "FIGURE_PANEL_GAP_PX": "拼板间距 px",
-    "FIG_FONT_SIZE": "图字号",
-    "FIG_PALETTE": "画图配色方案",
-    "FIG_COLORS_MAIN": "主色 5（Combined / RadScore / Clinical / Reader / Extra）",
-    "FIG_COLORS_AUX": "辅色 5（其余模型 / KM 分层 / 回退）",
-    "MODULES_DIR": "算法库 modules",
-}
-
-# 聊天里反复改的、换课题几乎必动的项
-HOT_KEYS = {
-    "INPUT", "MODULES_DIR",
-    "OUTCOME_COLS", "POSITIVE_GROUP_LABEL",
-    "GROUP_KEEP", "PAIRWISE_GROUPS", "PAIRWISE_ALL",
-    "DO_SURVIVAL", "DO_COX", "SURVIVAL_TIME_COL", "FIG_PALETTE",
-    "DO_EXCLUDE_SAMPLES", "EXCLUDE_IDS",
-    "VAL_MODE", "SUBGROUP_VAL_MODE", "EXTERNAL_VAL_MODE",
-    "FORCE_CLIN_FOR_ROC", "FORCE_REMOVE_FEATURES",
-    "SKIP_CLIN_FEATURES", "RAD_ID_COLS",
-}
-
-HINTS: dict[str, str] = {
-    "INPUT": "主数据 Excel，相对工程根目录或绝对路径。须能打开，并含组学/临床等工作表。左侧「数据」框只覆盖本次运行，点「写回」才会改这一项。",
-    "RAD_SHEET": "组学所在工作表。可空；与临床必须二选一。可选工作簿里任意工作表（不限于 rad）。空=本次不做组学/LASSO。",
-    "CLIN_SHEET": "临床所在工作表。可空；与组学必须二选一。可选任意工作表（不限于 cln）。空且仅有组学时，用组学 ID/Group 合成临床表。",
-    "QC_SHEET": "质控工作表。可空=不写 ref/qc.html。可选任意工作表名。",
-    "ICC_SHEET": "ICC 工作表。可空=不做 ICC 预筛选。可选任意工作表名。",
-    "RAD_ID_COL": "组学表里的受试者 ID 列，用来和临床表对接。",
-    "CLIN_ID_COL": "临床表里的受试者 ID，用来和组学表对齐、排除样本、按人划分训练/验证。不是姓名。",
-    "CLIN_PATH": "临床数据另存为一个 xlsx 时填写。空=与 INPUT 同一文件。",
-    "RAD_PATH": "组学数据另存为一个 xlsx 时填写。空=与 INPUT 同一文件。",
-    "LABEL_COL": "错分表/图上显示的姓名。与临床 ID 不是同一列：例如 Name=拼音 ID，patient_name=中文姓名。没有单独姓名列时可以和 ID 同列。",
-    "OUT_DIR": "本次结局输出目录，相对工程根。多结局时就是 <结局名>；两两比较再套 <阳性展示名>_vs_<阴性展示名>。不再套 output/。",
-    "OUTCOME_OUT_SUBDIR": "已从控制台撤下。始终按结局分子目录。",
-    "SUBPROJECT_BY_OUTCOME": "左=结局列，右=子工程文件夹。多结局可归到同一子工程。空=用结局名。同一终点的多个时间点不要写成多个结局，放到时间依赖性 ROC 的状态列。",
-    "OUTCOME_COLS": "要循环的结局列。单结局也填这一项（一项即可）。多选则依次建模、按列名建目录。多选后用「公共 / 各结局」页签改展示名、剔除、ROC/DCA/NRI、相关和高级分析。≥3 对两两比较时，各结局页下再分页。",
-    "OUTCOME_OVERRIDES": "按结局覆盖公共设置。缺键=继承公共。控制台页签编辑，不必手改。",
-    "PAIRWISE_OVERRIDES": "按结局→对子覆盖。≥3 对时下行页签编辑。缺键=继承该结局/公共。",
-    "GROUP_COL_KEYWORD": "仅当当前结局列不在表里时，才按这个关键词找 Group。多结局时分组来自该结局列。",
-    "POSITIVE_GROUP_LABEL": "该列取值中哪一个算阳性（y=1）。须与表里的实际字符串一致。未填则按字典序。",
-    "EXTERNAL_FILE": "外验 xlsx（第一条）。多条用外验列表。留空=不做外验（仅有默认 sheet 名不算）。",
-    "EXTERNAL_CLIN_SHEET": "外验临床工作表名（第一条）。须与外验文件、组学工作表一起填才启用。",
-    "EXTERNAL_RAD_SHEET": "外验组学工作表名（第一条）。须与外验文件、临床工作表一起填才启用。",
-    "EXTERNAL_TESTS": "外验列表。每项 name / file / clin_sheet / rad_sheet / rad_id_col。多条横拼；一条不拼。空=不做外验。",
-    "USE_INTERNAL_SPLIT_WHEN_EXTERNAL": "已有外验时是否仍按 TRAIN_RATIO 做内部训练/验证。默认开。",
-    "DO_EXCLUDE_SAMPLES": "开=按排除名单先删人，再进分析。关=忽略排除表。名单默认读子工程根 false_classification.xlsx 的 exc 表。",
-    "EXCLUDE_FILE": "排除名单 xlsx。选完一个，下面再出一行，可继续选其他文件。同一 sheet、列、内容套到每个文件，名单合并。留空=子工程根 false_classification.xlsx。",
-    "EXCLUDE_SHEET": "排除名单工作表。随所选文件列出。默认 exc。",
-    "EXCLUDE_COL": "排除列。选内容模式=放排除原因的列；空内容=该列整列当 ID。默认 exc。",
-    "EXCLUDE_ROW": "排除列中的内容，如下拉里的「3个月以后就手术了」。空=该列整列当 ID（旧 exc 名单）。",
-    "EXCLUDE_IDS": "额外手写要剔除的 ID，与 Excel 名单合并。",
-    "GROUP_DISPLAY_POS": "图/表阳性显示名，可与列值不同。两两比较时也用作结果目录 {阳性展示名}_vs_{阴性展示名} 的前半段。",
-    "GROUP_DISPLAY_NEG": "图/表阴性显示名。两两比较时也用作结果目录的后半段。",
-    "GROUP_LEVEL_DISPLAY": "Group 列值→短展示名，如 {\"Clear Cell Carcinoma\":\"CCC\"}。对子目录和图例默认用这个。",
-    "SUBGROUP_COL": "亚组列，可空白。空白=不做分层评估。与结局不同时：全队列训主模型（列线图），再按该列分层评估 ROC/校准/DCA。不重筛特征。切点见亚组验证。",
-    "READER_VALUE_MAP": "先选列，再为这一列里的文字选 1 或 0。Positive→1、Negative→0 不列出。分组已设的阴阳性不重复。行尾 − 只收起列，已有编码保留。",
-    "OUTCOME_BINARIZE": "与文本编码合并：结局水平写入此键；阅片文字写入 READER_VALUE_MAP。",
-    "TABLE1_P_THRESHOLD": "单因素 Logistic p 进入多因素候选池表的界值。VIF≥high 或完全分离不进入。不自动进入 Clinical / 列线图。更严就改小（如 0.05）。",
-    "ORDINAL_MAX_LEVELS": "水平数≤此值按计数，>此值按计量。空或未填显示并采用 5。强制计数/强制计量名单优先。",
-    "CLIN_FORCE_CONTINUOUS": "强制按计量。覆盖计数/计量等级默认分级。",
-    "CLIN_FORCE_CATEGORICAL": "强制按计数的列名。不是等级数字。覆盖计数/计量等级。空=不强制。",
-    "FORCE_INTER_FEATURES": "已不参与 Clinical 入选（仅 FORCE_MODEL_FEATURES 手动入模）。键保留兼容旧 ini。",
-    "FORCE_MODEL_FEATURES": "手动指定 Clinical / Combined / 列线图临床列 / ROC 单临床曲线。空=默认用多因素 Logistic p < ROC_MV_P_THRESHOLD 的特征。有手选则用手选。有组学时图 A = 这些列 + RadScore。此处的 RadScore 令牌表示纳入组学评分（不把 LASSO/Logistic 成分特征当作临床协变量；成分展开见相关/偏相关/ANCOVA/MLR/热图）。",
-    "FORCE_REMOVE_FEATURES": "子结局/对子页选择。进 Table 1，但不进 nomogram（阅片、泄漏、术中）。已跳过的列不会出现。",
-    "READER_COLS": "阅片列。只作对照 ROC/NRI/DCA，不进 nomogram。",
-    "SKIP_CLIN_FEATURES": "先选。ID、结局/标记列。不进 Table 1，也不进 nomogram。等级高于强制剔除。姓名只在 LABEL_COL 指向时锁定，不默认跳过 Name。多结局可按页签覆盖。",
-    "RAD_ID_COLS": "组学表里不是特征的列（ID、Group 等），不会进组学筛选。",
-    "FORCE_CLIN_FOR_ROC": "加到 ROC 的对照列，不进临床筛选、不进列线图。阅片或可疑指标放这里。DCA 另在下面勾曲线。",
-    "SEED": "划分训练集与 LASSO 的随机种子。填了分组列则不再用于划分，仍用于 LASSO。",
-    "TRAIN_RATIO": "内部训练比例，其余为验证。填了分组列则忽略此项。有外验时是否仍拆看开关。",
-    "SPLIT_COL": "表里已经分好训练/验证时选这一列。取值 training/train 或 test/validation。空=按训练比例随机拆。",
-    "DO_PLOT": "旧总开关。已拆成写出 TIFF / 写出 PDF。",
-    "DO_PLOT_TIFF": "开=另存 TIFF 投稿格式。默认关。结果 HTML 仍用 PNG。",
-    "DO_PLOT_PDF": "开=另存 PDF 投稿格式。默认关。结果 HTML 仍用 PNG。",
-    "DO_ROC": "开=结果里写 ROC 图和指标表。关=结果不显示 ROC。",
-    "DO_HEATMAP": "开=按热图列画 Spearman 热图。Clinical = 临床评分 + 筛选后的临床列，RadScore = 组学评分 + 筛选后的组学特征列，点名的列画那一列。空名单不画。关=不画热图。相关表由「相关/偏相关分析」里的相关表开关控制。",
-    "HEATMAP_COLS": "Clinical = 临床评分 + 筛选后的临床列，RadScore = 组学评分 + LASSO/Logistic 入选成分特征，点名的列画该列。两项可同时选，同名只保留一次。空名单不画。",
-    "DO_FALSE_CLASS": "输出错误分类表（假阳/假阴名单）。",
-    "DO_FDR": "Benjamini–Hochberg。两处家族分开：①协方差分析 / 多元线性回归每个因变量的 Group 检验（规格相同的两张表共用一家）；②组学单因素 Logistic 全部特征的 p（入选候选池时与 FWER 取 AND，α = RAD_LOGIT_UNI_P）。不校正 Table 1、临床 Logistic、LASSO，也不校正单独一对偏相关。",
-    "DO_FWER": "Holm。可与 FDR 同时开，校正对象与 FDR 相同（ANCOVA/MLR Group；组学单因素 Logistic）。组学候选池：两者都开时须同时通过（AND）。确认性结论再用；探索性 ROI 家族通常只开 FDR。",
-    "DO_FIRTH": "勾选后，在临床 Logistic 之外另出 Firth 惩罚 Logistic（单因素和候选池多因素）。完全分离时 OR 仍有限。不替换临床入选规则。组学 Firth 用组学 / Logistic 里的开关。",
-    "DO_REPRO": "本块开关。关掉后本块变灰且不能改，种子和训练比例仍按当前值使用。",
-    "DO_IO": "本块开关。关掉后本块变灰且不能改，已填路径仍生效。",
-    "DO_CLIN": "关=训练层只出 Table 1，不做单因素和多因素临床筛选。",
-    "DO_ANCOVA": "关=不拟合协方差分析。",
-    "DO_MLR": "关=不拟合多元线性回归。",
-    "DO_PARTIAL": "关=结果不写偏相关。不关相关表。控制变量与方法只在这个开关打开时生效。",
-    "DO_CORR": "关=不出相关表（预测因子 × 参考变量）。不关偏相关。热图由「相关热图」决定。",
-    "DO_BASELINE_ALL": "关=结果不写总表。不影响队列、拆分和建模。",
-    "DO_BASELINE_TRAIN_TEST": "关=结果不写 Table 1（Train vs Test）。不影响队列、拆分和建模。",
-    "DO_UNI_LOGISTIC_TABLE": "关=结果不写 Univariate Logistic。不改入模变量和筛选。",
-    "DO_MV_LOGISTIC_TABLE": "关=结果不写 Multivariate Logistic。不改入模变量和筛选。",
-    "DO_ADVANCED": "关=不做 DAG、SHAP 和中介。VIF 阈值与 Bootstrap 次数在「开关」。",
-    "DO_LASSO": "关=不跑 LASSO。未指定组学表时本来就跳过。组学 / Logistic 打开时本趟也不跑 LASSO。",
-    "DO_RAD_LOGISTIC": "开=用逻辑回归筛选组学并生成 RadScore，本趟不跑 LASSO。界值用本模块的单因素 p、多因素 p；VIF 上限在「开关」。不重筛。验证模式跟随内部验证、亚组验证、外部验证。",
-    "RAD_LOGIT_UNI_P": "组学单因素进入多因素候选池的 α。未开 FDR/FWER 时用原始 p < α；开了则用对应校正 p < α（两者都开时 AND）。完全分离不进入；VIF 只警告。",
-    "RAD_LOGIT_MV_P": "候选池多因素 Logistic p 小于此值才入选，并写入 RadScore。",
-    "DO_RAD_FIRTH": "另出组学 Firth 单因素和候选池表。不替换入选规则，也不跟随临床的 Firth 开关。",
-    "ENABLE_CORR_FILTER": "组学高相关特征预过滤，阈值见 RAD_COR_CUTOFF。",
-    "DO_FIGURE_PANELS": "图与显示总闸。关=不写任何 PNG/TIFF/PDF，结果 HTML 不嵌图，拼板也不跑。开=按各分析开关出图；拼板仍在本块。",
-    "DO_QC_REPORT": "根据 QC_SHEET 写 ref/qc.html。",
-    "QC_HTML": "质控 HTML，默认 ref/qc.html。清单另放在各子工程 QC/。",
-    "DO_ICC_FILTER": (
-        "intra 与 inter 都≥阈值才保留该组学特征。"
-        "在 TRAIN 上、交叉验证前执行，不使用分析结局（outcome-blind）。"
-    ),
-    "LASSO_CACHE": "开=训练矩阵和 LASSO 参数不变时读取上次交叉验证。关=每次重算。改 α、折数、λ 范围、种子、预处理或训练行会重算并保存。",
-    "ICC_THRESHOLD": "ICC 保留阈值，常用 0.75。",
-    "ICC_FEATURE_COL": "ICC 表里的特征名列。",
-    "ICC_INTRA_COL": "观察者内 ICC 列名。",
-    "ICC_INTER_COL": "观察者间 ICC 列名。",
-    "ICC_REQUIRE_ROW": "开=ICC 表没有该特征就丢掉；关=没有行则保留。",
-    "ROC_MV_P_THRESHOLD": "列线图变量为空时，多因素 Logistic 进入 Clinical / Combined / 列线图的 p 界值（默认 0.05）。有手选则忽略此项。",
-    "VAL_MODE": "内部验证切点。三项各自独立。重新拟合=锁特征、本层重估系数；套公式=锁系数、本层重算 Youden；锁定阈值=再锁 Train Youden。均不重筛。",
-    "SUBGROUP_VAL_MODE": "亚组验证切点。空=跟随内部验证。否则与内部验证独立：重新拟合 / 套公式 / 锁定阈值。不重筛。",
-    "EXTERNAL_VAL_MODE": "外验切点，与内部验证独立。重新拟合 / 套公式 / 锁定阈值。不重筛。公共页设置。",
-    "DO_COMBINED_MODEL": "临床 + RadScore 联合模型（主模型）。",
-    "DO_CALIBRATION": "校准曲线。",
-    "DO_DCA": "决策曲线。",
-    "DCA_CURVES": "画进 DCA 的曲线。可多选 Clinical / RadScore / Combined 或临床列。空=这三条模型曲线。",
-    "DO_NOMOGRAM": "列线图 / 联合模型（Clinical + RadScore）。关则不画 nomogram。",
-    "DO_NRI": "相对旧模型的 NRI/IDI。",
-    "NRI_CUTOFF": "NRI 风险切点，须含 0 和 1，如 0 / 0.3 / 0.7 / 1。",
-    "NRI_MODEL_OLD": "NRI 对照的旧模型。选多个 Reader 时各自对照，结果按所选顺序上下排列。临床多列仍合成一个旧模型。",
-    "NRI_MODEL_NEW": "NRI 的新模型，一般为 combined。",
-    "OUTCOME_READER_COMPARE": "结局列 → 对应 Reader 列的字典。空则用 READER_COMPARE_COL。",
-    "READER_COMPARE_COL": "当前结局用来对照的那一列 Reader。",
-    "CORR_PREDICTORS": "预测因子：相关表预测因子与偏相关 X 共用（RadScore / Clinical / Combined 或临床/连续列）。RadScore = 组学评分 + LASSO/Logistic 入选成分特征；Clinical = 临床评分 + 入选临床列。改这一项会同步写入 PARTIAL_X。",
-    "CORR_GROUP": "热图只用这一组的行（相关表共用此筛选）。全部=当前样本都用。列仍是已经筛选好的列。",
-    "CORR_REFS": "参考变量：相关表参考与偏相关 Y 共用。空=不出 Correlation with reference variables 表。改这一项会同步写入 PARTIAL_Y。每个参考出一张表，不出图。",
-    "CORR_E_REF": "相关分析 E 类参考变量，常用 Age。",
-    "CORR_F_REF": "相关分析 F 类参考，常用结局列。",
-    "ROC_PLOT_EXCLUDE": "ROC 图上不画、表里仍算的模型，如 Clinical。放在额外对照列下面。",
-    "BOOTSTRAP_N": "ROC AUC、中介、NRI/IDI、Spearman 等相关 Bootstrap 共用次数。默认 1000。",
-    "DO_LANDMARK_ROC": "开=用当前这一套分数，在每个编码后的窗口状态列上画 Landmark ROC。状态是文本编码之后的阴/阳（CR/PR=0，SD/PD=1）。窗口月从列名读。不按时间点重训。画法与 ROC 相同，再左右拼成 train | test。原始 AUC 低于 0.5 时把分数反过来，曲线留在对角线上方。表名 landmark_*，图 panel_landmark_roc_*。与 IPCW 开关独立。",
-    "DO_TIME_DEPENDENT_ROC": "开=时间依赖性 ROC（IPCW 累积/动态 ROC）。时间、单位和状态与 KM 共用。每个评估月各画一条 ROC。病例=时间≤t 且状态=1，对照=时间>t。删失用 KM 逆概率加权。画法与 ROC 相同，再左右拼成 train | test。原始 AUC 低于 0.5 时把分数反过来，曲线留在对角线上方。表名 ipcw_*，图 panel_ipcw_roc_*。与 Landmark 开关独立。",
-    "TD_ROC_TIMES": "留空。窗口月从状态列名读（_3m→3，_6m→6，_1y→12，_2y→24）。不要填月份数字。",
-    "TD_IPCW_TIME_COL": "与「时间」是同一列。控制台改时间时两处一起写。不能为负。",
-    "TD_IPCW_STATUS_COL": "KM 与 IPCW 共用。1=事件，0=删失。这不是 CR/PR/SD/PD 的阴阳性。",
-    "TD_IPCW_HORIZONS": "IPCW 评估月 t。每个 t 出一行 AUC。病例=时间≤t 且状态=1，对照=时间>t。常用 6,12,24。",
-    "RAD_MARKER_SIDE": "重新识别标记时看前缀、后缀或二者。不改变已保存标记按哪一端匹配。",
-    "RAD_MARKER_MIN_N": "同一标记至少这么多列才列入识别结果。默认 5。",
-    "TD_ROC_STATUS_COLS": "Landmark 状态列。用文本编码之后的阴/阳：CR/PR=0，SD/PD=1。窗口月从列名读，不必再配时间列。",
-    "ANCOVA_OUTCOMES": "和结局列一样：已选的是勾选标签，下拉再加一列。和分组、协变量排在同一行。选 RadScore / Clinical 时展开为评分本身 + 入选成分特征。全队列拟合。两组时 Group 的 F 与回归系数检验相同。这一张表就是一个多重校正家族。",
-    "ANCOVA_GROUP": "分组变量。参照组取阳性标签以外的水平（两组时即阴性组），所以系数是阳性减参照。",
-    "ANCOVA_COVARIATES": "要调整的控制变量，可多选。选 RadScore / Clinical 时展开为评分 + 入选成分。不要把疾病严重程度量表放进组间模型，否则会把疾病相关通路调掉。",
-    "MLR_OUTCOMES": "和结局列一样：已选的是勾选标签，下拉再加一列。和组别、协变量排在同一行。选 RadScore / Clinical 时展开为评分本身 + 入选成分特征。报告 Group 效应 β、95% CI 和 P。与协方差分析同一批因变量、同一分组和协变量时，多重校正只算一次。",
-    "MLR_GROUP": "组别。β 是该列阳性水平相对参照水平的调整后均值差。",
-    "MLR_COVARIATES": "与分组同时进入的协变量。选 RadScore / Clinical 时展开为评分 + 入选成分。",
-    "PARTIAL_X": "（已并入预测因子 / CORR_PREDICTORS，控制台不单独显示。）与参考变量两两配对做偏相关。",
-    "PARTIAL_Y": "（已并入参考变量 / CORR_REFS，控制台不单独显示。）与预测因子两两配对。",
-    "PARTIAL_CONTROLS": "和结局列一样：已选的是勾选标签，下拉再加一列。偏掉这些变量。选 RadScore / Clinical 时展开为评分 + 入选成分。预先指定的配对不进 Group 检验的 FDR/FWER。",
-    "PARTIAL_METHOD": "Spearman：连续变量先秩变换再做残差偏相关。Pearson：直接对原始值做残差偏相关。",
-    "PARTIAL_GROUP": "偏相关只用这一组的行。全部=当前样本都用。列仍是已经筛选好的列。",
-    "DO_DAG": "画 DAG。",
-    "DO_SHAP": "RadScore 的 SHAP 解释图。",
-    "DO_MEDIATION": "RadScore → 临床 → 结局的中介分析。",
-    "DO_SURVIVAL": "开=画 KM。时间、单位和状态与 IPCW 共用。状态列空时，事件退回当前结局。",
-    "SURVIVAL_TIME_COL": "KM 与 IPCW 共用的时间列。改这里会同时写入 IPCW 时间列。空则 KM 不画。",
-    "SURVIVAL_TIME_UNIT": "横轴单位，KM 与 IPCW 共用：months / days / years。",
-    "DO_SURVIVAL_BY_RISK": "按 Combined/RadScore 的 train 中位数分高低危再画 KM + log-rank。只在 KM 开着时计算。",
-    "DO_COX": "单因素 Cox PH：High vs Low（与 KM 切点相同）以及评分每 1 SD。图上标 HR，结果 HTML 出表。只在 KM 开着时计算。",
-    "READER_ALL_IN_ROC": "开=所有 Reader 都进 ROC 对照（WML/肝性脑病常用）。",
-    "NRI_OLD_COL": "不用模型名、直接指定旧对照列时用（界面已隐藏，仅 ini）。",
-    "NRI_NEW_COL": "直接指定新对照列时用（界面已隐藏，仅 ini）。",
-    "GROUP_KEEP": "只留这些组的行，用于多组里抽两两比较。空=不筛行。",
-    "PAIRWISE_GROUPS": "手写两两比较，如 [[\"A\",\"B\"],[\"A\",\"C\"]]。",
-    "PAIRWISE_ALL": "左侧「分组」卡。默认关=全部组不筛。开=对检出组做全部两两比较。仅 dll_OV 默认开。",
-    "GROUP_FROM_ID": "已从控制台撤下。旧 ini 若仍为 true，流水线仍可从 ID 前缀分组。",
-    "GROUP_FROM_ID_SEP": "已从控制台撤下。仅当旧 ini 打开 GROUP_FROM_ID 时有效。",
-    "VIF_THRESHOLD_WARN": "VIF 超过则警告共线性（仅警示，不按高阈值剔除候选），常用 5。",
-    "SHAP_MAX_SAMPLES": "算 SHAP 的最多人数，太大较慢。",
-    "DAG_NODES": "DAG 节点名，须含结局节点（常为 Group 或结局列）。",
-    "DAG_EDGES": "有向边列表 [[从, 到], ...]。",
-    "DAG_MEDIATION_HIGHLIGHT": "要加粗的中介边。",
-    "MEDIATION_PATHS": "中介路径 X → M → Y。下拉选节点。空则按入选临床自动生成 RadScore → 临床 → 结局。",
-    "RAD_FEATURE_SOURCE": "组学来源标签，仅用于展示，如 MRI。",
-    "RAD_COR_CUTOFF": "组学两两相关超过此值则去掉其中一个。",
-    "ALPHA": "LASSO 的 α，1=纯 L1。",
-    "LASSO_NFOLDS": "选 λ 的交叉验证折数。",
-    "LASSO_N_LAMBDAS": "候选 λ 个数。",
-    "LASSO_MAX_ITER": "每个 λ 最大迭代。",
-    "LASSO_N_JOBS": "并行核数，-1=全用。",
-    "LASSO_C_MAX": "λ 搜索上界（C 最大）。",
-    "LASSO_C_MIN": "λ 搜索下界。",
-    "LASSO_TOL": "收敛容差。",
-    "LASSO_PREFILTER_TOPK": "进 LASSO 前按单因素先留的特征数。",
-    "LASSO_PLOT_PATH": "是否画 λ 路径图。",
-    "RAD_FEATURE_PREFIX_EXCLUDE": "先按标记侧和最少列数识别前缀或后缀，再勾选。勾选的整组不进 LASSO、Logistic、相关、热图和其他分析。前缀按列名开头匹配；以 __ 结尾时同时去掉少一个下划线的族（如 perfusion_weighted__ 也排除 perfusion_weighted_*）。后缀按列名结尾匹配。ID 列保留。空=特征都可进。",
-    "RAD_FEATURE_PREFIX_GROUP": "手填分类名，再把未排除的标记分进各类。每一类单独做 Logistic，分数为 RadScore_分类名。都不填则仍是一整份 RadScore。已排除的标记不进入分类。前缀、后缀的匹配与筛选相同。",
-    "RAD_FEATURE_DISPLAY_STRIP": "左=检出的标记，右=要剥掉的字（通常就是该标记）。只剥它所在的那一端，不改名称中间。空=不剥。只改图/表显示，不改内部列名。",
-    "FIGURE_PANEL_DPI": "拼板 PNG 分辨率。",
-    "FIGURE_PANEL_MEDIATION_NCOLS": "中介拼板每行列数。",
-    "FIGURE_PANEL_LABEL_POS": "A/B/C 字母位置，如 lower_left。",
-    "FIGURE_PANEL_LABELS": "是否在拼板上加 A/B/C。",
-    "FIGURE_PANEL_GAP_PX": "拼板图之间的像素间距。",
-    "FIG_FONT_SIZE": "统计图默认字号。",
-    "FIG_PALETTE": "画图配色：20 套命名色板 + custom。npg 默认；okabe/aaas/nejm/lancet/jama/jco/frontiers/bmj 期刊风；tol/tolbright 色盲安全；radiology 本组；ibm/tableau 投影；d3/set1/dark2/paired 多模型；uchicago 学术；gray 黑白印刷。",
-    "FIG_COLORS_MAIN": "5 个主色，依次给 Combined、RadScore、Clinical、Reader、Age。",
-    "FIG_COLORS_AUX": "5 个辅色，给其余曲线、KM 分层和未点名的模型。",
-    "MODULES_DIR": "共享算法库 modules 的文件夹。填本仓 modules 的绝对路径（或设置后由 settings.ini 提供）。换盘或拷贝算法库时改这里。",
-}
-
-from modules.console.setting_meta import merge_icc_tips  # noqa: E402
-HINTS = merge_icc_tips(HINTS)
-
-_RUN_LOCK = threading.Lock()
-_RUN: dict[str, Any] = {
-    "status": "idle",
-    "pid": None,
-    "proc": None,
-    "log_path": "",
-    "started": None,
-    "ended": None,
-    "error": "",
-    "project": "",
-    "dry_run": False,
-}
+_RUN_LOCK = _state.RUN_LOCK   # 同一把锁
+_RUN = _state.RUN             # 同一个 dict（只 update，不重绑）
 
 # ── paths ──────────────────────────────────────────────────────
 def _resolve(p: str | Path) -> Path:
@@ -1083,37 +468,6 @@ def _id_dropdown_columns(columns, configured: str = "") -> list[str]:
     if not picked and cols:
         picked = [cols[0]]
     return picked
-
-_MODEL_CHOICES = ["Clinical", "RadScore", "Combined"]
-# 这些多选是在选分析列。结局列、ID、分组水平、排除名单不走这套。
-_COLUMN_MULTI = frozenset({
-    "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
-    "FORCE_REMOVE_FEATURES", "FORCE_INTER_FEATURES", "READER_COLS",
-    "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE",
-    "FORCE_MODEL_FEATURES",
-    "DCA_CURVES",
-    "NRI_MODEL_OLD", "NRI_MODEL_NEW",
-    "CORR_PREDICTORS", "CORR_REFS", "HEATMAP_COLS",
-    "ANCOVA_OUTCOMES", "ANCOVA_COVARIATES",
-    "MLR_OUTCOMES", "MLR_COVARIATES",
-    "PARTIAL_X", "PARTIAL_Y", "PARTIAL_CONTROLS",
-    "DAG_NODES",
-})
-_ADDSELECT_LABEL = {
-    "PARTIAL_X": "+ 选择连续变量",
-    "PARTIAL_Y": "+ 选择连续变量",
-    "HEATMAP_COLS": "+ 选择热图列",
-    "ANCOVA_OUTCOMES": "+ 选择因变量",
-    "MLR_OUTCOMES": "+ 选择因变量",
-    "ANCOVA_COVARIATES": "+ 选择协变量",
-    "MLR_COVARIATES": "+ 选择协变量",
-    "PARTIAL_CONTROLS": "+ 选择控制变量",
-    "OUTCOME_COLS": "+ 选择结局列",
-    "SKIP_CLIN_FEATURES": "+ 选择跳过列",
-    "FORCE_REMOVE_FEATURES": "+ 选择剔除列",
-    "FORCE_INTER_FEATURES": "+ 选择强制交互列",
-    "FORCE_MODEL_FEATURES": "+ 选择临床/列线图变量",
-}
 
 def _column_matches_prefix(name: str, prefix: str) -> bool:
     """与 data_io._column_matches_prefix 同规则。"""
@@ -1546,11 +900,6 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
             opts = [str(value)] + opts
         field["options"] = opts
     return field
-
-_LABEL_DISPLAY_CANDS = (
-    "patient_name", "PatientName", "Chinese name", "Chinese_name",
-    "ChineseName", "姓名",
-)
 
 def suggest_label_col(clin_cols: list[str], clin_id: str, current: str) -> str:
     """LABEL_COL ≠ CLIN_ID_COL。配置写成同一列但表里另有姓名列时改用姓名列。"""
@@ -1998,8 +1347,6 @@ def exclude_select_options(
         "EXCLUDE_ROW": rows,
     }
 
-_PREVIEW_HEAD_MAX_COLS = 400
-
 def _info_from_frame(df, name: str, max_rows: int = 12) -> dict[str, Any]:
     """Preview rows for a sheet already in memory. Every column is included."""
     all_cols = [str(c) for c in df.columns]
@@ -2027,12 +1374,6 @@ def _info_from_frame(df, name: str, max_rows: int = 12) -> dict[str, Any]:
         "missing": miss,
         "head": head,
     }
-
-_SHEET_ALIASES = {
-    "cln": ("clin", "clinical"),
-    "clin": ("cln", "clinical"),
-    "rad": ("radiomics",),
-}
 
 def resolve_sheet_name(name: str, sheets: list[str]) -> str | None:
     """Match a configured sheet to a workbook name (case, cln↔clin)."""
@@ -2554,7 +1895,7 @@ def _preview_external_one(
     one["has_qc_sheet"] = bool(st.get("QC_SHEET"))
     return one
 
-_PREVIEW_CACHE: dict[tuple, dict[str, Any]] = {}
+_PREVIEW_CACHE = _state.PREVIEW_CACHE  # 同一个 dict
 
 def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
     data_path = Path(data_path)
@@ -3356,12 +2697,6 @@ def read_log(offset: int = 0, max_bytes: int = 200_000) -> dict[str, Any]:
         "status": run_status()["status"],
     }
 
-# 结果不在 output/：QC HTML 在 ref/，Results{子项目}.html 在结局/队列子目录
-_RESULT_SKIP_DIRS = {
-    "ref", "0del", "0script", "0ref", "modules",
-    "__pycache__", ".git", "PNG", "QC",
-}
-
 def find_results(project: str) -> list[dict[str, Any]]:
     from modules.config.outcome import is_results_html_name
     from modules.utils.u_qc import is_qc_html_name, relocate_legacy_qc_html
@@ -3428,18 +2763,6 @@ def open_result_folder(project: str, rel: str) -> dict[str, Any]:
     else:
         subprocess.run(["xdg-open", str(folder)], check=True)
     return {"ok": True, "folder": str(folder), "rel": rel_s}
-
-_PICK_XLSX_SCRIPT = (
-    "import sys, tkinter as tk\n"
-    "from tkinter import filedialog\n"
-    "root = tk.Tk()\n"
-    "root.withdraw()\n"
-    "root.attributes('-topmost', True)\n"
-    "path = filedialog.askopenfilename(parent=root, initialdir=sys.argv[1], title=sys.argv[2],"
-    " filetypes=[('Excel', '*.xlsx *.xls')])\n"
-    "root.destroy()\n"
-    "sys.stdout.write(path or '')\n"
-)
 
 def pick_file_dialog(initial_dir: str, title: str = "选择 Excel") -> dict[str, Any]:
     raw_dir = str(initial_dir or "").strip()
@@ -3882,7 +3205,6 @@ def _tcp_open(port: int, timeout: float = 0.2) -> bool:
 def cmd_serve(port: int, open_browser: bool, project: str | None = None,
               wait_free: bool = False, data: str | None = None,
               exact: bool = False) -> None:
-    global _HTTPD, _SERVE_PORT
     register_protocol()
     if not HTML_PATH.is_file():
         print(f"缺少界面文件: {HTML_PATH}", file=sys.stderr)
@@ -3936,8 +3258,8 @@ def cmd_serve(port: int, open_browser: bool, project: str | None = None,
                 "error": "端口无法绑定",
             })
         sys.exit(2)
-    _HTTPD = httpd
-    _SERVE_PORT = port
+    _state.HTTPD = httpd
+    _state.SERVE_PORT = port
     save_preferred_port(port)
     url = _serve_url(port, project, data)
     print(f"console.html  {url}", flush=True)
@@ -3951,8 +3273,8 @@ def cmd_serve(port: int, open_browser: bool, project: str | None = None,
     except KeyboardInterrupt:
         print("\nstop")
     finally:
-        _HTTPD = None
-        _SERVE_PORT = None
+        _state.HTTPD = None
+        _state.SERVE_PORT = None
         httpd.server_close()
 
 def cmd_run(args: argparse.Namespace) -> int:
