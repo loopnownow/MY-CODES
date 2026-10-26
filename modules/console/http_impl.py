@@ -79,10 +79,11 @@ from modules.console.preview import (
     preview_workbook,
     xlsx_meta,
 )
+# dry-run 预览层：真 import（B4c4 起从 console 搬出，不进注入表）
+from modules.console.dryrun import dry_run_text
 
 if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
     from modules.console.console import (
-        dry_run_text,
         read_log,
         run_project_data_qc,
         run_status,
@@ -100,8 +101,6 @@ _INJECTED: frozenset[str] = frozenset({
     # 读 / 写 console 可变状态的函数
     "read_log", "run_project_data_qc", "run_status", "spawn_successor",
     "start_run", "start_run_bat", "stop_run",
-    # 纯函数
-    "dry_run_text",
 })
 
 def __getattr__(name: str) -> Any:
