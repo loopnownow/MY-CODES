@@ -75,11 +75,37 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
         xlsx_meta,
     )
 
-# 其余名字（DEFAULT_PROJECT, under_project, _CONSOLE_TOKEN, …）仍由
-# modules.console.http_server.install(console_globals) 注入，因为它们读的是
-# console 的运行期可变状态（_RUN / _RUN_LOCK / GROK_ROOT / main）。
+# 注入契约（SSOT）：http_impl 从 console 命名空间读取的全部自由名。
+# http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
+_INJECTED: frozenset[str] = frozenset({
+    # 常量
+    "CONSOLE_DEFAULTS", "CSS_PATH", "DEFAULT_PROJECT", "HTML_PATH", "JS_ASSETS",
+    "MODULES_ROOT", "OVERRIDE_PATH", "PORT_HI", "PORT_LO", "RAD_ROOT",
+    "STROBE_PATH", "_CONSOLE_TOKEN", "_TOKEN_SAFE_GET",
+    # 读 console 可变状态的函数
+    "discover_projects", "find_results", "load_settings_module", "open_result_folder",
+    "preview_workbook", "project_dir", "read_log", "run_project_data_qc",
+    "run_status", "start_run", "start_run_bat", "stop_run", "under_project",
+    "writeback_settings",
+    # 纯函数
+    "apply_label_col_suggestion", "build_schema", "dry_run_text",
+    "exclude_select_options", "hydrate_console_settings", "load_preferred_port",
+    "load_session", "normalize_overlay", "pick_file_dialog", "public_settings",
+    "read_project_overlay", "save_preferred_port", "save_session",
+    "spawn_successor", "unwrap_overlay_file", "xlsx_meta",
+})
 
 _NS: dict[str, Any] | None = None
+
+
+def __getattr__(name: str) -> Any:
+    """未注入就报错：比裸 NameError 多一句「谁没注入」。"""
+    if name in _INJECTED:
+        raise RuntimeError(
+            f"http_impl 未注入 modules.console.console.{name}；"
+            "检查 modules.console.http_server.install(console_globals)"
+        )
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _live(name: str, default: Any = None) -> Any:
