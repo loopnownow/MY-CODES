@@ -55,7 +55,7 @@ def test_install_binds_every_injected_name():
 def test_missing_injection_is_loud():
     from modules.console import http_impl
 
-    name = "project_dir"
+    name = "start_run"
     original = getattr(http_impl, name)
     delattr(http_impl, name)
     try:

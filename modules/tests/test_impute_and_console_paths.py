@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from modules.console import settings_layer
 from modules.utils.u_impute import _normalize_method, z_impute
 
 
@@ -64,7 +65,7 @@ def test_extra_project_roots_current_stages():
 def test_project_dir_explicit_dir(tmp_path, monkeypatch):
     from modules.console import console as cons
 
-    monkeypatch.setattr(cons, "GROK_ROOT", tmp_path)
+    monkeypatch.setattr(settings_layer, "GROK_ROOT", tmp_path)
     in_review = tmp_path / "in-review" / "tyt_DSI"
     in_review.mkdir(parents=True)
     (in_review / "tyt_DSI.xlsx").write_bytes(b"xx")
@@ -117,14 +118,14 @@ def test_fig_palettes_twenty_match_schema_js_and_options():
 def test_open_result_folder_project_only(tmp_path, monkeypatch):
     from modules.console import console as cons
 
-    monkeypatch.setattr(cons, "GROK_ROOT", tmp_path)
+    monkeypatch.setattr(settings_layer, "GROK_ROOT", tmp_path)
     proj = tmp_path / "in-review" / "tyt_DSI"
     proj.mkdir(parents=True)
     html = proj / "MCI" / "ResultsMCI.html"
     html.parent.mkdir()
     html.write_text("<html></html>", encoding="utf-8")
     opened = []
-    monkeypatch.setattr(cons, "project_dir", lambda name, explicit_dir="": proj.resolve())
+    monkeypatch.setattr(settings_layer, "project_dir", lambda name, explicit_dir="": proj.resolve())
     monkeypatch.setattr(cons.os, "startfile", lambda p: opened.append(p), raising=False)
     monkeypatch.setattr(cons.sys, "platform", "win32")
     info = cons.open_result_folder("tyt_DSI", "MCI/ResultsMCI.html")
@@ -140,7 +141,7 @@ def test_open_result_folder_project_only(tmp_path, monkeypatch):
 def test_under_project_blocks_sibling_project(tmp_path, monkeypatch):
     from modules.console import console as cons
 
-    monkeypatch.setattr(cons, "GROK_ROOT", tmp_path)
+    monkeypatch.setattr(settings_layer, "GROK_ROOT", tmp_path)
     a = tmp_path / "proj_a"
     b = tmp_path / "proj_b"
     a.mkdir()
