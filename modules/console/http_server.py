@@ -8,6 +8,19 @@ from __future__ import annotations
 
 from typing import Any
 
+# 由 modules.console.ops 静态 import 的叶层符号：注入时跳过，保证「真 import」可证伪。
+_OPS_OWNED = frozenset({
+    "_overlay_path",
+    "allow_browser_origin",
+    "clear_project_overlay",
+    "jsonable",
+    "project_settings",
+    "resolve_meta_xlsx",
+    "resolve_run_outcome",
+    "sync_external_tests",
+    "write_project_overlay",
+})
+
 
 def install(ns: dict[str, Any]) -> None:
     """Inject console globals into http_impl, then export Handler symbols to ns."""
@@ -16,6 +29,8 @@ def install(ns: dict[str, Any]) -> None:
     skip = {
         "__name__", "__file__", "__package__", "__doc__", "__loader__",
         "__spec__", "__builtins__", "__cached__",
+        # 叶层已由 http_impl 静态 import（modules.console.ops），注入不得覆盖。
+        *_OPS_OWNED,
     }
     # Keep the live globals dict so later assignments (_HTTPD, _SERVE_PORT)
     # remain visible to http_impl without re-install.

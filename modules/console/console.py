@@ -44,12 +44,23 @@ if str(_IMPORT_ROOT) not in sys.path:
 
 from modules.console import paths as _paths
 
-STAGE_ROOT_NAMES = _paths.STAGE_ROOT_NAMES
+# 叶层实现在 ops.py；此处保留同名绑定给 console 命名空间与旧调用点
+from modules.console.ops import (  # noqa: F401
+    _overlay_path,
+    allow_browser_origin,
+    clear_project_overlay,
+    jsonable,
+    project_settings,
+    resolve_meta_xlsx,
+    resolve_run_outcome,
+    sync_external_tests,
+    write_project_overlay,
+)
 
+STAGE_ROOT_NAMES = _paths.STAGE_ROOT_NAMES
 
 def _grok_and_drafting(modules_root: Path) -> tuple[Path, Path]:
     return _paths.grok_and_drafting(modules_root)
-
 
 GROK_ROOT, RAD_ROOT = _grok_and_drafting(MODULES_ROOT)
 EXTRA_PROJECT_ROOTS = tuple(GROK_ROOT / n for n in STAGE_ROOT_NAMES)
@@ -83,9 +94,6 @@ _TOKEN_SAFE_GET = {
     "/api/projects", "/api/settings",
 }
 
-
-def allow_browser_origin(origin: str) -> bool:
-    return _paths.allow_browser_origin(origin)
 SKIP_SETTING_KEYS = {
     "os", "copy", "List", "Optional", "Dict", "Any", "annotations",
     "PNG_DIR", "GROUP_SOURCE_COL", "OUT_DIR_BASE",
@@ -728,24 +736,19 @@ _RUN: dict[str, Any] = {
     "dry_run": False,
 }
 
-
 # ── paths ──────────────────────────────────────────────────────
 def _resolve(p: str | Path) -> Path:
     return _paths.resolve_path(p)
 
-
 def project_roots() -> list[Path]:
     return _paths.collect_project_roots(RAD_ROOT, EXTRA_PROJECT_ROOTS)
-
 
 def under_root(p: str | Path) -> Path:
     # Use live GROK_ROOT so tests can monkeypatch console.GROK_ROOT.
     return _paths.under_root(p, grok_root=GROK_ROOT)
 
-
 def under_project(proj: Path, p: str | Path) -> Path:
     return _paths.under_project(proj, p, grok_root=GROK_ROOT)
-
 
 def project_dir(name: str, explicit_dir: str = "") -> Path:
     return _paths.find_project_dir(
@@ -754,7 +757,6 @@ def project_dir(name: str, explicit_dir: str = "") -> Path:
         project_roots=project_roots(),
         explicit_dir=explicit_dir,
     )
-
 
 def resolve_modules_dir(proj: Path) -> Path:
     """MODULES_DIR from the project's ref/settings.ini (required; no default, no fallback)."""
@@ -770,31 +772,6 @@ def resolve_modules_dir(proj: Path) -> Path:
         raise FileNotFoundError(f"MODULES_DIR 不是现存目录: {raw}（来自 {ini}）")
     return p
 
-
-def project_settings(proj: Path) -> Path:
-    from modules.config.ini_io import resolve_settings_ini
-    ini = resolve_settings_ini(proj)
-    if ini.is_file():
-        return ini
-    py = proj / "config" / "settings.py"
-    if py.is_file():
-        return py
-    return ini
-
-
-# ── settings parse ─────────────────────────────────────────────
-def jsonable(v: Any) -> Any:
-    if isinstance(v, tuple):
-        return [jsonable(x) for x in v]
-    if isinstance(v, list):
-        return [jsonable(x) for x in v]
-    if isinstance(v, dict):
-        return {str(k): jsonable(x) for k, x in v.items()}
-    if isinstance(v, (str, int, float, bool)) or v is None:
-        return v
-    return repr(v)
-
-
 def load_settings_module(settings_path: Path):
     settings_path = under_root(settings_path)
     if settings_path.suffix.lower() == ".ini":
@@ -809,7 +786,6 @@ def load_settings_module(settings_path: Path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
-
 
 def public_settings(mod) -> dict[str, Any]:
     from modules.config.ini_io import migrate_retired_settings
@@ -829,7 +805,6 @@ def public_settings(mod) -> dict[str, Any]:
         for k, v in src.items():
             out.setdefault(k, v)
     return out
-
 
 def _as_name_list(value: Any) -> list[str]:
     """字符串或列表都收成去空、去重的列名。旧 ini 里的单列字符串仍可用。"""
@@ -851,7 +826,6 @@ def _as_name_list(value: Any) -> list[str]:
     s = str(value).strip()
     return [s] if s else []
 
-
 def _as_prefix_group(value: Any) -> dict[str, Any]:
     """分类名顺序 + 前缀归属。空结构表示仍做一整份 Logistic。"""
     names: list[str] = []
@@ -872,7 +846,6 @@ def _as_prefix_group(value: Any) -> dict[str, Any]:
                 if p and g and g in seen:
                     assign[p] = g
     return {"names": names, "assign": assign}
-
 
 def hydrate_console_settings(settings: dict[str, Any]) -> dict[str, Any]:
     """把旧键收成控制台现用字段。不删 ini 里的编码映射。"""
@@ -985,7 +958,6 @@ def hydrate_console_settings(settings: dict[str, Any]) -> dict[str, Any]:
     settings["CLIN_FORCE_CATEGORICAL"] = fc_names
     return settings
 
-
 def _uniq_keep_str(seq) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -996,7 +968,6 @@ def _uniq_keep_str(seq) -> list[str]:
         seen.add(s)
         out.append(s)
     return out
-
 
 def implicit_skip_cols(settings: dict[str, Any]) -> list[str]:
     """ID / 结局列 / Group 默认跳过，不进 Table 1 和 nomogram。姓名只在 LABEL_COL 指向时跳过。"""
@@ -1012,7 +983,6 @@ def implicit_skip_cols(settings: dict[str, Any]) -> list[str]:
             cols.append(s)
     return _uniq_keep_str(cols)
 
-
 def apply_clin_role_priority(settings: dict[str, Any]) -> dict[str, Any]:
     """跳过优先于强制剔除：隐含跳过并入 SKIP，重叠从 FORCE_REMOVE 拿掉。"""
     locked = implicit_skip_cols(settings)
@@ -1026,58 +996,6 @@ def apply_clin_role_priority(settings: dict[str, Any]) -> dict[str, Any]:
     settings["SKIP_CLIN_FEATURES"] = skip
     settings["FORCE_REMOVE_FEATURES"] = rm
     return settings
-
-
-def sync_external_tests(settings: dict[str, Any]) -> dict[str, Any]:
-    """EXTERNAL_TESTS 列表优先；否则三格合成一条。全空=不做外验。"""
-    raw = settings.get("EXTERNAL_TESTS")
-    norm: list[dict[str, str]] = []
-    if isinstance(raw, list):
-        for i, spec in enumerate(raw):
-            if not isinstance(spec, dict):
-                continue
-            cs = str(spec.get("clin_sheet") or "").strip()
-            rs = str(spec.get("rad_sheet") or "").strip()
-            f = str(spec.get("file") or "").strip()
-            if not f or not cs or not rs:
-                continue
-            name = str(spec.get("name") or "").strip() or (f"ext{i + 1}" if i else "ext")
-            item = {
-                "name": name,
-                "file": f,
-                "clin_sheet": cs,
-                "rad_sheet": rs,
-            }
-            rid = str(spec.get("rad_id_col") or "").strip()
-            if rid:
-                item["rad_id_col"] = rid
-            norm.append(item)
-    if norm:
-        settings["EXTERNAL_TESTS"] = norm
-        s0 = norm[0]
-        settings["EXTERNAL_FILE"] = s0["file"]
-        settings["EXTERNAL_CLIN_SHEET"] = s0["clin_sheet"]
-        settings["EXTERNAL_RAD_SHEET"] = s0["rad_sheet"]
-        return settings
-    has_ui = any(k in settings for k in (
-        "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
-    ))
-    if not has_ui:
-        return settings
-    f = str(settings.get("EXTERNAL_FILE") or "").strip()
-    cs = str(settings.get("EXTERNAL_CLIN_SHEET") or "").strip()
-    rs = str(settings.get("EXTERNAL_RAD_SHEET") or "").strip()
-    if f and cs and rs:
-        settings["EXTERNAL_TESTS"] = [{
-            "name": "ext",
-            "file": f,
-            "clin_sheet": cs,
-            "rad_sheet": rs,
-        }]
-    else:
-        settings["EXTERNAL_TESTS"] = []
-    return settings
-
 
 def _section_of(key: str) -> tuple[str, str]:
     if key in SECTION_OF:
@@ -1122,7 +1040,6 @@ def _section_of(key: str) -> tuple[str, str]:
     # No UI「其他」section — leftovers map to switch (usually hidden/retired).
     return ("switch", "开关")
 
-
 def _is_rad_feature(name: str) -> bool:
     s = str(name)
     low = s.lower()
@@ -1132,7 +1049,6 @@ def _is_rad_feature(name: str) -> bool:
         tok in low
         for tok in ("_glcm_", "_glrlm_", "_glszm_", "_gldm_", "_ngtdm_", "_fbn_", "firstorder")
     )
-
 
 def _looks_like_id_column(name: str) -> bool:
     """受试者 ID / 姓名列。不把测量特征当成 ID 候选项。"""
@@ -1149,7 +1065,6 @@ def _looks_like_id_column(name: str) -> bool:
     if low.endswith("_id") or low.endswith("-id"):
         return True
     return any(tok in s for tok in ("编号", "姓名", "病案", "患者"))
-
 
 def _id_dropdown_columns(columns, configured: str = "") -> list[str]:
     """组学 ID 下拉。非特征列很多时只留 ID/姓名，避免一长串特征名把下拉撑坏。"""
@@ -1168,7 +1083,6 @@ def _id_dropdown_columns(columns, configured: str = "") -> list[str]:
     if not picked and cols:
         picked = [cols[0]]
     return picked
-
 
 _MODEL_CHOICES = ["Clinical", "RadScore", "Combined"]
 # 这些多选是在选分析列。结局列、ID、分组水平、排除名单不走这套。
@@ -1201,12 +1115,10 @@ _ADDSELECT_LABEL = {
     "FORCE_MODEL_FEATURES": "+ 选择临床/列线图变量",
 }
 
-
 def _column_matches_prefix(name: str, prefix: str) -> bool:
     """与 data_io._column_matches_prefix 同规则。"""
     from modules.stats.data_io import _column_matches_prefix as _match
     return _match(name, prefix)
-
 
 def _columns_open_for_analysis(columns, clin_cols, prefixes, id_cols=None) -> list[str]:
     """从分析用列里拿掉命中前缀的组学特征。临床列和 ID 列保留。"""
@@ -1229,7 +1141,6 @@ def _columns_open_for_analysis(columns, clin_cols, prefixes, id_cols=None) -> li
         out.append(name)
     return out
 
-
 def _column_names(cols) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -1240,7 +1151,6 @@ def _column_names(cols) -> list[str]:
         seen.add(s)
         out.append(s)
     return out
-
 
 def _column_multi_pool(section: str, clin_cols, rad_cols, picked) -> tuple[list[str], list[str], str]:
     """临床模块只用 cln；组学模块只用 rad；其余模块两表都要，并带三个模型名。"""
@@ -1263,7 +1173,6 @@ def _column_multi_pool(section: str, clin_cols, rad_cols, picked) -> tuple[list[
             pool.append(s)
     return pool, models, source
 
-
 def _measure_cols(clin_cols, rad_cols) -> list[str]:
     """临床列 + 组学表里的非高维影像组学列。LASSO 特征名不进协方差下拉。"""
     out: list[str] = []
@@ -1284,7 +1193,6 @@ def _measure_cols(clin_cols, rad_cols) -> list[str]:
         _add(c, True)
     return out
 
-
 def _rad_meta_cols(columns) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -1296,7 +1204,6 @@ def _rad_meta_cols(columns) -> list[str]:
         out.append(s)
     return out
 
-
 def _uniq_keep(seq) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -1307,7 +1214,6 @@ def _uniq_keep(seq) -> list[str]:
         seen.add(s)
         out.append(s)
     return out
-
 
 def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
                 rad_id_cols: list[str], icc_cols: list[str],
@@ -1641,12 +1547,10 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
         field["options"] = opts
     return field
 
-
 _LABEL_DISPLAY_CANDS = (
     "patient_name", "PatientName", "Chinese name", "Chinese_name",
     "ChineseName", "姓名",
 )
-
 
 def suggest_label_col(clin_cols: list[str], clin_id: str, current: str) -> str:
     """LABEL_COL ≠ CLIN_ID_COL。配置写成同一列但表里另有姓名列时改用姓名列。"""
@@ -1674,7 +1578,6 @@ def suggest_label_col(clin_cols: list[str], clin_id: str, current: str) -> str:
             return c
     return cur
 
-
 def apply_label_col_suggestion(settings: dict[str, Any], clin_cols: list[str]) -> str | None:
     """若应改 LABEL_COL，写入 settings 并返回新列名。"""
     if not clin_cols:
@@ -1689,7 +1592,6 @@ def apply_label_col_suggestion(settings: dict[str, Any], clin_cols: list[str]) -
         settings["LABEL_COL"] = sug
         return sug
     return None
-
 
 def build_schema(settings: dict[str, Any], sheets: list[str] | None = None,
                  clin_cols: list[str] | None = None,
@@ -1739,7 +1641,6 @@ def build_schema(settings: dict[str, Any], sheets: list[str] | None = None,
     fields.sort(key=lambda f: (order.get(f["key"], 10_000), f["key"]))
     return fields
 
-
 # ── overlay ────────────────────────────────────────────────────
 def normalize_overlay(ov: dict[str, Any]) -> dict[str, Any]:
     from modules.config.ini_io import migrate_retired_settings
@@ -1748,7 +1649,6 @@ def normalize_overlay(ov: dict[str, Any]) -> dict[str, Any]:
         if k in out and isinstance(out[k], list):
             out[k] = [tuple(x) if isinstance(x, list) else x for x in out[k]]
     return sync_external_tests(hydrate_console_settings(out))
-
 
 def unwrap_overlay_file(obj: Any) -> dict[str, Any]:
     if not isinstance(obj, dict):
@@ -1759,7 +1659,6 @@ def unwrap_overlay_file(obj: Any) -> dict[str, Any]:
         raw = {k: v for k, v in obj.items()
                if k not in ("project", "data", "settings", "name", "saved_at")}
     return normalize_overlay(raw)
-
 
 def apply_overlay_to_modules(overlay: dict[str, Any], skip: set[str] | None = None) -> int:
     """把 overlay 写进已 import 的 modules.config 与 settings。"""
@@ -1784,7 +1683,6 @@ def apply_overlay_to_modules(overlay: dict[str, Any], skip: set[str] | None = No
         S.PNG_DIR = png
     return n
 
-
 def wrap_set_outcome(overlay: dict[str, Any]) -> None:
     from modules import config as cfg
 
@@ -1802,13 +1700,11 @@ def wrap_set_outcome(overlay: dict[str, Any]) -> None:
 
     cfg.set_outcome = _wrapped  # type: ignore[method-assign]
 
-
 def save_session(payload: dict[str, Any]) -> None:
     OVERRIDE_PATH.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-
 
 def load_session() -> dict[str, Any] | None:
     if not OVERRIDE_PATH.is_file():
@@ -1817,7 +1713,6 @@ def load_session() -> dict[str, Any] | None:
         return json.loads(OVERRIDE_PATH.read_text(encoding="utf-8"))
     except Exception:
         return None
-
 
 # ── writeback settings.py ──────────────────────────────────────
 def format_py_value(val: Any, indent: int = 0) -> str:
@@ -1855,7 +1750,6 @@ def format_py_value(val: Any, indent: int = 0) -> str:
             parts.append(f"{pad}{format_py_value(k)}: {format_py_value(v)}")
         return "{\n" + ",\n".join(parts) + ",\n}"
     return repr(val)
-
 
 def writeback_settings(
     settings_path: Path,
@@ -1955,7 +1849,6 @@ def writeback_settings(
         "backup": str(bak),
     }
 
-
 # ── projects / data ────────────────────────────────────────────
 def discover_projects() -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
@@ -2000,13 +1893,11 @@ def discover_projects() -> list[dict[str, Any]]:
     items.sort(key=lambda x: (0 if x["name"] == DEFAULT_PROJECT else 1, x["name"]))
     return items
 
-
 def project_xlsx_names(proj: Path) -> list[str]:
     return [
         p.name for p in sorted(proj.glob("*.xlsx"))
         if p.is_file() and not p.name.startswith("~")
     ]
-
 
 def _exclude_cell_text(raw) -> str:
     if raw is None:
@@ -2022,19 +1913,6 @@ def _exclude_cell_text(raw) -> str:
     if not s or s.lower() in ("nan", "none", "nat"):
         return ""
     return s
-
-
-def resolve_meta_xlsx(proj: Path, file_s: str, data_path: Path | None = None) -> Path:
-    raw = str(file_s or "").strip()
-    if raw:
-        p = Path(raw)
-        if not p.is_absolute():
-            p = proj / raw
-        return p
-    if data_path is not None:
-        return data_path
-    return proj / "false_classification.xlsx"
-
 
 def xlsx_meta(path: Path, sheet: str = "", col: str = "") -> dict[str, Any]:
     import pandas as pd
@@ -2085,7 +1963,6 @@ def xlsx_meta(path: Path, sheet: str = "", col: str = "") -> dict[str, Any]:
     out["col"] = str(use)
     return out
 
-
 def exclude_select_options(
     proj: Path,
     settings: dict[str, Any],
@@ -2121,9 +1998,7 @@ def exclude_select_options(
         "EXCLUDE_ROW": rows,
     }
 
-
 _PREVIEW_HEAD_MAX_COLS = 400
-
 
 def _info_from_frame(df, name: str, max_rows: int = 12) -> dict[str, Any]:
     """Preview rows for a sheet already in memory. Every column is included."""
@@ -2153,13 +2028,11 @@ def _info_from_frame(df, name: str, max_rows: int = 12) -> dict[str, Any]:
         "head": head,
     }
 
-
 _SHEET_ALIASES = {
     "cln": ("clin", "clinical"),
     "clin": ("cln", "clinical"),
     "rad": ("radiomics",),
 }
-
 
 def resolve_sheet_name(name: str, sheets: list[str]) -> str | None:
     """Match a configured sheet to a workbook name (case, cln↔clin)."""
@@ -2177,7 +2050,6 @@ def resolve_sheet_name(name: str, sheets: list[str]) -> str | None:
             if s.lower() == alt.lower():
                 return s
     return None
-
 
 def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str, Any]:
     import pandas as pd
@@ -2628,13 +2500,11 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         ),
     }
 
-
 def _resolve_ext_xlsx(file: str, data_path: Path) -> Path:
     src = Path(str(file or "").strip())
     if not src.is_absolute():
         src = data_path.parent / src
     return under_root(src)
-
 
 def _preview_external_one(
     data_path: Path, settings: dict[str, Any], spec: dict[str, str]
@@ -2684,9 +2554,7 @@ def _preview_external_one(
     one["has_qc_sheet"] = bool(st.get("QC_SHEET"))
     return one
 
-
 _PREVIEW_CACHE: dict[tuple, dict[str, Any]] = {}
-
 
 def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
     data_path = Path(data_path)
@@ -2723,7 +2591,6 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
             extras.append((str(p), est.st_mtime_ns, est.st_size))
     return (str(data_path.resolve()), st.st_mtime_ns, st.st_size, tuple(blob), tuple(extras))
 
-
 def preview_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str, Any]:
     from modules.utils.u_qc import _external_specs_from_settings
 
@@ -2745,18 +2612,6 @@ def preview_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str, Any
         _PREVIEW_CACHE[key] = main
     return main
 
-
-def resolve_run_outcome(body: dict[str, Any], overlay: dict[str, Any]) -> str:
-    """子结局页只跑这一项；公共页空字符串=全部 OUTCOME_COLS。"""
-    raw = str((body or {}).get("run_outcome") or "").strip()
-    if not raw:
-        return ""
-    cols = [str(x).strip() for x in ((overlay or {}).get("OUTCOME_COLS") or []) if str(x).strip()]
-    if cols and raw not in cols:
-        raise ValueError(f"run_outcome {raw!r} 不在 OUTCOME_COLS {cols}")
-    return raw
-
-
 def _parse_pair_list(raw) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -2775,7 +2630,6 @@ def _parse_pair_list(raw) -> list[tuple[str, str]]:
         seen.add(key)
         out.append((a, b))
     return out
-
 
 def _levels_from_outcome_dist(
     preview: dict[str, Any], outcome: str = "", subgroup: str = ""
@@ -2797,7 +2651,6 @@ def _levels_from_outcome_dist(
         )
     return _uniq_keep_str(preview.get("group_levels") or [])
 
-
 def _levels_for_pairs(
     merged: dict[str, Any], preview: dict[str, Any], outcome: str = ""
 ) -> list[str]:
@@ -2811,7 +2664,6 @@ def _levels_for_pairs(
     prev = _levels_from_outcome_dist(preview, outcome, sub)
     return _uniq_keep_str(prev + extra)
 
-
 def resolve_dry_pairs(
     merged: dict[str, Any], preview: dict[str, Any], outcome: str = ""
 ) -> list[tuple[str, str]]:
@@ -2824,7 +2676,6 @@ def resolve_dry_pairs(
     if len(labels) < 2:
         return []
     return [(a, b) for i, a in enumerate(labels) for b in labels[i + 1 :]]
-
 
 def _pair_display(merged: dict[str, Any], outcome: str, pos: str, neg: str) -> tuple[str, str]:
     """对子展示名：PAIRWISE_OVERRIDES > GROUP_LEVEL_DISPLAY > 列值。"""
@@ -2840,14 +2691,12 @@ def _pair_display(merged: dict[str, Any], outcome: str, pos: str, neg: str) -> t
     neg_d = str(dn).strip() if dn not in (None, "") else level_display_name(neg, mapping=mp)
     return pos_d, neg_d
 
-
 def _outcome_cfg(merged: dict[str, Any], outcome: str) -> dict[str, Any]:
     out = dict(merged)
     ov = (merged.get("OUTCOME_OVERRIDES") or {}).get(outcome) or {}
     if isinstance(ov, dict):
         out.update(ov)
     return out
-
 
 def _pair_n(preview: dict[str, Any], pos: str, neg: str, outcome: str = "") -> str:
     dist = preview.get("outcome_dist") or {}
@@ -2864,7 +2713,6 @@ def _pair_n(preview: dict[str, Any], pos: str, neg: str, outcome: str = "") -> s
         return f"n≈{counts.get(pos, 0)}/{counts.get(neg, 0)}"
     return ""
 
-
 def _exclude_file_log(raw: Any) -> str:
     """日志里的排除文件名。一个路径或「a.xlsx + b.xlsx」。"""
     if isinstance(raw, (list, tuple)):
@@ -2872,7 +2720,6 @@ def _exclude_file_log(raw: Any) -> str:
         return " + ".join(names) if names else "false_classification.xlsx"
     text = str(raw or "").strip()
     return text or "false_classification.xlsx"
-
 
 def plan_dry_dests(merged: dict[str, Any], preview: dict[str, Any]) -> list[dict[str, Any]]:
     from modules.config.outcome import (
@@ -2930,7 +2777,6 @@ def plan_dry_dests(merged: dict[str, Any], preview: dict[str, Any]) -> list[dict
             })
     return rows
 
-
 def _td_roc_name_list(value: Any) -> list[str]:
     if value in (None, "", []):
         return []
@@ -2939,7 +2785,6 @@ def _td_roc_name_list(value: Any) -> list[str]:
     if isinstance(value, str) and value.strip():
         return [value.strip()]
     return []
-
 
 def _td_roc_dry_lines(merged: dict[str, Any], clin_cols: list[str]) -> list[str]:
     from modules.config.ini_io import coerce_ipcw_horizons, coerce_td_roc_field
@@ -3022,7 +2867,6 @@ def _td_roc_dry_lines(merged: dict[str, Any], clin_cols: list[str]) -> list[str]
         line += f"  ⚠ 临床列未知，无法核对缺列。临床列: {listed}"
     lines.append(line)
     return lines
-
 
 def dry_run_text(project: str, data: Path, settings_path: Path,
                  settings: dict[str, Any], overlay: dict[str, Any],
@@ -3198,19 +3042,6 @@ def dry_run_text(project: str, data: Path, settings_path: Path,
     lines.append("═══ DRY-RUN 结束 ═══")
     return "\n".join(lines)
 
-
-# ── run ────────────────────────────────────────────────────────
-def _overlay_path(proj: Path) -> Path:
-    from modules.config.ini_io import project_ref_dir
-    return project_ref_dir(proj) / ".rad_console_overlay.json"
-
-
-def write_project_overlay(proj: Path, payload: dict[str, Any]) -> Path:
-    path = _overlay_path(proj)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    return path
-
-
 def read_project_overlay(proj: Path) -> dict[str, Any]:
     path = _overlay_path(proj)
     if not path.is_file():
@@ -3222,18 +3053,6 @@ def read_project_overlay(proj: Path) -> dict[str, Any]:
         return unwrap_overlay_file(json.loads(path.read_text(encoding="utf-8")))
     except Exception:
         return {}
-
-
-def clear_project_overlay(proj: Path) -> bool:
-    path = _overlay_path(proj)
-    old = proj / ".rad_console_overlay.json"
-    gone = False
-    for p in (path, old):
-        if p.is_file():
-            p.unlink()
-            gone = True
-    return gone
-
 
 def run_pipeline_inprocess(project: str, data: Path, overlay: dict[str, Any],
                            dry_run: bool, log_path: Path | None,
@@ -3295,7 +3114,6 @@ def run_pipeline_inprocess(project: str, data: Path, overlay: dict[str, Any],
     P.main(argv)
     return 0
 
-
 def run_project_data_qc(
     project: str,
     data: Path,
@@ -3317,8 +3135,6 @@ def run_project_data_qc(
     )
     return info
 
-
-
 def _popen_background_kwargs() -> dict[str, Any]:
     """Windows: no new console window; keep stdout/stderr as caller set."""
     kw: dict[str, Any] = {"stdin": subprocess.DEVNULL}
@@ -3330,7 +3146,6 @@ def _popen_background_kwargs() -> dict[str, Any]:
     else:
         kw["start_new_session"] = True
     return kw
-
 
 def start_run(project: str, data: Path, settings_path: Path,
               overlay: dict[str, Any], dry_run: bool,
@@ -3416,7 +3231,6 @@ def start_run(project: str, data: Path, settings_path: Path,
             "run_outcome": one,
         }
 
-
 def start_run_bat(project: str) -> dict[str, Any]:
     """等价于旧 run.bat：PYTHONPATH=<STATS_ROOT> 且 python -m modules.pipeline --no-overlay。"""
     with _RUN_LOCK:
@@ -3489,7 +3303,6 @@ def start_run_bat(project: str) -> dict[str, Any]:
             "mode": "bat",
         }
 
-
 def stop_run() -> dict[str, Any]:
     with _RUN_LOCK:
         proc = _RUN.get("proc")
@@ -3505,7 +3318,6 @@ def stop_run() -> dict[str, Any]:
         _RUN["ended"] = time.time()
         _RUN["error"] = "stopped by user"
         return {"status": "stopped", "stopped": True}
-
 
 def run_status() -> dict[str, Any]:
     with _RUN_LOCK:
@@ -3523,7 +3335,6 @@ def run_status() -> dict[str, Any]:
             "dry_run": bool(_RUN.get("dry_run")),
             "mode": _RUN.get("mode") or "",
         }
-
 
 def read_log(offset: int = 0, max_bytes: int = 200_000) -> dict[str, Any]:
     path = _RUN.get("log_path") or ""
@@ -3545,13 +3356,11 @@ def read_log(offset: int = 0, max_bytes: int = 200_000) -> dict[str, Any]:
         "status": run_status()["status"],
     }
 
-
 # 结果不在 output/：QC HTML 在 ref/，Results{子项目}.html 在结局/队列子目录
 _RESULT_SKIP_DIRS = {
     "ref", "0del", "0script", "0ref", "modules",
     "__pycache__", ".git", "PNG", "QC",
 }
-
 
 def find_results(project: str) -> list[dict[str, Any]]:
     from modules.config.outcome import is_results_html_name
@@ -3599,7 +3408,6 @@ def find_results(project: str) -> list[dict[str, Any]]:
     hits.sort(key=_qc_rank)
     return hits[:80]
 
-
 def open_result_folder(project: str, rel: str) -> dict[str, Any]:
     proj = project_dir(project)
     rel_s = str(rel or "").strip().replace("\\", "/")
@@ -3621,7 +3429,6 @@ def open_result_folder(project: str, rel: str) -> dict[str, Any]:
         subprocess.run(["xdg-open", str(folder)], check=True)
     return {"ok": True, "folder": str(folder), "rel": rel_s}
 
-
 _PICK_XLSX_SCRIPT = (
     "import sys, tkinter as tk\n"
     "from tkinter import filedialog\n"
@@ -3633,7 +3440,6 @@ _PICK_XLSX_SCRIPT = (
     "root.destroy()\n"
     "sys.stdout.write(path or '')\n"
 )
-
 
 def pick_file_dialog(initial_dir: str, title: str = "选择 Excel") -> dict[str, Any]:
     raw_dir = str(initial_dir or "").strip()
@@ -3663,9 +3469,7 @@ def pick_file_dialog(initial_dir: str, title: str = "选择 Excel") -> dict[str,
         rel = str(picked)
     return {"ok": True, "path": str(picked), "rel": rel, "dir": str(start)}
 
-
 # Port helpers / serve below; HTTP Handler installed at module end.
-
 
 def load_preferred_port() -> int:
     if PORT_FILE.is_file():
@@ -3678,13 +3482,11 @@ def load_preferred_port() -> int:
             print(f"  ⚠ console.port.json ignored: {e}", flush=True)
     return DEFAULT_PORT
 
-
 def save_preferred_port(port: int) -> None:
     PORT_FILE.write_text(
         json.dumps({"port": int(port)}, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-
 
 def pick_port(preferred: int) -> int:
     import socket
@@ -3698,7 +3500,6 @@ def pick_port(preferred: int) -> int:
         return port
     raise RuntimeError("8765–8776 端口都被占用")
 
-
 def _already_serving(port: int) -> bool:
     import urllib.request
     try:
@@ -3707,7 +3508,6 @@ def _already_serving(port: int) -> bool:
         return bool(obj.get("ok"))
     except Exception:
         return False
-
 
 def _parse_listen_table(text: str) -> dict[int, int]:
     """netstat -ano -p tcp → {port: pid} for LISTENING rows. First hit wins."""
@@ -3729,7 +3529,6 @@ def _parse_listen_table(text: str) -> dict[int, int]:
         found.setdefault(port, pid)
     return found
 
-
 def _listen_map() -> dict[int, int]:
     try:
         out = subprocess.check_output(
@@ -3739,10 +3538,8 @@ def _listen_map() -> dict[int, int]:
         return {}
     return _parse_listen_table(out)
 
-
 def _listen_pid(port: int) -> int | None:
     return _listen_map().get(int(port))
-
 
 def _command_lines(pids: set[int]) -> dict[int, str]:
     """PID → command line. PowerShell first; wmic is absent on current Windows."""
@@ -3784,11 +3581,9 @@ def _command_lines(pids: set[int]) -> dict[int, str]:
         found[pid] = out or ""
     return found
 
-
 def _pid_is_console(pid: int) -> bool:
     cmd = _command_lines({int(pid)}).get(int(pid), "")
     return "console.py" in cmd.lower()
-
 
 def _process_label(cmd: str, console: bool) -> str:
     if console:
@@ -3803,7 +3598,6 @@ def _process_label(cmd: str, console: bool) -> str:
         token = text.split()[0]
     return Path(token).name or token
 
-
 def _service_label(cmd: str, console: bool) -> str:
     """Short name of whatever is listening, for the start page confirm line."""
     if not console:
@@ -3815,7 +3609,6 @@ def _service_label(cmd: str, console: bool) -> str:
             proj = parts[i + 1].strip('"').strip("'")
             break
     return ("本控制台 · " + proj) if proj else "本控制台"
-
 
 def describe_port(port: int) -> dict[str, Any]:
     """Who is listening on one port. Does not stop anything."""
@@ -3844,7 +3637,6 @@ def describe_port(port: int) -> dict[str, Any]:
         "service": _service_label(cmd, console),
         "error": "",
     }
-
 
 def publish_local(payload: dict[str, Any], port: int = CHECK_PORT, hold: float = 20) -> bool:
     """Serve the same JSON on 8780 for `hold` seconds.
@@ -3899,7 +3691,6 @@ def publish_local(payload: dict[str, Any], port: int = CHECK_PORT, hold: float =
         httpd.server_close()
     return delivered["n"] > 0
 
-
 def radconsole_action(url: str) -> str:
     """serve starts one port; check names its listener; stop closes that one port."""
     u = urlparse(str(url or ""))
@@ -3909,7 +3700,6 @@ def radconsole_action(url: str) -> str:
     if action == "check":
         return "check"
     return "serve"
-
 
 def _port_band(lo: int | None, hi: int | None) -> tuple[int, int]:
     """Clamp to 8765–8776. An inverted or out-of-band pair yields an empty range (lo > hi)."""
@@ -3928,7 +3718,6 @@ def _port_band(lo: int | None, hi: int | None) -> tuple[int, int]:
     a = max(PORT_LO, a)
     b = min(PORT_HI, b)
     return a, b
-
 
 def stop_console_ports(lo: int | None = None, hi: int | None = None) -> dict[str, Any]:
     """End console.py listeners on 8765–8776. Other programs on those ports are left running."""
@@ -3957,7 +3746,6 @@ def stop_console_ports(lo: int | None = None, hi: int | None = None) -> dict[str
         killed.append({"port": port, "pid": pid})
     return {"ok": True, "killed": killed, "spared": spared, "lo": a, "hi": b}
 
-
 def stop_console_port(port: int) -> dict[str, Any]:
     """Stop one console.py listener inside 8765–8776. Any other program is left running."""
     try:
@@ -3980,7 +3768,6 @@ def stop_console_port(port: int) -> dict[str, Any]:
     subprocess.run(["taskkill", "/PID", str(pid), "/F"], check=False, capture_output=True)
     return {**info, "ok": True, "killed": True, "error": ""}
 
-
 def stop_from_query(qs: dict) -> dict[str, Any]:
     """radconsole://stop requires one port. A missing port does not close the range."""
     raw = qs.get("port") if isinstance(qs, dict) else None
@@ -3999,7 +3786,6 @@ def stop_from_query(qs: dict) -> dict[str, Any]:
             "ok": False, "port": 0, "listening": False, "console": False,
             "pid": 0, "name": "", "killed": False, "error": "端口无效",
         }
-
 
 def _reclaim_dead_port(port: int) -> None:
     """8765 被僵死的旧 console 占着时，健康检查失败 → 结束该进程，让新服务绑回 8765。"""
@@ -4021,7 +3807,6 @@ def _reclaim_dead_port(port: int) -> None:
         if _listen_pid(port) != pid:
             return
 
-
 def register_protocol() -> None:
     """HKCU radconsole:// → 本脚本 serve（无需管理员）。"""
     try:
@@ -4040,7 +3825,6 @@ def register_protocol() -> None:
     winreg.CloseKey(sub)
     winreg.CloseKey(key)
 
-
 def _serve_url(port: int, project: str | None, data: str | None = None) -> str:
     from urllib.parse import urlencode
     url = f"http://{HOST}:{port}/"
@@ -4053,14 +3837,12 @@ def _serve_url(port: int, project: str | None, data: str | None = None) -> str:
         url += "?" + urlencode(q)
     return url
 
-
 def _wait_port_free(port: int, seconds: float = 12.0) -> None:
     deadline = time.time() + seconds
     while time.time() < deadline:
         if not _already_serving(port) and _listen_pid(port) is None:
             return
         time.sleep(0.2)
-
 
 def spawn_successor(port: int, project: str | None = None) -> None:
     """另起一个 console.py，等本进程让出端口后再 bind。"""
@@ -4087,7 +3869,6 @@ def spawn_successor(port: int, project: str | None = None) -> None:
         kw["start_new_session"] = True
     subprocess.Popen(cmd, **kw)
 
-
 def _tcp_open(port: int, timeout: float = 0.2) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -4097,7 +3878,6 @@ def _tcp_open(port: int, timeout: float = 0.2) -> bool:
             return True
         except OSError:
             return False
-
 
 def cmd_serve(port: int, open_browser: bool, project: str | None = None,
               wait_free: bool = False, data: str | None = None,
@@ -4175,7 +3955,6 @@ def cmd_serve(port: int, open_browser: bool, project: str | None = None,
         _SERVE_PORT = None
         httpd.server_close()
 
-
 def cmd_run(args: argparse.Namespace) -> int:
     project = args.project
     data = under_root(args.data)
@@ -4202,7 +3981,6 @@ def cmd_run(args: argparse.Namespace) -> int:
         project, data, overlay, dry_run=False, log_path=None,
         outcome=outcome,
     )
-
 
 def main(argv: list[str] | None = None) -> None:
     raw = list(sys.argv[1:] if argv is None else argv)
@@ -4301,11 +4079,9 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(rc)
     parser.print_help()
 
-
 # Install Handler after all helpers exist (http_impl looks up free names here).
 from modules.console.http_server import install as _install_http
 _install_http(globals())
-
 
 if __name__ == "__main__":
     main()
