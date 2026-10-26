@@ -18,11 +18,8 @@ import threading
 import traceback
 import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import parse_qs, urlparse
-
-if TYPE_CHECKING:  # 运行期由文件末尾 http_server.install(globals()) 导出
-    from modules.console.http_impl import ConsoleServer, Handler
 
 # ── CONFIG ─────────────────────────────────────────────────────
 # Protocol handler launches this file directly; bootstrap import root first.
@@ -223,6 +220,9 @@ from modules.console.serve import (  # noqa: E402,F401
     stop_console_ports,
     stop_from_query,
 )
+
+# HTTP Handler / Server 实现：真 import（B4c7 起不再 install 注入）
+from modules.console.http_impl import ConsoleServer, Handler  # noqa: E402
 
 _RUN_LOCK = _state.RUN_LOCK   # 同一把锁
 _RUN = _state.RUN             # 同一个 dict（只 update，不重绑）
@@ -434,10 +434,6 @@ def main(argv: list[str] | None = None) -> None:
             rc = 1
         sys.exit(rc)
     parser.print_help()
-
-# Install Handler after all helpers exist (http_impl looks up free names here).
-from modules.console.http_server import install as _install_http
-_install_http(globals())
 
 if __name__ == "__main__":
     main()
