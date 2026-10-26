@@ -48,16 +48,20 @@ from modules.console.const import (  # noqa: F401
 # 运行期状态：与 console 同一份对象（不进注入表）
 from modules.console import state as _state
 from modules.console.state import CONSOLE_TOKEN
+# UI schema 层：真 import（B4c1 起从 console 搬出，不进注入表）
+from modules.console.schema_ui import (
+    apply_label_col_suggestion,
+    build_schema,
+    hydrate_console_settings,
+    public_settings,
+)
 
 if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
     from modules.console.console import (
-        apply_label_col_suggestion,
-        build_schema,
         discover_projects,
         dry_run_text,
         exclude_select_options,
         find_results,
-        hydrate_console_settings,
         load_preferred_port,
         load_session,
         load_settings_module,
@@ -66,7 +70,6 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
         pick_file_dialog,
         preview_workbook,
         project_dir,
-        public_settings,
         read_log,
         read_project_overlay,
         run_project_data_qc,
@@ -94,9 +97,8 @@ _INJECTED: frozenset[str] = frozenset({
     "run_status", "start_run", "start_run_bat", "stop_run", "under_project",
     "writeback_settings",
     # 纯函数
-    "apply_label_col_suggestion", "build_schema", "dry_run_text",
-    "exclude_select_options", "hydrate_console_settings", "load_preferred_port",
-    "load_session", "normalize_overlay", "pick_file_dialog", "public_settings",
+    "dry_run_text", "exclude_select_options", "load_preferred_port",
+    "load_session", "normalize_overlay", "pick_file_dialog",
     "read_project_overlay", "save_preferred_port", "save_session",
     "spawn_successor", "unwrap_overlay_file", "xlsx_meta",
 })

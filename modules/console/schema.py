@@ -131,6 +131,12 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ]),
 ]
 
+# 键 -> (section id, 标题)；由 SECTION_DEFS 派生（原在 console.py）
+SECTION_OF: dict[str, tuple[str, str]] = {}
+for _sid, _title, _keys in SECTION_DEFS:
+    for _k in _keys:
+        SECTION_OF[_k] = (_sid, _title)
+
 LABELS = {
     "INPUT": "数据文件",
     "RAD_SHEET": "组学 sheet（可空）",
