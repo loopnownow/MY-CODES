@@ -1,0 +1,15 @@
+{
+  "project": "",
+  "data": "",
+  "settings": "",
+  "saved_at": "",
+  "overlay": {
+    "SEED": 66666,
+    "TRAIN_RATIO": 0.7,
+    "VAL_MODE": "refit",
+    "OUTCOME_COLS": [
+      "Group"
+    ],
+    "MODULES_DIR": ""
+  }
+}

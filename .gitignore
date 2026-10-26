@@ -8,3 +8,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .pytest_cache/
+
+# console session state (per-machine; the console rewrites these on save)
+modules/console/console.override.json
+modules/console/console.port.json

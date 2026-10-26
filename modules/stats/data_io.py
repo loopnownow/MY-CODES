@@ -2185,7 +2185,13 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     if file is None:
         file = str(getattr(cfg, "INPUT", "data_merged.xlsx") or "data_merged.xlsx")
     if ratio is None:
-        ratio = float(getattr(cfg, "TRAIN_RATIO", 0.7) or 0.7)
+        ratio = float(getattr(cfg, "TRAIN_RATIO", 0.7))
+    ratio = float(ratio)
+    if not 0.0 < ratio <= 1.0:
+        raise ValueError(
+            f"TRAIN_RATIO must be in (0, 1]; got {ratio!r} "
+            "(1 = no internal split, all rows stay in TRAIN)"
+        )
     if seed is None:
         seed = int(getattr(cfg, "SEED", 66666) or 66666)
     print("═══ DATA LOADING & SPLIT ═══")

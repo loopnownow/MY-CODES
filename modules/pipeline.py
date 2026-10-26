@@ -2168,8 +2168,12 @@ def _apply_console_overlay() -> None:
     """console.html / JSON 覆盖配置优先于 settings.py。"""
     # 仅当控制台显式设置环境变量时才覆盖；命令行默认只用 settings.py
     path = os.environ.get("RAD_CONSOLE_OVERLAY") or ""
-    if not path or not os.path.isfile(path):
+    if not path:
         return
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"RAD_CONSOLE_OVERLAY points to a missing overlay file: {path}"
+        )
     import json
     with open(path, encoding="utf-8") as f:
         obj = json.load(f)
