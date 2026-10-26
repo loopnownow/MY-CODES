@@ -1,8 +1,11 @@
-"""Bind console HTTP Handler into the console module namespace.
+"""Bind console's HTTP Handler into the console module namespace.
 
-``http_impl.py`` holds the real ``Handler`` / ``ConsoleServer`` classes.
-``console.py`` calls ``install(globals())`` after helpers are defined so
-free names resolve inside ``http_impl`` without ``exec``.
+``http_impl.py`` holds the real ``Handler`` / ``ConsoleServer`` classes.  Two
+paths feed its free names: stateless leaf helpers are plain-imported from
+``modules.console.ops`` (so they are skipped here via ``_OPS_OWNED``), while the
+names that read console's mutable state (``_RUN``, ``GROK_ROOT``,
+``_CONSOLE_TOKEN``, ``main``) are injected by ``console.py`` calling
+``install(globals())`` once its helpers exist.
 """
 from __future__ import annotations
 
