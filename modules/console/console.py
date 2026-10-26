@@ -6,7 +6,7 @@ console.py — RAD 统计控制台后端（modules/console/console.html）
 用法:
   python console.py              # 启动 http://127.0.0.1:<端口>
   python console.py serve --port 8765   # 默认 8765，可改；记住后写在 console.port.json
-  python console.py run --project xlm_LG --data PATH --overlay PATH [--dry-run]
+  python console.py run --project demo_study --data PATH --overlay PATH [--dry-run]
 """
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ JS_PATH = JS_ASSETS["/console_ui.js"]
 STROBE_PATH = CONSOLE_DIR / "strobe" / "index.html"
 _HTTPD = None
 OVERRIDE_PATH = CONSOLE_DIR / "console.override.json"
-DEFAULT_PROJECT = "xlm_LG"
+DEFAULT_PROJECT = "demo_study"
 DEFAULT_PORT = 8765
 PORT_LO = 8765
 PORT_HI = 8776
@@ -717,7 +717,7 @@ HINTS: dict[str, str] = {
     "FIG_PALETTE": "画图配色：20 套命名色板 + custom。npg 默认；okabe/aaas/nejm/lancet/jama/jco/frontiers/bmj 期刊风；tol/tolbright 色盲安全；radiology 本组；ibm/tableau 投影；d3/set1/dark2/paired 多模型；uchicago 学术；gray 黑白印刷。",
     "FIG_COLORS_MAIN": "5 个主色，依次给 Combined、RadScore、Clinical、Reader、Age。",
     "FIG_COLORS_AUX": "5 个辅色，给其余曲线、KM 分层和未点名的模型。",
-    "MODULES_DIR": "共享算法库 modules 的文件夹。默认 D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules。换盘或拷贝算法库时改这里。",
+    "MODULES_DIR": "共享算法库 modules 的文件夹。填本仓 modules 的绝对路径（或设置后由 settings.ini 提供）。换盘或拷贝算法库时改这里。",
 }
 
 from modules.console.setting_meta import merge_icc_tips  # noqa: E402

@@ -50,7 +50,7 @@ QC_HTML_EXT_PREFIX = "qc-ext-"
 
 
 def _project_root() -> Path:
-    # 子工程根（yt_RDL 等），不是 0Grok 仓库根。
+    # 子工程根（drafting/<study> 等），不是 lab 仓库根。
     from modules.config.ini_io import resolve_project_dir
     return resolve_project_dir()
 

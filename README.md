@@ -1,56 +1,49 @@
 # stats-analysis（算法库主库）
 
-2026-10-23 由 `0doc\GitHub\stats-analysis\` 提升为**独立主库**（用户方案 P1）。
+2026-10-23 由 `0doc/GitHub/stats-analysis/` 提升为**独立主库**。
 
-## 远端（2026-10-26 核对）
+## 远端
 
-`origin` = `https://github.com/loopnownow/stats-analysis.git`；本地 `master` 与 `origin/master` 同步。
-**该 GitHub 仓库当前为 public**（2026-10-26 匿名访问确认），所以本文件与仓库内容在公网可读。
+`origin` = `https://github.com/loopnownow/stats-analysis.git`（**public**）。
+本地以 `master` 跟踪 `origin/master`；推送 / fetch / 改可见性都属**联网动作**，须当轮点名才做。
 
-- `git push`、`git fetch/pull`、改仓库可见性都属**联网动作**，须当轮点名才做（「直接做」「继续」不算同意）。
-- 公网可读前提下，尤其不要把本机绝对路径、未发表课题代号、具体分析变量名写进代码、用例或文档。
-- `modules\console\console.override.json` / `console.port.json` 是**本机会话状态**（控制台每次保存重写），已 gitignore、不再入库；键结构示例见 `modules\console\console.override.example.json`。
+- 公网可读：不要把本机绝对路径、未发表课题代号、具体分析变量名写进代码、用例或文档。
+- `modules/console/console.override.json` / `console.port.json` 是**本机会话状态**（控制台每次保存重写），已 gitignore；键结构示例见 `modules/console/console.override.example.json`。
 
 ## 内容
 
 | 目录 | 角色 |
 |---|---|
-| `modules\` | 可复用算法库：`config` / `console`（含 `strobe/` 页）/ `stats` / `tests` / `utils` |
-| `model-validation\` | 模型验证（校准 / DCA / NRI 等）流程与脚本 |
+| `modules/` | 可复用算法库：`config` / `console`（含 `strobe/` 页）/ `stats` / `tests` / `utils` |
+| `model-validation/` | 模型验证（校准 / DCA / NRI 等）流程与脚本 |
 
-## 与 `_code` 的关系（2026-10-25 起：本仓即唯一真源）
+## 与 `_code` 的关系（本仓即唯一真源）
 
 ```
-D:\0Grok\0doc\GitHub\stats-analysis\modules              ← 运行时真源 + 本地 git（唯一）
-D:\0Grok\0doc\_code\02-data-processing\stats-analysis\   ← 已退役，只留指针 README
-                                                             （原 80 文件 → D:\0del\...\stats-analysis-mirror\）
+<this-repo>/modules                         ← 运行时真源 + git（唯一）
+<_code>/02-data-processing/stats-analysis/  ← 已退役，只留指针 README
 ```
 
-- **本仓是运行时的唯一真源**：22 个课题的 `ref\settings.ini` 里 `MODULES_DIR` 全部指向
-  `D:\0Grok\0doc\GitHub\stats-analysis\modules`（2026-10-25 全量改写）。`MODULES_DIR` 不是目录时
-  console 与 `import modules` 直接报错，不回退。
-- 改算法 → 直接改本仓 → 在本仓 `git commit`（只本地，无远端）。
-- **不再有 `--promote` / 镜像同步**：旧 `sync_modules.py --promote` 已删除（`_code` 副本不存在，无双份可同步）。
+- **本仓是运行时的唯一真源**：各课题 `ref/settings.ini` 的 `MODULES_DIR` 指向本仓 `modules/`。`MODULES_DIR` 不是目录时 console 与 `import modules` 直接报错，不回退。
+- 改算法 → 直接改本仓 → `git commit`；需要远端时再 `git push`（须点名）。
+- **不再有 `--promote` / 镜像同步**：旧 `sync_modules.py --promote` 已删除。
+
+实验根目录用环境变量 `GROK_ROOT`（未设置时本机 lab 有冻结默认）；算法库根用 `STATS_ROOT` 或 `MODULES_DIR`。
 
 ## 校验
 
 ```powershell
-cd D:\0Grok\0doc\GitHub\stats-analysis
-$env:PYTHONDONTWRITEBYTECODE='1'   # 别在树里留 pyc
+cd <this-repo>
+$env:PYTHONDONTWRITEBYTECODE='1'
 python -B -m pytest modules\tests -q -p no:cacheprovider
 ```
 
-2026-10-25 实测基线：**160 passed / 0 failed**。
+2026-10-26 实测基线：**169 passed / 1 skipped / 0 failed**（可有 1 条 statsmodels 警告）。
 
-2026-10-23 曾记为**既有失败**的 `test_dry_run_and_shutdown.py::test_icc_panel_hint_present`
-（测试要 `modules.console.setting_meta.ICC_PANEL_HINT`，该常量当时不存在）已于 2026-10-25 修复：
-在 `setting_meta.py` 补 `ICC_PANEL_HINT`（面板级 outcome-blind 文案），并在 `console_schema.js`
-的 `icc` 组接上 `title` / `hint`（该组此前是全套唯一无 title 无 hint 的组）。未改动测试断言。
-
-项目侧一致性用 `python D:\0Grok\0doc\_code\02-data-processing\_shared\sync\sync_modules.py --check`（22 个项目应全部 OK）。
+项目侧一致性用 `_code` 下的 `sync_modules.py --check`（各项目应全部 OK）。
 
 ## 纪律
 
-- 本仓只放代码与测试，**不放**患者数据、`ref\settings.ini`、项目稿。
+- 本仓只放代码与测试，**不放**患者数据、`ref/settings.ini`、项目稿。
 - `__pycache__` / `*.pyc` 由 `.gitignore` 挡住，不要提交。
-- 需要远端时由主人点名后再 `git remote add`（本仓当前无远端）。
+- 公网仓：示例课题名用 `demo_study`；路径用相对路径或 `GROK_ROOT` / `STATS_ROOT` / `PROJECT_ROOT`。

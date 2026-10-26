@@ -4385,7 +4385,7 @@ async function boot() {
   } else if (ses && ses.project) {
     $("project").value = ses.project;
   } else {
-    $("project").value = pr.default_project || "xlm_LG";
+    $("project").value = pr.default_project || "demo_study";
   }
   onProjectChange();
   applyUrlLock();

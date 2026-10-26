@@ -1,0 +1,34 @@
+[project]
+name = "stats-analysis"
+version = "0.1.0"
+description = "Reusable stats / radiomics analysis library (modules) and model-validation CLIs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "loopnownow" }]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "scipy>=1.11",
+  "scikit-learn>=1.3",
+  "statsmodels>=0.14",
+  "matplotlib>=3.7",
+  "joblib>=1.3",
+  "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+shap = ["shap>=0.44"]
+dev = ["pytest>=7.4", "ruff>=0.12"]
+
+[tool.pytest.ini_options]
+testpaths = ["modules/tests"]
+pythonpath = ["."]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["modules*"]

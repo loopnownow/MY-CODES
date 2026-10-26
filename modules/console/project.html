@@ -203,13 +203,13 @@ footer{
 </header>
 <main>
   <div id="tplBanner" class="banner" hidden>
-    这是 <code>stats-analysis/modules/console/project.html</code> 金版。复制到课题目录（如 <code>D:\0Grok\submitting\wkl_UGIB</code>），可改名为 <code>课题名.html</code>，或保持此文件名由文件夹识别课题。
+    这是 <code>stats-analysis/modules/console/project.html</code> 金版。复制到课题目录（如 <code><GROK_ROOT>/drafting/demo_study</code>），可改名为 <code>课题名.html</code>，或保持此文件名由文件夹识别课题。
   </div>
   <div class="grid">
     <section class="card" aria-labelledby="h-cfg">
       <h2 id="h-cfg"><span class="n">1</span> 配置</h2>
       <div class="fld"><span class="lab" title="优先 ?project=，其次本文件名，再次所在文件夹。">课题</span>
-        <input id="projectName" type="text" placeholder="如 wkl_UGIB" value=""/>
+        <input id="projectName" type="text" placeholder="如 demo_study" value=""/>
       </div>
       <div class="fld"><span class="lab" title="可空=工程 ref/settings.ini">settings</span>
         <div class="pick-row">
@@ -219,7 +219,7 @@ footer{
         </div></div>
       <div class="fld"><span class="lab" title="共享算法库路径（必填，写回 settings.ini 的 MODULES_DIR）。">modules</span>
         <div class="pick-row">
-          <input id="modulesDir" type="text" placeholder="必填，如 D:\0Grok\0doc\GitHub\stats-analysis\modules" value="D:\0Grok\0doc\GitHub\stats-analysis\modules"/>
+          <input id="modulesDir" type="text" placeholder="必填，如 /path/to/stats-analysis/modules" value=""/>
           <input id="modulesDirPick" type="file" webkitdirectory hidden/>
           <button type="button" id="btnModPick">选择</button>
         </div></div>
@@ -335,7 +335,7 @@ const GENERIC_FOLDERS = {
 };
 const PORT_KEY = "rad-console-port";
 const MOD_KEY = "rad-modules-dir";
-const DEFAULT_MODULES = "D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules";
+const DEFAULT_MODULES = "";  // set to your stats-analysis/modules absolute path
 const IO_DEFAULTS = {
   RAD_SHEET: "rad",
   CLIN_SHEET: "cln",

@@ -1,4 +1,4 @@
-"""三种 VAL_MODE 验证对比（默认 zyp_OV）。
+"""三种 VAL_MODE 验证对比（默认 demo_study；可用 PROJECT_ROOT / STUDY_ROOT 覆盖）。
 
 归属 ``0doc/GitHub/stats-analysis/model-validation``（统计/验证 CLI，非 tidy 清洗主链）。
 路径与开关置顶软编码。
@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 _STAT = Path(__file__).resolve().parent
-_IMPORT = Path(os.environ.get("STATS_ROOT", r"D:\0Grok\0doc\GitHub\stats-analysis"))
+_IMPORT = Path(os.environ.get("STATS_ROOT", str(_STAT.parent)))
 _TIDY = Path(os.environ.get(
     "CLEAN_DATA_ROOT",
     str(_IMPORT.parent.parent / "02-data-processing" / "base" / "clean-data"),
@@ -22,7 +22,7 @@ for p in (_IMPORT, _TIDY):
 from tidy_paths import project_root  # noqa: E402
 
 # ==================== CONFIG ====================
-PROJ = Path(os.environ.get("ZYP_OV_ROOT", str(project_root("zyp_OV"))))
+PROJ = Path(os.environ.get("PROJECT_ROOT") or os.environ.get("STUDY_ROOT") or str(project_root("demo_study")))
 DRY_RUN = False
 # ================================================
 os.chdir(PROJ)
@@ -125,7 +125,7 @@ def _expand_to_full(prob_short, df_ref, n_full):
 
 def main() -> None:
     print("=" * 70)
-    print("zyp_OV VAL_MODE comparison  (train once, three validation modes)")
+    print("demo_study VAL_MODE comparison  (train once, three validation modes)")
     print("=" * 70)
     data = data_io.load_data(file=cfg.INPUT, ratio=cfg.TRAIN_RATIO, seed=cfg.SEED)
     res_train = run_analysis(data.train, "train", skip_roc=True)
@@ -254,7 +254,7 @@ def main() -> None:
         )
     page = f"""<!DOCTYPE html>
 <html lang="zh"><head><meta charset="utf-8"/>
-<title>zyp_OV VAL_MODE comparison</title>
+<title>demo_study VAL_MODE comparison</title>
 <style>
 body{{font:15px/1.45 "Segoe UI",Calibri,sans-serif;margin:32px;color:#222}}
 h1{{font-size:22px}} h2{{font-size:17px;margin-top:28px}}
@@ -264,7 +264,7 @@ th{{border-bottom:2px solid #222}}
 .note{{color:#444;max-width:860px}}
 code{{background:#f4f4f4;padding:1px 4px}}
 </style></head><body>
-<h1>zyp_OV — 三种验证方式对比</h1>
+<h1>demo_study — 三种验证方式对比</h1>
 <p class="note">
 Train N={n_tr} (event={n1_tr}) · Test N={n_te} (event={n1_te}) · seed={cfg.SEED} · ratio={cfg.TRAIN_RATIO}<br/>
 Selected clinical: {", ".join(train_clin) or "—"} · Combined covariates: {", ".join(clin_feat_combined)} ·

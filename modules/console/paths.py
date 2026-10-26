@@ -12,7 +12,7 @@ from pathlib import Path
 # Live stage folder under GROK_ROOT (was PREPARING_DIRNAME / "preparing").
 DRAFTING_DIRNAME = "drafting"
 PREPARING_DIRNAME = DRAFTING_DIRNAME  # back-compat alias; prefer DRAFTING_DIRNAME
-DEFAULT_GROK_ROOT = Path(r"D:\0Grok")  # frozen lab default; GROK_ROOT overrides
+DEFAULT_GROK_ROOT = Path(r"D:\0Grok")  # lab machine fallback; always prefer GROK_ROOT env
 STAGE_ROOT_NAMES = (
     "pre-submit", "in-review", "accepted",
 )
@@ -23,10 +23,8 @@ def grok_root(modules_root: Path) -> Path:
 
     Order: ``GROK_ROOT`` env -> frozen lab default ``DEFAULT_GROK_ROOT``.
 
-    The package lives under ``0doc/GitHub/stats-analysis`` (lab-paths
-    ``{code_stats}``). The former ``0script`` tree was retired 2026-10-23;
-    do **not** hard-code ``D:\\0Grok\\0script`` or revive a
-    ``parent.name == "0script"`` probe. ``modules_root`` is kept for API
+    Prefer ``GROK_ROOT``. The former ``0script`` tree was retired; do not
+    revive a ``0script`` path probe. ``modules_root`` is kept for API
     stability (callers pass it) but is unused for root resolution.
     """
     _ = modules_root  # API stability; layout probe retired with 0script

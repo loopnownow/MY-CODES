@@ -446,7 +446,7 @@ def write_ini(path: Path, data: dict[str, Any]) -> None:
     lines = [
         "# RAD 工程配置（只改本文件）",
         "# 值用 JSON：true/false/null、数字、字符串带引号、列表/对象。",
-        "# 运行: <工程名>.html   配置: ref/settings.ini   算法: D:\\0Grok\\0doc\\GitHub\\stats-analysis\\modules",
+        "# 运行: <工程名>.html   配置: ref/settings.ini   算法: <STATS_ROOT>/modules",
         "",
     ]
     for sid, title, _keys in INI_SECTIONS:
@@ -559,7 +559,7 @@ def load_ini_namespace(path: Path) -> types.ModuleType:
 
 
 def resolve_project_dir(proj: Path | None = None) -> Path:
-    """当前子工程根（如 D:\\0Grok\\drafting\\yt_RDL），不是 0Grok 仓库根。
+    """当前子工程根（如 <GROK_ROOT>/drafting/<study>），不是 lab 仓库根。
 
     优先级：显式路径 > 环境变量 RAD_PROJECT > cwd。
     """
@@ -590,7 +590,7 @@ def resolve_settings_ini(proj: Path) -> Path:
 
 
 def _lab_grok_root() -> Path:
-    """D:\0Grok 默认根；GROK_ROOT 优先（与 console.paths.grok_root 同口径）。"""
+    """Lab fallback root; GROK_ROOT 优先（与 console.paths.grok_root 同口径）。"""
     env = os.environ.get("GROK_ROOT", "").strip()
     return Path(env).expanduser() if env else Path(r"D:\0Grok")
 

@@ -1,4 +1,4 @@
-"""ini_io 实验根判定：GROK_ROOT 优先，缺省回落 D:\\0Grok。"""
+"""ini_io 实验根判定：GROK_ROOT 优先，缺省回落 lab DEFAULT_GROK_ROOT。"""
 from __future__ import annotations
 
 from pathlib import Path

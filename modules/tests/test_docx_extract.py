@@ -8,8 +8,22 @@ from pathlib import Path
 import docx
 import pytest
 
-# docx_extract.py 现在在 _code\05-manuscript\write-paper\（原 0script\manuscript-body 已 rehome）
-_MS_BODY = Path(os.environ.get("ODOC_CODE", r"D:\0Grok\0doc\_code")) / "05-manuscript" / "write-paper"
+# docx_extract: prefer ODOC_CODE / GROK_ROOT; else discover ../_code from this repo layout
+def _resolve_ms_body() -> Path:
+    cands: list[Path] = []
+    if os.environ.get("ODOC_CODE"):
+        cands.append(Path(os.environ["ODOC_CODE"]))
+    if os.environ.get("GROK_ROOT"):
+        cands.append(Path(os.environ["GROK_ROOT"]) / "0doc" / "_code")
+    # <lab>/0doc/GitHub/stats-analysis/modules/tests -> <lab>/0doc/_code
+    cands.append(Path(__file__).resolve().parents[2].parent.parent / "_code")
+    for base in cands:
+        hit = base / "05-manuscript" / "write-paper"
+        if (hit / "docx_extract.py").is_file():
+            return hit
+    return Path(".")
+
+_MS_BODY = _resolve_ms_body()
 if str(_MS_BODY) not in sys.path:
     sys.path.insert(0, str(_MS_BODY))
 

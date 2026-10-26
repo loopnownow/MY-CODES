@@ -6,7 +6,7 @@ Replicates patient-level split (data_io.load_data), then keeps:
   all Positive, all test Negative, and a histology×sex-stratified
   sample of train Negative at 1:2 vs train Positive.
 
-Writes cln+rad only. Does not touch lxf_LG.xlsx, qc, icc, or lxf_js.xlsx.
+Writes cln+rad only. Does not touch source workbook extras (qc/icc) or sibling workbooks.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 
 _STAT = Path(__file__).resolve().parent
-_IMPORT = Path(os.environ.get("STATS_ROOT", r"D:\0Grok\0doc\GitHub\stats-analysis"))
+_IMPORT = Path(os.environ.get("STATS_ROOT", str(_STAT.parent)))
 _TIDY = Path(os.environ.get(
     "CLEAN_DATA_ROOT",
     str(_IMPORT.parent.parent / "02-data-processing" / "base" / "clean-data"),
@@ -30,10 +30,10 @@ for p in (_IMPORT, _TIDY):
 from tidy_paths import project_root  # noqa: E402
 
 # ==================== CONFIG ====================
-PROJECT_DIR = Path(os.environ.get("LXF_PP_ROOT", str(project_root("lxf_PP"))))
-SRC_XLSX = PROJECT_DIR / "lxf_LG.xlsx"
-OUT_XLSX = PROJECT_DIR / "lxf_PP.xlsx"
-KEEP_LIST = PROJECT_DIR / "ref" / "lxf_PP_keep_list.csv"
+PROJECT_DIR = Path(os.environ.get("PROJECT_ROOT") or os.environ.get("STUDY_ROOT") or str(project_root("demo_study")))
+SRC_XLSX = PROJECT_DIR / os.environ.get("SRC_XLSX_NAME", "source.xlsx")
+OUT_XLSX = PROJECT_DIR / os.environ.get("OUT_XLSX_NAME", "downsampled.xlsx")
+KEEP_LIST = PROJECT_DIR / "ref" / os.environ.get("KEEP_LIST_NAME", "keep_list.csv")
 CLIN_SHEET = "cln"
 RAD_SHEET = "rad"
 ID_COL = "Patient_ID"
