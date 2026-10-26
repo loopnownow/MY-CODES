@@ -1,10 +1,8 @@
-"""RAD console HTTP Handler / ConsoleServer (normal module).
+"""RAD console HTTP Handler / ConsoleServer（普通模块，零注入）。
 
-Imported by console.py after helpers exist; console then injects the names in
-``_INJECTED`` (functions that still read console's own state).  Constants come
-from ``modules.console.const``, mutable run/serve state from
-``modules.console.state`` and the schema tables from ``modules.console.schema``
-— those three are real imports, not injection.
+console.py 直接真 import 本模块的 Handler / ConsoleServer；依赖全部来自
+modules.console 的叶层模块（const / state / schema / schema_ui / settings_layer /
+preview / dryrun / run / serve），没有 _INJECTED 注入表，也没有 __getattr__ 兜底。
 """
 from __future__ import annotations
 
@@ -93,18 +91,18 @@ from modules.console.run import (
 # 端口 / 服务层：真 import（B4c6 起从 console 搬出，注入表随之清空）
 from modules.console.serve import spawn_successor
 
-# 注入契约（SSOT）：B4c6 起为空——console 的函数已全部搬进模块，http_impl 只做真 import。
-# http_server.install() 仍按这张表注入；空表即不再覆盖 console 的任何全局。
-_INJECTED: frozenset[str] = frozenset()
-
-def __getattr__(name: str) -> Any:
-    """未注入就报错：比裸 NameError 多一句「谁没注入」。"""
-    if name in _INJECTED:
-        raise RuntimeError(
-            f"http_impl 未注入 modules.console.console.{name}；"
-            "检查 modules.console.http_server.install(console_globals)"
-        )
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+# 由 modules.console.ops 静态 import 的叶层符号：契约自检用（测试断言二者一致）。
+_OPS_OWNED = frozenset({
+    "_overlay_path",
+    "allow_browser_origin",
+    "clear_project_overlay",
+    "jsonable",
+    "project_settings",
+    "resolve_meta_xlsx",
+    "resolve_run_outcome",
+    "sync_external_tests",
+    "write_project_overlay",
+})
 
 
 def _require_project(value: Any) -> str:
