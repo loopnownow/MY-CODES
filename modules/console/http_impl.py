@@ -73,12 +73,16 @@ from modules.console.settings_layer import (
     unwrap_overlay_file,
     writeback_settings,
 )
+# 工作簿预览层：真 import（B4c3 起从 console 搬出，不进注入表）
+from modules.console.preview import (
+    exclude_select_options,
+    preview_workbook,
+    xlsx_meta,
+)
 
 if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
     from modules.console.console import (
         dry_run_text,
-        exclude_select_options,
-        preview_workbook,
         read_log,
         run_project_data_qc,
         run_status,
@@ -86,7 +90,6 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
         start_run,
         start_run_bat,
         stop_run,
-        xlsx_meta,
     )
 
 # 注入契约（SSOT）：http_impl 仍需要 console 提供的自由名。
@@ -95,10 +98,10 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
 # http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
 _INJECTED: frozenset[str] = frozenset({
     # 读 / 写 console 可变状态的函数
-    "preview_workbook", "read_log", "run_project_data_qc", "run_status",
-    "spawn_successor", "start_run", "start_run_bat", "stop_run",
+    "read_log", "run_project_data_qc", "run_status", "spawn_successor",
+    "start_run", "start_run_bat", "stop_run",
     # 纯函数
-    "dry_run_text", "exclude_select_options", "xlsx_meta",
+    "dry_run_text",
 })
 
 def __getattr__(name: str) -> Any:
