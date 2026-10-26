@@ -42,10 +42,12 @@ from modules.console.const import (  # noqa: F401
     STROBE_PATH,
     _TOKEN_SAFE_GET,
 )
+# 运行期状态：与 console 同一份对象（不进注入表）
+from modules.console import state as _state
+from modules.console.state import CONSOLE_TOKEN
 
 if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
     from modules.console.console import (
-        _CONSOLE_TOKEN,
         apply_label_col_suggestion,
         build_schema,
         discover_projects,
@@ -79,11 +81,10 @@ if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_glo
     )
 
 # 注入契约（SSOT）：http_impl 仍需要 console 提供的自由名。
-# 常量层已改为静态 import（modules.console.const），这里只剩运行期状态。
+# 常量层（modules.console.const）与运行期状态（modules.console.state）都是真 import，
+# 这里只剩仍住在 console 的函数。
 # http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
 _INJECTED: frozenset[str] = frozenset({
-    # 运行期状态
-    "_CONSOLE_TOKEN",
     # 读 console 可变状态的函数
     "discover_projects", "find_results", "load_settings_module", "open_result_folder",
     "preview_workbook", "project_dir", "read_log", "run_project_data_qc",
@@ -97,9 +98,6 @@ _INJECTED: frozenset[str] = frozenset({
     "spawn_successor", "unwrap_overlay_file", "xlsx_meta",
 })
 
-_NS: dict[str, Any] | None = None
-
-
 def __getattr__(name: str) -> Any:
     """未注入就报错：比裸 NameError 多一句「谁没注入」。"""
     if name in _INJECTED:
@@ -108,14 +106,6 @@ def __getattr__(name: str) -> Any:
             "检查 modules.console.http_server.install(console_globals)"
         )
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def _live(name: str, default: Any = None) -> Any:
-    """Read a console.py global that may be assigned after install()."""
-    ns = _NS
-    if isinstance(ns, dict) and name in ns:
-        return ns[name]
-    return globals().get(name, default)
 
 
 def _require_project(value: Any) -> str:
@@ -274,7 +264,7 @@ class Handler(BaseHTTPRequestHandler):
         if not got:
             q = parse_qs(urlparse(self.path).query)
             got = (q.get("token") or [""])[0]
-        if not got or not secrets.compare_digest(str(got), str(_CONSOLE_TOKEN)):
+        if not got or not secrets.compare_digest(str(got), str(CONSOLE_TOKEN)):
             self._err(403, "invalid console token")
             return False
         return True
@@ -302,11 +292,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             html = HTML_PATH.read_text(encoding="utf-8")
             if "__CONSOLE_TOKEN__" in html:
-                html = html.replace("__CONSOLE_TOKEN__", _CONSOLE_TOKEN)
+                html = html.replace("__CONSOLE_TOKEN__", CONSOLE_TOKEN)
             else:
                 html = html.replace(
                     "<head>",
-                    f'<head><meta name="console-token" content="{_CONSOLE_TOKEN}">',
+                    f'<head><meta name="console-token" content="{CONSOLE_TOKEN}">',
                     1,
                 )
             # Cache-bust static assets so Ctrl+F5 is enough after edits
@@ -370,11 +360,11 @@ class Handler(BaseHTTPRequestHandler):
             payload = {
                 "ok": True,
                 "root": str(RAD_ROOT),
-                "port": _live("_SERVE_PORT") or load_preferred_port(),
+                "port": _state.SERVE_PORT or load_preferred_port(),
                 "preferred": load_preferred_port(),
             }
             if self._origin_ok():
-                payload["token"] = _CONSOLE_TOKEN
+                payload["token"] = CONSOLE_TOKEN
             c, b, t = _json_bytes(payload)
             self._send(c, b, t)
             return
@@ -382,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/port":
             c, b, t = _json_bytes({
                 "ok": True,
-                "current": _live("_SERVE_PORT"),
+                "current": _state.SERVE_PORT,
                 "preferred": load_preferred_port(),
                 "lo": PORT_LO,
                 "hi": PORT_HI,
@@ -394,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self._token_ok():
                 return
             def _stop() -> None:
-                httpd = _live("_HTTPD")
+                httpd = _state.HTTPD
                 if httpd is not None:
                     httpd.shutdown()
             threading.Timer(0.25, _stop).start()
@@ -709,11 +699,11 @@ class Handler(BaseHTTPRequestHandler):
                 stop_run()
             except Exception:
                 pass
-            port = _live("_SERVE_PORT") or load_preferred_port()
+            port = _state.SERVE_PORT or load_preferred_port()
             project = str(body.get("project") or "").strip() or None
             spawn_successor(port, project)
             def _stop() -> None:
-                httpd = _live("_HTTPD")
+                httpd = _state.HTTPD
                 if httpd is not None:
                     httpd.shutdown()
             threading.Timer(0.35, _stop).start()
@@ -839,7 +829,7 @@ class Handler(BaseHTTPRequestHandler):
             c, b, t = _json_bytes({
                 "ok": True,
                 "preferred": n,
-                "current": _live("_SERVE_PORT"),
+                "current": _state.SERVE_PORT,
                 "note": "已记住。下次启动用此端口；当前进程仍占用原端口。",
             })
             self._send(c, b, t)

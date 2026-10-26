@@ -17,7 +17,6 @@ import importlib.util
 import inspect
 import json
 import os
-import secrets
 import shutil
 import subprocess
 import sys
@@ -92,10 +91,11 @@ from modules.console.ops import (  # noqa: F401
 )
 
 
-# ── 运行期可变状态 ─────────────────────────────────────────────
-_HTTPD = None
-_SERVE_PORT: int | None = None
-_CONSOLE_TOKEN = secrets.token_urlsafe(24)
+# ── 运行期可变状态：单一之家在 modules.console.state ──────────
+from modules.console import state as _state
+
+# 兼容别名（同一对象 / 同一字符串）：真值在 _state，此处只为少改调用点。
+_CONSOLE_TOKEN = _state.CONSOLE_TOKEN
 
 
 SECTION_DEFS: list[tuple[str, str, list[str]]] = [
@@ -600,18 +600,8 @@ HINTS: dict[str, str] = {
 from modules.console.setting_meta import merge_icc_tips  # noqa: E402
 HINTS = merge_icc_tips(HINTS)
 
-_RUN_LOCK = threading.Lock()
-_RUN: dict[str, Any] = {
-    "status": "idle",
-    "pid": None,
-    "proc": None,
-    "log_path": "",
-    "started": None,
-    "ended": None,
-    "error": "",
-    "project": "",
-    "dry_run": False,
-}
+_RUN_LOCK = _state.RUN_LOCK   # 同一把锁
+_RUN = _state.RUN             # 同一个 dict（只 update，不重绑）
 
 # ── paths ──────────────────────────────────────────────────────
 def _resolve(p: str | Path) -> Path:
@@ -2431,7 +2421,7 @@ def _preview_external_one(
     one["has_qc_sheet"] = bool(st.get("QC_SHEET"))
     return one
 
-_PREVIEW_CACHE: dict[tuple, dict[str, Any]] = {}
+_PREVIEW_CACHE = _state.PREVIEW_CACHE  # 同一个 dict
 
 def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
     data_path = Path(data_path)
@@ -3759,7 +3749,6 @@ def _tcp_open(port: int, timeout: float = 0.2) -> bool:
 def cmd_serve(port: int, open_browser: bool, project: str | None = None,
               wait_free: bool = False, data: str | None = None,
               exact: bool = False) -> None:
-    global _HTTPD, _SERVE_PORT
     register_protocol()
     if not HTML_PATH.is_file():
         print(f"缺少界面文件: {HTML_PATH}", file=sys.stderr)
@@ -3813,8 +3802,8 @@ def cmd_serve(port: int, open_browser: bool, project: str | None = None,
                 "error": "端口无法绑定",
             })
         sys.exit(2)
-    _HTTPD = httpd
-    _SERVE_PORT = port
+    _state.HTTPD = httpd
+    _state.SERVE_PORT = port
     save_preferred_port(port)
     url = _serve_url(port, project, data)
     print(f"console.html  {url}", flush=True)
@@ -3828,8 +3817,8 @@ def cmd_serve(port: int, open_browser: bool, project: str | None = None,
     except KeyboardInterrupt:
         print("\nstop")
     finally:
-        _HTTPD = None
-        _SERVE_PORT = None
+        _state.HTTPD = None
+        _state.SERVE_PORT = None
         httpd.server_close()
 
 def cmd_run(args: argparse.Namespace) -> int:

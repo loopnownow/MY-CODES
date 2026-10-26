@@ -81,3 +81,15 @@ def test_const_layer_is_static_not_injected():
     for name in sorted(imported):
         assert getattr(http_impl, name) is getattr(const, name), name
 
+
+def test_mutable_state_has_one_home():
+    from modules.console import console, http_impl, state
+
+    assert console._RUN is state.RUN
+    assert console._RUN_LOCK is state.RUN_LOCK
+    assert console._PREVIEW_CACHE is state.PREVIEW_CACHE
+    assert console._CONSOLE_TOKEN is state.CONSOLE_TOKEN
+    assert "_CONSOLE_TOKEN" not in http_impl._INJECTED
+    assert http_impl.CONSOLE_TOKEN is state.CONSOLE_TOKEN
+
+

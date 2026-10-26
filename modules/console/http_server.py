@@ -44,8 +44,6 @@ def install(ns: dict[str, Any]) -> None:
     clash = sorted(impl._INJECTED & _OPS_OWNED)
     if clash:
         raise RuntimeError("叶层符号被重复声明为注入名: " + ", ".join(clash))
-    # 保留活字典：install 之后 console 侧的赋值（_HTTPD / _SERVE_PORT）仍可见。
-    impl._NS = ns
     for name in impl._INJECTED:
         setattr(impl, name, ns[name])
     for name in _EXPORTED:
