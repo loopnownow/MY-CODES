@@ -6,17 +6,78 @@ into this module so free names (under_root, _CONSOLE_TOKEN, …) resolve here.
 from __future__ import annotations
 
 import json
-import os
+import secrets
+import sys
 import threading
 import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-# Names below (DEFAULT_PROJECT, under_root, _CONSOLE_TOKEN, …) are injected
-# by modules.console.http_server.install(console_globals) before first request.
+from modules.console.ops import (  # 叶层：真实 import，不再依赖注入
+    _overlay_path,
+    allow_browser_origin,
+    clear_project_overlay,
+    jsonable,
+    project_settings,
+    resolve_meta_xlsx,
+    resolve_run_outcome,
+    sync_external_tests,
+    write_project_overlay,
+)
+
+if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
+    from modules.console.console import (
+        CONSOLE_DEFAULTS,
+        CSS_PATH,
+        DEFAULT_PROJECT,
+        HTML_PATH,
+        JS_ASSETS,
+        MODULES_ROOT,
+        OVERRIDE_PATH,
+        PORT_HI,
+        PORT_LO,
+        RAD_ROOT,
+        STROBE_PATH,
+        _CONSOLE_TOKEN,
+        _TOKEN_SAFE_GET,
+        apply_label_col_suggestion,
+        build_schema,
+        discover_projects,
+        dry_run_text,
+        exclude_select_options,
+        find_results,
+        hydrate_console_settings,
+        load_preferred_port,
+        load_session,
+        load_settings_module,
+        normalize_overlay,
+        open_result_folder,
+        pick_file_dialog,
+        preview_workbook,
+        project_dir,
+        public_settings,
+        read_log,
+        read_project_overlay,
+        run_project_data_qc,
+        run_status,
+        save_preferred_port,
+        save_session,
+        spawn_successor,
+        start_run,
+        start_run_bat,
+        stop_run,
+        under_project,
+        unwrap_overlay_file,
+        writeback_settings,
+        xlsx_meta,
+    )
+
+# 其余名字（DEFAULT_PROJECT, under_project, _CONSOLE_TOKEN, …）仍由
+# modules.console.http_server.install(console_globals) 注入，因为它们读的是
+# console 的运行期可变状态（_RUN / _RUN_LOCK / GROK_ROOT / main）。
 
 _NS: dict[str, Any] | None = None
 

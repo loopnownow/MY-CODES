@@ -589,6 +589,12 @@ def resolve_settings_ini(proj: Path) -> Path:
     return Path(proj) / "ref" / "settings.ini"
 
 
+def _lab_grok_root() -> Path:
+    """D:\0Grok 默认根；GROK_ROOT 优先（与 console.paths.grok_root 同口径）。"""
+    env = os.environ.get("GROK_ROOT", "").strip()
+    return Path(env).expanduser() if env else Path(r"D:\0Grok")
+
+
 def find_settings_ini(start: Path | None = None) -> Path | None:
     env = os.environ.get("RAD_PROJECT", "").strip()
     if env:
@@ -596,7 +602,7 @@ def find_settings_ini(start: Path | None = None) -> Path | None:
         if hit.is_file():
             return hit
     cwd = Path(start) if start else Path.cwd()
-    grok = Path(r"D:\0Grok")
+    grok = _lab_grok_root()
     for base in (cwd, *cwd.parents):
         for p in settings_ini_candidates(base):
             if not p.is_file():

@@ -2,7 +2,7 @@
 shap_analysis.py — SHAP 解释 Combined 逻辑回归；失败时回退 permutation importance
 """
 from __future__ import annotations
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 import pandas as pd

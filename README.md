@@ -1,7 +1,15 @@
 # stats-analysis（算法库主库）
 
 2026-10-23 由 `0doc\GitHub\stats-analysis\` 提升为**独立主库**（用户方案 P1）。
-只做**本地 git**，**未配远端**（不联网、不推送）。
+
+## 远端（2026-10-26 核对）
+
+`origin` = `https://github.com/loopnownow/stats-analysis.git`；本地 `master` 与 `origin/master` 同步。
+**该 GitHub 仓库当前为 public**（2026-10-26 匿名访问确认），所以本文件与仓库内容在公网可读。
+
+- `git push`、`git fetch/pull`、改仓库可见性都属**联网动作**，须当轮点名才做（「直接做」「继续」不算同意）。
+- 公网可读前提下，尤其不要把本机绝对路径、未发表课题代号、具体分析变量名写进代码、用例或文档。
+- `modules\console\console.override.json` / `console.port.json` 是**本机会话状态**（控制台每次保存重写），已 gitignore、不再入库；键结构示例见 `modules\console\console.override.example.json`。
 
 ## 内容
 

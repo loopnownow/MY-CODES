@@ -14,7 +14,7 @@ nomogram.py — 列线图 (Nomogram) 构建
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -485,7 +485,6 @@ def _plot_nomogram(
     C_VAR = "#1565C0"
     C_POINTS = "#212121"
     C_TOTAL = "#37474F"
-    C_MUTED = "#616161"
     C_GRID = "#ECEFF1"
 
     def _draw_axis(y: float, x0: float, x1: float, color: str, lw: float = 1.6) -> None:
@@ -536,7 +535,6 @@ def _plot_nomogram(
         y = y_vars[f]
         lo, hi = ranges[f]
         discrete = _is_discrete(X_feat[f], feat=f)
-        b = float(betas[f])
         max_pts = beta_effect[f] * scale
 
         _left_label(y, _display_name(f))

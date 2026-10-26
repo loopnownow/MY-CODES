@@ -2,7 +2,7 @@
 dag_plot.py — 假设因果 DAG（完整领域结构 + 中介边高亮）
 """
 from __future__ import annotations
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches

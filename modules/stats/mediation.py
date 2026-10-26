@@ -6,7 +6,7 @@ mediation.py — 探索性中介分析（bootstrap product-of-coefficients）
 表注：associational / exploratory, not causal identification.
 """
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -338,7 +338,6 @@ def run_mediation_paths(
     for p in paths:
         pid = str(p.get("id", "path"))
         xlab, mspec, ylab = p.get("x"), p.get("m"), p.get("y")
-        label = p.get("label") or f"{xlab} → {mspec} → {ylab}"
         x = resolve_vector(str(xlab), frame, extras)
         y = resolve_vector(str(ylab), frame, extras)
         m_list = mspec if isinstance(mspec, (list, tuple)) else [mspec]

@@ -90,7 +90,6 @@ def _build_colored_clin_xlsx(clin_df: pd.DataFrame, target_cols: List[str],
         ws.cell(row=1, column=j).border = thin_border
     for i in range(1, n_row + 2):
         for j in range(1, n_cols + 1):
-            existing = ws.cell(row=i, column=j).border
             ws.cell(row=i, column=j).border = all_border if i > 1 else thin_border
 
     fill_high = PatternFill(start_color=COLOR_HIGH, end_color=COLOR_HIGH, fill_type="solid")

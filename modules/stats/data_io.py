@@ -1139,7 +1139,6 @@ def _align_clin_to_rad(
         exact = remaining.index[remaining["_align_id"] == rid].tolist()
         if len(exact) >= 1:
             pick = exact[0]
-            how = "exact"
         else:
             nrid = _norm_patient_id(rid)
             fuzzy = remaining.index[
@@ -1151,7 +1150,6 @@ def _align_clin_to_rad(
                 print(f"  ⚠ 归一化后多条临床记录匹配 {rid!r}，取第一条: "
                       f"{remaining.loc[fuzzy, '_align_id'].tolist()}")
             pick = fuzzy[0]
-            how = "fuzzy"
             fuzzy_pairs.append((rid, remaining.at[pick, "_align_id"]))
 
         aligned_rows.append(remaining.loc[pick])
@@ -2185,7 +2183,13 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     if file is None:
         file = str(getattr(cfg, "INPUT", "data_merged.xlsx") or "data_merged.xlsx")
     if ratio is None:
-        ratio = float(getattr(cfg, "TRAIN_RATIO", 0.7) or 0.7)
+        ratio = float(getattr(cfg, "TRAIN_RATIO", 0.7))
+    ratio = float(ratio)
+    if not 0.0 < ratio <= 1.0:
+        raise ValueError(
+            f"TRAIN_RATIO must be in (0, 1]; got {ratio!r} "
+            "(1 = no internal split, all rows stay in TRAIN)"
+        )
     if seed is None:
         seed = int(getattr(cfg, "SEED", 66666) or 66666)
     print("═══ DATA LOADING & SPLIT ═══")

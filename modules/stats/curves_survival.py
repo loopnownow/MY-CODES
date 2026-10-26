@@ -45,7 +45,6 @@ def _km_steps(time: np.ndarray, event: np.ndarray) -> Tuple[np.ndarray, np.ndarr
     s = 1.0
     times_s = [0.0]
     surv_s = [1.0]
-    n = len(t)
     for ut in uniq:
         at = t == ut
         d = int(e[at].sum())

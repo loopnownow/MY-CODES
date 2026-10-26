@@ -134,6 +134,84 @@ def _numbered(title: str, lines: list[str], width: int = 36) -> str:
 
 
 
+class Canvas:
+    """Inch-coordinate canvas. Origin at top-left; y grows downward.
+
+    Items are collected first, so the canvas height follows the content, and
+    everything is drawn once in render().
+    """
+
+    def __init__(self, width: float, height: float | None = None, dpi: int = 600):
+        self.width = float(width)
+        self.height = float(height) if height else 0.0
+        self.dpi = int(dpi)
+        self._items: list[tuple] = []
+        self._bottom = 0.0
+
+    def add_box(self, x, y, w, h, text, fs: float = FS, align: str = "center"):
+        box = (float(x), float(y), float(w), float(h))
+        self._items.append(("box", box, text or "", float(fs), align))
+        self._bottom = max(self._bottom, box[1] + box[3])
+        return box
+
+    def add_arrow(self, x1, y1, x2, y2):
+        seg = (float(x1), float(y1), float(x2), float(y2))
+        self._items.append(("arrow", seg))
+        self._bottom = max(self._bottom, seg[1], seg[3])
+
+    def add_line(self, x1, y1, x2, y2):
+        seg = (float(x1), float(y1), float(x2), float(y2))
+        self._items.append(("line", seg))
+        self._bottom = max(self._bottom, seg[1], seg[3])
+
+    def render(self, out_path) -> Path:
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        height = self.height or (self._bottom + 0.3)
+        fig = plt.figure(figsize=(self.width, height), facecolor=FACE)
+        ax = fig.add_axes((0.0, 0.0, 1.0, 1.0))
+        ax.set_xlim(0.0, self.width)
+        ax.set_ylim(height, 0.0)
+        ax.set_axis_off()
+        ax.set_facecolor(FACE)
+        for kind, seg, *rest in self._items:
+            if kind == "box":
+                x, y, w, h = seg
+                text, fs, align = rest
+                ax.add_patch(
+                    FancyBboxPatch(
+                        (x, y), w, h,
+                        boxstyle="square,pad=0",
+                        linewidth=LW, edgecolor=EDGE, facecolor=FACE,
+                    )
+                )
+                if text:
+                    ha = "left" if align == "left" else "center"
+                    tx = x + 0.14 if ha == "left" else x + w / 2
+                    ax.text(
+                        tx, y + h / 2, text,
+                        ha=ha, va="center", multialignment=ha,
+                        linespacing=1.42, color=EDGE,
+                        fontproperties=FontProperties(family=FONT, size=fs),
+                    )
+            elif kind == "arrow":
+                x1, y1, x2, y2 = seg
+                ax.add_patch(
+                    FancyArrowPatch(
+                        (x1, y1), (x2, y2),
+                        arrowstyle="-|>", mutation_scale=9.0,
+                        linewidth=LW, color=EDGE, shrinkA=0.0, shrinkB=0.0,
+                    )
+                )
+            else:
+                x1, y1, x2, y2 = seg
+                ax.plot([x1, x2], [y1, y2], color=EDGE, linewidth=LW,
+                        solid_capstyle="butt")
+        fig.savefig(out_path, dpi=self.dpi, facecolor=FACE)
+        plt.close(fig)
+        return out_path
+
+
 FS_STUDY = 12
 _MODELS = ("clinical", "radiomics", "nomogram")
 _MODEL_LABEL = {
@@ -308,8 +386,6 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
     top_t, top_w, top_h = fitted(top, 42)
     inc_w, inc_h = _box_wh(inc_txt, fs, pad_x=0.28, max_w=4.6) if inc_txt else (0.0, 0.0)
     exc_w, exc_h = _box_wh(exc_txt, fs, pad_x=0.28, max_w=4.6) if exc_txt else (0.0, 0.0)
-    inc_box = (inc_txt, inc_w, inc_h)
-    exc_box = (exc_txt, exc_w, exc_h)
     ana_t, ana_w, ana_h = fitted(included, 28)
     cohort_fit = [(bid, *fitted(text, 24)) for bid, text in cohorts]
     bal_fit = fitted(balance_txt, 22) if balance_txt else None
@@ -331,7 +407,6 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
     c = Canvas(width=canvas_w)
 
     def center_row(items, y, ids=None):
-        total = row_width([(None, w, h) for *_, w, h in items]) if False else 0
         widths = []
         packed = []
         if ids is None:
@@ -468,7 +543,7 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
             eh = max(h for _, _, _, h in explain_fit)
             explain_boxes = []
             for mid, text, w, _h in explain_fit:
-                box = c.add_box(x, y, w, h, text, fs=fs)
+                box = c.add_box(x, y, w, eh, text, fs=fs)
                 explain_boxes.append(box)
                 x += w + gap_x
             src = metric_boxes[len(metric_boxes) // 2]
