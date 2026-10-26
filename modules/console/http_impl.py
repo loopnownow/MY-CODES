@@ -16,7 +16,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 from modules.console.ops import (  # 叶层：真实 import，不再依赖注入
@@ -90,20 +90,12 @@ from modules.console.run import (
     start_run_bat,
     stop_run,
 )
+# 端口 / 服务层：真 import（B4c6 起从 console 搬出，注入表随之清空）
+from modules.console.serve import spawn_successor
 
-if TYPE_CHECKING:  # 静态视图；运行期由 http_server.install(console_globals) 注入
-    from modules.console.console import (
-        spawn_successor,
-    )
-
-# 注入契约（SSOT）：http_impl 仍需要 console 提供的自由名。
-# 常量层（modules.console.const）与运行期状态（modules.console.state）都是真 import，
-# 这里只剩仍住在 console 的函数。
-# http_server.install() 只按这张表注入；缺一个即 KeyError，其余全局一概不进。
-_INJECTED: frozenset[str] = frozenset({
-    # 读 / 写 console 可变状态的函数
-    "spawn_successor",
-})
+# 注入契约（SSOT）：B4c6 起为空——console 的函数已全部搬进模块，http_impl 只做真 import。
+# http_server.install() 仍按这张表注入；空表即不再覆盖 console 的任何全局。
+_INJECTED: frozenset[str] = frozenset()
 
 def __getattr__(name: str) -> Any:
     """未注入就报错：比裸 NameError 多一句「谁没注入」。"""
