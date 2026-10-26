@@ -1,4 +1,4 @@
-﻿# stats-analysis（算法库主库）
+# stats-analysis（算法库主库）
 
 2026-10-23 由 `0doc/GitHub/stats-analysis/` 提升为**独立主库**。
 
