@@ -14,7 +14,7 @@
 
 | 目录 | 角色 |
 |---|---|
-| `modules/` | 可复用算法库：`config` / `console`（含 `strobe/` 页）/ `stats` / `tests` / `utils` |
+| `modules/` | 可复用算法库：`config` / `console`（含 `strobe/` 页；控制台已拆为 `schema_ui` / `settings_layer` / `preview` / `dryrun` / `run` / `serve` + `http_impl` 零注入）/ `stats` / `tests` / `utils` |
 | `model-validation/` | 模型验证（校准 / DCA / NRI 等）流程与脚本 |
 
 ## 与 `_code` 的关系（本仓即唯一真源）
