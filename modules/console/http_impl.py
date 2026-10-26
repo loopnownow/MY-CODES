@@ -90,6 +90,14 @@ def _live(name: str, default: Any = None) -> Any:
     return globals().get(name, default)
 
 
+def _require_project(value: Any) -> str:
+    """页面必须显式给 project；缺了直接报错，不回退 DEFAULT_PROJECT。"""
+    name = str(value or "").strip()
+    if not name:
+        raise ValueError("未指定 project")
+    return name
+
+
 # ── HTTP ───────────────────────────────────────────────────────
 def _json_bytes(obj: Any, code: int = 200) -> tuple[int, bytes, str]:
     raw = json.dumps(obj, ensure_ascii=False, indent=None, default=str).encode("utf-8")
@@ -125,7 +133,7 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
 
 
 def _merged_from_request(body: dict[str, Any]) -> tuple[str, Path, Path, dict, dict]:
-    project = str(body.get("project") or DEFAULT_PROJECT).strip()
+    project = _require_project(body.get("project"))
     proj = project_dir(project)
     settings_raw = str(body.get("settings") or "").strip()
     settings_path = Path(settings_raw) if settings_raw else project_settings(proj)
@@ -197,6 +205,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         try:
             self._do_GET()
+        except ValueError as e:
+            self._err(400, str(e))
         except Exception as e:
             traceback.print_exc()
             self._err(500, str(e))
@@ -377,7 +387,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/settings":
-            project = qs.get("project") or DEFAULT_PROJECT
+            project = _require_project(qs.get("project"))
             proj = project_dir(project, qs.get("dir") or "")
             sp = Path(qs["settings"]) if qs.get("settings") else project_settings(proj)
             if not sp.is_absolute():
@@ -508,13 +518,13 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/results":
-            project = qs.get("project") or DEFAULT_PROJECT
+            project = _require_project(qs.get("project"))
             c, b, t = _json_bytes({"ok": True, "results": find_results(project)})
             self._send(c, b, t)
             return
 
         if path == "/api/xlsx-meta":
-            project = qs.get("project") or DEFAULT_PROJECT
+            project = _require_project(qs.get("project"))
             proj = project_dir(project)
             file_s = str(qs.get("file") or "").strip()
             sheet_s = str(qs.get("sheet") or "").strip()
@@ -655,7 +665,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path in ("/api/run/bat", "/api/run/runbat"):
-            project = str(body.get("project") or DEFAULT_PROJECT).strip()
+            project = _require_project(body.get("project"))
             info = start_run_bat(project)
             c, b, t = _json_bytes({"ok": True, **info})
             self._send(c, b, t)
@@ -685,7 +695,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/settings/clear-keys":
             from modules.config.ini_io import blank_ini_keys
-            project = str(body.get("project") or DEFAULT_PROJECT).strip()
+            project = _require_project(body.get("project"))
             proj = project_dir(project, str(body.get("dir") or ""))
             settings_raw = str(body.get("settings") or "").strip()
             settings_path = Path(settings_raw) if settings_raw else project_settings(proj)
@@ -706,7 +716,7 @@ class Handler(BaseHTTPRequestHandler):
             only_keys = body.get("only_keys")
             if only_keys:
                 only = [str(k) for k in only_keys if str(k).strip()]
-                project = str(body.get("project") or DEFAULT_PROJECT).strip()
+                project = _require_project(body.get("project"))
                 proj = project_dir(project)
                 settings_raw = str(body.get("settings") or "").strip()
                 settings_path = Path(settings_raw) if settings_raw else project_settings(proj)
@@ -774,7 +784,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/open-folder":
-            project = str(body.get("project") or DEFAULT_PROJECT).strip()
+            project = _require_project(body.get("project"))
             rel = str(body.get("rel") or "").strip()
             try:
                 info = open_result_folder(project, rel)
@@ -808,7 +818,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/overlay/clear":
-            project = str(body.get("project") or DEFAULT_PROJECT)
+            project = _require_project(body.get("project"))
             cleared = clear_project_overlay(project_dir(project))
             c, b, t = _json_bytes({"ok": True, "cleared": cleared})
             self._send(c, b, t)
