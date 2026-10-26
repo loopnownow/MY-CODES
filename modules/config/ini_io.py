@@ -13,6 +13,8 @@ import types
 from pathlib import Path
 from typing import Any
 
+from modules.console.paths import DEFAULT_GROK_ROOT
+
 TUPLE_LIST_KEYS = {"DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT"}
 SKIP_KEYS = {
     "os", "copy", "List", "Optional", "Dict", "Any", "annotations", "PNG_DIR",
@@ -592,7 +594,7 @@ def resolve_settings_ini(proj: Path) -> Path:
 def _lab_grok_root() -> Path:
     """Lab fallback root; GROK_ROOT 优先（与 console.paths.grok_root 同口径）。"""
     env = os.environ.get("GROK_ROOT", "").strip()
-    return Path(env).expanduser() if env else Path(r"D:\0Grok")
+    return Path(env).expanduser() if env else DEFAULT_GROK_ROOT
 
 
 def find_settings_ini(start: Path | None = None) -> Path | None:
