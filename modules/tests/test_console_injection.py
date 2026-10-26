@@ -21,12 +21,11 @@ def _http_impl_source() -> str:
     return (CONSOLE_DIR / "http_impl.py").read_text(encoding="utf-8-sig")
 
 
-def test_injected_matches_type_checking_view():
+def test_injected_table_is_empty():
     from modules.console import http_impl
 
-    assert set(http_impl._INJECTED) == _imported(
-        _http_impl_source(), "modules.console.console"
-    )
+    assert http_impl._INJECTED == frozenset()
+    assert "from modules.console.console import" not in _http_impl_source()
 
 
 def test_ops_owned_matches_real_imports():
@@ -50,19 +49,6 @@ def test_install_binds_every_injected_name():
     for name in sorted(http_impl._INJECTED):
         assert hasattr(http_impl, name), f"未注入 {name}"
         assert getattr(http_impl, name) is getattr(console, name), name
-
-
-def test_missing_injection_is_loud():
-    from modules.console import http_impl
-
-    name = "spawn_successor"
-    original = getattr(http_impl, name)
-    delattr(http_impl, name)
-    try:
-        with pytest.raises(RuntimeError, match=name):
-            getattr(http_impl, name)
-    finally:
-        setattr(http_impl, name, original)
 
 
 def test_unknown_attribute_still_raises_attribute_error():
