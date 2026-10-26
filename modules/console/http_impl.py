@@ -1,7 +1,10 @@
 """RAD console HTTP Handler / ConsoleServer (normal module).
 
-Imported by console.py after helpers exist; console then injects its globals
-into this module so free names (under_root, _CONSOLE_TOKEN, …) resolve here.
+Imported by console.py after helpers exist; console then injects the names in
+``_INJECTED`` (functions that still read console's own state).  Constants come
+from ``modules.console.const``, mutable run/serve state from
+``modules.console.state`` and the schema tables from ``modules.console.schema``
+— those three are real imports, not injection.
 """
 from __future__ import annotations
 
