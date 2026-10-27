@@ -1,6 +1,7 @@
 [project]
 name = "stats-analysis"
-version = "0.1.0"
+# Keep in step with modules/__init__.py __version__; tests/test_version_consistency.py enforces it.
+version = "4.3.1"
 description = "Reusable stats / radiomics analysis library (modules) and model-validation CLIs"
 readme = "README.md"
 requires-python = ">=3.10"

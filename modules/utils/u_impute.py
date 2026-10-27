@@ -57,6 +57,53 @@ _METHOD_ALIASES = {
 }
 _OUTCOME_LIKE = {"group", "label", "y", "outcome", "event"}
 
+# Distinguishes "caller named a column" from "caller did not pass group_col".
+# Without this, the default `"Group"` looks exactly like an explicit request, and a
+# bare `z_impute(df)` would stratify on an outcome column the caller never chose.
+_GROUP_UNSET = object()
+
+
+def _resolve_stratify_col(
+    columns,
+    group_col,
+    outcome_cols: Optional[Sequence[str]],
+) -> Optional[str]:
+    """Decide the imputation stratum.
+
+    An **explicitly named** column is always honoured — the caller knows their data,
+    and a library that silently second-guesses an explicit argument produces a table
+    nobody can explain.
+
+    The outcome guard therefore only covers the case where the caller named nothing
+    and the conventional `Group` column happens to be present: that column is often
+    the outcome, and stratifying on it writes `y` into the predictors. Nobody asked
+    for it, so it is not done. See
+    `02_data-processing/base/clean-data/impute/references/methods.md`.
+    """
+    if group_col is None:
+        return None
+
+    explicit = group_col is not _GROUP_UNSET
+    if not explicit:
+        group_col = IMPUTE_GROUP_COL
+        if group_col not in columns:
+            return None  # nothing to stratify on; single pool
+
+    if group_col not in columns:
+        raise ValueError(f"group_col '{group_col}' not found in columns: {list(columns)}")
+
+    if explicit:
+        return group_col
+
+    outcome_set = {
+        str(x).strip().lower()
+        for x in (outcome_cols or list(_OUTCOME_LIKE))
+        if str(x).strip()
+    }
+    if str(group_col).strip().lower() in outcome_set:
+        return None  # implicit + outcome-like -> one pool, reported by the caller
+    return group_col
+
 
 def _normalize_method(method: str) -> str:
     raw = str(method).strip()
@@ -253,7 +300,7 @@ def _build_estimator(
 
 
 def z_impute(data: Union[str, pd.DataFrame], sheet: Optional[str] = None,
-             group_col: Optional[str] = IMPUTE_GROUP_COL, method: str = "iterative",
+             group_col: Optional[str] = _GROUP_UNSET, method: str = "iterative",
              seed: int = IMPUTE_SEED, max_iter: int = IMPUTE_MAX_ITER,
              mf_n_trees: int = IMPUTE_MF_N_TREES, output: Optional[str] = None,
              verbose: bool = True,
@@ -264,7 +311,6 @@ def z_impute(data: Union[str, pd.DataFrame], sheet: Optional[str] = None,
              mf_max_depth: Optional[int] = IMPUTE_MF_MAX_DEPTH,
              mf_max_features: Union[str, float, int, None] = IMPUTE_MF_MAX_FEATURES,
              skip_complete: bool = True,
-             allow_outcome_stratify: bool = False,
              outcome_cols: Optional[Sequence[str]] = None) -> Optional[pd.DataFrame]:
     """
     对 DataFrame 中每个 Group 内的列执行缺失值插补，各组独立处理。
@@ -273,9 +319,12 @@ def z_impute(data: Union[str, pd.DataFrame], sheet: Optional[str] = None,
     ----
     data                 : DataFrame 或 Excel 文件路径
     sheet                : 当 data 为文件路径时必须提供的工作表名
-    group_col            : 分组列名（各组独立插补）
+    group_col            : 分组列名。**显式传入一律分层**（调用方最了解自己的数据）；
+                           不传时若存在 `Group` 列，仅当它不是结局式列名才分层。
+                           传 `None` = 明确要求单池。
     method               : "median" | "mean" | "iterative"（默认，单次链式插补）| "missForest"
-    allow_outcome_stratify : False 时禁止用 Group/结局列分层（避免预测建模 leakage）
+    outcome_cols         : 结局列名。只影响“未显式传 group_col”时的结局式列名判断。
+                           按结局分层 = 把 y 写进 x（泄漏），见 impute references/methods.md。
     include_categorical  : True 时对分类列先编码再插补再还原
     categorical_cols     : 显式指定分类列；None 时自动检测 object/category
     align_decimals       : True 时，新插补值小数位 = 该列非缺失观测小数位均值
@@ -297,30 +346,14 @@ def z_impute(data: Union[str, pd.DataFrame], sheet: Optional[str] = None,
     else:
         raise TypeError("'data' must be a DataFrame or a file path.")
 
-    outcome_set = {
-        str(x).strip().lower()
-        for x in (outcome_cols or list(_OUTCOME_LIKE))
-        if str(x).strip()
-    }
-    stratify_col = group_col
-    dummy_pool = False
-    if stratify_col:
-        if str(stratify_col).strip().lower() in outcome_set and not allow_outcome_stratify:
-            if verbose:
-                print(
-                    f"  ⚠ skip outcome-stratified imputation ({stratify_col}); "
-                    "filling as one pool (set allow_outcome_stratify=True to override)"
-                )
-            stratify_col = None
-        elif stratify_col not in df.columns:
-            raise ValueError(
-                f"group_col '{stratify_col}' not found in columns: {list(df.columns)}"
-            )
-    if stratify_col is None:
-        dummy_pool = True
+    stratify_col = _resolve_stratify_col(df.columns, group_col, outcome_cols)
+    dummy_pool = stratify_col is None
+    if dummy_pool:
         df = df.copy()
         df["_impute_pool"] = 0
         stratify_col = "_impute_pool"
+    elif group_col is _GROUP_UNSET and verbose:
+        print(f"  note: implicit single pool; column '{stratify_col}' looks outcome-like")
 
     if verbose:
         print(f"=== {method} Imputation ===\nData: {df.shape[0]} rows x {df.shape[1]} cols")

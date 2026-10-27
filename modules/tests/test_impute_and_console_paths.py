@@ -16,7 +16,13 @@ def test_mice_alias_is_iterative():
     assert _normalize_method("iterative") == "iterative"
 
 
-def test_outcome_group_not_used_for_stratify_by_default():
+def test_implicit_group_not_used_for_stratify_when_outcome_like():
+    """No `group_col` passed + a `Group` column: do not stratify on it.
+
+    The conventional `Group` column is usually the outcome, and stratifying on an
+    outcome writes `y` into the predictors. Nobody asked for a stratum here, so the
+    safe default is one pool.
+    """
     rng = np.random.RandomState(4)
     n = 40
     y = np.array([0] * 20 + [1] * 20)
@@ -25,10 +31,62 @@ def test_outcome_group_not_used_for_stratify_by_default():
         "x": rng.normal(0, 1, n),
     })
     df.loc[0:3, "x"] = np.nan
-    out = z_impute(df, group_col="Group", method="median", verbose=False)
+    out = z_impute(df, method="median", verbose=False)
     assert out is not None
     assert "_impute_pool" not in out.columns
     assert out["x"].isna().sum() == 0
+
+
+def test_explicit_group_is_always_honoured():
+    """An explicitly named column stratifies, even when it is called `Group`.
+
+    The caller knows their data; second-guessing an explicit argument silently is
+    how a table ends up with numbers nobody can reproduce.
+    """
+    rng = np.random.RandomState(7)
+    frame = pd.DataFrame({
+        "Group": np.repeat(["low", "high"], 20),
+        "x": np.concatenate([rng.normal(10, 1, 20), rng.normal(30, 1, 20)]),
+    })
+    frame.loc[[0, 20], "x"] = np.nan
+    out = z_impute(frame, group_col="Group", method="median", verbose=False)
+    low_fill = float(out.loc[0, "x"])
+    high_fill = float(out.loc[20, "x"])
+    # Stratified fills sit inside their own group, roughly 20 apart.
+    assert low_fill < 15
+    assert high_fill > 25
+
+
+def test_group_none_means_one_pool():
+    rng = np.random.RandomState(8)
+    frame = pd.DataFrame({
+        "Group": np.repeat(["a", "b"], 20),
+        "x": np.concatenate([rng.normal(10, 1, 20), rng.normal(30, 1, 20)]),
+    })
+    frame.loc[[0, 20], "x"] = np.nan
+    out = z_impute(frame, group_col=None, method="median", verbose=False)
+    # One pool: both fills are the same overall median.
+    assert float(out.loc[0, "x"]) == float(out.loc[20, "x"])
+
+
+def test_outcome_cols_releases_a_cohort_named_group():
+    """`Group` as a cohort label is fine once the real outcome is named."""
+    rng = np.random.RandomState(9)
+    frame = pd.DataFrame({
+        "Group": np.repeat(["HC", "SSD"], 20),
+        "Outcome": rng.randint(0, 2, 40),
+        "x": np.concatenate([rng.normal(10, 1, 20), rng.normal(30, 1, 20)]),
+    })
+    frame.loc[[0, 20], "x"] = np.nan
+    out = z_impute(frame, method="median", verbose=False, outcome_cols=["Outcome"])
+    assert float(out.loc[0, "x"]) < 15
+    assert float(out.loc[20, "x"]) > 25
+
+
+def test_missing_explicit_group_column_raises():
+    frame = pd.DataFrame({"Group": ["a", "b"], "x": [1.0, np.nan]})
+    with pytest.raises(ValueError, match="not found"):
+        z_impute(frame, group_col="Cohort", method="median", verbose=False)
 
 
 def test_empty_corr_refs_not_filled_from_legacy():
