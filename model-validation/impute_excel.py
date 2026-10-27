@@ -148,9 +148,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             n_nearest_features=n_nearest,
             align_decimals=not args.no_align_decimals,
             include_categorical=args.include_categorical,
-            # --group is an explicit request: honor it instead of letting the
-            # library pool the strata because the name looks outcome-like.
-            allow_outcome_stratify=True,
             verbose=verbose,
         )
         if imputed is None:

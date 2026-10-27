@@ -57,6 +57,7 @@ from modules.utils.u_impute import (
     IMPUTE_N_NEAREST,
     IMPUTE_SEED,
     _detect_categorical_cols,
+    _resolve_stratify_col,
     _decode_categoricals,
     _encode_categoricals,
 )
@@ -94,7 +95,7 @@ def z_impute_mi(
     n_nearest_features: Optional[int] = IMPUTE_N_NEAREST,
     include_categorical: bool = False,
     categorical_cols: Optional[Sequence[str]] = None,
-    allow_outcome_stratify: bool = True,
+    outcome_cols: Optional[Sequence[str]] = None,
     verbose: bool = True,
 ) -> List[pd.DataFrame]:
     """Return `m` completed datasets drawn with a Bayesian posterior.
@@ -114,16 +115,10 @@ def z_impute_mi(
     else:
         raise TypeError("'data' must be a DataFrame or a file path.")
 
-    stratify_col = group_col
-    if stratify_col and str(stratify_col).strip().lower() in {
-        "group", "label", "y", "outcome", "event",
-    } and not allow_outcome_stratify:
-        stratify_col = None
+    stratify_col = _resolve_stratify_col(df.columns, group_col, outcome_cols)
     if stratify_col is None:
         df["_impute_pool"] = 0
         stratify_col = "_impute_pool"
-    elif stratify_col not in df.columns:
-        raise ValueError(f"group_col '{stratify_col}' not found in columns: {list(df.columns)}")
 
     num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != stratify_col]
     cat_cols: List[str] = []
@@ -179,10 +174,8 @@ def z_impute_mi(
 
         if code_to_label:
             out = _decode_categoricals(out, code_to_label)
-        if "_impute_pool" in out.columns and (group_col is None or group_col == "_impute_pool"):
+        if "_impute_pool" in out.columns:
             out = out.drop(columns=["_impute_pool"])
-        elif "_impute_pool" in out.columns and str(group_col).lower() in {"group", "label", "y", "outcome", "event"}:
-            out = out.drop(columns=["_impute_pool"], errors="ignore")
 
         # Observed cells must not move between draws.
         observed = df[impute_cols].notna()

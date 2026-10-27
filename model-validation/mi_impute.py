@@ -46,7 +46,6 @@ def _cmd_draw(args) -> int:
         seed=args.seed,
         max_iter=args.max_iter,
         include_categorical=args.include_categorical,
-        allow_outcome_stratify=True,
         verbose=not args.quiet,
     )
 

@@ -1,8 +1,9 @@
 """model-validation CLIs: the impute wrapper stays faithful to the library.
 
-The library pools outcome-like strata unless `allow_outcome_stratify` is set.
-An explicit `--group` from the operator is not a guess, so the CLI must pass
-the override and keep the strata apart.
+`--group` reaches `z_impute` as an explicitly named column, and an explicit name
+always stratifies. These tests pin that the CLI does not lose the strata on the
+way in - the 2026-10-27 QC found it did, because the library used to pool any
+column whose name looked outcome-like.
 """
 from __future__ import annotations
 
