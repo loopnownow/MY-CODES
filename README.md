@@ -7,7 +7,7 @@
 | 仓 | 放什么 | 不放什么 |
 |---|---|---|
 | **MY-RULES** | 站立运营政策：本机布局、交付落点、新建禁区、网络红线、技能库契约 | 专业技能正文、可运行代码 |
-| **MY-SKILLS** | 专业技能（`NN_slug/base/` 能力正文 + `personal/` 个人层 + `qc/` 门控标准），全部是 prose | 可运行的分析/清洗代码 |
+| **MY-SKILLS** | 专业技能（`NN_slug/base/` 能力正文 + `advanced/` 个人层 + `qc/` 门控标准），全部是 prose | 可运行的分析/清洗代码 |
 | **stats-analysis**（本仓） | 可运行代码：`modules/` 算法库 + `model-validation/` CLI | 任何 skill 正文、患者数据、课题配置 |
 
 `stats-analysis` 是 **02_data-processing 席位的脚本半**：`MY-SKILLS/02_data-processing/` 说「怎么做、按什么规则」，
