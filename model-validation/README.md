@@ -17,6 +17,7 @@
 | `split_leakage_check.py` | 检查 patient ID 是否跨 train/val/test 泄漏 | 命令行传入 CSV |
 | `radiology_audit.py` | 放射 AI 研究卡 Markdown 快速审计 | 命令行 / JSON 模板 |
 | `impute_excel.py` | 分组分层缺失值插补 CLI（备份 / QC 表 / 小数位对齐）；库函数 `modules/utils/u_impute.py` | 命令行传入 xlsx |
+| `recalc_xlsx.py` | 用 LibreOffice 重算公式 + 扫描 `#REF!`/`#DIV/0!` 等错误；`--check-only` 只扫描 | 命令行传入 xlsx |
 
 ## 运行
 
@@ -29,7 +30,8 @@ python model-validation\compare_val_modes.py
 python model-validation\downsample_train.py
 python model-validation\split_leakage_check.py path\to\splits.csv
 python model-validation\radiology_audit.py --help
-python model-validation\impute_excel.py --input data.xlsx --sheet cln --group Group --method mice
+python model-validation\impute_excel.py --input data.xlsx --sheet cln --group Group --method iterative
+python model-validation\recalc_xlsx.py book.xlsx
 ```
 
 未设 `STATS_ROOT` 时，脚本默认把仓库根（本文件的上一级）加入 `sys.path`。`downsample_train.py` 默认 `DRY_RUN=True`。
