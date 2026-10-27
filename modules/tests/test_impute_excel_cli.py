@@ -81,3 +81,13 @@ def test_cli_reports_missing_input(tmp_path, capsys):
     cli = _load_cli()
     assert cli.main(["--input", str(tmp_path / "absent.xlsx"), "--quiet"]) == 1
     assert "ERROR" in capsys.readouterr().err
+
+
+def test_cli_accepts_every_documented_method(workbook):
+    """The skill documents iterative / median / mean / missForest, mice as the alias."""
+    cli = _load_cli()
+    for method in ("iterative", "mice", "median", "mean"):
+        path, _ = workbook
+        assert cli.main(
+            ["--input", str(path), "--group", "Group", "--method", method, "--quiet", "--no-backup"]
+        ) == 0, method

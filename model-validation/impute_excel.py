@@ -79,9 +79,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--method",
         "-m",
-        default="mice",
-        choices=["median", "mean", "mice", "missForest"],
-        help="imputation method",
+        default="iterative",
+        choices=["median", "mean", "iterative", "mice", "missForest"],
+        help="imputation method (mice is the legacy alias of iterative)",
     )
     parser.add_argument("--seed", type=int, default=66)
     parser.add_argument("--max-iter", type=int, default=10)
