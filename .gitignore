@@ -9,6 +9,11 @@ __pycache__/
 Thumbs.db
 .pytest_cache/
 
+# build / install residue (pip install -e leaves this behind)
+*.egg-info/
+build/
+dist/
+
 # console session state (per-machine; the console rewrites these on save)
 modules/console/console.override.json
 modules/console/console.port.json
