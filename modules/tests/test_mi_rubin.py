@@ -187,3 +187,32 @@ def test_mi_and_single_agree_on_explicit_stratum():
     mi = z_impute_mi(frame, m=2, group_col="Group", seed=8, verbose=False)[0]
     assert float(mi.loc[0, "Score"]) < 15
     assert float(mi.loc[25, "Score"]) > 25
+
+
+# ── CLI error handling ────────────────────────────────────────────────────
+def _load_cli():
+    import importlib.util
+
+    path = REPO_ROOT / "model-validation" / "mi_impute.py"
+    spec = importlib.util.spec_from_file_location("mi_impute_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+REPO_ROOT = __import__("pathlib").Path(__file__).resolve().parents[2]
+
+
+def test_pool_cli_rejects_single_imputation(tmp_path, capsys):
+    """One row per term cannot be pooled; say so instead of raising a traceback."""
+    table = tmp_path / "one.csv"
+    table.write_text("term,estimate,variance\nAge,0.1,0.01\n", encoding="utf-8")
+    assert _load_cli().main(["pool", "--table", str(table)]) == 1
+    assert "at least 2 imputations" in capsys.readouterr().err
+
+
+def test_pool_cli_rejects_missing_columns(tmp_path, capsys):
+    table = tmp_path / "bad.csv"
+    table.write_text("a,b\n1,2\n", encoding="utf-8")
+    assert _load_cli().main(["pool", "--table", str(table)]) == 1
+    assert "missing column" in capsys.readouterr().err

@@ -67,13 +67,28 @@ def _cmd_pool(args) -> int:
         return 1
 
     table = pd.read_csv(table_path) if table_path.suffix.lower() == ".csv" else pd.read_excel(table_path)
-    pooled = rubin_pool_frame(
-        table,
-        estimate_col=args.estimate_col,
-        variance_col=args.variance_col,
-        term_col=args.term_col,
-        n_complete=args.n_complete,
-    )
+
+    counts = table.groupby(args.term_col).size() if args.term_col in table.columns else None
+    if counts is not None and int(counts.min()) < 2:
+        thin = counts[counts < 2]
+        print(
+            "ERROR: every term needs at least 2 imputations to pool; found "
+            + ", ".join(f"{term}={n}" for term, n in thin.items()),
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        pooled = rubin_pool_frame(
+            table,
+            estimate_col=args.estimate_col,
+            variance_col=args.variance_col,
+            term_col=args.term_col,
+            n_complete=args.n_complete,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     target = Path(args.out).resolve() if args.out else table_path.with_name(
         f"{table_path.stem}_pooled.csv"
     )

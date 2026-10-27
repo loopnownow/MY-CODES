@@ -86,3 +86,13 @@ def test_recalculation_fills_cached_values(book):
     assert cli.main([str(book), "--json"]) == 0
     report = cli._scan(book)
     assert report["total_uncached"] == 0
+
+
+def test_missing_libreoffice_fails_loudly(tmp_path, book, capsys, monkeypatch):
+    """No soffice: exit 1 with a message, not a traceback and not exit 0."""
+    cli = _load_cli()
+    monkeypatch.setattr(cli.shutil, "which", lambda _name: None)
+    assert cli.main([str(book)]) == 1
+    err = capsys.readouterr().err
+    assert "LibreOffice" in err
+    assert "--check-only" in err

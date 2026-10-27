@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -39,17 +40,31 @@ FORMULA_PREFIX = "="
 
 
 def _recalculate(path: Path, timeout: int) -> int:
-    result = run_soffice(
-        [
-            "--headless",
-            "--calc",
-            "--convert-to",
-            "xlsx",
-            "--outdir",
-            str(path.parent),
-            str(path),
-        ]
-    )
+    if shutil.which("soffice") is None and shutil.which("libreoffice") is None:
+        print(
+            "ERROR: LibreOffice (soffice) is not installed, so formulas cannot be "
+            "recalculated. Use --check-only to scan the existing cached values, or "
+            "install LibreOffice.",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        result = run_soffice(
+            [
+                "--headless",
+                "--calc",
+                "--convert-to",
+                "xlsx",
+                "--outdir",
+                str(path.parent),
+                str(path),
+            ]
+        )
+    except OSError as exc:
+        print(f"ERROR: could not start LibreOffice: {exc}", file=sys.stderr)
+        return 1
+
     if result.returncode != 0:
         print(
             f"ERROR: LibreOffice exited {result.returncode}: "
