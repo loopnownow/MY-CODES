@@ -47,7 +47,6 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import BayesianRidge
 
 from modules.utils.u_impute import (
-    IMPUTE_GROUP_COL,
     IMPUTE_MAX_ITER,
     IMPUTE_MF_MAX_DEPTH,
     IMPUTE_MF_MAX_FEATURES,
@@ -56,6 +55,7 @@ from modules.utils.u_impute import (
     IMPUTE_MIN_UNIQUE,
     IMPUTE_N_NEAREST,
     IMPUTE_SEED,
+    _GROUP_UNSET,
     _detect_categorical_cols,
     _resolve_stratify_col,
     _decode_categoricals,
@@ -85,7 +85,7 @@ def z_impute_mi(
     data: Union[str, pd.DataFrame],
     m: int = MI_DRAWS,
     sheet: Optional[str] = None,
-    group_col: Optional[str] = IMPUTE_GROUP_COL,
+    group_col: Optional[str] = _GROUP_UNSET,
     method: str = "iterative",
     seed: int = IMPUTE_SEED,
     max_iter: int = IMPUTE_MAX_ITER,

@@ -151,3 +151,39 @@ def test_single_imputation_is_not_a_draw(missing_frame):
 
 def test_default_draw_count_is_documented():
     assert MI_DRAWS >= 20
+
+
+# ── parity with z_impute ──────────────────────────────────────────────────
+def _stratum_frame():
+    rng = np.random.default_rng(21)
+    frame = pd.DataFrame({
+        "Group": np.repeat(["HC", "SSD"], 25),
+        "Score": np.concatenate([rng.normal(10, 1, 25), rng.normal(30, 1, 25)]),
+    })
+    frame.loc[[0, 1, 25, 26], "Score"] = np.nan
+    return frame
+
+
+def test_mi_and_single_agree_on_implicit_pooling():
+    """Both entry points must read an omitted group_col the same way.
+
+    They disagreed once: z_impute took a sentinel default, z_impute_mi still took
+    the string "Group", so a bare MI call stratified on an outcome-like column
+    while a bare single call pooled it.
+    """
+    frame = _stratum_frame()
+    mi = z_impute_mi(frame, m=2, seed=7, verbose=False)[0]
+    single = z_impute(frame.copy(), method="median", verbose=False)
+
+    def pooled(draw):
+        return float(draw.loc[0, "Score"]) == float(draw.loc[25, "Score"])
+
+    assert pooled(mi), "bare MI call stratified - it must pool like z_impute"
+    assert pooled(single), "bare single call stratified - it must pool"
+
+
+def test_mi_and_single_agree_on_explicit_stratum():
+    frame = _stratum_frame()
+    mi = z_impute_mi(frame, m=2, group_col="Group", seed=8, verbose=False)[0]
+    assert float(mi.loc[0, "Score"]) < 15
+    assert float(mi.loc[25, "Score"]) > 25
