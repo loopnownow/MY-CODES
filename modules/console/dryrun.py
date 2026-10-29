@@ -423,6 +423,9 @@ def dry_run_text(project: str, data: Path, settings_path: Path,
             f"  {qc_html_rel(external_qc_html_name(spec['name']))}  ← 工程 ref/ 外验 QC"
             f"  [{spec['name']}] {spec['file']}"
         )
+    lines.append("  ref/pipeline/pipeline_run.log   ← 工程 ref/pipeline/ 运行日志")
+    if merged.get("DO_FALSE_CLASS", True):
+        lines.append("  false_classification.xlsx   ← 工程根（不随 OUT_DIR）")
     if not plan:
         lines.append("  （无结局、无对子）")
     else:

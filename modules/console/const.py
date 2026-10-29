@@ -74,7 +74,7 @@ EXCLUDE_SELECT_KEYS = (
     "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW",
 )
 EXCLUDE_EMPTY_LABELS = {
-    "EXCLUDE_FILE": "（空＝默认 false_classification.xlsx）",
+    "EXCLUDE_FILE": "（空＝默认工程根 false_classification.xlsx）",
     "EXCLUDE_SHEET": "（空＝默认 exc）",
     "EXCLUDE_COL": "（空＝默认 exc）",
     "EXCLUDE_ROW": "（空＝整列当 ID）",

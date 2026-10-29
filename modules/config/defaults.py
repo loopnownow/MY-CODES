@@ -49,7 +49,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "GROUP_DISPLAY_NEG": "",
     "EXTERNAL_TESTS": [],
     "DO_EXCLUDE_SAMPLES": False,
-    # 排除名单 xlsx。空=默认 false_classification.xlsx。一个写成字符串，多个写成列表。
+    # 排除名单 xlsx。空=默认工程根 false_classification.xlsx。一个写成字符串，多个写成列表。
     "EXCLUDE_FILE": "",
     "EXCLUDE_SHEET": "",
     "EXCLUDE_COL": "",
