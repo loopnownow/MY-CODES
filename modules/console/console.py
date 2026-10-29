@@ -1,4 +1,4 @@
-﻿"""
+"""
 console.py — RAD 统计控制台后端（modules/console/console.html）
 
 页面配置（console.html / overlay JSON）优先于 settings.ini。
