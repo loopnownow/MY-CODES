@@ -1,4 +1,4 @@
-﻿"""RAD console HTTP Handler / ConsoleServer（普通模块，零注入）。
+"""RAD console HTTP Handler / ConsoleServer（普通模块，零注入）。
 
 console.py 直接真 import 本模块的 Handler / ConsoleServer；依赖全部来自
 modules.console 的叶层模块（const / state / schema / schema_ui / settings_layer /

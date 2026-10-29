@@ -1,4 +1,4 @@
-﻿"""
+"""
 ops.py — 控制台叶层操作（无 console 可变状态）。
 
 由 console.py 逐字搬出：不读 `_RUN` / `_RUN_LOCK` / `GROK_ROOT` 等运行期可变名，

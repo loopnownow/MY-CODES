@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Project settings.ini — JSON values, sectioned INI, case-preserving."""
 from __future__ import annotations
 
