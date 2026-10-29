@@ -1,4 +1,4 @@
-﻿"""Dry-run helpers + console shutdown token guard."""
+"""Dry-run helpers + console shutdown token guard."""
 from __future__ import annotations
 
 import pandas as pd
