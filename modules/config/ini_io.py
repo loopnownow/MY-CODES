@@ -572,8 +572,21 @@ def resolve_project_dir(proj: Path | None = None) -> Path:
 
 
 def project_ref_dir(proj: Path | None = None) -> Path:
-    """工程下的 ref/：settings.ini、运行日志、QC HTML、审稿 md。"""
+    """工程下的 ref/：settings.ini、QC HTML、QC 摘要、审稿 md。
+
+    运行锁 / 运行日志不进 ref/ 根，走 project_pipeline_dir()。
+    """
     d = resolve_project_dir(proj) / "ref"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def project_pipeline_dir(proj: Path | None = None) -> Path:
+    """工程下的 ref/pipeline/：pipeline_run.log、console_dryrun.log 等运行日志。
+
+    布局 SSOT 把运行锁放在 ref/pipeline/，与 ref/ 根的 settings.ini / qc.html 分开。
+    """
+    d = resolve_project_dir(proj) / "ref" / "pipeline"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

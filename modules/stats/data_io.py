@@ -14,6 +14,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Optional, List
 
 import numpy as np
@@ -692,10 +693,24 @@ def resolve_subproject_root(settings: Optional[dict] = None) -> str:
 
 
 def default_exclude_xlsx(settings: Optional[dict] = None) -> str:
-    """子工程根下 false_classification.xlsx；无子工程则工程根。"""
-    name = "false_classification.xlsx"
-    root = resolve_subproject_root(settings)
-    return os.path.join(root, name) if root else name
+    """工程根 false_classification.xlsx（不放子工程目录、不随 OUT_DIR 走）。
+
+    排除名单与 DO_FALSE_CLASS 写出的错分表是同一份文件，都在工程根。
+    settings 参数保留，便于调用方统一传设置。
+    """
+    _ = settings
+    return "false_classification.xlsx"
+
+
+def false_classification_xlsx_path(proj=None) -> str:
+    """错分表 / 排除名单的绝对路径：<工程根>/false_classification.xlsx。
+
+    写入（pipeline DO_FALSE_CLASS）与默认读取（排除名单）共用这一处，
+    免得一边写工程根、一边读子工程目录。
+    """
+    from modules.config.ini_io import resolve_project_dir
+    root = Path(proj) if proj is not None else Path(resolve_project_dir())
+    return str(root / default_exclude_xlsx())
 
 
 def exclude_file_names(settings: Optional[dict] = None) -> list[str]:
@@ -708,24 +723,28 @@ def exclude_file_names(settings: Optional[dict] = None) -> list[str]:
 
 
 def resolve_exclude_files(settings: Optional[dict] = None) -> list[str]:
-    """排除名单路径。填了就用所填的全部；一个都没填 → 子工程根 false_classification.xlsx。"""
+    """排除名单路径。填了就用所填的全部；一个都没填 → 工程根 false_classification.xlsx。
+
+    默认那一份给绝对路径：写错分表和读排除名单必须是同一份，
+    且流水线子进程的 cwd 不一定是工程根。
+    """
     names = exclude_file_names(settings)
     if names:
         return names
-    return [default_exclude_xlsx(settings)]
+    return [false_classification_xlsx_path()]
 
 
 def resolve_exclude_xlsx(settings: Optional[dict] = None) -> str:
     """
     排除名单 xlsx（第一个）。
-    EXCLUDE_FILE 非空 → 用该路径；空 → 子工程根 false_classification.xlsx。
+    EXCLUDE_FILE 非空 → 用该路径；空 → 工程根 false_classification.xlsx。
     多个文件时其余文件由 resolve_exclude_files 读取，这里仍返回第一个。
     """
     return resolve_exclude_files(settings)[0]
 
 
 def _resolve_exclude_file(data_file: Optional[str] = None) -> str:
-    """排除表路径：EXCLUDE_FILE > 子工程根 false_classification.xlsx。"""
+    """排除表路径：EXCLUDE_FILE > 工程根 false_classification.xlsx。"""
     _ = data_file
     return resolve_exclude_xlsx()
 
@@ -971,7 +990,7 @@ def load_exclude_id_keys(
 ) -> frozenset:
     """
     读取排除 ID 集合（匹配用 key）。
-    来源：EXCLUDE_IDS + 排除 xlsx（可多个；默认子工程根 false_classification.xlsx）
+    来源：EXCLUDE_IDS + 排除 xlsx（可多个；默认工程根 false_classification.xlsx）
     的 EXCLUDE_SHEET / EXCLUDE_COL（默认 exc / exc）。同一 sheet、列、内容套到每个文件，名单合并。
     EXCLUDE_ROW 非空：只剔除该列内容等于所选值的行（取其 ID 列）。
     无文件 / 无 sheet / 关闭开关 → 空集。

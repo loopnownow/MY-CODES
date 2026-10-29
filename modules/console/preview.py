@@ -428,10 +428,7 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         )
         paths: list[Path] = []
         for exclude_file in resolve_exclude_files(settings):
-            ex_p = Path(str(exclude_file))
-            if not ex_p.is_absolute():
-                ex_p = data_path.parent / ex_p
-            paths.append(ex_p)
+            paths.append(_exclude_path(exclude_file, data_path))
         ecol = str(settings.get("EXCLUDE_COL") or "exc")
         row_vals = normalize_exclude_rows(settings.get("EXCLUDE_ROW"))
         sheets_u: list[str] = []
@@ -711,6 +708,24 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
             est = p.stat()
             extras.append((str(p), est.st_mtime_ns, est.st_size))
     return (str(data_path.resolve()), st.st_mtime_ns, st.st_size, tuple(blob), tuple(extras))
+
+
+def _exclude_path(raw: str, data_path: Path) -> Path:
+    """已填/默认的排除表路径。
+
+    绝对路径照用。相对路径先按数据文件同目录找，再按工程根（进程 cwd）找 ——
+    默认的 false_classification.xlsx 在工程根，数据表可放在子目录。
+    """
+    p = Path(str(raw))
+    if p.is_absolute():
+        return p
+    beside_data = data_path.parent / p
+    if beside_data.is_file():
+        return beside_data
+    if p.is_file():
+        return p
+    return beside_data
+
 
 def preview_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str, Any]:
     from modules.utils.u_qc import _external_specs_from_settings

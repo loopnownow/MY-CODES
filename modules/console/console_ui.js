@@ -1668,7 +1668,7 @@ function fillDatalist(id, items) {
   el.innerHTML = uniqOpts(items).map(s => "<option value=\"" + esc(s) + "\"></option>").join("");
 }
 const EXCLUDE_EMPTY_LABELS = {
-  EXCLUDE_FILE: "（空＝默认 false_classification.xlsx）",
+  EXCLUDE_FILE: "（空＝默认工程根 false_classification.xlsx）",
   EXCLUDE_SHEET: "（空＝默认 exc）",
   EXCLUDE_COL: "（空＝默认 exc）",
   EXCLUDE_ROW: "（空＝整列当 ID）",
