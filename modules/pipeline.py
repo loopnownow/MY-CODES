@@ -12,8 +12,8 @@ modules.pipeline — 主管线
 运行（在项目根目录）：
     python -m modules.pipeline
     python -m modules.pipeline --input pipeline_data.xlsx
-    # 日志默认 UTF-8 写入 pipeline_run.log（勿再用 PowerShell Tee-Object，易中文乱码）
-    python -m modules.pipeline --log ref/pipeline_run.log
+    # 日志默认 UTF-8 写入 ref/pipeline/pipeline_run.log（勿再用 PowerShell Tee-Object，易中文乱码）
+    python -m modules.pipeline --log ref/pipeline/pipeline_run.log
     python -m modules.pipeline --no-log
 
 配置：工程根目录 settings.ini
@@ -85,6 +85,16 @@ def _configure_stdio_utf8() -> None:
             sys.__stderr__.write(f"  ⚠ stdio utf8 reconfigure: {e}\n")
     # 子进程 / 部分库读取该环境变量
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+
+def _default_run_log_path() -> str:
+    """Default run log: <project>/ref/pipeline/pipeline_run.log (layout SSOT)."""
+    from modules.config.ini_io import project_pipeline_dir
+    try:
+        return str(project_pipeline_dir() / "pipeline_run.log")
+    except OSError as e:
+        print(f"  ⚠ 无法创建 ref/pipeline/，改用相对路径: {e}", flush=True)
+        return os.path.join("ref", "pipeline", "pipeline_run.log")
 
 
 def _attach_run_log(log_path: str) -> TextIO:
@@ -753,11 +763,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             print_false_classification(
                 fc_details, split_by_id=split_by_id, group_labels=gmap,
             )
-            import os
-            out = str(getattr(cfg, "OUT_DIR", "") or "").strip()
-            fc_path = os.path.join(out, "false_classification.xlsx") if out else "false_classification.xlsx"
             save_false_classification_xlsx(
-                fc_details, fc_path, split_by_id=split_by_id, group_labels=gmap,
+                fc_details, data_io.false_classification_xlsx_path(),
+                split_by_id=split_by_id, group_labels=gmap,
             )
         except Exception as e:
             print(f"  ⚠ false_classification failed: {e}")
@@ -2275,8 +2283,9 @@ def main(argv: list[str] | None = None) -> None:
         help="结局列名；逗号分隔多个；仅当 config.OUTCOME_COLS 存在时使用",
     )
     parser.add_argument(
-        "--log", type=str, default="ref/pipeline_run.log",
-        help="运行日志路径（UTF-8 BOM，默认工程 ref/）。空字符串禁用写文件",
+        "--log", type=str, default=None,
+        help="运行日志路径（UTF-8 BOM，默认工程 ref/pipeline/pipeline_run.log）。"
+             "空字符串禁用写文件",
     )
     parser.add_argument(
         "--no-log", action="store_true",
@@ -2312,6 +2321,8 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     log_f = None
+    if not args.no_log and args.log is None:
+        args.log = _default_run_log_path()
     if not args.no_log and args.log:
         try:
             log_f = _attach_run_log(args.log)

@@ -186,6 +186,7 @@ from modules.console.run import (  # noqa: E402,F401
     apply_overlay_to_modules,
     read_log,
     resolve_modules_dir,
+    run_log_path,
     run_pipeline_inprocess,
     run_project_data_qc,
     run_status,

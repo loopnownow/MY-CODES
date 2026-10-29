@@ -1,7 +1,7 @@
 """
 false_class.py — 假阳性/假阴性个体分类
 ═══════════════════════════════════════════════════════════════════
-默认：控制台打印宽表 + 写入当前 OUT_DIR/false_classification.xlsx
+默认：控制台打印宽表 + 写入工程根 false_classification.xlsx（不随 OUT_DIR 走）
 两张工作单：
   false_classification — ID | Split | Group | Pattern | 各模型 TP/TN/FP/FN
   exc — 排除名单（默认即本文件；重写时保留已填 ID）

@@ -171,6 +171,13 @@ def _popen_background_kwargs() -> dict[str, Any]:
         kw["start_new_session"] = True
     return kw
 
+def run_log_path(proj: Path, dry_run: bool = False) -> Path:
+    """运行日志一律在工程 ref/pipeline/：pipeline_run.log / console_dryrun.log。"""
+    from modules.config.ini_io import project_pipeline_dir
+    name = "console_dryrun.log" if dry_run else "pipeline_run.log"
+    return project_pipeline_dir(proj) / name
+
+
 def start_run(project: str, data: Path, settings_path: Path,
               overlay: dict[str, Any], dry_run: bool,
               run_outcome: str = "") -> dict[str, Any]:
@@ -180,9 +187,7 @@ def start_run(project: str, data: Path, settings_path: Path,
             if proc.poll() is None:
                 raise RuntimeError("已有任务在跑，请先等待或停止")
         proj = project_dir(project)
-        from modules.config.ini_io import project_ref_dir
-        ref = project_ref_dir(proj)
-        log_path = ref / ("console_dryrun.log" if dry_run else "pipeline_run.log")
+        log_path = run_log_path(proj, dry_run)
         ov_payload = {
             "project": project,
             "data": str(data),
@@ -263,9 +268,7 @@ def start_run_bat(project: str) -> dict[str, Any]:
             if proc.poll() is None:
                 raise RuntimeError("已有任务在跑，请先等待或停止")
         proj = project_dir(project)
-        from modules.config.ini_io import project_ref_dir
-        ref = project_ref_dir(proj)
-        log_path = ref / "pipeline_run.log"
+        log_path = run_log_path(proj)
         env = {
             **os.environ,
             "PYTHONPATH": str(_IMPORT_ROOT),
