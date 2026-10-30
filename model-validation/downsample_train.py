@@ -63,6 +63,76 @@ def patient_key(label: str) -> str:
     return s if s else str(label)
 
 
+
+def _is_missing_id(val) -> bool:
+    """True for NaN / None / empty / nan / None / <NA> sentinel IDs."""
+    if val is None:
+        return True
+    try:
+        if pd.isna(val):
+            return True
+    except (TypeError, ValueError):
+        pass
+    s = str(val).strip()
+    if not s:
+        return True
+    return s.lower() in {"nan", "none", "<na>", "nat", "null"}
+
+
+def _require_outcome_labels(series: pd.Series, pos_label: str, neg_label: str) -> None:
+    """Only {pos,neg} allowed; missing or unknown outcome FAIL before execute."""
+    allowed = {str(pos_label), str(neg_label)}
+    # Treat NA via pandas, and string sentinels via strip compare
+    is_na = series.isna()
+    as_str = series.astype(object).where(~is_na, other=None)
+    bad_missing = []
+    bad_unknown = []
+    for i, raw in enumerate(as_str.tolist()):
+        if raw is None or _is_missing_id(raw):
+            bad_missing.append(i)
+            continue
+        token = str(raw).strip()
+        if token not in allowed:
+            bad_unknown.append((i, token))
+    if bad_missing or bad_unknown:
+        parts = []
+        if bad_missing:
+            parts.append(f"missing outcome rows={len(bad_missing)} (first idx {bad_missing[:5]})")
+        if bad_unknown:
+            samples = ", ".join(repr(t) for _, t in bad_unknown[:5])
+            parts.append(
+                f"unknown outcome labels={len(bad_unknown)} not in {sorted(allowed)} "
+                f"(examples: {samples})"
+            )
+        raise RuntimeError(
+            "downsample_train outcome FAIL: " + "; ".join(parts)
+            + ". Only {pos,neg} labels allowed; refuse silent encode-as-negative."
+        )
+
+
+def _require_patient_ids(series: pd.Series, id_col: str) -> pd.Series:
+    """FAIL on NaN/empty/nan/None/<NA> before astype(str) / split."""
+    bad = []
+    for i, raw in enumerate(series.tolist()):
+        if _is_missing_id(raw):
+            bad.append(i)
+    if bad:
+        raise RuntimeError(
+            f"downsample_train patient ID FAIL: {len(bad)} missing/empty "
+            f"values in {id_col!r} (first idx {bad[:10]}). "
+            "Refuse astype(str) of NaN before patient-level split."
+        )
+    out = series.astype(str).str.strip()
+    # Second pass: catch stringified sentinels that survived
+    still = [i for i, v in enumerate(out.tolist()) if _is_missing_id(v)]
+    if still:
+        raise RuntimeError(
+            f"downsample_train patient ID FAIL: {len(still)} sentinel IDs "
+            f"in {id_col!r} after strip (first idx {still[:10]})."
+        )
+    return out
+
+
 def pipeline_split(ids: list[str], y, ratio: float, seed: int):
     """Match modules.stats.data_io.load_data patient-level stratified split."""
     key_to_idx: dict[str, list[int]] = {}
@@ -189,14 +259,22 @@ def main(argv=None) -> int:
         raise RuntimeError("Refusing to overwrite source workbook")
 
     id_col = args.id_col
-    cln = pd.read_excel(src_xlsx, sheet_name=args.clin_sheet, dtype={id_col: str})
-    rad = pd.read_excel(src_xlsx, sheet_name=args.rad_sheet, dtype={id_col: str})
-    cln[id_col] = cln[id_col].astype(str).str.strip()
-    rad[id_col] = rad[id_col].astype(str).str.strip()
+    # Do not force dtype=str on read: that would turn real NaN into the string "nan"
+    # before we can FAIL missing IDs (N3).
+    cln = pd.read_excel(src_xlsx, sheet_name=args.clin_sheet)
+    rad = pd.read_excel(src_xlsx, sheet_name=args.rad_sheet)
 
     for col in [args.outcome_col, *strata_cols]:
         if col not in cln.columns:
             raise KeyError(f"Missing clinical column {col!r}")
+    if id_col not in cln.columns:
+        raise KeyError(f"Missing clinical ID column {id_col!r}")
+    if id_col not in rad.columns:
+        raise KeyError(f"Missing radiomics ID column {id_col!r}")
+
+    cln[id_col] = _require_patient_ids(cln[id_col], id_col)
+    rad[id_col] = _require_patient_ids(rad[id_col], id_col)
+    _require_outcome_labels(cln[args.outcome_col], args.pos_label, args.neg_label)
 
     if cln[id_col].duplicated().any() or rad[id_col].duplicated().any():
         raise RuntimeError("Duplicate Patient_ID in cln or rad")
