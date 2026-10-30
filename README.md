@@ -54,7 +54,7 @@ cd <this-repo>
 PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 ```
 
-2026-10-30 实测基线：**237 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
+2026-10-30 实测基线：**241 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
 
 版本号只有两个位置：`modules/__init__.py` 的 `__version__`（运行时，课题看到的就是它）与
 `pyproject.toml` 的 `version`（打包元数据）。两者必须相同，`modules/tests/test_version_consistency.py` 会卡住。
@@ -64,4 +64,5 @@ PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 
 - 本仓只放代码与测试，**不放**患者数据、`ref/settings.ini`、项目稿。
 - `__pycache__` / `*.pyc` / `*.egg-info` 由 `.gitignore` 挡住，不要提交。
-- 公网仓：示例课题名用 `demo_study`；路径用相对路径或 `GROK_ROOT` / `STATS_ROOT` / `PROJECT_ROOT`。
+- 公网仓：示例课题名用 `demo_study`；路径用相对路径或 `GROK_ROOT` / `STATS_ROOT` / `PROJECT_ROOT` / `RAD_MODULES`。
+- **Public-path policy (C1)**：README、代码注释、测试夹具优先写 env / 相对路径 / 示例名；不要把本机绝对盘符（如 lab drive under 0Grok）散落到公开路径。唯一文档化的 lab 例外是 `modules.console.paths.DEFAULT_GROK_ROOT`（`GROK_ROOT` 未设时的冻结回退）。Lab 拓扑与 `{code_stats}` / `{code_modules}` 仍以 MY-SKILLS `lab-paths.yaml` 为 SSOT，本仓不另起一套。
