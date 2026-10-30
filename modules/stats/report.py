@@ -14,6 +14,7 @@ from __future__ import annotations
 import html
 import os
 import re
+from pathlib import Path
 from typing import Optional, Dict, Any, List
 
 import numpy as np
@@ -2546,6 +2547,15 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
     html_parts = [
         f'<header>\n<h1>{page_title}</h1>\n</header>',
     ]
+    # C2: modules provenance note under page header (best-effort).
+    try:
+        from modules import __version__ as _mod_ver
+        from modules.provenance import collect as _prov_collect, format_html_note
+
+        _pkg = Path(__file__).resolve().parents[1]
+        html_parts.append(format_html_note(_prov_collect(_pkg, version=_mod_ver)))
+    except Exception:
+        pass
     if run_status and str(run_status.get("status") or "OK") != "OK":
         fails = run_status.get("failures") or []
         items = "".join(
