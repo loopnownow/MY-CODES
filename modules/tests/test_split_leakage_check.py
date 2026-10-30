@@ -94,3 +94,57 @@ def test_cli_writes_report(tmp_path):
         w.writerow({"patient_id": "", "split": "train"})
         w.writerow({"patient_id": "A", "split": "train"})
     assert mod.main([str(path)]) == 2
+
+
+def test_empty_sentinels_fail():
+    """N7: None/nan/NA/"None"/"nan" and kin count as empty, not valid IDs."""
+    mod = _load()
+    for sentinel in [None, float("nan"), "None", "nan", "NA", "n/a", "<NA>", "null", "  "]:
+        code, report = mod.check_rows(
+            [{"patient_id": sentinel, "split": "train"}, {"patient_id": "A", "split": "test"}],
+            patient_col="patient_id",
+            split_col="split",
+        )
+        assert code == 2, repr(sentinel)
+        assert "Empty patient ID rows: 1" in report
+        assert "FAIL" in report
+    for sentinel in [None, "None", "nan", "NA", ""]:
+        code, report = mod.check_rows(
+            [{"patient_id": "A", "split": sentinel}, {"patient_id": "B", "split": "test"}],
+            patient_col="patient_id",
+            split_col="split",
+        )
+        assert code == 2, repr(sentinel)
+        assert "Empty split rows: 1" in report
+
+
+def test_is_empty_field_helpers():
+    mod = _load()
+    assert mod.is_empty_field(None) is True
+    assert mod.is_empty_field("") is True
+    assert mod.is_empty_field("  ") is True
+    assert mod.is_empty_field("None") is True
+    assert mod.is_empty_field("nan") is True
+    assert mod.is_empty_field("NA") is True
+    assert mod.is_empty_field(float("nan")) is True
+    assert mod.is_empty_field("P001") is False
+
+
+def test_pseudonymized_wording_not_anonymized():
+    """N13: report says pseudonymized; notes HMAC-with-key for external share."""
+    mod = _load()
+    code, report = mod.check_rows(
+        _rows([("P1", "train"), ("P1", "test")]),
+        patient_col="patient_id",
+        split_col="split",
+        show_raw_ids=False,
+    )
+    assert code == 1
+    assert "pseudonymized" in report.lower()
+    assert "anonymized" in report.lower()  # clarification "not anonymized"
+    assert "HMAC-with-key" in report
+    assert "Patient (hashed)" not in report
+    assert "Patient (pseudonymized)" in report
+    # alias still works
+    assert mod.anonymize_id("P1") == mod.pseudonymize_id("P1")
+

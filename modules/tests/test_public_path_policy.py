@@ -23,7 +23,7 @@ LAB_ABS = re.compile(
     re.I,
 )
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", "egg-info"}
-SUFFIXES = {".py", ".md", ".txt", ".toml", ".ini", ".yml", ".yaml", ".cfg"}
+SUFFIXES = {".py", ".md", ".txt", ".toml", ".ini", ".yml", ".yaml", ".cfg", ".json", ".html", ".js", ".css"}
 
 
 class TestPublicPathPolicy(unittest.TestCase):
