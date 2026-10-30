@@ -97,3 +97,13 @@ def test_require_patient_ids_fails_before_astype_str():
         mod._require_patient_ids(pd.Series(["A", "", "B"]), "Patient_ID")
     out = mod._require_patient_ids(pd.Series([" A ", "B2"]), "Patient_ID")
     assert list(out) == ["A", "B2"]
+
+
+def test_parse_args_overwrite_default_false():
+    mod = _load()
+    args = mod.parse_args([])
+    assert args.overwrite is False
+    args2 = mod.parse_args(["--execute", "--overwrite"])
+    assert args2.execute is True
+    assert args2.overwrite is True
+
