@@ -38,15 +38,14 @@ def _override() -> Path | None:
 
 _ov = _override()
 if _ov is not None and str(_ov) not in __path__:
-    import warnings
-
-    warnings.warn(
-        f"modules loaded from non-canonical path {_ov} "
-        f"(package dir {_HERE}; version {__version__}). "
-        "Prefer the stats-analysis repo modules/ as the sole SSOT; "
-        "record MODULES_DIR / RAD_MODULES provenance in run logs.",
-        UserWarning,
-        stacklevel=1,
-    )
     __path__.insert(0, str(_ov))
+
+# C2: provenance enforce (warn, or block when RAD_MODULES_STRICT=1). Import-time
+# failures must not break package load; pipeline/report re-emit into run log/HTML.
+try:
+    from modules.provenance import collect as _prov_collect, enforce as _prov_enforce
+
+    _prov_enforce(_prov_collect(_HERE, version=__version__))
+except Exception:
+    pass
 
