@@ -3,14 +3,15 @@ val_mode.py — 验证策略（不重新筛选）
 ═══════════════════════════════════════════════════════════════════
 VAL_MODE 三选一（特征集一律锁定 Train；LASSO / stepwise 不再跑）：
 
-    refit           重新拟合（默认）
-                    同一特征集在验证层重估系数（CLN GLM / RadScore OLS /
-                    Combined logit）；Youden 在本层重算
+    lock_threshold  锁定阈值（独立验证默认）
+                    套 Train 系数 + Train 的 logistic 校准与 Youden
     apply_formula   套公式
                     验证集套 Train 系数；Youden 在本层重算
-    lock_threshold  锁定阈值
-                    套 Train 系数 + Train 的 logistic 校准与 Youden
+    refit           重新拟合 / 模型更新（须显式 opt-in）
+                    同一特征集在评估层用该层结局重估系数；Youden 在本层重算
+                    不得当作独立测试 / 外部验证性能上报
 
+非法值：raise ValueError（不静默回退）。
 配置：settings.ini  [switch] VAL_MODE
 入口：resolve_val_mode()
 ═══════════════════════════════════════════════════════════════════
@@ -45,21 +46,29 @@ VAL_MODE_ALIASES: Dict[str, str] = {
 
 VAL_MODE_LABELS: Dict[str, str] = {
     "apply_formula": "套公式（锁定特征与系数，验证集重算 Youden）",
-    "lock_threshold": "锁定阈值（锁定特征、系数与 Train Youden）",
-    "refit": "重新拟合（锁定特征，验证集重估系数；不重筛）",
+    "lock_threshold": "锁定阈值（锁定特征、系数与 Train Youden；独立验证）",
+    "refit": "重新拟合/模型更新（锁定特征，评估层用结局重估系数；非独立验证）",
 }
 
 
 def resolve_val_mode(raw=None) -> str:
-    """把配置值规范成 apply_formula / lock_threshold / refit。"""
+    """把配置值规范成 apply_formula / lock_threshold / refit。
+
+    默认（raw is None 且配置缺键）为 lock_threshold。
+    非法字符串直接 ValueError，不回退 refit。
+    """
     if raw is None:
-        raw = getattr(cfg, "VAL_MODE", "refit")
-    key = str(raw or "refit").strip()
+        raw = getattr(cfg, "VAL_MODE", "lock_threshold")
+    key = str(raw if raw is not None else "lock_threshold").strip()
+    if not key:
+        key = "lock_threshold"
     tok = key.lower().replace(" ", "").replace("-", "_")
     mode = VAL_MODE_ALIASES.get(key) or VAL_MODE_ALIASES.get(tok)
     if mode is None:
-        print(f"  ⚠ VAL_MODE={raw!r} 无效，回退 refit")
-        return "refit"
+        allowed = "apply_formula | lock_threshold | refit"
+        raise ValueError(
+            f"VAL_MODE={raw!r} 无效；允许: {allowed}（refit 须显式 opt-in，不得静默回退）"
+        )
     return mode
 
 

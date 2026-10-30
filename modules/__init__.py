@@ -38,5 +38,15 @@ def _override() -> Path | None:
 
 _ov = _override()
 if _ov is not None and str(_ov) not in __path__:
+    import warnings
+
+    warnings.warn(
+        f"modules loaded from non-canonical path {_ov} "
+        f"(package dir {_HERE}; version {__version__}). "
+        "Prefer the stats-analysis repo modules/ as the sole SSOT; "
+        "record MODULES_DIR / RAD_MODULES provenance in run logs.",
+        UserWarning,
+        stacklevel=1,
+    )
     __path__.insert(0, str(_ov))
 
