@@ -20,7 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 shap = ["shap>=0.44"]
-dev = ["pytest>=7.4", "ruff>=0.12"]
+dev = ["pytest>=7.4", "ruff>=0.12", 'tomli>=2.0; python_version < "3.11"']
 
 [tool.pytest.ini_options]
 testpaths = ["modules/tests"]

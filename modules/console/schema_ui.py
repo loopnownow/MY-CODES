@@ -660,15 +660,15 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
         return field
     if key in ("VAL_MODE", "SUBGROUP_VAL_MODE", "EXTERNAL_VAL_MODE"):
         field["widget"] = "select"
-        field["options"] = ["refit", "apply_formula", "lock_threshold"]
+        field["options"] = ["lock_threshold", "apply_formula", "refit"]
         field["option_labels"] = {
-            "refit": "重新拟合",
+            "lock_threshold": "锁定阈值（独立验证）",
             "apply_formula": "套公式",
-            "lock_threshold": "锁定阈值",
+            "refit": "重新拟合/模型更新",
         }
         if key == "SUBGROUP_VAL_MODE":
             field["options"] = [""] + list(field["options"])
-            field["option_labels"][""] = "跟随内部验证"
+            field["option_labels"][""] = "空白=套公式"
         return field
     if key in ("CORR_GROUP", "PARTIAL_GROUP"):
         field["widget"] = "select"

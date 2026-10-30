@@ -64,9 +64,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "GROUP_FROM_ID_SEP": "_",
     "GROUP_LEVEL_DISPLAY": {},
     "SUBGROUP_COL": "",
-    "VAL_MODE": "refit",
+    "VAL_MODE": "lock_threshold",
     "SUBGROUP_VAL_MODE": "",
-    "EXTERNAL_VAL_MODE": "refit",
+    "EXTERNAL_VAL_MODE": "lock_threshold",
     "GROUP_SOURCE_COL": "",
     # clin
     "DO_CLIN": True,
