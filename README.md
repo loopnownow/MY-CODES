@@ -52,7 +52,7 @@ cd <this-repo>
 PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 ```
 
-2026-10-27 实测基线：**183 passed / 1 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
+2026-10-30 实测基线：**221 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
 
 版本号只有两个位置：`modules/__init__.py` 的 `__version__`（运行时，课题看到的就是它）与
 `pyproject.toml` 的 `version`（打包元数据）。两者必须相同，`modules/tests/test_version_consistency.py` 会卡住。
