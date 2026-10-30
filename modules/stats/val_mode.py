@@ -5,8 +5,10 @@ VAL_MODE 三选一（特征集一律锁定 Train；LASSO / stepwise 不再跑）
 
     lock_threshold  锁定阈值（独立验证默认）
                     套 Train 系数 + Train 的 logistic 校准与 Youden
-    apply_formula   套公式
-                    验证集套 Train 系数；Youden 在本层重算
+    apply_formula   套公式（recalibration / threshold adaptation）
+                    验证集套 Train 系数后，仍可能在本层做 logistic 再校准
+                    并在本层重算 Youden；属于阈值/校准适应分析，
+                    不得当作无偏的独立外部验证上报
     refit           重新拟合 / 模型更新（须显式 opt-in）
                     同一特征集在评估层用该层结局重估系数；Youden 在本层重算
                     不得当作独立测试 / 外部验证性能上报
@@ -45,7 +47,7 @@ VAL_MODE_ALIASES: Dict[str, str] = {
 }
 
 VAL_MODE_LABELS: Dict[str, str] = {
-    "apply_formula": "套公式（锁定特征与系数，验证集重算 Youden）",
+    "apply_formula": "套公式/再校准（锁定特征与系数；本层 logistic 再校准 + Youden；非独立外部验证）",
     "lock_threshold": "锁定阈值（锁定特征、系数与 Train Youden；独立验证）",
     "refit": "重新拟合/模型更新（锁定特征，评估层用结局重估系数；非独立验证）",
 }

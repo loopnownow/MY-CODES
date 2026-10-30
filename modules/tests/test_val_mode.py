@@ -10,7 +10,6 @@ from modules.config.defaults import DEFAULT_SETTINGS
 from modules.stats.val_mode import (
     resolve_val_mode,
     refit_clinical_prob,
-    _safe_predict_glm,
 )
 
 
@@ -34,28 +33,83 @@ def test_illegal_val_mode_raises_value_error():
         resolve_val_mode("silent_fallback_please")
 
 
-def test_locked_glm_predictions_ignore_mutated_eval_y():
-    """Train coefficients + test X → same probs when test y is scrambled."""
+def test_lock_threshold_predictions_ignore_mutated_eval_y(monkeypatch):
+    """Integration: train lock → predict → mutate eval y → locked probs unchanged.
+
+    Also: missing train lock must not GLM-refit on eval y (unlocked raw path).
+    """
+    from modules.stats import curves_roc as roc
+
+    monkeypatch.setattr(roc.cfg, "DO_ROC", False, raising=False)
+    monkeypatch.setattr(roc.cfg, "ROC_PLOT_EXCLUDE", [], raising=False)
+    monkeypatch.setattr(roc.cfg, "BOOTSTRAP_N", 20, raising=False)
+
     rng = np.random.RandomState(0)
     n_train, n_test = 80, 40
-    x_tr = rng.normal(size=(n_train, 2))
-    y_tr = (0.8 * x_tr[:, 0] - 0.5 * x_tr[:, 1] + rng.normal(scale=0.3, size=n_train) > 0).astype(int)
+    x_tr = rng.normal(size=n_train)
+    y_tr = (x_tr + rng.normal(scale=0.4, size=n_train) > 0).astype(int)
     if y_tr.min() == y_tr.max():
-        y_tr[0] = 1 - y_tr[0]
-    Xtr = sm.add_constant(pd.DataFrame({"a": x_tr[:, 0], "b": x_tr[:, 1]}), has_constant="add")
-    model = sm.GLM(y_tr, Xtr, family=sm.families.Binomial()).fit()
+        y_tr[0] = 1 - int(y_tr[0])
+    x_te = rng.normal(size=n_test)
+    y_te = (x_te + rng.normal(scale=0.4, size=n_test) > 0).astype(int)
+    if y_te.min() == y_te.max():
+        y_te[0] = 1 - int(y_te[0])
 
-    x_te = rng.normal(size=(n_test, 2))
-    Xte = sm.add_constant(pd.DataFrame({"a": x_te[:, 0], "b": x_te[:, 1]}), has_constant="add")
-    y1 = (rng.rand(n_test) > 0.5).astype(int)
-    y2 = 1 - y1
+    roc.ROC_LOCK.clear()
+    roc.ROC_METRICS.clear()
+    roc.plot_roc({"M1": x_tr}, y_tr, dataset_label="train", seed=0, val_mode="lock_threshold")
+    assert "train" in roc.ROC_LOCK and "M1" in roc.ROC_LOCK["train"]
+    lock = dict(roc.ROC_LOCK["train"])
 
-    p1 = _safe_predict_glm(model, Xte, n_test)
-    p2 = _safe_predict_glm(model, Xte, n_test)
-    assert p1 is not None and p2 is not None
-    np.testing.assert_allclose(p1, p2)
-    # y vectors unused by locked predict; keep names so the contract is visible
-    assert y1.shape == y2.shape
+    roc.plot_roc(
+        {"M1": x_te},
+        y_te,
+        dataset_label="test",
+        seed=0,
+        val_mode="lock_threshold",
+        lock_from=lock,
+    )
+    m1 = roc.ROC_METRICS["roc_test"].set_index("Model").loc["M1"]
+    assert m1["Threshold_source"] == "train"
+    thr = float(m1["Threshold"])
+    intercept = float(lock["M1"]["intercept"])
+    slope = float(lock["M1"]["slope"])
+    p_locked = roc._apply_logit_cal(x_te, intercept, slope)
+
+    y_mut = 1 - y_te
+    roc.plot_roc(
+        {"M1": x_te},
+        y_mut,
+        dataset_label="test",
+        seed=0,
+        val_mode="lock_threshold",
+        lock_from=lock,
+    )
+    m2 = roc.ROC_METRICS["roc_test"].set_index("Model").loc["M1"]
+    assert m2["Threshold_source"] == "train"
+    assert float(m2["Threshold"]) == thr
+    p_after = roc._apply_logit_cal(x_te, float(lock["M1"]["intercept"]), float(lock["M1"]["slope"]))
+    np.testing.assert_allclose(p_locked, p_after)
+    # Mutating eval y must not change locked calibration params used above
+    assert lock["M1"] == roc.ROC_LOCK["train"]["M1"]
+
+    # Missing train lock: must NOT refit GLM on eval y; unlocked raw AUC only.
+    roc.ROC_LOCK.clear()
+    roc.ROC_METRICS.clear()
+    roc.plot_roc(
+        {"M1": x_te},
+        y_te,
+        dataset_label="test",
+        seed=0,
+        val_mode="lock_threshold",
+        lock_from={},
+    )
+    row = roc.ROC_METRICS["roc_test"].set_index("Model").loc["M1"]
+    assert row["Threshold_source"] == "unlocked_no_train_lock"
+    assert not np.isfinite(float(row["Threshold"]))
+    assert not np.isfinite(float(row["ACC"]))
+    # Raw continuous AUC is still reported
+    assert np.isfinite(float(row["AUC"]))
 
 
 def test_refit_clinical_prob_changes_when_eval_y_mutates():

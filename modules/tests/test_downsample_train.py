@@ -48,3 +48,52 @@ def test_clean_data_root_prefers_env(monkeypatch, tmp_path):
     monkeypatch.setenv("CLEAN_DATA_ROOT", str(tmp_path))
     monkeypatch.delenv("ODOC_CODE", raising=False)
     assert mod._default_clean_data_root() == tmp_path
+
+
+def test_require_outcome_labels_accepts_pos_neg_only():
+    import pandas as pd
+    mod = _load()
+    s = pd.Series(["Positive", "Negative", "Positive"])
+    mod._require_outcome_labels(s, "Positive", "Negative")
+
+
+def test_require_outcome_labels_fails_unknown_and_missing():
+    import pandas as pd
+    import pytest
+    mod = _load()
+    with pytest.raises(RuntimeError, match="unknown outcome"):
+        mod._require_outcome_labels(
+            pd.Series(["Positive", "Unknown", "Negative"]),
+            "Positive",
+            "Negative",
+        )
+    with pytest.raises(RuntimeError, match="missing outcome"):
+        mod._require_outcome_labels(
+            pd.Series(["Positive", None, "Negative"]),
+            "Positive",
+            "Negative",
+        )
+    with pytest.raises(RuntimeError, match="missing outcome"):
+        mod._require_outcome_labels(
+            pd.Series(["Positive", float("nan"), "Negative"]),
+            "Positive",
+            "Negative",
+        )
+
+
+def test_require_patient_ids_fails_before_astype_str():
+    import pandas as pd
+    import pytest
+    mod = _load()
+    with pytest.raises(RuntimeError, match="patient ID FAIL"):
+        mod._require_patient_ids(pd.Series(["A", None, "B"]), "Patient_ID")
+    with pytest.raises(RuntimeError, match="patient ID FAIL"):
+        mod._require_patient_ids(pd.Series(["A", float("nan"), "B"]), "Patient_ID")
+    with pytest.raises(RuntimeError, match="patient ID FAIL"):
+        mod._require_patient_ids(pd.Series(["A", "nan", "B"]), "Patient_ID")
+    with pytest.raises(RuntimeError, match="patient ID FAIL"):
+        mod._require_patient_ids(pd.Series(["A", "<NA>", "B"]), "Patient_ID")
+    with pytest.raises(RuntimeError, match="patient ID FAIL"):
+        mod._require_patient_ids(pd.Series(["A", "", "B"]), "Patient_ID")
+    out = mod._require_patient_ids(pd.Series([" A ", "B2"]), "Patient_ID")
+    assert list(out) == ["A", "B2"]

@@ -375,10 +375,27 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
             cm = _cls_metrics(lab, pred_bin)
             sens_y, spec_y = cm["SEN"], cm["SPE"]
             thr_source = "train"
+        elif is_val and mode == "lock_threshold":
+            # Missing train ROC_LOCK: never refit GLM / Youden on eval y.
+            # Raw continuous AUC only, labeled unlocked; threshold metrics skipped.
+            print(
+                f"  FAIL {nm}: lock_threshold missing train ROC_LOCK — "
+                "unlocked raw AUC only; threshold metrics skipped (no eval-y GLM)"
+            )
+            score = pred[ok]
+            fpr, tpr, _thr = roc_curve(lab, score)
+            auc = roc_auc_score(lab, score)
+            ci = _boot_auc_ci(lab, score, seed=seed)
+            prob = score
+            intercept = float("nan")
+            slope = float("nan")
+            thr_y = float("nan")
+            cm = {k: float("nan") for k in ("ACC", "SEN", "SPE", "NPV", "PPV")}
+            sens_y = spec_y = float("nan")
+            thr_source = "unlocked_no_train_lock"
         else:
-            if is_val and mode == "lock_threshold":
-                print(f"  ⚠ {nm}: no train lock — Youden on this set")
-            # Step 1: logistic 校准（预测值 → 概率），使 ROC 平滑
+            # apply_formula / refit / train layer: logistic recalibration on this
+            # set + Youden on this set (threshold adaptation, not independent lock).
             X = sm.add_constant(pred[ok])
             fit = sm.GLM(lab, X, family=sm.families.Binomial()).fit()
             params = np.asarray(fit.params, dtype=float).ravel()
@@ -395,15 +412,21 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
             cm = _cls_metrics(lab, pred_bin)
             sens_y, spec_y = float(tpr[idx_y]), float(1.0 - fpr[idx_y])
 
-        lock_store[nm] = {
-            "intercept": float(intercept),
-            "slope": float(slope),
-            "threshold": float(thr_y),
-        }
+        if thr_source != "unlocked_no_train_lock":
+            lock_store[nm] = {
+                "intercept": float(intercept),
+                "slope": float(slope),
+                "threshold": float(thr_y),
+            }
 
         plot_skip = _roc_plot_skipped(nm)
         tag = "  [table only]" if plot_skip else ""
-        thr_tag = "  thr=train" if thr_source == "train" else ""
+        if thr_source == "train":
+            thr_tag = "  thr=train"
+        elif thr_source == "unlocked_no_train_lock":
+            thr_tag = "  thr=UNLOCKED(no train lock)"
+        else:
+            thr_tag = ""
         print(f"  {nm:<25s} AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f}){tag}{thr_tag}")
 
         prob_full = np.full(len(y), np.nan, dtype=float)
