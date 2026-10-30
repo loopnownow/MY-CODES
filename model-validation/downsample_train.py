@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Train-only 1:2 downsample of Pseudo_progress-Negative.
+"""Train-only stratified downsample of negative class (generic CLI).
 
-归属 ``0doc/GitHub/stats-analysis/model-validation``（建模队列构建，非 tidy 清洗）。
-Replicates patient-level split (data_io.load_data), then keeps:
-  all Positive, all test Negative, and a histology×sex-stratified
-  sample of train Negative at 1:2 vs train Positive.
+Belong in ``model-validation`` (queue construction). Project-specific column
+names are CLI/env parameters — do not hardcode a study into the library API.
 
-Writes cln+rad only. Does not touch source workbook extras (qc/icc) or sibling workbooks.
+Requires tidy_paths from clean-data (CLEAN_DATA_ROOT / ODOC_CODE). Dry-run is
+the default; pass ``--execute`` to write outputs (no source-edit of DRY_RUN).
 """
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
@@ -20,42 +20,50 @@ import pandas as pd
 
 _STAT = Path(__file__).resolve().parent
 _IMPORT = Path(os.environ.get("STATS_ROOT", str(_STAT.parent)))
-_TIDY = Path(os.environ.get(
-    "CLEAN_DATA_ROOT",
-    str(_IMPORT.parent.parent / "02-data-processing" / "base" / "clean-data"),
-))
-for p in (_IMPORT, _TIDY):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
-from tidy_paths import project_root  # noqa: E402
 
-# ==================== CONFIG ====================
-PROJECT_DIR = Path(os.environ.get("PROJECT_ROOT") or os.environ.get("STUDY_ROOT") or str(project_root("demo_study")))
-SRC_XLSX = PROJECT_DIR / os.environ.get("SRC_XLSX_NAME", "source.xlsx")
-OUT_XLSX = PROJECT_DIR / os.environ.get("OUT_XLSX_NAME", "downsampled.xlsx")
-KEEP_LIST = PROJECT_DIR / "ref" / os.environ.get("KEEP_LIST_NAME", "keep_list.csv")
-CLIN_SHEET = "cln"
-RAD_SHEET = "rad"
-ID_COL = "Patient_ID"
-OUTCOME_COL = "Pseudo_progress"
-POS_LABEL = "Positive"
-NEG_LABEL = "Negative"
-STRATA_COLS = ["histology", "sex"]
-SEED = 66666
-TRAIN_RATIO = 0.7
-NEG_PER_POS = 2  # train Negative : train Positive
-DRY_RUN = True
-# ================================================
+
+def _default_clean_data_root() -> Path:
+    env = (os.environ.get("CLEAN_DATA_ROOT") or "").strip()
+    if env:
+        return Path(env)
+    odoc = (os.environ.get("ODOC_CODE") or "").strip()
+    if odoc:
+        return Path(odoc) / "02-data-processing" / "clean-data"
+    # lab-paths: {_code}/02-data-processing/clean-data (not .../base/clean-data)
+    guess = _IMPORT.parent.parent / "_code" / "02-data-processing" / "clean-data"
+    return guess
+
+
+def _ensure_tidy_import() -> None:
+    roots = [_IMPORT, _default_clean_data_root()]
+    for p in roots:
+        if str(p) not in sys.path:
+            sys.path.insert(0, str(p))
+    try:
+        import tidy_paths  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "tidy_paths not found. Set CLEAN_DATA_ROOT or ODOC_CODE to "
+            ".../02-data-processing/clean-data (see MY-SKILLS lab-paths.yaml "
+            "code_clean_data)."
+        ) from exc
 
 
 def patient_key(label: str) -> str:
+    """Normalize a row label for patient-level split.
+
+    Strips a trailing whitespace-separated integer token (e.g. lesion index).
+    If that digit sequence is part of the true patient identifier, pass IDs
+    that do not match this pattern, or pre-normalize upstream — do not assume
+    this rule is safe for every ID scheme.
+    """
     s = str(label).strip().lower()
     s = re.sub(r"\s+\d+$", "", s)
     s = re.sub(r"\s+", " ", s).strip()
     return s if s else str(label)
 
 
-def pipeline_split(ids: list[str], y: np.ndarray, ratio: float, seed: int):
+def pipeline_split(ids: list[str], y, ratio: float, seed: int):
     """Match modules.stats.data_io.load_data patient-level stratified split."""
     key_to_idx: dict[str, list[int]] = {}
     key_to_y: dict[str, int] = {}
@@ -109,39 +117,102 @@ def allocate_strata(counts: dict[str, int], n_keep: int) -> dict[str, int]:
     return base
 
 
-def main() -> None:
-    print("=== PP train 1:2 downsample ===")
-    print(f"SRC      : {SRC_XLSX}")
-    print(f"OUT      : {OUT_XLSX}")
-    print(f"KEEP_LIST: {KEEP_LIST}")
-    print(f"DRY_RUN  : {DRY_RUN}")
-    print(f"SEED={SEED}  TRAIN_RATIO={TRAIN_RATIO}  NEG_PER_POS={NEG_PER_POS}")
+def parse_args(argv=None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Train-only stratified downsample of the negative class."
+    )
+    p.add_argument(
+        "--project-root",
+        default=os.environ.get("PROJECT_ROOT") or os.environ.get("STUDY_ROOT") or "",
+        help="Project folder (default: PROJECT_ROOT / STUDY_ROOT / demo_study via tidy_paths).",
+    )
+    p.add_argument("--src", default="", help="Source xlsx path (default: <project>/<src-name>).")
+    p.add_argument("--out", default="", help="Output xlsx path (default: <project>/<out-name>).")
+    p.add_argument("--src-name", default=os.environ.get("SRC_XLSX_NAME", "source.xlsx"))
+    p.add_argument("--out-name", default=os.environ.get("OUT_XLSX_NAME", "downsampled.xlsx"))
+    p.add_argument(
+        "--keep-list-name",
+        default=os.environ.get("KEEP_LIST_NAME", "keep_list.csv"),
+    )
+    p.add_argument("--clin-sheet", default="cln")
+    p.add_argument("--rad-sheet", default="rad")
+    p.add_argument("--id-col", default="Patient_ID")
+    p.add_argument(
+        "--outcome-col",
+        default=os.environ.get("OUTCOME_COL", "Pseudo_progress"),
+        help="Outcome column (project-specific; override for non-demo studies).",
+    )
+    p.add_argument("--pos-label", default=os.environ.get("POS_LABEL", "Positive"))
+    p.add_argument("--neg-label", default=os.environ.get("NEG_LABEL", "Negative"))
+    p.add_argument(
+        "--strata",
+        default=os.environ.get("STRATA_COLS", "histology,sex"),
+        help="Comma-separated stratum columns for negative sampling.",
+    )
+    p.add_argument("--seed", type=int, default=int(os.environ.get("SEED", "66666")))
+    p.add_argument("--train-ratio", type=float, default=float(os.environ.get("TRAIN_RATIO", "0.7")))
+    p.add_argument("--neg-per-pos", type=int, default=int(os.environ.get("NEG_PER_POS", "2")))
+    p.add_argument(
+        "--execute",
+        action="store_true",
+        help="Write output xlsx and keep_list (default is dry-run; no files written).",
+    )
+    return p.parse_args(argv)
 
-    if not SRC_XLSX.exists():
-        raise FileNotFoundError(SRC_XLSX)
-    if OUT_XLSX.resolve() == SRC_XLSX.resolve():
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
+    _ensure_tidy_import()
+    from tidy_paths import project_root  # noqa: E402
+
+    project_dir = Path(args.project_root or str(project_root("demo_study"))).resolve()
+    src_xlsx = Path(args.src) if args.src else project_dir / args.src_name
+    out_xlsx = Path(args.out) if args.out else project_dir / args.out_name
+    keep_list = project_dir / "ref" / args.keep_list_name
+    strata_cols = [c.strip() for c in str(args.strata).split(",") if c.strip()]
+    dry_run = not bool(args.execute)
+
+    print("=== train stratified downsample ===")
+    print(f"SRC      : {src_xlsx}")
+    print(f"OUT      : {out_xlsx}")
+    print(f"KEEP_LIST: {keep_list}")
+    print(f"DRY_RUN  : {dry_run}  (pass --execute to write)")
+    print(
+        f"SEED={args.seed}  TRAIN_RATIO={args.train_ratio}  "
+        f"NEG_PER_POS={args.neg_per_pos}  OUTCOME={args.outcome_col!r}"
+    )
+    print(f"STRATA   : {strata_cols}")
+
+    if not src_xlsx.exists():
+        raise FileNotFoundError(src_xlsx)
+    if out_xlsx.resolve() == src_xlsx.resolve():
         raise RuntimeError("Refusing to overwrite source workbook")
 
-    cln = pd.read_excel(SRC_XLSX, sheet_name=CLIN_SHEET, dtype={ID_COL: str})
-    rad = pd.read_excel(SRC_XLSX, sheet_name=RAD_SHEET, dtype={ID_COL: str})
-    cln[ID_COL] = cln[ID_COL].astype(str).str.strip()
-    rad[ID_COL] = rad[ID_COL].astype(str).str.strip()
+    id_col = args.id_col
+    cln = pd.read_excel(src_xlsx, sheet_name=args.clin_sheet, dtype={id_col: str})
+    rad = pd.read_excel(src_xlsx, sheet_name=args.rad_sheet, dtype={id_col: str})
+    cln[id_col] = cln[id_col].astype(str).str.strip()
+    rad[id_col] = rad[id_col].astype(str).str.strip()
 
-    if cln[ID_COL].duplicated().any() or rad[ID_COL].duplicated().any():
+    for col in [args.outcome_col, *strata_cols]:
+        if col not in cln.columns:
+            raise KeyError(f"Missing clinical column {col!r}")
+
+    if cln[id_col].duplicated().any() or rad[id_col].duplicated().any():
         raise RuntimeError("Duplicate Patient_ID in cln or rad")
-    if set(cln[ID_COL]) != set(rad[ID_COL]):
+    if set(cln[id_col]) != set(rad[id_col]):
         raise RuntimeError("cln/rad Patient_ID sets differ")
-    if list(cln[ID_COL]) != list(rad[ID_COL]):
-        rad = rad.set_index(ID_COL).loc[cln[ID_COL]].reset_index()
+    if list(cln[id_col]) != list(rad[id_col]):
+        rad = rad.set_index(id_col).loc[cln[id_col]].reset_index()
         print("  aligned rad row order to cln")
 
-    y = (cln[OUTCOME_COL].astype(str) == POS_LABEL).astype(int).to_numpy()
+    y = (cln[args.outcome_col].astype(str) == args.pos_label).astype(int).to_numpy()
     n_pos = int(y.sum())
     n_neg = int((y == 0).sum())
-    print(f"source N={len(cln)}  {POS_LABEL}={n_pos}  {NEG_LABEL}={n_neg}")
+    print(f"source N={len(cln)}  {args.pos_label}={n_pos}  {args.neg_label}={n_neg}")
 
     train_idx, test_idx, keys = pipeline_split(
-        cln[ID_COL].tolist(), y, TRAIN_RATIO, SEED
+        cln[id_col].tolist(), y, args.train_ratio, args.seed
     )
     split = np.array(["test"] * len(cln), dtype=object)
     split[train_idx] = "training"
@@ -154,12 +225,15 @@ def main() -> None:
         f"split    train {len(train_idx)} (pos={len(train_pos)}, neg={len(train_neg)})  "
         f"test {len(test_idx)} (pos={len(test_pos)}, neg={len(test_neg)})"
     )
-    n_keep_neg = int(len(train_pos) * NEG_PER_POS)
-    print(f"target   train neg keep={n_keep_neg} (1:{NEG_PER_POS} vs train pos {len(train_pos)})")
+    n_keep_neg = int(len(train_pos) * args.neg_per_pos)
+    print(
+        f"target   train neg keep={n_keep_neg} "
+        f"(1:{args.neg_per_pos} vs train pos {len(train_pos)})"
+    )
 
     train_neg_df = cln.iloc[train_neg].copy()
     train_neg_df["_stratum"] = (
-        train_neg_df[STRATA_COLS].astype(str).agg(" × ".join, axis=1)
+        train_neg_df[strata_cols].astype(str).agg(" \u00d7 ".join, axis=1)
     )
     counts = train_neg_df["_stratum"].value_counts().to_dict()
     alloc = allocate_strata(counts, n_keep_neg)
@@ -167,7 +241,7 @@ def main() -> None:
     for k in sorted(alloc):
         print(f"  {k}: keep {alloc[k]} / {counts[k]}")
 
-    rng = np.random.RandomState(SEED)
+    rng = np.random.RandomState(args.seed)
     kept_neg_idx: list[int] = []
     for stratum, n_s in alloc.items():
         pool = train_neg_df.index[train_neg_df["_stratum"] == stratum].to_numpy()
@@ -195,61 +269,58 @@ def main() -> None:
     split_keep = split[keep_idx]
     if "split" in cln_out.columns:
         raise RuntimeError("cln already has split column")
-    id_pos = list(cln_out.columns).index(ID_COL)
+    id_pos = list(cln_out.columns).index(id_col)
     cln_out.insert(id_pos + 1, "split", split_keep)
 
-    if list(cln_out[ID_COL]) != list(rad_out[ID_COL]):
+    if list(cln_out[id_col]) != list(rad_out[id_col]):
         raise RuntimeError("output cln/rad ID order mismatch")
-    if cln_out[ID_COL].duplicated().any():
+    if cln_out[id_col].duplicated().any():
         raise RuntimeError("output duplicate IDs")
 
-    manifest = pd.DataFrame(
-        {
-            ID_COL: cln[ID_COL],
-            "patient_key": keys,
-            OUTCOME_COL: cln[OUTCOME_COL].astype(str),
-            "histology": cln["histology"].astype(str),
-            "sex": cln["sex"].astype(str),
-            "split": split,
-            "kept": np.isin(np.arange(len(cln)), keep_idx),
-            "reason": np.where(
-                y == 1,
-                "all_positive",
-                np.where(
-                    split == "test",
-                    "all_test_negative",
-                    np.where(
-                        np.isin(np.arange(len(cln)), kept_neg_idx),
-                        "sampled_train_negative",
-                        "dropped_train_negative",
-                    ),
-                ),
+    manifest_cols = {
+        id_col: cln[id_col],
+        "patient_key": keys,
+        args.outcome_col: cln[args.outcome_col].astype(str),
+    }
+    for c in strata_cols:
+        manifest_cols[c] = cln[c].astype(str)
+    manifest_cols["split"] = split
+    manifest_cols["kept"] = np.isin(np.arange(len(cln)), keep_idx)
+    manifest_cols["reason"] = np.where(
+        y == 1,
+        "all_positive",
+        np.where(
+            split == "test",
+            "all_test_negative",
+            np.where(
+                np.isin(np.arange(len(cln)), kept_neg_idx),
+                "sampled_train_negative",
+                "dropped_train_negative",
             ),
-        }
+        ),
     )
+    manifest = pd.DataFrame(manifest_cols)
 
-    print("output PP counts:")
+    print("output outcome counts:")
     print(
-        pd.crosstab(cln_out[OUTCOME_COL], cln_out["split"], margins=True).to_string()
+        pd.crosstab(cln_out[args.outcome_col], cln_out["split"], margins=True).to_string()
     )
-    print("output histology × sex × PP (training only):")
-    tr = cln_out[cln_out["split"] == "training"]
-    print(pd.crosstab([tr["histology"], tr["sex"]], tr[OUTCOME_COL]).to_string())
 
-    if DRY_RUN:
+    if dry_run:
         print("\n=== DRY RUN: no files written ===")
-        print(f"would write {OUT_XLSX.name} sheets={CLIN_SHEET},{RAD_SHEET}")
-        print(f"would write {KEEP_LIST.name} rows={len(manifest)}")
-        return
+        print(f"would write {out_xlsx.name} sheets={args.clin_sheet},{args.rad_sheet}")
+        print(f"would write {keep_list.name} rows={len(manifest)}")
+        return 0
 
-    KEEP_LIST.parent.mkdir(parents=True, exist_ok=True)
-    manifest.to_csv(KEEP_LIST, index=False, encoding="utf-8-sig")
-    with pd.ExcelWriter(OUT_XLSX, engine="openpyxl") as w:
-        cln_out.to_excel(w, sheet_name=CLIN_SHEET, index=False)
-        rad_out.to_excel(w, sheet_name=RAD_SHEET, index=False)
-    print(f"wrote {OUT_XLSX}  cln={cln_out.shape} rad={rad_out.shape}")
-    print(f"wrote {KEEP_LIST}")
+    keep_list.parent.mkdir(parents=True, exist_ok=True)
+    manifest.to_csv(keep_list, index=False, encoding="utf-8-sig")
+    with pd.ExcelWriter(out_xlsx, engine="openpyxl") as w:
+        cln_out.to_excel(w, sheet_name=args.clin_sheet, index=False)
+        rad_out.to_excel(w, sheet_name=args.rad_sheet, index=False)
+    print(f"wrote {out_xlsx}  cln={cln_out.shape} rad={rad_out.shape}")
+    print(f"wrote {keep_list}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

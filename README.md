@@ -29,6 +29,8 @@
 | `modules/` | 可复用算法库：`config` / `console`（含 `strobe/` 页；控制台已拆为 `schema_ui` / `settings_layer` / `preview` / `dryrun` / `run` / `serve` + `http_impl` 零注入）/ `stats` / `tests` / `utils` |
 | `model-validation/` | 建模 / 验证 / 插补 CLI（校准、DCA、NRI、泄漏检查、研究卡审计、`impute_excel.py`） |
 
+运行时要求 **Python ≥ 3.10**（`pyproject.toml` `requires-python`）。标准库 `tomllib` 仅 3.11+；3.10 下测试依赖可选 `tomli`（`pip install -e ".[dev]"`）。
+
 测试用 `pyproject.toml` 的 `[tool.pytest.ini_options]`（`testpaths = modules/tests`，`pythonpath = ["."]`），
 仓根直接 `pytest` 即可，不另设 `pytest.ini`。
 
@@ -52,7 +54,7 @@ cd <this-repo>
 PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 ```
 
-2026-10-30 实测基线：**221 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
+2026-10-30 实测基线：**237 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
 
 版本号只有两个位置：`modules/__init__.py` 的 `__version__`（运行时，课题看到的就是它）与
 `pyproject.toml` 的 `version`（打包元数据）。两者必须相同，`modules/tests/test_version_consistency.py` 会卡住。
