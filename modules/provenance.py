@@ -102,7 +102,7 @@ def format_banner(rec: dict[str, Any]) -> str:
     ]
     if rec.get("stats_root_env"):
         lines.append(f"    STATS_ROOT={rec['stats_root_env']}")
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def format_html_note(rec: dict[str, Any]) -> str:

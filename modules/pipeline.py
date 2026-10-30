@@ -2337,11 +2337,14 @@ def main(argv: list[str] | None = None) -> None:
         _configure_stdio_utf8()
 
     # C2: write modules provenance into run log / stdout (warn or block non-canonical).
+    # N6: RuntimeError from RAD_MODULES_STRICT must propagate; only soft failures skip.
     try:
         from modules import __version__ as _mod_ver
         from modules.provenance import emit_to_stdout as _emit_prov
 
         _emit_prov(Path(__file__).resolve().parent, version=_mod_ver)
+    except RuntimeError:
+        raise
     except Exception as _prov_err:
         print(f"  modules provenance skipped: {_prov_err}", flush=True)
 

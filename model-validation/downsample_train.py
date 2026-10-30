@@ -227,6 +227,11 @@ def parse_args(argv=None) -> argparse.Namespace:
         action="store_true",
         help="Write output xlsx and keep_list (default is dry-run; no files written).",
     )
+    p.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow overwriting an existing OUT xlsx or keep_list (default: refuse).",
+    )
     return p.parse_args(argv)
 
 
@@ -243,10 +248,11 @@ def main(argv=None) -> int:
     dry_run = not bool(args.execute)
 
     print("=== train stratified downsample ===")
-    print(f"SRC      : {src_xlsx}")
-    print(f"OUT      : {out_xlsx}")
-    print(f"KEEP_LIST: {keep_list}")
+    print(f"SRC      : {src_xlsx.resolve()}")
+    print(f"OUT      : {out_xlsx.resolve()}")
+    print(f"KEEP_LIST: {keep_list.resolve()}")
     print(f"DRY_RUN  : {dry_run}  (pass --execute to write)")
+    print(f"OVERWRITE: {bool(args.overwrite)}")
     print(
         f"SEED={args.seed}  TRAIN_RATIO={args.train_ratio}  "
         f"NEG_PER_POS={args.neg_per_pos}  OUTCOME={args.outcome_col!r}"
@@ -386,17 +392,35 @@ def main(argv=None) -> int:
 
     if dry_run:
         print("\n=== DRY RUN: no files written ===")
-        print(f"would write {out_xlsx.name} sheets={args.clin_sheet},{args.rad_sheet}")
-        print(f"would write {keep_list.name} rows={len(manifest)}")
+        print(f"would write {out_xlsx.resolve()} sheets={args.clin_sheet},{args.rad_sheet}")
+        print(f"would write {keep_list.resolve()} rows={len(manifest)}")
         return 0
+
+    # N11: refuse overwrite unless --overwrite; always print full paths.
+    conflicts = []
+    if out_xlsx.exists():
+        conflicts.append(f"OUT={out_xlsx.resolve()}")
+    if keep_list.exists():
+        conflicts.append(f"KEEP_LIST={keep_list.resolve()}")
+    if conflicts and not args.overwrite:
+        raise RuntimeError(
+            "Refusing to overwrite existing output(s) without --overwrite: "
+            + "; ".join(conflicts)
+            + f". SRC={src_xlsx.resolve()}"
+        )
+    if conflicts and args.overwrite:
+        print("OVERWRITE enabled; replacing:")
+        for c in conflicts:
+            print(f"  {c}")
+        print(f"  SRC={src_xlsx.resolve()}")
 
     keep_list.parent.mkdir(parents=True, exist_ok=True)
     manifest.to_csv(keep_list, index=False, encoding="utf-8-sig")
     with pd.ExcelWriter(out_xlsx, engine="openpyxl") as w:
         cln_out.to_excel(w, sheet_name=args.clin_sheet, index=False)
         rad_out.to_excel(w, sheet_name=args.rad_sheet, index=False)
-    print(f"wrote {out_xlsx}  cln={cln_out.shape} rad={rad_out.shape}")
-    print(f"wrote {keep_list}")
+    print(f"wrote {out_xlsx.resolve()}  cln={cln_out.shape} rad={rad_out.shape}")
+    print(f"wrote {keep_list.resolve()}")
     return 0
 
 

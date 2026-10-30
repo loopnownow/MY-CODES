@@ -40,12 +40,15 @@ _ov = _override()
 if _ov is not None and str(_ov) not in __path__:
     __path__.insert(0, str(_ov))
 
-# C2: provenance enforce (warn, or block when RAD_MODULES_STRICT=1). Import-time
-# failures must not break package load; pipeline/report re-emit into run log/HTML.
+# C2: provenance enforce (warn, or block when RAD_MODULES_STRICT=1).
+# Non-strict import soft-fail must not break package load; RuntimeError from
+# RAD_MODULES_STRICT must propagate (N6). pipeline/report re-emit into run log/HTML.
 try:
     from modules.provenance import collect as _prov_collect, enforce as _prov_enforce
 
     _prov_enforce(_prov_collect(_HERE, version=__version__))
+except RuntimeError:
+    raise
 except Exception:
     pass
 
