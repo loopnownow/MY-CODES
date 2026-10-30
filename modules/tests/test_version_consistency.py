@@ -8,7 +8,10 @@ together here.
 from __future__ import annotations
 
 import re
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11
+    import tomli as tomllib  # type: ignore
 from pathlib import Path
 
 import modules

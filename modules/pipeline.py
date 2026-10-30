@@ -1830,10 +1830,13 @@ def _subgroup_val_mode() -> str:
 
 
 def _external_val_mode() -> str:
-    """外验切点：只用 EXTERNAL_VAL_MODE，不跟随内部验证。"""
+    """外验切点：只用 EXTERNAL_VAL_MODE，不跟随内部验证。
+
+    空白默认 lock_threshold（独立外验）；refit 须显式配置，且不得当作独立验证。
+    """
     from modules.stats.val_mode import resolve_val_mode
     raw = str(getattr(cfg, "EXTERNAL_VAL_MODE", "") or "").strip()
-    return resolve_val_mode(raw or "refit")
+    return resolve_val_mode(raw or "lock_threshold")
 
 
 def _wanted_subgroup_levels(series: pd.Series) -> list[str]:
