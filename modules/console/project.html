@@ -293,6 +293,7 @@ footer{
       <button type="button" class="pri" id="btnLoadData">加载数据</button>
       <span class="hint" id="loadMsg" style="margin:0">先开服务，再点加载。</span>
       <button type="button" id="btnClearBad" hidden title="把报错的设置项写成空字符串。先备份 settings.ini.bak，再重新加载。">清空报错键</button>
+      <button type="button" id="btnRegister" hidden title="生成本项目 token 并写入本页 meta；仅本地文件页需要">注册本项目</button>
     </div>
     <div id="sheetBlock" hidden>
       <div class="sublab">工作表</div>
@@ -747,6 +748,12 @@ if (saved >= 1024 && saved <= 65535) portEl.value = saved;
 const savedMod = localStorage.getItem(MOD_KEY);
 if (savedMod !== null && modEl) modEl.value = savedMod;
 applyProject(inferProject());
+const metaTok = ((document.querySelector('meta[name="console-token"]') || {}).content || "").trim();
+if (location.protocol === "file:" && loadMsg) {
+  loadMsg.textContent = (metaTok && metaTok !== "__CONSOLE_TOKEN__")
+    ? "已注册本项目：可直接在本页加载。"
+    : "本页未注册：点「注册本项目」生成 token，或点「加载数据」进入控制台。";
+}
 portEl.addEventListener("change", () => {
   syncLinks();
   if (lastScanRows && lastScanRows.length) paintPorts(lastScanRows);
@@ -911,9 +918,12 @@ function onServiceReady(p) {
   hydrateSettings(p);
   occupant = null;
   noteLive(p);
-  msg.textContent = PROJECT
-    ? "服务已开。选数据后点「加载数据」，再选 sheet。"
-    : "服务已开。填写课题名后再加载数据。";
+  const fileMode = location.protocol === "file:";
+  msg.textContent = !PROJECT
+    ? "服务已开。填写课题名后再加载数据。"
+    : (fileMode && !pageToken
+      ? "服务已开。本页未注册：点「注册本项目」或「加载数据」进入控制台。"
+      : "服务已开。选数据后点「加载数据」，再选 sheet。");
 }
 function keysFromSettingsError(msg) {
   const text = String(msg || "");
@@ -972,6 +982,17 @@ async function clearBadKeys() {
   }
 }
 async function loadWorkbook() {
+  if (location.protocol === "file:" && !pageToken) {
+    const livePort = await ensureLive();
+    if (!livePort) {
+      if (loadMsg) loadMsg.textContent = "请先开启 Python 服务。";
+      return;
+    }
+    if (loadMsg) loadMsg.textContent = "本页未注册，正在进入控制台加载…";
+    holdForConsole = true;
+    location.href = pageUrl(livePort);
+    return;
+  }
   if (!PROJECT) {
     if (loadMsg) loadMsg.textContent = "请先填写课题名。";
     return;
@@ -1131,6 +1152,45 @@ function apiHeaders(extra) {
   return h;
 }
 syncTokenFromMeta();
+const btnRegister = document.getElementById("btnRegister");
+if (btnRegister) btnRegister.hidden = !(location.protocol === "file:" && !pageToken);
+async function pollRegisterResult(ms) {
+  const until = Date.now() + (ms == null ? 15000 : ms);
+  while (Date.now() < until) {
+    const j = await readCheckOnce();
+    if (j && j.op === "register") return j;
+    await sleep(300);
+  }
+  return null;
+}
+async function registerProject() {
+  if (!PROJECT) {
+    if (loadMsg) loadMsg.textContent = "请先填写课题名。";
+    return;
+  }
+  const dir = fileDir();
+  if (!dir) {
+    if (loadMsg) loadMsg.textContent = "当前不是本地文件页，无需注册。";
+    return;
+  }
+  launchProto(
+    "radconsole://register?project=" + encodeURIComponent(PROJECT) +
+    "&dir=" + encodeURIComponent(dir)
+  );
+  if (loadMsg) loadMsg.textContent = "已请求注册；浏览器若弹窗请点允许…";
+  const j = await pollRegisterResult();
+  if (!j) {
+    if (loadMsg) loadMsg.textContent = "注册没有回执。请允许打开 radconsole 后再点一次。";
+    return;
+  }
+  if (!j.ok) {
+    if (loadMsg) loadMsg.textContent = "注册失败：" + (j.error || "未知错误");
+    return;
+  }
+  if (loadMsg) loadMsg.textContent = "已注册（token 已写入本页），即将刷新…";
+  setTimeout(() => location.reload(), 800);
+}
+if (btnRegister) btnRegister.onclick = () => registerProject();
 let occupant = null;
 let svcPollFrom = 0;
 let svcWant = 0;

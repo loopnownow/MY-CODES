@@ -15,12 +15,18 @@ import time
 from pathlib import Path
 from typing import Any
 
-from modules.console import state as _state
-from modules.console.const import MODULES_ROOT, OVERRIDE_PATH, SET_OUTCOME_DERIVED
-from modules.console.ops import _overlay_path, jsonable, write_project_overlay
-from modules.console.settings_layer import normalize_overlay, project_dir, save_session
-
+# start_run 曾用 Path(__file__) 拉起本文件；B4c5 搬层后本文件无 CLI。
+# 直接执行或子进程缺 PYTHONPATH 时先把仓库根塞进 sys.path，避免 ModuleNotFoundError。
 _IMPORT_ROOT = Path(__file__).resolve().parents[2]  # 与 console.py 同一仓库根
+_CONSOLE_PY = Path(__file__).resolve().parent / "console.py"
+if str(_IMPORT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_IMPORT_ROOT))
+
+from modules.console import state as _state  # noqa: E402  bootstrap 之后才能 import
+from modules.console.const import MODULES_ROOT, OVERRIDE_PATH, SET_OUTCOME_DERIVED  # noqa: E402
+from modules.console.ops import _overlay_path, jsonable, write_project_overlay  # noqa: E402
+from modules.console.settings_layer import normalize_overlay, project_dir, save_session  # noqa: E402
+
 _RUN = _state.RUN
 _RUN_LOCK = _state.RUN_LOCK
 
@@ -199,8 +205,14 @@ def start_run(project: str, data: Path, settings_path: Path,
         save_session(ov_payload)
         write_project_overlay(proj, ov_payload)
         ov_file = OVERRIDE_PATH
+        # CLI 在 console.py（含 argparse cmd_run）；B4c5 误把 Path(__file__) 指向本文件导致
+        # ModuleNotFoundError / 无入口。与 start_run_bat / spawn_successor 一致：仓库根 + console.py。
+        if not _CONSOLE_PY.is_file():
+            raise FileNotFoundError(
+                f"控制台入口缺失: {_CONSOLE_PY}（start_run 需要 modules/console/console.py）"
+            )
         cmd = [
-            sys.executable, "-u", str(Path(__file__).resolve()),
+            sys.executable, "-u", str(_CONSOLE_PY),
             "run",
             "--project", project,
             "--data", str(data),
@@ -218,10 +230,14 @@ def start_run(project: str, data: Path, settings_path: Path,
             cwd=str(_IMPORT_ROOT),
             stdout=log_f,
             stderr=subprocess.STDOUT,
-            env={**os.environ, "PYTHONIOENCODING": "utf-8",
-                 "RAD_PROJECT": str(proj),
-                 "RAD_MODULES": str(resolve_modules_dir(proj)),
-                 "RAD_CONSOLE_OVERLAY": str(_overlay_path(proj))},
+            env={
+                **os.environ,
+                "PYTHONPATH": str(_IMPORT_ROOT),
+                "PYTHONIOENCODING": "utf-8",
+                "RAD_PROJECT": str(proj),
+                "RAD_MODULES": str(resolve_modules_dir(proj)),
+                "RAD_CONSOLE_OVERLAY": str(_overlay_path(proj)),
+            },
             **_popen_background_kwargs(),
         )
         _RUN.update({
@@ -382,3 +398,19 @@ def read_log(offset: int = 0, max_bytes: int = 200_000) -> dict[str, Any]:
         "size": size,
         "status": run_status()["status"],
     }
+
+
+if __name__ == "__main__":
+    # 本文件是库模块，不是 CLI。UI「运行」走 start_run → console.py run；勿直接执行本文件。
+    root = _IMPORT_ROOT
+    print(
+        "modules.console.run 不能直接当脚本跑。\n"
+        f"请从仓库根启动控制台:\n"
+        f"  set PYTHONPATH={root}\n"
+        f"  python -m modules.console.console serve\n"
+        f"或: python {_CONSOLE_PY} serve\n"
+        f"UI「运行」会经 /api/run → start_run 拉起 console.py run（已设 PYTHONPATH）。",
+        file=sys.stderr,
+        flush=True,
+    )
+    raise SystemExit(2)
