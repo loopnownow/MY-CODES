@@ -15,7 +15,7 @@ def _resolve_ms_body() -> Path:
         cands.append(Path(os.environ["ODOC_CODE"]))
     if os.environ.get("GROK_ROOT"):
         cands.append(Path(os.environ["GROK_ROOT"]) / "0doc" / "_code")
-    # <lab>/0doc/GitHub/stats-analysis/modules/tests -> <lab>/0doc/_code
+    # <lab>/0doc/GitHub/MY-CODES/modules/tests -> <lab>/0doc/_code
     cands.append(Path(__file__).resolve().parents[2].parent.parent / "_code")
     for base in cands:
         hit = base / "05-manuscript" / "write-paper"

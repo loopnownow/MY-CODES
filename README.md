@@ -1,6 +1,7 @@
-# stats-analysis（算法库主库 / 02 席位脚本半）
+# MY-CODES（可运行代码主库 / 02 席位脚本半）
 
-2026-10-23 由 `0doc/GitHub/stats-analysis/` 提升为**独立主库**。
+2026-10-23 提升为**独立主库**；**2026-11-01 由 `stats-analysis` 更名为 `MY-CODES`**（GitHub 旧 URL 保留
+redirect）。技能 fine-id `stats-analysis` 与别名 `{code_stats}` / `STATS_ROOT` **不随仓名改**，两者已解耦。
 
 ## 三仓分工（2026-10-27 站立）
 
@@ -8,15 +9,15 @@
 |---|---|---|
 | **MY-RULES** | 站立运营政策：本机布局、交付落点、新建禁区、网络红线、技能库契约 | 专业技能正文、可运行代码 |
 | **MY-SKILLS** | 专业技能（`NN_slug/base/` 能力正文 + `advanced/` 个人层 + `qc/` 门控标准），全部是 prose | 可运行的分析/清洗代码 |
-| **stats-analysis**（本仓） | 可运行代码：`modules/` 算法库 + `model-validation/` CLI | 任何 skill 正文、患者数据、课题配置 |
+| **MY-CODES**（本仓） | 可运行代码：`modules/` 算法库 + `model-validation/` CLI + `tools/` | 任何 skill 正文、患者数据、课题配置 |
 
-`stats-analysis` 是 **02_data-processing 席位的脚本半**：`MY-SKILLS/02_data-processing/` 说「怎么做、按什么规则」，
+`MY-CODES` 是 **02_data-processing 席位的脚本半**：`MY-SKILLS/02_data-processing/` 说「怎么做、按什么规则」，
 本仓是它真正跑的那部分。技能正文引用本仓的路径别名（`{code_stats}` / `{code_modules}` / `{code_model_validation}`），
 不 vendor 任何 `.py`。反方向同样成立：本仓不写 skill 规则，规则改动进 MY-SKILLS。
 
 ## 远端
 
-`origin` = `https://github.com/loopnownow/stats-analysis.git`（**public**）。
+`origin` = `https://github.com/loopnownow/MY-CODES.git`（**public**；旧名 `stats-analysis` 已 redirect）。
 默认分支 `main`；推送 / fetch / 改可见性都属**联网动作**，须当轮点名才做。
 
 - 公网可读：不要把本机绝对路径、未发表课题代号、具体分析变量名写进代码、用例或文档。
@@ -38,7 +39,7 @@
 
 ```
 <this-repo>/modules                         ← 运行时真源 + git（唯一）
-<_code>/02-data-processing/stats-analysis/  ← 已退役，只留指针 README
+<_code>/02-data-processing/stats-analysis/  ← HISTORIC: 已退役，仅指针壳（QC 清理对象）
 ```
 
 - **本仓是运行时的唯一真源**：各课题 `ref/settings.ini` 的 `MODULES_DIR` 指向本仓 `modules/`。`MODULES_DIR` 不是目录时 console 与 `import modules` 直接报错，不回退。
