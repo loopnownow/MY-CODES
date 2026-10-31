@@ -4361,9 +4361,21 @@ async function boot() {
     $("diffBanner").textContent = "未连上后端。打开工程文件夹里的 <工程名>.html 拨开关，或在 modules/console 执行 python console.py";
     return;
   }
-  const pr = await api("/api/projects");
-  fillProjects(pr.projects || []);
-  const ses = (await api("/api/session")).session;
+  let pr;
+  let ses;
+  try {
+    pr = await api("/api/projects");
+    fillProjects(pr.projects || []);
+    ses = (await api("/api/session")).session;
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    setDot("err", "配置载入失败");
+    $("diffBanner").className = "banner bad";
+    $("diffBanner").textContent = "配置页无法载入：" + msg;
+    if ($("loadHint")) $("loadHint").innerHTML = '<span class="err">' + esc(msg) + "</span>";
+    return;
+  }
+
   const qs = new URLSearchParams(location.search);
   const urlProj = qs.get("project");
   const urlDir = (qs.get("dir") || "").trim();
