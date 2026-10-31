@@ -554,7 +554,7 @@ def main(argv: list[str] | None = None) -> None:
     p_reg.add_argument("--dir", default="", help="显式项目目录；空=按项目名自动查找")
     p_reg.add_argument(
         "--scopes", default="",
-        help="逗号分隔 read,write-settings,run；空=默认 read,write-settings",
+        help="逗号分隔 read,write-settings,run；空=默认 read,write-settings,run",
     )
     p_reg.add_argument("--rotate", action="store_true", help="重发 token 并重写启动页")
 
