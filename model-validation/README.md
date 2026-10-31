@@ -1,4 +1,4 @@
-# stats-analysis/model-validation — 统计 / 验证课题 CLI
+# MY-CODES/model-validation — 统计 / 验证课题 CLI
 
 本目录放**可复跑的统计与验证脚本**（顶部 CONFIG、绑课题），不是清洗主链，也不是 `modules/utils` 库。
 
