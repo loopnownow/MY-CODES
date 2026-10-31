@@ -1,4 +1,4 @@
-"""控制台常量：路径、端口、设置键元数据。
+﻿"""控制台常量：路径、端口、设置键元数据。
 
 纯数据、无状态，不 import console：console.py 先 bootstrap sys.path，
 再 import 本模块并把同名符号复用到自己的命名空间。
@@ -33,7 +33,9 @@ PORT_LO = 8765
 PORT_HI = 8776
 CHECK_PORT = 8780
 PORT_FILE = CONSOLE_DIR / "console.port.json"
-REGISTRY_PATH = CONSOLE_DIR / "console.projects.json"
+# Live registry lives under the local doc tree (outside the GitHub clone).
+# Lab default: <GROK_ROOT>/0doc/console.projects.json  →  D:\0Grok\0doc\console.projects.json
+REGISTRY_PATH = GROK_ROOT / "0doc" / "console.projects.json"
 HOST = "127.0.0.1"
 _TOKEN_SAFE_GET = {
     "/", "/console.html", "/xlm_console.html",
