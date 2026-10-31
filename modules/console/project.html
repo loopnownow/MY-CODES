@@ -137,6 +137,22 @@ button.pri:hover,a.pri:hover{background:#0c3d4a;text-decoration:none}
 #msg{min-height:1.4em}
 #msg.ok{color:var(--ok)} #msg.err{color:var(--err)} #msg.warn{color:var(--warn)}
 .save-row{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.cfg-topic-row{
+  display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin:0 0 16px;
+}
+.cfg-topic-row h2{margin:0;flex:0 0 auto}
+.cfg-topic-row .fld{margin:0;flex:1 1 14em;min-width:10em}
+.reg-row{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin:0 0 4px;padding:10px 12px;border-radius:var(--r);
+  background:#f0ebe3;box-shadow:inset 0 0 0 1px var(--line);
+}
+.reg-row .reg-title{font-weight:600;font-size:13px;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-right:4px}
+.reg-row .reg-title .n{
+  width:1.5em;height:1.5em;border-radius:50%;background:var(--accent);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:0;
+}
+
 .sheet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(8em,1fr));gap:12px;margin:0 0 16px}
 .sheet-grid .fld{margin:0}
 .id-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10em,1fr));gap:12px;margin:0 0 4px}
@@ -193,12 +209,13 @@ footer{
   <div class="header-inner">
     <p class="kicker">RAD 统计控制台</p>
     <h1 id="projTitle">通用模板</h1>
-    <p class="lead">先开服务，再加载数据，然后选 sheet。项目 / 数据 / 外验在本页。进控制台不强制写 ini。</p>
+    <p class="lead">先定课题并登记，再开服务、加载数据，然后选 sheet。项目 / 数据 / 外验在本页。进控制台不强制写 ini。</p>
     <ol class="flow" aria-label="操作顺序">
       <li><span class="n">1</span> 课题路径</li>
-      <li><span class="n">2</span> 开服务</li>
-      <li><span class="n">3</span> 加载数据</li>
-      <li><span class="n">4</span> 进入配置</li>
+      <li><span class="n">2</span> 登记本项目</li>
+      <li><span class="n">3</span> 开服务</li>
+      <li><span class="n">4</span> 加载数据</li>
+      <li><span class="n">5</span> 进入配置</li>
     </ol>
   </div>
 </header>
@@ -208,9 +225,11 @@ footer{
   </div>
   <div class="grid">
     <section class="card" aria-labelledby="h-cfg">
-      <h2 id="h-cfg"><span class="n">1</span> 配置</h2>
-      <div class="fld"><span class="lab" title="优先 ?project=，其次本文件名，再次所在文件夹。">课题</span>
-        <input id="projectName" type="text" placeholder="如 demo_study" value=""/>
+      <div class="cfg-topic-row">
+        <h2 id="h-cfg"><span class="n">1</span> 配置</h2>
+        <div class="fld"><span class="lab" title="优先 ?project=，其次本文件名，再次所在文件夹。课题路径即本页所在目录。">课题</span>
+          <input id="projectName" type="text" placeholder="如 demo_study" value=""/>
+        </div>
       </div>
       <div class="fld"><span class="lab" title="可空=工程 ref/settings.ini">settings</span>
         <div class="pick-row">
@@ -228,9 +247,18 @@ footer{
         <button type="button" id="btnSaveIni" title="可选：把 settings / modules 路径写入 ini。先备份 bak。须先开服务。">保存 ini</button>
         <span class="hint" style="margin:0">可选手动写回；进入配置不强制写 ini</span>
       </div>
+      <div class="reg-row" id="regBlock">
+        <span class="reg-title"><span class="n">2</span> 登记本项目</span>
+        <button type="button" id="btnRegister" title="生成本项目 token 并写入本页 meta（默认 scopes: read, write-settings）">登记本项目</button>
+        <label class="check" title="默认不含 run。勾选后登记前会二次确认。">
+          <input type="checkbox" id="regScopeRun"/>
+          含 run（需确认）
+        </label>
+        <span class="hint" id="regMsg" style="margin:0">默认 read + write-settings；run 勿默认给满权。</span>
+      </div>
     </section>
     <section class="card" aria-labelledby="h-svc">
-      <h2 id="h-svc"><span class="n">2</span> 服务</h2>
+      <h2 id="h-svc"><span class="n">3</span> 服务</h2>
       <label class="rad-switch" for="radToggle" title="打开或关闭本机 radconsole（Python 控制台服务）">
         <span class="rad-meta">
           <span class="rad-title">radconsole</span>
@@ -266,7 +294,7 @@ footer{
     </section>
   </div>
   <section id="dataBlock" class="card" hidden aria-labelledby="h-data">
-    <h2 id="h-data"><span class="n">3</span> 项目 / 数据 / 外部验证</h2>
+    <h2 id="h-data"><span class="n">4</span> 项目 / 数据 / 外部验证</h2>
     <p class="hint">服务已开。选 Excel 和外验后点「加载数据」，再选 sheet。</p>
     <div class="fld"><span class="lab" title="工程根下的 Excel。可空=默认与课题同名。">数据</span>
       <div class="pick-row">
@@ -293,7 +321,6 @@ footer{
       <button type="button" class="pri" id="btnLoadData">加载数据</button>
       <span class="hint" id="loadMsg" style="margin:0">先开服务，再点加载。</span>
       <button type="button" id="btnClearBad" hidden title="把报错的设置项写成空字符串。先备份 settings.ini.bak，再重新加载。">清空报错键</button>
-      <button type="button" id="btnRegister" hidden title="生成本项目 token 并写入本页 meta；仅本地文件页需要">注册本项目</button>
     </div>
     <div id="sheetBlock" hidden>
       <div class="sublab">工作表</div>
@@ -751,8 +778,8 @@ applyProject(inferProject());
 const metaTok = ((document.querySelector('meta[name="console-token"]') || {}).content || "").trim();
 if (location.protocol === "file:" && loadMsg) {
   loadMsg.textContent = (metaTok && metaTok !== "__CONSOLE_TOKEN__")
-    ? "已注册本项目：可直接在本页加载。"
-    : "本页未注册：点「注册本项目」生成 token，或点「加载数据」进入控制台。";
+    ? "已登记本项目：可直接在本页加载。"
+    : "本页未登记：点「登记本项目」生成 token，或点「加载数据」进入控制台。";
 }
 portEl.addEventListener("change", () => {
   syncLinks();
@@ -922,7 +949,7 @@ function onServiceReady(p) {
   msg.textContent = !PROJECT
     ? "服务已开。填写课题名后再加载数据。"
     : (fileMode && !pageToken
-      ? "服务已开。本页未注册：点「注册本项目」或「加载数据」进入控制台。"
+      ? "服务已开。本页未登记：点「登记本项目」或「加载数据」进入控制台。"
       : "服务已开。选数据后点「加载数据」，再选 sheet。");
 }
 function keysFromSettingsError(msg) {
@@ -1153,7 +1180,21 @@ function apiHeaders(extra) {
 }
 syncTokenFromMeta();
 const btnRegister = document.getElementById("btnRegister");
-if (btnRegister) btnRegister.hidden = !(location.protocol === "file:" && !pageToken);
+const regMsg = document.getElementById("regMsg");
+const regScopeRun = document.getElementById("regScopeRun");
+const regBlock = document.getElementById("regBlock");
+function setRegMsg(t) {
+  if (regMsg) regMsg.textContent = t;
+  if (loadMsg && location.protocol === "file:") loadMsg.textContent = t;
+}
+function syncRegisterUi() {
+  const isFile = location.protocol === "file:";
+  if (regBlock) regBlock.hidden = !isFile;
+  if (!btnRegister) return;
+  btnRegister.hidden = !isFile;
+  btnRegister.textContent = pageToken ? "重新登记" : "登记本项目";
+}
+syncRegisterUi();
 async function pollRegisterResult(ms) {
   const until = Date.now() + (ms == null ? 15000 : ms);
   while (Date.now() < until) {
@@ -1165,29 +1206,41 @@ async function pollRegisterResult(ms) {
 }
 async function registerProject() {
   if (!PROJECT) {
-    if (loadMsg) loadMsg.textContent = "请先填写课题名。";
+    setRegMsg("请先填写课题名。");
     return;
   }
   const dir = fileDir();
   if (!dir) {
-    if (loadMsg) loadMsg.textContent = "当前不是本地文件页，无需注册。";
+    setRegMsg("当前不是本地文件页，无需登记。");
     return;
+  }
+  const scopes = ["read", "write-settings"];
+  if (regScopeRun && regScopeRun.checked) {
+    const ok = window.confirm(
+      "将授予 run 权限（可在本机启动分析流水线）。确定要一并登记 run 吗？\n默认只需 read + write-settings。"
+    );
+    if (!ok) {
+      setRegMsg("已取消；未授予 run。可去掉勾选后重新登记。");
+      return;
+    }
+    scopes.push("run");
   }
   launchProto(
     "radconsole://register?project=" + encodeURIComponent(PROJECT) +
-    "&dir=" + encodeURIComponent(dir)
+    "&dir=" + encodeURIComponent(dir) +
+    "&scopes=" + encodeURIComponent(scopes.join(","))
   );
-  if (loadMsg) loadMsg.textContent = "已请求注册；浏览器若弹窗请点允许…";
+  setRegMsg("已请求登记；浏览器若弹窗请点允许…");
   const j = await pollRegisterResult();
   if (!j) {
-    if (loadMsg) loadMsg.textContent = "注册没有回执。请允许打开 radconsole 后再点一次。";
+    setRegMsg("登记没有回执。请允许打开 radconsole 后再点一次。");
     return;
   }
   if (!j.ok) {
-    if (loadMsg) loadMsg.textContent = "注册失败：" + (j.error || "未知错误");
+    setRegMsg("登记失败：" + (j.error || "未知错误"));
     return;
   }
-  if (loadMsg) loadMsg.textContent = "已注册（token 已写入本页），即将刷新…";
+  setRegMsg("已登记（token 已写入本页），即将刷新…");
   setTimeout(() => location.reload(), 800);
 }
 if (btnRegister) btnRegister.onclick = () => registerProject();
