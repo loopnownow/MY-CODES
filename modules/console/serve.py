@@ -232,6 +232,8 @@ def radconsole_action(url: str) -> str:
         return "stop"
     if action == "check":
         return "check"
+    if action in {"register", "unregister"}:
+        return action
     return "serve"
 
 def _port_band(lo: int | None, hi: int | None) -> tuple[int, int]:

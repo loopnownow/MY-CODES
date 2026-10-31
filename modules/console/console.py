@@ -224,6 +224,8 @@ from modules.console.serve import (  # noqa: E402,F401
 
 # HTTP Handler / Server 实现：真 import（B4c7 起不再 install 注入）
 from modules.console.http_impl import ConsoleServer, Handler  # noqa: E402
+from modules.console import registry as project_registry  # noqa: E402
+from modules.console import warmup as console_warmup  # noqa: E402
 
 _RUN_LOCK = _state.RUN_LOCK   # 同一把锁
 _RUN = _state.RUN             # 同一个 dict（只 update，不重绑）
@@ -236,6 +238,15 @@ def _resolve(p: str | Path) -> Path:
 _PREVIEW_CACHE = _state.PREVIEW_CACHE  # 同一个 dict
 
 # ── CLI：serve / run（端口与服务 helper 见 serve.py）────────────
+
+def _warmup_then_log(project: str | None, data: str | None) -> None:
+    console_warmup.run(project, data)
+    state = console_warmup.STATE
+    if state["error"]:
+        print(f"[warmup] 失败\n{state['error']}", flush=True)
+    else:
+        print(f"[warmup] {state['detail']}", flush=True)
+
 
 def cmd_serve(port: int, open_browser: bool, project: str | None = None,
               wait_free: bool = False, data: str | None = None,
@@ -301,6 +312,9 @@ def cmd_serve(port: int, open_browser: bool, project: str | None = None,
     print(f"RAD_ROOT     {RAD_ROOT}", flush=True)
     print(f"MODULES      {MODULES_ROOT}", flush=True)
     print("Ctrl+C 结束", flush=True)
+    threading.Thread(
+        target=_warmup_then_log, args=(project, data), daemon=True
+    ).start()
     if open_browser:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:
@@ -339,6 +353,94 @@ def cmd_run(args: argparse.Namespace) -> int:
         outcome=outcome,
     )
 
+def register_project(
+    project: str,
+    directory: str = "",
+    *,
+    scopes: list[str] | None = None,
+    rotate: bool = False,
+) -> dict[str, Any]:
+    """登记项目并把 token 写进 <project>.html；CLI 与 radconsole://register 共用。"""
+    key = str(project or "").strip()
+    if not key:
+        raise ValueError("未指定 project")
+    proj = project_dir(key, directory)
+    starter = Path(proj) / f"{key}.html"
+    entry, token = project_registry.register(
+        key,
+        proj,
+        scopes=scopes or None,
+        rotate=rotate,
+        starter_html=str(starter) if starter.is_file() else "",
+    )
+    out: dict[str, Any] = {
+        "ok": True,
+        "op": "register",
+        "project": entry.project,
+        "dir": entry.dir,
+        "scopes": entry.scopes,
+        "starter": str(starter),
+        "action": "",
+        "token_written": False,
+    }
+    if token and starter.is_file():
+        out["action"] = project_registry.inject_token(starter, token)
+        out["token_written"] = True
+    elif token:
+        out["token"] = token
+    return out
+
+
+def cmd_register(args: argparse.Namespace) -> int:
+    scopes = [s.strip() for s in str(getattr(args, "scopes", "") or "").split(",") if s.strip()]
+    result = register_project(
+        str(args.project or "").strip(),
+        getattr(args, "dir", "") or "",
+        scopes=scopes or None,
+        rotate=bool(getattr(args, "rotate", False)),
+    )
+    print(f"已登记 {result['project']} → {result['dir']}", flush=True)
+    print(f"scopes  {','.join(result['scopes'])}", flush=True)
+    if result["token_written"]:
+        print(f"token 已写入启动页（{result['action']}）: {result['starter']}", flush=True)
+    elif result.get("token"):
+        print(f"缺启动页 {result['starter']}；token 只出现在本次输出，请手工写入页面 meta", flush=True)
+        print(f"TOKEN {result['token']}", flush=True)
+    else:
+        print("token 未轮换（页面里旧 token 继续有效）；要重写页面请加 --rotate", flush=True)
+    print(f"注册表 {project_registry.path()}", flush=True)
+    return 0
+
+
+def cmd_unregister(args: argparse.Namespace) -> int:
+    project = str(args.project or "").strip()
+    entry = project_registry.get(project)
+    starter = Path(entry.starter_html) if entry and entry.starter_html else None
+    if not project_registry.unregister(project):
+        print(f"未登记: {project}", flush=True)
+        return 1
+    if starter and starter.is_file():
+        project_registry.clear_token(starter)
+        print(f"已抹掉页面 token: {starter}", flush=True)
+    print(f"已注销 {project}", flush=True)
+    return 0
+
+
+def cmd_registry(args: argparse.Namespace) -> int:
+    rows = project_registry.listing()
+    if not rows:
+        print("注册表为空", flush=True)
+        return 0
+    for row in rows:
+        state = "ok" if row.get("dir_ok") else "STALE"
+        print(
+            f"{row['project']:<14} {state:<6} {','.join(row.get('scopes') or []):<22} {row.get('dir')}",
+            flush=True,
+        )
+    print(f"注册表 {project_registry.path()}", flush=True)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     raw = list(sys.argv[1:] if argv is None else argv)
     if raw and str(raw[0]).startswith("radconsole:"):
@@ -372,6 +474,30 @@ def main(argv: list[str] | None = None) -> None:
             else:
                 print(result.get("error") or "未关闭", flush=True)
             publish_local(result)
+            return
+        if action in ("register", "unregister"):
+            project_q = (qs.get("project") or [""])[0]
+            dir_q = (qs.get("dir") or [""])[0]
+            try:
+                if action == "unregister":
+                    entry = project_registry.get(project_q)
+                    starter = Path(entry.starter_html) if entry and entry.starter_html else None
+                    removed = project_registry.unregister(project_q)
+                    if starter and starter.is_file():
+                        project_registry.clear_token(starter)
+                    result = {
+                        "ok": removed,
+                        "op": "unregister",
+                        "project": project_q,
+                        "starter": str(starter or ""),
+                        "error": "" if removed else "未登记",
+                    }
+                else:
+                    result = register_project(project_q, dir_q, rotate=True)
+            except Exception as e:
+                result = {"ok": False, "op": action, "project": project_q, "error": str(e)}
+            print(json.dumps(result, ensure_ascii=False), flush=True)
+            publish_local(result, hold=12)
             return
         project = (qs.get("project") or [""])[0] or None
         data = (qs.get("data") or [""])[0] or None
@@ -419,6 +545,20 @@ def main(argv: list[str] | None = None) -> None:
         help="只跑这一结局；空=公共页，跑全部 OUTCOME_COLS",
     )
 
+    p_reg = sub.add_parser("register", help="登记项目并给启动页写 token")
+    p_reg.add_argument("--project", required=True)
+    p_reg.add_argument("--dir", default="", help="显式项目目录；空=按项目名自动查找")
+    p_reg.add_argument(
+        "--scopes", default="",
+        help="逗号分隔 read,write-settings,run；空=默认 read,write-settings",
+    )
+    p_reg.add_argument("--rotate", action="store_true", help="重发 token 并重写启动页")
+
+    p_unreg = sub.add_parser("unregister", help="注销项目并抹掉启动页 token")
+    p_unreg.add_argument("--project", required=True)
+
+    sub.add_parser("registry", help="列出注册表")
+
     args = parser.parse_args(argv)
     if args.cmd in (None, "serve"):
         port = getattr(args, "port", None) or load_preferred_port()
@@ -434,6 +574,12 @@ def main(argv: list[str] | None = None) -> None:
             traceback.print_exc()
             rc = 1
         sys.exit(rc)
+    if args.cmd == "register":
+        sys.exit(cmd_register(args))
+    if args.cmd == "unregister":
+        sys.exit(cmd_unregister(args))
+    if args.cmd == "registry":
+        sys.exit(cmd_registry(args))
     parser.print_help()
 
 if __name__ == "__main__":

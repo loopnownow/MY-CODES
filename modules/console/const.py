@@ -33,6 +33,7 @@ PORT_LO = 8765
 PORT_HI = 8776
 CHECK_PORT = 8780
 PORT_FILE = CONSOLE_DIR / "console.port.json"
+REGISTRY_PATH = CONSOLE_DIR / "console.projects.json"
 HOST = "127.0.0.1"
 _TOKEN_SAFE_GET = {
     "/", "/console.html", "/xlm_console.html",

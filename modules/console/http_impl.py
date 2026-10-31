@@ -91,15 +91,25 @@ from modules.console.run import (
 )
 # 端口 / 服务层：真 import（B4c6 起从 console 搬出，注入表随之清空）
 from modules.console.serve import spawn_successor
+from modules.console import registry as project_registry
 
 PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
 _PROBE_SAFE_GET = frozenset({"/api/health", "/api/port"})
+# 需要 run scope 的写请求（会起进程 / 重跑流水线）
+_RUN_SCOPE_PATHS = frozenset({
+    "/api/run",
+    "/api/run/bat",
+    "/api/run/runbat",
+    "/api/run/stop",
+    "/api/restart",
+})
 
 # 由 modules.console.ops 静态 import 的叶层符号：契约自检用（测试断言二者一致）。
 _OPS_OWNED = frozenset({
     "_overlay_path",
     "allow_browser_origin",
     "clear_project_overlay",
+    "cors_allow_origin",
     "jsonable",
     "project_settings",
     "resolve_meta_xlsx",
@@ -214,7 +224,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
-        hdrs = dict(self._cors_headers(allow_null=cors_null_ok))
+        allow_null = bool(cors_null_ok or getattr(self, "_reg_entry", None) is not None)
+        hdrs = dict(self._cors_headers(allow_null=allow_null))
+        if ctype.startswith("text/html"):
+            hdrs.update({
+                "X-Frame-Options": "DENY",
+                "Content-Security-Policy": "frame-ancestors 'none'",
+                "X-Content-Type-Options": "nosniff",
+            })
         if extra:
             hdrs.update(extra)
         for k, v in hdrs.items():
@@ -228,7 +245,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def _err(self, code: int, msg: str) -> None:
         c, b, t = _json_bytes({"ok": False, "error": msg}, code)
-        self._send(c, b, t)
+        null_req = (self.headers.get("Origin") or "").strip().lower() == "null"
+        self._send(c, b, t, cors_null_ok=null_req)
 
     def do_GET(self) -> None:  # noqa: N802
         try:
@@ -250,7 +268,7 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         path = unquote(u.path)
         origin = self.headers.get("Origin") or ""
-        null_ok = path in _PROBE_SAFE_GET
+        null_ok = path in _PROBE_SAFE_GET or (origin or "").strip().lower() == "null"
         acao = cors_allow_origin(origin, allow_null=null_ok)
         self.send_response(204)
         if acao is not None:
@@ -282,14 +300,95 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _page_origin_ok(self) -> bool:
+        # 顶层导航/静态资源通常不带 Origin；带了就必须是本机控制台来源
+        origin = (self.headers.get("Origin") or "").strip()
+        return not origin or allow_browser_origin(origin)
+
+    def _loopback_host_ok(self) -> bool:
+        """同机控制台 Host（或 Referer）为本机环回。同域 fetch 常不带 Origin。"""
+        host = (self.headers.get("Host") or "").strip().lower()
+        if host:
+            hostname = host.split("@")[-1].split("%")[0].split(":")[0].rstrip(".")
+            if hostname in {"127.0.0.1", "localhost", "::1"}:
+                return True
+        ref = (self.headers.get("Referer") or "").strip()
+        if ref:
+            try:
+                from urllib.parse import urlsplit
+                parts = urlsplit(ref)
+                origin = f"{parts.scheme}://{parts.netloc}"
+            except Exception:
+                origin = ""
+            if allow_browser_origin(origin):
+                return True
+        return False
+
+    def _registered_entry(self):
+        """file:// 页（Origin: null）凭项目 token 换访问权；其它 Origin 返回 None。"""
+        origin = (self.headers.get("Origin") or "").strip().lower()
+        if origin != "null":
+            return None
+        got = self.headers.get("X-Console-Token") or ""
+        if not got:
+            q = parse_qs(urlparse(self.path).query)
+            got = (q.get("token") or [""])[0]
+        if not got:
+            return None
+        return project_registry.lookup(got)
+
     def _guard(self, path: str, mutating: bool) -> bool:
-        if path not in _PROBE_SAFE_GET and not self._origin_ok():
+        if path in _PROBE_SAFE_GET:
+            return True
+        if not path.startswith("/api/"):
+            if not self._page_origin_ok():
+                self._err(403, "origin not allowed")
+                return False
+            return True
+        origin = (self.headers.get("Origin") or "").strip()
+        # 显式环回 Origin，或同域 fetch 省略 Origin（仅环回 Host/Referer）
+        if allow_browser_origin(origin) or (not origin and self._loopback_host_ok()):
+            if mutating or path not in _TOKEN_SAFE_GET:
+                return self._token_ok()
+            return True
+        entry = self._registered_entry()
+        if entry is None:
             self._err(403, "origin not allowed")
             return False
+        if not entry.dir_ok():
+            self._err(403, f"registration stale: {entry.project}")
+            return False
+        if not entry.allows("read"):
+            self._err(403, f"scope denied: {entry.project}")
+            return False
+        self._reg_entry = entry
         if mutating:
-            return self._token_ok()
-        if path.startswith("/api/") and path not in _TOKEN_SAFE_GET:
-            return self._token_ok()
+            need = "run" if path in _RUN_SCOPE_PATHS else "write-settings"
+            if not entry.allows(need):
+                self._err(403, f"scope denied: {entry.project} 缺 {need}")
+                return False
+            return True
+        return self._reg_query_ok()
+
+    def _reg_query_ok(self) -> bool:
+        entry = getattr(self, "_reg_entry", None)
+        if entry is None:
+            return True
+        qs = parse_qs(urlparse(self.path).query)
+        want = (qs.get("project") or [""])[0].strip()
+        if want and want != entry.project:
+            self._err(403, "project scope mismatch")
+            return False
+        return True
+
+    def _reg_body_ok(self, body: dict) -> bool:
+        entry = getattr(self, "_reg_entry", None)
+        if entry is None:
+            return True
+        want = str(body.get("project") or "").strip()
+        if want and want != entry.project:
+            self._err(403, "project scope mismatch")
+            return False
         return True
 
     def _do_GET(self) -> None:
@@ -635,6 +734,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self._guard(path, mutating=True):
             return
         body = _read_json_body(self)
+        if not self._reg_body_ok(body):
+            return
 
         if path == "/api/preview":
             project, data, settings_path, settings, overlay = _merged_from_request(body)
