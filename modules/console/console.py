@@ -493,7 +493,11 @@ def main(argv: list[str] | None = None) -> None:
                         "error": "" if removed else "未登记",
                     }
                 else:
-                    result = register_project(project_q, dir_q, rotate=True)
+                    scopes_q = (qs.get("scopes") or [""])[0]
+                    scopes = [s.strip() for s in scopes_q.split(",") if s.strip()] or None
+                    result = register_project(
+                        project_q, dir_q, scopes=scopes, rotate=True,
+                    )
             except Exception as e:
                 result = {"ok": False, "op": action, "project": project_q, "error": str(e)}
             print(json.dumps(result, ensure_ascii=False), flush=True)
