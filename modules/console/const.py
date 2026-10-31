@@ -39,8 +39,7 @@ _TOKEN_SAFE_GET = {
     "/console.css",
     "/console_schema.js", "/console_api.js", "/console_ui.js", "/console_app.js",
     "/api/health", "/api/port",
-    # 工程 html 从 file:// 列课题/载入预览；关服务改走 token（health 本机回传）
-    "/api/projects", "/api/settings",
+    # 起始页须用 http://127.0.0.1:<port>/start.html（内嵌 token）；file:// 仅可探测 health
 }
 
 SKIP_SETTING_KEYS = {

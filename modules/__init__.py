@@ -6,6 +6,7 @@ PYTHONPATH=<repo root> 后: python -m modules.pipeline
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 
 __version__ = "4.3.1"
@@ -49,6 +50,10 @@ try:
     _prov_enforce(_prov_collect(_HERE, version=__version__))
 except RuntimeError:
     raise
-except Exception:
-    pass
+except Exception as exc:
+    warnings.warn(
+        f"modules provenance initialization failed: {exc}",
+        UserWarning,
+        stacklevel=1,
+    )
 

@@ -206,7 +206,7 @@ def test_shutdown_not_token_safe():
 
 
 def test_shutdown_requires_token_http():
-    """Local HTTP: health returns token; shutdown without it is 403."""
+    """Local HTTP: console token from state; shutdown without it is 403."""
     import json
     import threading
 
@@ -214,6 +214,7 @@ def test_shutdown_requires_token_http():
     from http.client import HTTPConnection
 
     from modules.console import console as cons
+    from modules.console.state import CONSOLE_TOKEN
 
     httpd = cons.ConsoleServer((cons.HOST, 0), cons.Handler)
     port = httpd.server_address[1]
@@ -227,7 +228,8 @@ def test_shutdown_requires_token_http():
         resp = conn.getresponse()
         body = json.loads(resp.read().decode("utf-8"))
         assert resp.status == 200 and body.get("ok")
-        tok = body.get("token")
+        assert "token" not in body
+        tok = CONSOLE_TOKEN
         assert tok
 
         conn.request("GET", "/api/shutdown")
