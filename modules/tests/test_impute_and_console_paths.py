@@ -237,6 +237,8 @@ def test_nomogram_clinical_only(tmp_path, monkeypatch):
     y = (0.8 * x1 + 0.4 * x2 + rng.normal(0, 0.3, n) > 0).astype(int)
     clin = pd.DataFrame({"Age": x1, "Shape": x2})
     monkeypatch.chdir(tmp_path)
+    from modules.config import outcome as oc
+    oc.set_outcome("Group")
     res = M.build_nomogram(
         train_label=y,
         radscore_train=None,
@@ -265,6 +267,8 @@ def test_nomogram_uses_original_category_strings(tmp_path, monkeypatch):
     y = (x >= 1).astype(int)
     clin = pd.DataFrame({"Layers Involvement": x})
     monkeypatch.chdir(tmp_path)
+    from modules.config import outcome as oc
+    oc.set_outcome("Group")
     res = M.build_nomogram(
         train_label=y,
         radscore_train=None,

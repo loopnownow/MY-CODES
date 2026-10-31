@@ -348,9 +348,22 @@ apply_fig_palette(_S)
 
 
 def ensure_output_dirs(out_dir: str = None) -> None:
-    out_dir = out_dir if out_dir is not None else (_S.OUT_DIR or ".")
-    if not out_dir:
-        out_dir = "."
+    """创建 ``{OUT_DIR}/`` 与 ``{OUT_DIR}/PNG/``。
+
+    禁止落到工程根 ``.``：现行分析数字必须在终点夹（见 outcome.normalize_analysis_out_dir）。
+    绝对路径（测试 monkeypatch）原样使用。
+    """
+    from modules.config.outcome import normalize_analysis_out_dir
+
+    if out_dir is None:
+        out_dir = getattr(_S, "OUT_DIR", "") or ""
+    out_dir = str(out_dir or "").strip()
+    if not out_dir or out_dir in (".", "./"):
+        raise ValueError(
+            "OUT_DIR 未解析，禁止写到工程根；请先 set_outcome，"
+            "或设置 SUBPROJECT_BY_OUTCOME / 结局名作终点夹"
+        )
+    out_dir = normalize_analysis_out_dir(out_dir)
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(os.path.join(out_dir, "PNG"), exist_ok=True)
 

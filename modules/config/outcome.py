@@ -80,6 +80,75 @@ def safe_dir_token(name: str) -> str:
     return s or "unnamed"
 
 
+# 现行分析数字终点夹：不得落在这些相对工程根的第一段（MY-RULES workspace-layout /
+# project-ref-layout：分析临时结果在子工程根旁 ASL 类树，不进 ref/；无 0result）。
+_RESERVED_ANALYSIS_OUT_ROOTS = frozenset({
+    "ref",
+    "0result",
+    "0del",
+    "output",
+    "results",
+    "modules",
+    "__pycache__",
+    ".git",
+})
+
+# ref/ 地图下的子夹名：剥掉 ref/ 后若只剩这些，仍不算分析终点夹。
+_REF_LAYOUT_TOKENS = frozenset({
+    "pipeline",
+    "tables",
+    "figures",
+    "results",
+    "tmp",
+    "review",
+    "citation",
+    "refer",
+    "code-gates",
+    "analysis",
+    "materials",
+    "exec",
+    "code",
+    "gates",
+    "writing-refs",
+    "raw-pre",
+})
+
+
+def normalize_analysis_out_dir(path: str, *, fallback: str = "") -> str:
+    """把分析输出目录收成相对工程根的终点夹路径。
+
+    规则：`<project>/<endpoint>/`（可再套对子夹）；禁止工程根 ``.``、禁止 ``ref/``
+    与退役壳（``0result`` / ``output`` / ``results`` 等）。绝对路径原样返回
+    （测试或显式外置目录）。
+    """
+    raw = str(path or "").strip()
+    fb = safe_dir_token(fallback) if str(fallback or "").strip() else ""
+    if raw and (os.path.isabs(raw) or (len(raw) >= 2 and raw[1] == ":")):
+        return raw
+    norm = raw.replace(chr(92), "/")
+    parts = [p for p in norm.split("/") if p and p != "."]
+    if any(p == ".." for p in parts):
+        raise ValueError(f"OUT_DIR 不得含 '..': {path!r}")
+    stripped_ref = False
+    while parts and parts[0].lower() in _RESERVED_ANALYSIS_OUT_ROOTS:
+        if parts[0].lower() == "ref":
+            stripped_ref = True
+        parts.pop(0)
+    if stripped_ref:
+        while parts and parts[0].lower() in _REF_LAYOUT_TOKENS:
+            parts.pop(0)
+    if not parts:
+        if fb:
+            return fb
+        raise ValueError(
+            "分析输出目录不能落在工程根或 ref/ 等保留位；"
+            "请用终点夹名（如 ASL、Group），"
+            "见 MY-RULES workspace-layout「现行分析数字」"
+        )
+    return os.path.join(*parts)
+
+
+
 def results_html_name(subproject: str) -> str:
     """结果页文件名：Results + 子项目名 + .html。例：perfusion → Resultsperfusion.html。"""
     return "Results" + safe_dir_token(subproject) + ".html"
@@ -182,20 +251,27 @@ def map_outcome_out_dir(
       单结局子工程 → {子工程}/{队列}
       多结局子工程 → {子工程}/{队列}/{结局}
     无映射时保持 {队列}/{结局}（队列空则只有结局名）。
+
+    返回值经 ``normalize_analysis_out_dir``：落在 ``<endpoint>/``，
+    不会是工程根或 ``ref/`` 保留位。
     """
     mapping = mapping or {}
     cohort = str(cohort or "").strip()
+    outcome = str(outcome or "").strip()
     sub = str(mapping.get(outcome) or "").strip()
     if sub:
         n = sum(1 for v in mapping.values() if str(v) == sub)
         if n <= 1:
-            return os.path.join(sub, cohort) if cohort else sub
-        if cohort:
-            return os.path.join(sub, cohort, outcome)
-        return os.path.join(sub, outcome)
-    if use_subdir:
-        return os.path.join(cohort, outcome) if cohort else outcome
-    return cohort
+            raw = os.path.join(sub, cohort) if cohort else sub
+        elif cohort:
+            raw = os.path.join(sub, cohort, outcome)
+        else:
+            raw = os.path.join(sub, outcome)
+    elif use_subdir:
+        raw = os.path.join(cohort, outcome) if cohort else outcome
+    else:
+        raw = cohort
+    return normalize_analysis_out_dir(raw, fallback=outcome or "unnamed")
 
 
 def subproject_root(
@@ -214,7 +290,9 @@ def subproject_root(
     if outcome:
         sub = str(mapping.get(outcome) or "").strip()
         if sub:
-            return sub
+            coerced = normalize_analysis_out_dir(sub, fallback=outcome)
+            first = os.path.normpath(coerced).replace(chr(92), "/").split("/")[0]
+            return first or outcome
     out_dir = str(out_dir or "").strip()
     if out_dir and out_dir not in (".",):
         first = os.path.normpath(out_dir).replace("\\", "/").split("/")[0]
@@ -286,6 +364,7 @@ def set_outcome(outcome: str, out_dir_base: str | None = None) -> None:
         mapping = {}
     use_subdir = bool(getattr(S, "OUTCOME_OUT_SUBDIR", True))
     new_out = map_outcome_out_dir(outcome, cohort, mapping, use_subdir)
+    new_out = normalize_analysis_out_dir(new_out, fallback=outcome)
     new_png = os.path.join(new_out, "PNG")
 
     base = snapshot_outcome_base(S, cfg)
@@ -483,7 +562,9 @@ def set_pairwise(pos: str, neg: str, out_dir_base: str | None = None) -> None:
         disp_neg = level_display_name(neg, S=S)
     folder = pair_dir_name(disp_pos, disp_neg)
     base = _outcome_parent_dir(S, cfg, out_dir_base)
+    base = normalize_analysis_out_dir(base, fallback=outcome) if base else ""
     new_out = os.path.join(base, folder) if base else folder
+    new_out = normalize_analysis_out_dir(new_out, fallback=folder)
     new_png = os.path.join(new_out, "PNG")
     _pub("OUT_DIR", new_out)
     _pub("PNG_DIR", new_png)

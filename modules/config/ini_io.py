@@ -319,6 +319,20 @@ def coerce_ipcw_horizons(value: Any) -> list[float]:
     return sorted(out)
 
 
+def _coerce_analysis_endpoint(val: str, *, fallback: str = "") -> str:
+    """把 OUT_DIR / SUBPROJECT 映射值从 ref/ 等保留前缀收成终点夹名。"""
+    from modules.config.outcome import normalize_analysis_out_dir, safe_dir_token
+
+    s = str(val or "").strip()
+    fb = safe_dir_token(fallback) if str(fallback or "").strip() else ""
+    if not s:
+        return fb
+    try:
+        return normalize_analysis_out_dir(s, fallback=fb)
+    except ValueError:
+        return fb
+
+
 def migrate_retired_settings(data: dict[str, Any]) -> dict[str, Any]:
     """旧键迁到现用字段后丢掉退役项。
 
@@ -349,6 +363,26 @@ def migrate_retired_settings(data: dict[str, Any]) -> dict[str, Any]:
             continue
         if _retired_is_default(k, out[k]):
             out.pop(k, None)
+    # 现行分析数字不得落在 ref/ 或退役壳；加载时收成终点夹。
+    raw_out = str(out.get("OUT_DIR") or "").strip()
+    if raw_out:
+        fixed_out = _coerce_analysis_endpoint(raw_out)
+        if fixed_out.replace(chr(92), "/") != raw_out.replace(chr(92), "/"):
+            out["OUT_DIR"] = fixed_out
+    mapping = out.get("SUBPROJECT_BY_OUTCOME")
+    if isinstance(mapping, dict) and mapping:
+        new_map: dict[str, Any] = {}
+        changed = False
+        for key, val in mapping.items():
+            k = str(key).strip()
+            fv = _coerce_analysis_endpoint(str(val or ""), fallback=k)
+            # 子工程映射只保留终点夹第一段（ASL / Group），不带队列深层。
+            first = fv.replace(chr(92), "/").split("/")[0] if fv else k
+            new_map[k] = first
+            if first.replace(chr(92), "/") != str(val or "").strip().replace(chr(92), "/"):
+                changed = True
+        if changed:
+            out["SUBPROJECT_BY_OUTCOME"] = new_map
     return out
 
 
