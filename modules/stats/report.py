@@ -2509,12 +2509,19 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
         train_ratio = float(getattr(cfg, "TRAIN_RATIO", 0.7) or 0.7)
     if out_dir is None:
         out_dir = str(getattr(cfg, "OUT_DIR", "") or "")
-    out_dir = str(out_dir or "").strip() or "."
+    out_dir = str(out_dir or "").strip()
     if _dry.exit_after_plan("report", [
-        f"out_dir={out_dir}",
+        f"out_dir={out_dir or '(unset)'}",
         "assemble Results*.html (skipped write)",
     ]):
         return ""
+    if not out_dir or out_dir in (".", "./"):
+        raise ValueError(
+            "generate_results_html: OUT_DIR 为空，禁止写到工程根；请先 set_outcome"
+        )
+    from modules.config.outcome import normalize_analysis_out_dir
+
+    out_dir = normalize_analysis_out_dir(out_dir)
     src = str(getattr(cfg, "GROUP_SOURCE_COL", None) or "").strip()
     cols = [
         str(x).strip()

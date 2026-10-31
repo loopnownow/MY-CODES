@@ -1,4 +1,4 @@
-﻿"""控制台项目注册表：项目 → 目录 / token 哈希 / scopes（per-machine）。
+"""控制台项目注册表：项目 → 目录 / token 哈希 / scopes（per-machine）。
 
 落盘位置：const.REGISTRY_PATH（默认 <GROK_ROOT>/0doc/console.projects.json，在仓库外；旧 in-repo 路径已进 .gitignore）。
 运行：由 http_impl / console.py 导入，不单独执行；
@@ -21,7 +21,7 @@ from modules.console import const as _const
 TZ = timezone(timedelta(hours=8))
 VERSION = 1
 SCOPES = ("read", "write-settings", "run")
-DEFAULT_SCOPES = ("read", "write-settings")
+DEFAULT_SCOPES = ("read", "write-settings", "run")
 
 
 def path() -> Path:
