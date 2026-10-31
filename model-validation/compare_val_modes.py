@@ -1,6 +1,6 @@
 """三种 VAL_MODE 验证对比（默认 demo_study；可用 PROJECT_ROOT / STUDY_ROOT 覆盖）。
 
-归属 ``0doc/GitHub/stats-analysis/model-validation``（统计/验证 CLI，非 tidy 清洗主链）。
+归属 ``0doc/GitHub/MY-CODES/model-validation``（统计/验证 CLI，非 tidy 清洗主链）。
 路径与开关置顶软编码。
 """
 from __future__ import annotations
