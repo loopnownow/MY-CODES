@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from modules.console.ops import (  # 叶层：真实 import，不再依赖注入
     _overlay_path,
     allow_browser_origin,
+    cors_allow_origin,
     clear_project_overlay,
     jsonable,
     project_settings,
@@ -90,6 +91,9 @@ from modules.console.run import (
 )
 # 端口 / 服务层：真 import（B4c6 起从 console 搬出，注入表随之清空）
 from modules.console.serve import spawn_successor
+
+PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
+_PROBE_SAFE_GET = frozenset({"/api/health", "/api/port"})
 
 # 由 modules.console.ops 静态 import 的叶层符号：契约自检用（测试断言二者一致）。
 _OPS_OWNED = frozenset({
@@ -183,25 +187,34 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
-    def _cors_headers(self) -> dict[str, str]:
+    def _cors_headers(self, *, allow_null: bool = False) -> dict[str, str]:
         origin = (self.headers.get("Origin") or "").strip()
-        if not origin or not allow_browser_origin(origin):
+        acao = cors_allow_origin(origin, allow_null=allow_null)
+        if acao is None:
             return {}
         return {
-            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Origin": acao,
             "Vary": "Origin",
             "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, X-Console-Token",
             "Access-Control-Allow-Private-Network": "true",
         }
 
-    def _send(self, code: int, payload: bytes, ctype: str, extra: dict | None = None) -> None:
+    def _send(
+        self,
+        code: int,
+        payload: bytes,
+        ctype: str,
+        extra: dict | None = None,
+        *,
+        cors_null_ok: bool = False,
+    ) -> None:
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "close")
-        hdrs = dict(self._cors_headers())
+        hdrs = dict(self._cors_headers(allow_null=cors_null_ok))
         if extra:
             hdrs.update(extra)
         for k, v in hdrs.items():
@@ -234,10 +247,13 @@ class Handler(BaseHTTPRequestHandler):
             self._err(400, str(e))
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        u = urlparse(self.path)
+        path = unquote(u.path)
         origin = self.headers.get("Origin") or ""
+        null_ok = path in _PROBE_SAFE_GET
+        acao = cors_allow_origin(origin, allow_null=null_ok)
         self.send_response(204)
-        if allow_browser_origin(origin):
-            acao = origin.strip() or "*"
+        if acao is not None:
             self.send_header("Access-Control-Allow-Origin", acao)
             self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
@@ -267,7 +283,7 @@ class Handler(BaseHTTPRequestHandler):
         return True
 
     def _guard(self, path: str, mutating: bool) -> bool:
-        if not self._origin_ok():
+        if path not in _PROBE_SAFE_GET and not self._origin_ok():
             self._err(403, "origin not allowed")
             return False
         if mutating:
@@ -308,6 +324,22 @@ class Handler(BaseHTTPRequestHandler):
                     f'href="{_name}"', f'href="{_name}?v={_ver}"'
                 ).replace(
                     f'src="{_name}"', f'src="{_name}?v={_ver}"'
+                )
+            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            return
+
+        if path in ("/start.html", "/project.html"):
+            if not PROJECT_HTML_PATH.is_file():
+                self._err(404, f"缺少 {PROJECT_HTML_PATH}")
+                return
+            html = PROJECT_HTML_PATH.read_text(encoding="utf-8")
+            if "__CONSOLE_TOKEN__" in html:
+                html = html.replace("__CONSOLE_TOKEN__", CONSOLE_TOKEN)
+            else:
+                html = html.replace(
+                    "<head>",
+                    f'<head><meta name="console-token" content="{CONSOLE_TOKEN}">',
+                    1,
                 )
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
@@ -353,17 +385,14 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/health":
-            # token 仅给本机 / file:// 起始页；跨站读不到（CORS 已收紧）
             payload = {
                 "ok": True,
                 "root": str(RAD_ROOT),
                 "port": _state.SERVE_PORT or load_preferred_port(),
                 "preferred": load_preferred_port(),
             }
-            if self._origin_ok():
-                payload["token"] = CONSOLE_TOKEN
             c, b, t = _json_bytes(payload)
-            self._send(c, b, t)
+            self._send(c, b, t, cors_null_ok=True)
             return
 
         if path == "/api/port":
@@ -374,7 +403,7 @@ class Handler(BaseHTTPRequestHandler):
                 "lo": PORT_LO,
                 "hi": PORT_HI,
             })
-            self._send(c, b, t)
+            self._send(c, b, t, cors_null_ok=True)
             return
 
         if path == "/api/shutdown":

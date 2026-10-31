@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"/>
+<meta name="console-token" content="__CONSOLE_TOKEN__"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>RAD 起始页</title>
 <style>
@@ -879,7 +880,7 @@ function fillXlsxList(list) {
 async function hydrateSettings(p) {
   if (!PROJECT) return;
   try {
-    const pr = await fetch(host(p) + "/api/projects").then(r => r.json());
+    const pr = await fetch(host(p) + "/api/projects", {headers: apiHeaders()}).then(r => r.json());
     const hit = ((pr && pr.projects) || []).find(x => x.name === PROJECT);
     if (hit && hit.settings && setEl && !(setEl.value || "").trim()) {
       const s = String(hit.settings).replace(/\\/g, "/");
@@ -991,7 +992,7 @@ async function loadWorkbook() {
     });
     const dir = fileDir();
     if (dir) q.set("dir", dir);
-    const j = await fetch(host(p) + "/api/settings?" + q.toString()).then((r) => r.json());
+    const j = await fetch(host(p) + "/api/settings?" + q.toString(), {headers: apiHeaders()}).then((r) => r.json());
     if (!j || j.ok === false) {
       const msgText = (j && j.error) || "加载失败";
       const err = new Error(msgText);
@@ -1063,7 +1064,7 @@ async function saveIni() {
     const io = ioOverlay();
     const r = await fetch(host(p) + "/api/writeback", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: apiHeaders({"Content-Type": "application/json"}),
       body: JSON.stringify({
         project: PROJECT,
         data: dataFile(),
@@ -1119,6 +1120,17 @@ const CHECK_PORT = 8780;
 let holdForConsole = false;
 let pagePort = 0;
 let pageToken = "";
+function syncTokenFromMeta() {
+  const m = document.querySelector('meta[name="console-token"]');
+  const t = ((m && m.content) || "").trim();
+  if (t && t !== "__CONSOLE_TOKEN__") pageToken = t;
+}
+function apiHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  if (pageToken) h["X-Console-Token"] = pageToken;
+  return h;
+}
+syncTokenFromMeta();
 let occupant = null;
 let svcPollFrom = 0;
 let svcWant = 0;
@@ -1175,7 +1187,7 @@ async function noteLive(p) {
   const h = await probe(p);
   if (!(h && h.ok)) return false;
   pagePort = p;
-  if (h.token) pageToken = h.token;
+  syncTokenFromMeta();
   return true;
 }
 const SCAN_KEY = "rad-console-scan-range";
@@ -1204,7 +1216,7 @@ if (scanRangeEl) {
 }
 async function probeDetail(p) {
   const j = await probe(p);
-  if (j && j.ok) return {port: p, state: "console", token: j.token || ""};
+  if (j && j.ok) return {port: p, state: "console", token: pageToken || ""};
   return {port: p, state: "down"};
 }
 let lastScanRows = null;
@@ -1315,7 +1327,7 @@ if (btnConfirm) btnConfirm.addEventListener("click", () => {
       };
       rememberOccupant(info);
       pagePort = p;
-      if (health.token) pageToken = health.token;
+      syncTokenFromMeta();
       setDataBlockVisible(true);
       markDataStale();
       syncLinks();

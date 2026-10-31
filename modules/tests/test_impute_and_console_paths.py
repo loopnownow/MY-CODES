@@ -102,13 +102,14 @@ def test_empty_corr_refs_not_filled_from_legacy():
     assert out["DO_COMBINED_MODEL"] is True
 
 
-def test_allow_file_origin_for_start_page():
+def test_allow_browser_origin_loopback_only():
     from modules.console.console import allow_browser_origin
 
-    assert allow_browser_origin("") is True
-    assert allow_browser_origin("null") is True
+    assert allow_browser_origin("") is False
+    assert allow_browser_origin("null") is False
     assert allow_browser_origin("http://127.0.0.1:8765") is True
     assert allow_browser_origin("http://localhost:8765") is True
+    assert allow_browser_origin("http://localhost.evil.example:8765") is False
     assert allow_browser_origin("https://example.com") is False
 
 
