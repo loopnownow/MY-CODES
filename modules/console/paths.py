@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 # Live stage folder under GROK_ROOT (was PREPARING_DIRNAME / "preparing").
 DRAFTING_DIRNAME = "drafting"
@@ -16,6 +17,10 @@ DEFAULT_GROK_ROOT = Path(r"D:\0Grok")  # lab machine fallback; always prefer GRO
 STAGE_ROOT_NAMES = (
     "pre-submit", "in-review", "accepted",
 )
+
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+_CONSOLE_ORIGIN_PORT_LO = 8765
+_CONSOLE_ORIGIN_PORT_HI = 8776
 
 
 def grok_root(modules_root: Path) -> Path:
@@ -116,8 +121,33 @@ def find_project_dir(
 
 
 def allow_browser_origin(origin: str) -> bool:
-    """file:// 起始页 Origin 为 null；控制台页为 127.0.0.1。"""
+    """True only for http loopback console pages (not opaque/null origins)."""
     o = (origin or "").strip()
-    if not o or o == "null":
+    if not o or o.lower() == "null":
+        return False
+    parts = urlsplit(o)
+    if parts.scheme != "http":
+        return False
+    if parts.username or parts.password:
+        return False
+    if parts.fragment:
+        return False
+    host = (parts.hostname or "").lower().rstrip(".")
+    if not host or host not in _LOOPBACK_HOSTS:
+        return False
+    port = parts.port
+    if port is None:
         return True
-    return o.startswith("http://127.0.0.1") or o.startswith("http://localhost")
+    if port == 80:
+        return True
+    return _CONSOLE_ORIGIN_PORT_LO <= port <= _CONSOLE_ORIGIN_PORT_HI
+
+
+def cors_allow_origin(origin: str, *, allow_null: bool = False) -> str | None:
+    """Access-Control-Allow-Origin value, or None when JS must not read the body."""
+    o = (origin or "").strip()
+    if allow_browser_origin(o):
+        return o
+    if allow_null and o.lower() == "null":
+        return "null"
+    return None

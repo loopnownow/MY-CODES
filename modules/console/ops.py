@@ -17,6 +17,10 @@ def allow_browser_origin(origin: str) -> bool:
     return _paths.allow_browser_origin(origin)
 
 
+def cors_allow_origin(origin: str, *, allow_null: bool = False) -> str | None:
+    return _paths.cors_allow_origin(origin, allow_null=allow_null)
+
+
 def project_settings(proj: Path) -> Path:
     from modules.config.ini_io import resolve_settings_ini
     ini = resolve_settings_ini(proj)
