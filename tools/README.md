@@ -13,6 +13,7 @@
 | `write-paper/` | 稿件侧小工具（docx 抽文本、改稿证据汇总） | `docx_extract.py`、`diff_harvest.py` |
 | `revise/` | 回修包打包 | `pack_docx.py` |
 | `templates/` | 软编码 + dry-run 模板 | `soft_code_template.py` |
+| `orchestrator/` | 00 层 QC 子检查：AI-tell 风格 linter（G-05） | `style_lint.py`；需 `SKILLS_ROOT`（读技能树的 `ban-terms.yaml`） |
 
 ## 路径与环境（软编码，无绝对盘符）
 
