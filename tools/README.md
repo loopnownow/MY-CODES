@@ -15,6 +15,15 @@
 | `templates/` | 软编码 + dry-run 模板 | `soft_code_template.py` |
 | `orchestrator/` | 00 层 QC 子检查：AI-tell 风格 linter（G-05） | `style_lint.py`；需 `SKILLS_ROOT`（读技能树的 `ban-terms.yaml`） |
 | `office/` | Word 修订机制：`unpack` / `validate` / `pack` + `helpers/` + `validators/`（Anthropic，见 `LICENSE.txt`） | `validate.py --original <pre-edit.docx> --author A` 是硬门；契约在 `{SKILLS}\06_review\base\track-changes\MODULE.md` |
+| `verify-refs/` | 引用核验与 BibTeX：OpenAlex / PubMed / Scholar 检索、元数据抽取、格式化、核验、撤稿扫描 | `_common.py` + 8 个 CLI；上游 MIT 见 `LICENSE_NOTE.txt`；联网脚本过网络闸（见下节） |
+| `lit-fulltext/` | OA 全文批量取回（Unpaywall / PMC / EuropePMC / OpenAlex / Crossref / arXiv） | `fetch.py`；付费墙只写 `manual_needed.txt`；`LICENSE_NOTE.txt` 记上游 |
+
+## 网络闸（`verify-refs` / `lit-fulltext`）
+
+这两个包会打 PubMed / OpenAlex / Crossref / Unpaywall / Retraction Watch，**默认拒绝运行**
+（exit 1，stderr `network disabled`）。opt-in 两种：每次加 `--allow-network`，或整壳设
+`SKILLS_ALLOW_NETWORK=1`。`format_bibtex.py`、`search_google_scholar.py` 不出网，无需开关。
+`modules/tests/test_tools_lit_verify.py` 卡住这条闸（只在本地跑，不联网）。
 
 ## 路径与环境（软编码，无绝对盘符）
 
