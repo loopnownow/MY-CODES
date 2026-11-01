@@ -8,17 +8,17 @@ from pathlib import Path
 import docx
 import pytest
 
-# docx_extract: prefer ODOC_CODE / GROK_ROOT; else discover ../_code from this repo layout
+# docx_extract: in-repo tools/ first, then ODOC_CODE / GROK_ROOT fallbacks
 def _resolve_ms_body() -> Path:
-    cands: list[Path] = []
+    repo = Path(__file__).resolve().parents[2]
+    cands: list[Path] = [repo / "tools" / "write-paper"]  # 2026-11-01 P2: tools/ moved into this repo
     if os.environ.get("ODOC_CODE"):
-        cands.append(Path(os.environ["ODOC_CODE"]))
+        cands.append(Path(os.environ["ODOC_CODE"]) / "05-manuscript" / "write-paper")
     if os.environ.get("GROK_ROOT"):
-        cands.append(Path(os.environ["GROK_ROOT"]) / "0doc" / "_code")
-    # <lab>/0doc/GitHub/MY-CODES/modules/tests -> <lab>/0doc/_code
-    cands.append(Path(__file__).resolve().parents[2].parent.parent / "_code")
-    for base in cands:
-        hit = base / "05-manuscript" / "write-paper"
+        cands.append(
+            Path(os.environ["GROK_ROOT"]) / "0doc" / "_code" / "05-manuscript" / "write-paper"
+        )
+    for hit in cands:
         if (hit / "docx_extract.py").is_file():
             return hit
     return Path(".")

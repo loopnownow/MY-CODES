@@ -1,0 +1,39 @@
+# Conda env for 0doc\_code (habitat + organized + common ops). 2026-10-23 由 0script 迁入。
+# Mirrors requirements.txt with conda-forge-friendly names where possible.
+# Create: conda env create -f environment.yml
+name: zeradscripts
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  # core scientific
+  - numpy
+  - pandas
+  - scikit-learn
+  - scipy
+  - matplotlib
+  - joblib
+  - seaborn
+  # - umap-learn  # optional; plot_individual.py
+  # imaging
+  - simpleitk
+  - pydicom
+  - pywavelets
+  - scikit-image
+  - pillow
+  - dicom2nifti
+  - pynrrd
+  # docs / office
+  - openpyxl
+  - python-docx
+  - pywin32  # Windows manuscript automation
+  # optional
+  # - selenium
+  - pip
+  - pip:
+      # Lab-local / not reliably on conda — install manually if needed:
+      # - pictologics  # local/lab wheel or path install for habitat radiomics
+      # - antspyx      # ANTsPy (import ants); or lab ANTsPy install
+      # - pyradiomics  # only if using organized/radiomics_ops.py (habitat uses pictologics)
+      # - umap-learn
