@@ -217,9 +217,16 @@ def publish_local(payload: dict[str, Any], port: int = CHECK_PORT, hold: float =
         return False
     httpd.timeout = 0.5
     deadline = time.time() + max(0.2, float(hold))
+    early_close_after = 0.9  # brief grace for duplicate polls after first delivery
+    delivered_at: float | None = None
     try:
         while time.time() < deadline:
             httpd.handle_request()
+            if delivered["n"] > 0:
+                if delivered_at is None:
+                    delivered_at = time.time()
+                elif time.time() - delivered_at >= early_close_after:
+                    break
     finally:
         httpd.server_close()
     return delivered["n"] > 0
@@ -349,6 +356,10 @@ def register_protocol() -> None:
     except ImportError:
         return
     exe = sys.executable
+    if os.name == "nt":
+        pythonw = Path(sys.executable).with_name("pythonw.exe")
+        if pythonw.is_file():
+            exe = str(pythonw)
     script = str(_CONSOLE_PY)
     # bootstrap at top of this file makes PYTHONPATH unnecessary
     cmd = f'"{exe}" "{script}" "%1"'
