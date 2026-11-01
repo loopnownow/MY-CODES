@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-harvest_write_phrases.py -- count the owner's recurring manuscript wording in the 0doc bank.
+harvest_write_phrases.py -- count the owner's recurring manuscript wording in the 0doc glossary.
 
-Reads the paragraph layer of `_bank` (paras.jsonl), groups it by IMRAD section, and
+Reads the paragraph layer of `_library\\glossary\\banks` (paras.jsonl), groups it by IMRAD section, and
 counts sentence-head / sentence-tail phrases per section. Offline, stdlib only,
-read-only on the bank. Default is dry-run: prints the summary and the tables.
+read-only on the banks. Default is dry-run: prints the summary and the tables.
 `--execute --out FILE` writes the markdown.
 
 Run:
-    python3 harvest_write_phrases.py --bank "{doc_review_bank}\\bank\\paras.jsonl"
+    python3 harvest_write_phrases.py --bank "{doc_glossary_banks}\\paras.jsonl"
     python3 harvest_write_phrases.py --bank paras.jsonl --section Discussion --limit 40
     python3 harvest_write_phrases.py --bank paras.jsonl --execute --out phrases.md
 
