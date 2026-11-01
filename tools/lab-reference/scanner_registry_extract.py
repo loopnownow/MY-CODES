@@ -1,4 +1,4 @@
-"""Crawl 0doc manuscripts for imaging-scanner descriptions.
+﻿"""Crawl 0doc manuscripts for imaging-scanner descriptions.
 
 Stage --extract
     Read 05-manuscript thesis + manuscripts (.docx/.doc), dump plain text to
@@ -10,7 +10,7 @@ Stage --candidates
     For every extracted text, write {OUT}/candidates/<tier>__<name>.md holding
     (a) tables that look like scanner / parameter tables and (b) paragraphs that
     hit vendor or acquisition keywords. These files are the evidence base for the
-    hand-built registry workbook at 0doc/templates/scanner-parameter-registry.xlsx (_library/scanner-registry retired 2026-10-23; see MY-SKILLS scanner-registry-digest).
+    hand-built registry workbook at 0doc/_library/scanner-registry/scanner-parameter-registry.xlsx (restored t1553u; see MY-SKILLS scanner-registry-digest).
 
 Source Word files were archived out of the tree on 2026-10-22: set ODOC_WORD if the
 archive root is not D:/00db/_lab/doc-word.
