@@ -1,7 +1,7 @@
-"""Build the imaging-scanner registry workbook.
+﻿"""Build the imaging-scanner registry workbook.
 
 Input : scanner_registry_rows.py (hand-curated rows, evidence quoted from 0doc)
-Output: D:\\0Grok\\0doc\\templates\\scanner-parameter-registry.xlsx  (_library\\scanner-registry retired 2026-10-23)
+Output: D:\\0Grok\\0doc\\_library\\scanner-registry\\scanner-parameter-registry.xlsx  (restored t1553u; was briefly under templates)
 
 Every row is one sequence of one device at one centre of one study. Values are
 copied from the source sentence named in the row; nothing is inferred. Missing
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 from collections import OrderedDict
 
 from openpyxl import Workbook
@@ -23,8 +24,8 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from scanner_registry_rows import COLS, DICT_ROWS, GAPS, ROWS, SOURCES
 
-OUT_DIR = Path(os.environ.get("SCANNER_REGISTRY_DIR") or Path(__file__).resolve().parents[5] / "0doc" / "templates")
-OUT_XLSX = os.path.join(OUT_DIR, "scanner-parameter-registry.xlsx")  # live workbook; was _library\scanner-registry
+OUT_DIR = Path(os.environ.get("SCANNER_REGISTRY_DIR") or Path(__file__).resolve().parents[4] / "_library" / "scanner-registry")
+OUT_XLSX = os.path.join(OUT_DIR, "scanner-parameter-registry.xlsx")  # live workbook under _library\scanner-registry
 
 SEP = "||"
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
