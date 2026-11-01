@@ -1,0 +1,36 @@
+# 0doc\_code helper scripts — third-party dependencies（2026-10-23 由 0script 迁入）
+# Pins below are from this lab machine (python 3.13.9 / anaconda3 base) via
+# importlib.metadata / conda list where installed; otherwise unpinned names.
+# Local/lab-only packages are commented with install hints — do not treat as PyPI pins.
+
+# --- core scientific ---
+numpy==2.3.5
+pandas==2.3.3
+scikit-learn==1.7.2
+scipy==1.16.3
+matplotlib==3.10.6
+joblib==1.5.2
+seaborn==0.13.2
+# umap-learn  # optional; imported as umap in delta_habitat_pipeline/utility/plot_individual.py (not installed here)
+
+# --- imaging ---
+SimpleITK  # habitat trees; not in current env — prefer: conda install -c conda-forge simpleitk
+pydicom  # organized/dicom_ops.py
+PyWavelets==1.9.0
+scikit-image==0.25.2
+Pillow==12.0.0
+dicom2nifti  # organized/dicom_ops.py
+pynrrd  # organized/nii_ops.py (import nrrd)
+
+# --- radiomics / habitat (lab-local preferred) ---
+# pictologics  # local/lab install used by habitat_pipeline & delta_habitat_pipeline radiomics.py — not on PyPI as a public pin
+# antspyx  # ANTsPy; imported as ants in *habitat*/registration.py & data_loader — local/lab install (pip install antspyx or lab wheel)
+# pyradiomics  # optional: organized/radiomics_ops.py imports radiomics.featureextractor; habitat trees use pictologics instead
+
+# --- docs / office ---
+openpyxl==3.1.5
+python-docx==1.2.0
+pywin32==311  # win32com for manuscript Word automation (Windows)
+
+# --- optional selenium ---
+# selenium  # organized/query_patient.py only

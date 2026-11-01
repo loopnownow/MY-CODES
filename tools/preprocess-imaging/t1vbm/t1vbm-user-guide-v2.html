@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>T1 VBM V2.4 User Guide</title><style>body{font-family:"Microsoft YaHei",Arial,sans-serif;max-width:1100px;margin:30px auto;padding:0 18px;color:#20252b;line-height:1.7;background:#f7f8fa}h1,h2{color:#174a6e}.card{background:#fff;border:1px solid #d9dee4;border-radius:10px;padding:18px;margin:16px 0}table{border-collapse:collapse;width:100%}th,td{border:1px solid #d9dee4;padding:7px 9px;text-align:left}th{background:#eef3f7}code,pre{font-family:Consolas,monospace}pre{background:#101923;color:#e7eef5;padding:14px;border-radius:8px;overflow:auto}.ok{color:#176b3a}.warn{color:#a15c00}</style></head><body>
+<h1>T1 VBM V2 全流程使用说明</h1>
+<div class="card"><b>流程：</b> G0 环境检查 → Step1 输入 QC/解压/Manifest → calibration → Step2 CAT12 → Step3 SPM + Design QC → Step4 FWE/探索性结果 + Table1 → HTML QC + Methods 参数摘要。</div>
+<h2>1. 首次运行</h2><pre>addpath('G:\SSD_dyf\T1_vbm')
+C = t1vbm_config();
+t1vbm_env('checkspm', C)
+t1vbm_step1_unzip(C)
+t1vbm_calibrate(C)</pre>
+<p>校准结果写入 <code>log/calibration.mat</code>。随后按校准结果设置 <code>nproc</code>。</p>
+<h2>2. CAT12</h2><pre>run_all('from','step2','nproc',8)</pre>
+<p>这里的 8 只是示例，不是固定推荐值。CAT12 完成判定不再只依赖 mwp1；每例需要 mwp1、mwp2、y_ 三类输出均存在且非空，并建立 <code>manifest/cat12_done/&lt;subject&gt;.done</code>。</p>
+<h2>3. 统计模型</h2>
+<div class="card"><table><tr><th>项目</th><th>V2 设置</th></tr><tr><td>组间模型</td><td>two-sample t-test，unequal variance</td></tr><tr><td>协变量</td><td>Age, Sex, EducationYears</td></tr><tr><td>Sex</td><td>0/1 coding</td></tr><tr><td>连续协变量</td><td>默认中心化</td></tr><tr><td>显式 mask</td><td>全样本 mean GM probability &gt; 0.20</td></tr><tr><td>平滑</td><td>FWHM 8 mm（可配置）</td></tr><tr><td>Primary</td><td>voxel-level FWE p &lt; 0.05</td></tr><tr><td>Exploratory</td><td>voxel-level uncorrected p &lt; 0.001 + ≥10 voxels</td></tr></table></div>
+<h2>4. 断点与失败恢复</h2><p><code>log/pipeline_state.mat</code> 记录 step1–4 的 running/complete/failed 状态。CAT12 subject 状态记录在 manifest 中。修复失败例后可使用：</p><pre>run_all('from','step2')
+run_all('from','step3','until','step3')
+run_all('from','step4','until','step4')</pre>
+<h2>5. 主要输出</h2><table><tr><th>路径</th><th>用途</th></tr><tr><td>manifest/subject_manifest.csv</td><td>subject-level 唯一状态表</td></tr><tr><td>manifest/cat12_done/</td><td>CAT12 completion markers</td></tr><tr><td>03_stats/SSDvsHC/SPM.mat</td><td>主模型</td></tr><tr><td>04_report/Clusters_FWE.csv</td><td>Primary FWE cluster table</td></tr><tr><td>04_report/Clusters_uncorrected.csv</td><td>Exploratory cluster table</td></tr><tr><td>04_report/Table1_人口学.csv</td><td>人口学 Table 1</td></tr><tr><td>04_report/Design_QC.csv</td><td>VIF / predictor QC</td></tr><tr><td>04_report/SPM_design_summary.csv</td><td>rank / condition number / DF</td></tr><tr><td>04_report/T1_VBM_QC_Report.html</td><td>最终 QC 报告</td></tr><tr><td>04_report/Methods_analysis_summary.txt</td><td>Methods 参数摘要</td></tr></table>
+<h2>6. 兼容性</h2><p><code>t1vbm_util.m</code> 保留为兼容层，因此旧脚本中调用 <code>t1vbm_util(...)</code> 不需要立即修改。新的模块分别承担 environment、files、log、table 和 manifest 功能。</p>
+<div class="card"><span class="warn">注意：</span>本版本已经把“FWE 阈值”和“uncorrected exploratory threshold”严格分开。正式论文中应根据预先设定的统计分析方案选择并如实报告主要推断标准。</div>
+<h2>V2.1 Windows 后台 CAT12</h2><p>Step2 默认使用隐藏 MATLAB worker。每个 subject 启动一个 <code>matlab -batch</code> worker，由 PowerShell 的 <code>Start-Process -WindowStyle Hidden</code> 启动；worker 内部 CAT12 使用 <code>nproc=0</code>，避免 CAT12 再次创建可见 MATLAB Command Window。监督状态使用 <code>.running/.done/.fail</code> 文件，不再依赖 CAT12 父进程的 Unknown/Unprocessed 统计。</p><p>推荐运行：<code>C=t1vbm_config('nproc',12); run_all('from','step2','until','step2','nproc',12)</code>。</p></body></html>
