@@ -36,11 +36,11 @@ redirect）。技能 fine-id `stats-analysis` 与别名 `{code_stats}` / `STATS_
 测试用 `pyproject.toml` 的 `[tool.pytest.ini_options]`（`testpaths = modules/tests`，`pythonpath = ["."]`），
 仓根直接 `pytest` 即可，不另设 `pytest.ini`。
 
-## 与 `_code` 的关系（本仓即唯一真源）
+## 与 `_code` 的关系（该层 2026-11-01 整层退役）
 
 ```
 <this-repo>/modules                         ← 运行时真源 + git（唯一）
-<_code>/02-data-processing/stats-analysis/  ← HISTORIC: 已退役，仅指针壳（QC 清理对象）
+_code                                       ← 2026-11-01 P4 退役（壳/索引移 {DEL}，台账 MOVED-_code.tsv）
 ```
 
 - **本仓是运行时的唯一真源**：各课题 `ref/settings.ini` 的 `MODULES_DIR` 指向本仓 `modules/`。`MODULES_DIR` 不是目录时 console 与 `import modules` 直接报错，不回退。
