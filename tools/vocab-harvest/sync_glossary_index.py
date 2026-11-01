@@ -4,8 +4,9 @@
 sync_glossary_index.py -- rebuild `<0doc>\\_library\\glossary\\index.csv` from the four md layers.
 
 The md files are the SSOT for glossary entries; `index.csv` is the machine index.
-This script parses `### <entry>` blocks plus the `- 用法/证据/频次/判断/bucket/规则：` fields,
-then rewrites index.csv (12 fixed columns). Fenced code blocks (the entry template) are ignored.
+This script parses `### <entry>` blocks plus the `- 用法/证据/频次/判断/bucket/节/规则：` fields,
+then rewrites index.csv (13 fixed columns; the 12th `sections` column holds the section tag).
+Fenced code blocks (the entry template) are ignored.
 Offline, stdlib only, read-only except with `--apply`.
 
 Run (PowerShell, Python 3.13.9):
@@ -14,8 +15,9 @@ Run (PowerShell, Python 3.13.9):
     python .\\sync_glossary_index.py            # dry-run: print rows
     python .\\sync_glossary_index.py --apply    # rewrite index.csv
 
-Gate: `test\\structure_check.py` S19 validates the same contract (layer/sub enums,
-sub2 only on sentences/review, evidence_ref shape, verdict/rule_ptr).
+Gate: `test\\structure_check.py` S19 validates the same contract (13 columns, layer/sub enums,
+sub2 only on sentences/review, `sections` value domain, evidence_ref shape, verdict/rule_ptr);
+S20 validates that `sections\\*.md` pointer tables match the index rows carrying that section tag.
 """
 
 from __future__ import annotations
@@ -31,12 +33,16 @@ GLOSSARY_ROOT_ENV = "GLOSSARY_ROOT"
 INDEX_NAME = "index.csv"
 # LAYERS: sub-directory order; also the legal `layer` values.
 LAYERS = ("words", "sentences", "paragraphs", "sections")
+# SECTIONS: legal values of the multi-valued `sections` column (';' separated); also the
+# eight `sections\*.md` files whose pointer tables S20 cross-checks.
+SECTIONS = ("abstract", "intro", "methods", "results", "discussion",
+            "limitation", "conclusion", "other")
 # COLUMNS: index.csv header, must stay in sync with test\structure_check.py S19.
 COLUMNS = ("layer", "sub", "sub2", "entry", "lang", "example", "evidence_ref",
-           "freq", "verdict", "rule_ptr", "note", "updated_at")
+           "freq", "verdict", "rule_ptr", "note", "sections", "updated_at")
 UPDATED = "2026-11-01"
 CJK = re.compile(r"[\u4e00-\u9fff]")
-FIELD = re.compile(r"^-\s*(用法|证据|频次|判断|bucket|规则)：(.*)$")
+FIELD = re.compile(r"^-\s*(用法|证据|频次|判断|bucket|节|规则)：(.*)$")
 BACKTICK = re.compile(r"`([^`]+)`")
 TRIM = " `（(，,；;"
 
@@ -71,6 +77,14 @@ def entries(md: Path) -> list[dict[str, str]]:
     return out
 
 
+def entry_sections(item: dict[str, str], layer: str, sub: str) -> str:
+    """`sections` cell: optional `- 节：a;b` wins; `sections` layer rows default to their own sub."""
+    raw = (item.get("节") or "").strip()
+    if not raw and layer == "sections":
+        raw = sub
+    return ";".join(t.strip() for t in raw.split(";") if t.strip())
+
+
 def build_rows(root: Path) -> list[list[str]]:
     rows: list[list[str]] = []
     for layer in LAYERS:
@@ -92,6 +106,7 @@ def build_rows(root: Path) -> list[list[str]]:
                     item.get("判断", ""),
                     rule.group(1) if rule else "",
                     "",
+                    entry_sections(item, layer, md.stem),
                     UPDATED,
                 ])
     return rows
@@ -113,9 +128,16 @@ def main(argv: list[str] | None = None) -> int:
             print("INCOMPLETE %s/%s :: %s" % (r[0], r[1], r[3]))
         raise SystemExit("%d entrie(s) missing evidence_ref / verdict / rule_ptr" % len(bad))
 
+    bad_sec = [r for r in rows
+               if any(t not in SECTIONS for t in (r[11].split(";") if r[11] else []))]
+    if bad_sec:
+        for r in bad_sec:
+            print("BAD-SECTION %s/%s :: %s -> %r" % (r[0], r[1], r[3], r[11]))
+        raise SystemExit("%d entrie(s) carry a section tag outside the 8-value domain" % len(bad_sec))
+
     print("rows=%d" % len(rows))
     for r in rows:
-        print("  %s | %s | %s | %s | %s" % (r[0], r[1], r[3], r[6], r[8]))
+        print("  %s | %s | %s | %s | %s | %s" % (r[0], r[1], r[3], r[6], r[8], r[11]))
     if not args.apply:
         print("dry-run: add --apply to rewrite %s" % INDEX_NAME)
         return 0
