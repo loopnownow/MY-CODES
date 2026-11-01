@@ -1,4 +1,4 @@
-# lab-reference (fine_id: fill-protocol)
+﻿# lab-reference (fine_id: fill-protocol)
 
 
 
@@ -8,7 +8,7 @@ Rehomed 2026-10-23 from `_code\_infra\lab-reference\`.
 
 Scripts that build (a) lab reference-ranges workbook and (b) imaging-scanner
 
-parameter registry under `%GROK_ROOT%\0doc\_library\`.
+parameter registry under `%GROK_ROOT%\0doc\_library\scanner-registry\` (live xlsx; t1553u).
 
 
 
