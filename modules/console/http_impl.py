@@ -195,7 +195,14 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.0"
 
     def log_message(self, fmt: str, *args) -> None:
-        sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+        # pythonw: sys.stderr may be None; never let access logs kill a response.
+        stream = sys.stderr
+        if stream is None:
+            return
+        try:
+            stream.write("%s - %s\n" % (self.address_string(), fmt % args))
+        except Exception:
+            return
 
     def _cors_headers(self, *, allow_null: bool = False) -> dict[str, str]:
         origin = (self.headers.get("Origin") or "").strip()

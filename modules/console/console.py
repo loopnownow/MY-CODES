@@ -27,6 +27,13 @@ _IMPORT_ROOT = Path(__file__).resolve().parents[2]
 if str(_IMPORT_ROOT) not in sys.path:
     sys.path.insert(0, str(_IMPORT_ROOT))
 
+# pythonw.exe leaves stdout/stderr as None; BaseHTTPRequestHandler.log_message
+# writes stderr and would abort every response with an empty connection close.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
+
 from modules.console import paths as _paths  # noqa: E402  bootstrap 之后才能 import
 
 from modules.console.const import (  # noqa: E402,F401  bootstrap 之后才能 import
