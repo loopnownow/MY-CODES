@@ -9,7 +9,7 @@ covers it.
 
 Run (PowerShell, Python 3.13.9). Two env vars replace the old lab-drive defaults:
 
-    $env:DOC_BANK_ROOT = "<0doc>\_bank"   # holds bank\paras.jsonl
+    $env:GLOSSARY_ROOT = "<0doc>\_library\glossary"   # holds banks\paras.jsonl
     $env:SKILLS_ROOT   = "<MY-SKILLS>"   # holds 05_manuscript\base\vocab\L1\ban-terms.yaml
     python .\harvest_sections.py
     python .\harvest_sections.py --doc-prefix 05
@@ -30,9 +30,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 import harvest_write_phrases as hw  # noqa: E402
 
 # ---------------------------------------------------------------- CONFIG
-# DOC_BANK_ROOT: env naming the 0doc root; the paragraph layer is <root>\bank\paras.jsonl (read-only).
-DOC_BANK_ROOT_ENV = "DOC_BANK_ROOT"
-BANK_REL = Path("bank") / "paras.jsonl"
+# GLOSSARY_ROOT: env naming the 0doc glossary seat; the paragraph layer is <root>\banks\paras.jsonl (read-only).
+GLOSSARY_ROOT_ENV = "GLOSSARY_ROOT"
+BANKS_REL = Path("banks") / "paras.jsonl"
 # SKILLS_ROOT: env naming the MY-SKILLS checkout; the machine ban list lives there.
 SKILLS_ROOT_ENV = "SKILLS_ROOT"
 BANS_REL = Path("05_manuscript") / "base" / "vocab" / "L1" / "ban-terms.yaml"
@@ -49,9 +49,10 @@ def _require_env(name: str, purpose: str) -> Path:
     return Path(value)
 
 
-def bank_path() -> Path:
-    """Paragraph layer of the bank: <DOC_BANK_ROOT>\\bank\\paras.jsonl."""
-    return _require_env(DOC_BANK_ROOT_ENV, "the 0doc _bank root that holds bank\\paras.jsonl") / BANK_REL
+def banks_path() -> Path:
+    """Paragraph layer of the glossary: <GLOSSARY_ROOT>\\banks\\paras.jsonl."""
+    return _require_env(GLOSSARY_ROOT_ENV,
+                        "the 0doc glossary seat that holds banks\\paras.jsonl") / BANKS_REL
 
 
 def bans_path() -> Path:
@@ -315,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     prefixes = (args.doc_prefix,) if args.doc_prefix else DOC_PREFIXES
-    rows, dropped = load_paragraphs(bank_path(), prefixes)
+    rows, dropped = load_paragraphs(banks_path(), prefixes)
     if not rows:
         print("no prose paragraphs found", file=sys.stderr)
         return 2
