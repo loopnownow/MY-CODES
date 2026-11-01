@@ -197,8 +197,9 @@ def main():
         Path(args.log)
         if args.log
         # 默认 write-paper/data/（rehome 2026-10-23）
-        else Path(os.environ.get("ODOC_CODE") or Path(__file__).resolve().parents[2] / "tools")
-        / "05-manuscript" / "write-paper" / "data" / "diff-evidence-log.csv"
+        # 默认 tools/write-paper/data/（ODOC_CODE 随 _code 于 2026-11-01 退役，改读 STATS_ROOT）
+        else (Path(os.environ.get("STATS_ROOT") or Path(__file__).resolve().parents[2])
+              / "tools" / "write-paper" / "data" / "diff-evidence-log.csv")
     )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     is_new = not log_path.exists()
