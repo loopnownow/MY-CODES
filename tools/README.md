@@ -17,6 +17,9 @@
 | `office/` | Word 修订机制：`unpack` / `validate` / `pack` + `helpers/` + `validators/`（Anthropic，见 `LICENSE.txt`） | `validate.py --original <pre-edit.docx> --author A` 是硬门；契约在 `{SKILLS}\06_review\base\track-changes\MODULE.md` |
 | `verify-refs/` | 引用核验与 BibTeX：OpenAlex / PubMed / Scholar 检索、元数据抽取、格式化、核验、撤稿扫描 | `_common.py` + 8 个 CLI；上游 MIT 见 `LICENSE_NOTE.txt`；联网脚本过网络闸（见下节） |
 | `lit-fulltext/` | OA 全文批量取回（Unpaywall / PMC / EuropePMC / OpenAlex / Crossref / arXiv） | `fetch.py`；付费墙只写 `manual_needed.txt`；`LICENSE_NOTE.txt` 记上游 |
+| `manuscript-qc/` | 稿面 QC 检测器：改写保真（数字/引用不漂移）与句长多样性 | `check_rewrite_fidelity.py`、`check_sentence_variety.py`；离线、stdlib |
+| `vocab-harvest/` | 语料措辞计数：重建 IMRAD 段落层、统计句首/句尾短语 | `harvest_sections.py`、`harvest_write_phrases.py`；需 `DOC_BANK_ROOT`（`<0doc>\_bank`）与 `SKILLS_ROOT`（ban 词表），缺则 exit 1 |
+| `response-qc/` | 审稿回复包 QC：包一致性审计 + tone-polish 机械打磨 | `check_package_consistency.py`、`tone_polish_main.py`；MIT（AIPOCH）见 `LICENSE_NOTE.txt`；离线、stdlib |
 
 ## 网络闸（`verify-refs` / `lit-fulltext`）
 
