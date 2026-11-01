@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+
+<head>
+
+<meta charset="utf-8"/>
+
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>RAD 起始页</title>
+
+<style>
+
+:root{
+
+  --bg:#f4f1ea; --paper:#fffcf6; --ink:#1c2421; --muted:#5c6b66;
+
+  --line:#d7d0c4; --accent:#0f4c5c; --accent2:#e07a3d; --ok:#2f6f4e;
+
+}
+
+*{box-sizing:border-box}
+
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+
+  font:15px/1.5 "Segoe UI","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif}
+
+a{color:var(--accent)}
+
+.shell{min-height:100vh;display:flex;flex-direction:column}
+
+header{
+
+  background:var(--accent);color:#f4f1ea;padding:22px 28px 20px;
+
+  border-bottom:3px solid #0a323c;
+
+}
+
+header .kicker{opacity:.72;font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 6px}
+
+header h1{margin:0;font-size:26px;font-weight:700;letter-spacing:.04em}
+
+header .lead{margin:8px 0 0;opacity:.85;font-size:13px;max-width:40em}
+
+main{flex:1;width:min(920px,100%);margin:0 auto;padding:28px 20px 48px}
+
+.banner{
+
+  background:#fff6e8;color:#8a4a12;border-radius:10px;padding:10px 14px;margin:0 0 16px;
+
+  box-shadow:inset 0 0 0 1px #ead9b8;font-size:13px;
+
+}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+
+.card{
+
+  background:#fff;border-radius:12px;padding:18px 18px 16px;
+
+  box-shadow:inset 0 0 0 1px var(--line);
+
+  display:flex;flex-direction:column;min-width:0;overflow:visible;
+
+}
+
+.card h2{
+
+  margin:0 0 14px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);
+
+}
+
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0;margin:0 0 12px}
+
+.fld:last-of-type{margin-bottom:0}
+
+.lab{font-weight:650;font-size:12px;color:#3d4a46}
+
+.hint{color:var(--muted);font-size:13px;margin:0 0 10px}
+
+.pick-row{display:flex;gap:6px;align-items:center}
+
+.pick-row input{flex:1 1 auto;min-width:0}
+
+input[type=number],input[type=text]{
+
+  border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;background:#fbfaf7;width:100%;
+
+}
+
+input[type=number]{width:96px;flex:0 0 96px}
+
+button{
+
+  border:1px solid var(--accent);background:#fff;color:var(--accent);
+
+  border-radius:6px;padding:6px 12px;font:inherit;cursor:pointer;white-space:nowrap;
+
+}
+
+button:hover{background:#e7eef0}
+
+button.pri,a.pri{
+
+  background:var(--accent);color:#fff;border-color:#0a323c;
+
+  text-decoration:none;display:inline-flex;align-items:center;justify-content:center;
+
+  border-radius:6px;padding:7px 14px;font-weight:650;
+
+}
+
+button.pri:hover,a.pri:hover{background:#0c3d4a}
+
+.sw{position:relative;width:52px;height:30px;flex:0 0 auto}
+
+.sw input{opacity:0;width:0;height:0}
+
+.slider{position:absolute;inset:0;background:#c5c0b6;border-radius:999px;cursor:pointer;transition:.2s}
+
+.slider:before{content:"";position:absolute;height:24px;width:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+
+.sw input:checked + .slider{background:var(--accent)}
+
+.sw input:checked + .slider:before{transform:translateX(22px)}
+
+.svc-top{display:flex;align-items:center;gap:12px;margin:0 0 14px}
+
+.svc-top .lab{font-size:15px;color:var(--ink)}
+
+.svc-port{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+
+.links{margin-top:auto;padding-top:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+
+#msg{min-height:1.4em}
+
+.save-row{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+
+@media (max-width:720px){
+
+  .grid{grid-template-columns:1fr}
+
+  header{padding:18px 18px 16px}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="shell">
+
+<header>
+
+  <p class="kicker">RAD 统计控制台</p>
+
+  <h1 id="projTitle">通用模板</h1>
+
+  <p class="lead">本页只开服务、指定 settings 与 modules。数据表、工作表、ID、外验到控制台第一页签「项目/数据」载入。复制到课题目录即可用，不必改源码。</p>
+
+</header>
+
+<main>
+
+  <div id="tplBanner" class="banner" hidden>
+
+    这是 <code>stats-analysis/modules/project.html</code> 金版。复制到课题目录（如 <code>%GROK_ROOT%\submitting\wkl_UGIB</code>），可改名为 <code>课题名.html</code>，或保持此文件名由文件夹识别课题。
+
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+
+      <h2>配置</h2>
+
+      <div class="fld"><span class="lab" title="优先 ?project=，其次本文件名，再次所在文件夹。">课题</span>
+
+        <input id="projectName" type="text" placeholder="如 wkl_UGIB" value=""/>
+
+      </div>
+
+      <div class="fld"><span class="lab" title="可空=工程 ref/settings.ini">settings</span>
+
+        <div class="pick-row">
+
+          <input id="settingsFile" type="text" placeholder="可空，默认工程 ref/settings.ini" value=""/>
+
+          <input id="settingsFilePick" type="file" accept=".ini,.py" hidden/>
+
+          <button type="button" id="btnSetPick">选择</button>
+
+        </div></div>
+
+      <div class="fld"><span class="lab" title="共享算法库路径（必填，写回 settings.ini 的 MODULES_DIR）。">modules</span>
+
+        <div class="pick-row">
+
+          <input id="modulesDir" type="text" placeholder="必填，如 %GROK_ROOT%\0doc\GitHub\stats-analysis\modules" value="%GROK_ROOT%\0doc\GitHub\stats-analysis\modules"/>
+
+          <input id="modulesDirPick" type="file" webkitdirectory hidden/>
+
+          <button type="button" id="btnModPick">选择</button>
+
+        </div></div>
+
+      <div class="save-row">
+
+        <button type="button" id="btnSaveIni" title="把 settings / modules 路径写入 ini。先备份 bak。须先开服务。">保存 ini</button>
+
+        <span class="hint" style="margin:0">写入当前 settings，先备份 .bak</span>
+
+      </div>
+
+    </div>
+
+    <div class="card">
+
+      <h2>服务</h2>
+
+      <div class="svc-top">
+
+        <label class="sw"><input id="svc" type="checkbox"/><span class="slider"></span></label>
+
+        <span class="lab">开启 Python 服务</span>
+
+      </div>
+
+      <div class="svc-port">
+
+        <span class="lab" title="控制台网页端口。被占或无响应时改 8766–8776。">端口</span>
+
+        <input id="port" type="number" min="1024" max="65535" step="1" value="8765"/>
+
+        <button type="button" id="btnScan">探测 8765–8776</button>
+
+      </div>
+
+      <p id="msg" class="hint">开服务后进入控制台。数据在「项目/数据」页签载入。</p>
+
+      <div class="links">
+
+        <a id="go" class="pri" href="http://127.0.0.1:8765/">进入配置</a>
+
+        <a id="goFlow" href="http://127.0.0.1:8765/?tab=flow">入组流程图</a>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</main>
+
+</div>
+
+<script>
+
+const GENERIC_STEMS = {
+
+  index: 1, console: 1, project: 1, rad: 1,
+
+  flow_chart: 1, strobe: 1, qc: 1, "": 1,
+
+};
+
+const GENERIC_FOLDERS = {
+
+  modules: 1, console: 1, strobe: 1, stats: 1, utils: 1, config: 1,
+
+  "0script": 1, "0del": 1, ref: 1, "0grok": 1, preparing: 1, polishing: 1, submitting: 1, reseived: 1,
+
+};
+
+const PORT_KEY = "rad-console-port";
+
+const MOD_KEY = "rad-modules-dir";
+
+const SVC_KEY = "rad-console-svc";
+
+const DEFAULT_MODULES = "%GROK_ROOT%\\0doc\\GitHub\\stats-analysis\\modules";
+
+const PORT_LO = 8765;
+
+const PORT_HI = 8776;
+
+const svc = document.getElementById("svc");
+
+const portEl = document.getElementById("port");
+
+const modEl = document.getElementById("modulesDir");
+
+const setEl = document.getElementById("settingsFile");
+
+const projEl = document.getElementById("projectName");
+
+const msg = document.getElementById("msg");
+
+const go = document.getElementById("go");
+
+const goFlow = document.getElementById("goFlow");
+
+let PROJECT = "";
+
+
+
+function decodePath(s) {
+
+  try { return decodeURIComponent(s || ""); } catch (e) { return s || ""; }
+
+}
+
+function fileParts() {
+
+  let path = decodePath(location.pathname || "");
+
+  path = path.replace(/\\/g, "/");
+
+  if (/^\/[A-Za-z]:\//.test(path)) path = path.slice(1);
+
+  path = path.replace(/^\/+/, "");
+
+  const segs = path.split("/").filter(Boolean);
+
+  const file = segs.length ? segs[segs.length - 1] : "";
+
+  const stem = file.replace(/\.html?$/i, "");
+
+  const folder = segs.length >= 2 ? segs[segs.length - 2] : "";
+
+  const dirWin = segs.length >= 2 ? segs.slice(0, -1).join("\\") : "";
+
+  return {stem: stem, folder: folder, dir: dirWin, file: file};
+
+}
+
+function isGeneric(name) {
+
+  const k = String(name || "").trim().toLowerCase();
+
+  return !k || !!GENERIC_STEMS[k] || !!GENERIC_FOLDERS[k];
+
+}
+
+function inferProject() {
+
+  const q = new URLSearchParams(location.search).get("project");
+
+  if (q && q.trim()) return q.trim();
+
+  const p = fileParts();
+
+  if (!isGeneric(p.stem)) return p.stem;
+
+  if (!isGeneric(p.folder)) return p.folder;
+
+  return "";
+
+}
+
+function isTemplateHere() {
+
+  const p = fileParts();
+
+  return String(p.folder || "").toLowerCase() === "modules"
+
+    && (isGeneric(p.stem) || p.stem.toLowerCase() === "project");
+
+}
+
+function fileDir() {
+
+  if (location.protocol !== "file:") return "";
+
+  const p = fileParts();
+
+  return isTemplateHere() ? "" : (p.dir || "");
+
+}
+
+function dataKey() { return "rad-data-file:" + PROJECT; }
+
+function setKey() { return "rad-settings-file:" + PROJECT; }
+
+
+
+function port() {
+
+  const n = parseInt(portEl.value, 10);
+
+  return (n >= 1024 && n <= 65535) ? n : PORT_LO;
+
+}
+
+function host(p) { return "http://127.0.0.1:" + (p || port()); }
+
+function dataFile() {
+
+  if (!PROJECT) return "";
+
+  return (localStorage.getItem(dataKey()) || "").trim() || (PROJECT + ".xlsx");
+
+}
+
+function modulesDir() {
+
+  return ((modEl && modEl.value) || "").trim();
+
+}
+
+function modulesDirError() {
+
+  if (modulesDir()) return "";
+
+  return "错误：MODULES_DIR 未填写。请在 modules 栏填写共享算法库路径（如 " + DEFAULT_MODULES + "）。";
+
+}
+
+function settingsPath() {
+
+  let v = ((setEl && setEl.value) || "").trim();
+
+  if (!v || v.toLowerCase() === "settings.ini") return "ref/settings.ini";
+
+  return v;
+
+}
+
+function pageUrl(p) {
+
+  const q = new URLSearchParams();
+
+  if (PROJECT) q.set("project", PROJECT);
+
+  const data = dataFile();
+
+  if (data) q.set("data", data);
+
+  if (settingsPath()) q.set("settings", settingsPath());
+
+  if (modulesDir()) q.set("modules", modulesDir());
+
+  const dir = fileDir();
+
+  if (dir) q.set("dir", dir);
+
+  const qs = q.toString();
+
+  return host(p) + "/?" + qs;
+
+}
+
+function protoUrl(p) {
+
+  let u = "radconsole://serve?port=" + (p || port())
+
+    + "&modules=" + encodeURIComponent(modulesDir());
+
+  if (PROJECT) u += "&project=" + encodeURIComponent(PROJECT);
+
+  const data = dataFile();
+
+  if (data) u += "&data=" + encodeURIComponent(data);
+
+  const dir = fileDir();
+
+  if (dir) u += "&dir=" + encodeURIComponent(dir);
+
+  return u;
+
+}
+
+function applyProject(name, fromInput) {
+
+  PROJECT = String(name || "").trim();
+
+  document.title = PROJECT || "RAD 起始页";
+
+  const h = document.getElementById("projTitle");
+
+  if (h) h.textContent = PROJECT || "通用模板";
+
+  if (projEl && !fromInput) projEl.value = PROJECT;
+
+  const banner = document.getElementById("tplBanner");
+
+  if (banner) banner.hidden = !isTemplateHere();
+
+  const savedSet = PROJECT ? localStorage.getItem(setKey()) : "";
+
+  if (setEl && savedSet) {
+
+    setEl.value = (savedSet.toLowerCase() === "settings.ini") ? "ref/settings.ini" : savedSet;
+
+  }
+
+  syncLinks();
+
+}
+
+function syncLinks() {
+
+  const modErr = modulesDirError();
+
+  if (modErr) msg.textContent = modErr;
+
+  go.href = pageUrl();
+
+  goFlow.href = pageUrl() + "&tab=flow";
+
+  localStorage.setItem(PORT_KEY, String(port()));
+
+  localStorage.setItem(MOD_KEY, modulesDir());
+
+  if (PROJECT) {
+
+    try { localStorage.setItem(setKey(), settingsPath()); } catch (e) {}
+
+  }
+
+}
+
+
+
+const saved = parseInt(localStorage.getItem(PORT_KEY) || "", 10);
+
+if (saved >= 1024 && saved <= 65535) portEl.value = saved;
+
+const savedMod = localStorage.getItem(MOD_KEY);
+
+if (savedMod !== null && modEl) modEl.value = savedMod;
+
+applyProject(inferProject());
+
+portEl.addEventListener("change", syncLinks);
+
+if (modEl) {
+
+  modEl.addEventListener("input", syncLinks);
+
+  modEl.addEventListener("change", syncLinks);
+
+}
+
+if (setEl) {
+
+  setEl.addEventListener("input", syncLinks);
+
+  setEl.addEventListener("change", syncLinks);
+
+}
+
+if (projEl) {
+
+  projEl.addEventListener("input", () => applyProject(projEl.value, true));
+
+  projEl.addEventListener("change", () => applyProject(projEl.value, true));
+
+}
+
+function bindFilePick(btnId, inpId, destId, kind) {
+
+  const btn = document.getElementById(btnId);
+
+  const inp = document.getElementById(inpId);
+
+  const dest = document.getElementById(destId);
+
+  if (!btn || !inp || !dest) return;
+
+  btn.onclick = () => inp.click();
+
+  inp.addEventListener("change", () => {
+
+    const f = inp.files && inp.files[0];
+
+    if (!f) return;
+
+    if (kind === "settings") {
+
+      dest.value = (String(f.name).toLowerCase() === "settings.ini") ? "ref/settings.ini" : f.name;
+
+    } else if (kind === "modules") {
+
+      const top = String(f.webkitRelativePath || "").split(/[/\\\\]/)[0];
+
+      dest.value = (top && top.toLowerCase() === "modules") ? DEFAULT_MODULES : (top || DEFAULT_MODULES);
+
+    } else {
+
+      dest.value = f.name;
+
+    }
+
+    syncLinks();
+
+  });
+
+}
+
+bindFilePick("btnSetPick", "settingsFilePick", "settingsFile", "settings");
+
+bindFilePick("btnModPick", "modulesDirPick", "modulesDir", "modules");
+
+
+
+function probe(p) {
+
+  return fetch(host(p) + "/api/health").then(r => r.ok ? r.json() : null).catch(() => null);
+
+}
+
+async function scan(from, to) {
+
+  for (let p = from; p <= to; p++) {
+
+    const j = await probe(p);
+
+    if (j && j.ok) return p;
+
+  }
+
+  return 0;
+
+}
+
+async function ensureLive() {
+
+  let p = port();
+
+  if (await probe(p)) return p;
+
+  const found = await scan(PORT_LO, PORT_HI);
+
+  if (found) { portEl.value = found; syncLinks(); return found; }
+
+  return 0;
+
+}
+
+async function hydrateSettings(p) {
+
+  if (!PROJECT) return;
+
+  try {
+
+    const pr = await fetch(host(p) + "/api/projects").then(r => r.json());
+
+    const hit = ((pr && pr.projects) || []).find(x => x.name === PROJECT);
+
+    if (hit && hit.settings && setEl && !(setEl.value || "").trim()) {
+
+      const s = String(hit.settings).replace(/\\/g, "/");
+
+      setEl.value = /\/ref\/settings\.ini$/i.test(s) ? "ref/settings.ini" : (s.split("/").pop() || "");
+
+      syncLinks();
+
+    }
+
+  } catch (e) {}
+
+}
+
+async function saveIni() {
+
+  syncLinks();
+
+  if (!PROJECT) {
+
+    msg.textContent = "请先填写课题名，或把本页放到课题目录再打开。";
+
+    return;
+
+  }
+
+  const p = await ensureLive();
+
+  if (!p) {
+
+    msg.textContent = "请先开启 Python 服务，再写回 ini。";
+
+    return;
+
+  }
+
+  const modErr = modulesDirError();
+
+  if (modErr) {
+
+    msg.textContent = modErr;
+
+    return;
+
+  }
+
+  msg.textContent = "正在写回 settings.ini…";
+
+  try {
+
+    const r = await fetch(host(p) + "/api/writeback", {
+
+      method: "POST",
+
+      headers: {"Content-Type": "application/json"},
+
+      body: JSON.stringify({
+
+        project: PROJECT,
+
+        data: dataFile(),
+
+        settings: settingsPath(),
+
+        overlay: {INPUT: dataFile(), MODULES_DIR: modulesDir()},
+
+        only_keys: ["INPUT", "MODULES_DIR"],
+
+      }),
+
+    });
+
+    const j = await r.json();
+
+    if (!j || !j.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+
+    const n = (j.updated || []).length + (j.appended || []).length;
+
+    msg.textContent = "已写回 settings.ini · " + n + " 项 · 备份 " + (j.backup || "settings.ini.bak");
+
+  } catch (e) {
+
+    msg.textContent = "写回失败：" + (e && e.message ? e.message : e);
+
+  }
+
+}
+
+document.getElementById("btnSaveIni").onclick = () => saveIni();
+
+document.getElementById("btnScan").onclick = async () => {
+
+  msg.textContent = "正在探测 " + PORT_LO + "–" + PORT_HI + "…";
+
+  const p = await scan(PORT_LO, PORT_HI);
+
+  if (p) {
+
+    portEl.value = p;
+
+    syncLinks();
+
+    svc.checked = true;
+
+    msg.textContent = "发现可用服务 · 端口 " + p + "。点「进入配置」。";
+
+    hydrateSettings(p);
+
+  } else {
+
+    svc.checked = false;
+
+    msg.textContent = PORT_LO + "–" + PORT_HI + " 都没有可用服务。可改端口后开开关。";
+
+  }
+
+};
+
+
+
+function startSvc() {
+
+  const a = document.createElement("a");
+
+  a.href = protoUrl();
+
+  document.body.appendChild(a);
+
+  a.click();
+
+  a.remove();
+
+}
+
+let svcPollFrom = 0;
+
+async function pollSvc() {
+
+  const p = await ensureLive();
+
+  if (p) {
+
+    svc.checked = true;
+
+    localStorage.setItem(SVC_KEY, "1");
+
+    msg.textContent = "服务已开 · 进入配置…";
+
+    location.replace(pageUrl(p));
+
+    return;
+
+  }
+
+  if (Date.now() - svcPollFrom > 15000) {
+
+    msg.textContent = "端口 " + port() + " 启动失败。可改端口或点「探测」。";
+
+    svc.checked = false;
+
+    localStorage.setItem(SVC_KEY, "0");
+
+    return;
+
+  }
+
+  setTimeout(pollSvc, 700);
+
+}
+
+svc.addEventListener("change", () => {
+
+  if (svc.checked && !PROJECT) {
+
+    svc.checked = false;
+
+    msg.textContent = "请先填写课题名，或把本页放到课题目录再打开。";
+
+    return;
+
+  }
+
+  localStorage.setItem(SVC_KEY, svc.checked ? "1" : "0");
+
+  syncLinks();
+
+  if (svc.checked) {
+
+    msg.textContent = "正在启动 Python 服务 · 端口 " + port() + "…";
+
+    svcPollFrom = Date.now();
+
+    startSvc();
+
+    pollSvc();
+
+  } else {
+
+    fetch(host() + "/api/shutdown").catch(() => {});
+
+    msg.textContent = "已请求关闭端口 " + port() + " 上的服务";
+
+  }
+
+});
+
+
+
+(async () => {
+
+  const p = await ensureLive();
+
+  if (p) {
+
+    svc.checked = true;
+
+    localStorage.setItem(SVC_KEY, "1");
+
+    msg.textContent = PROJECT
+
+      ? "服务已开。点「进入配置」，在「项目/数据」页签载入工作表。"
+
+      : "服务已开。填写课题名后再进入配置。";
+
+    syncLinks();
+
+    hydrateSettings(p);
+
+    return;
+
+  }
+
+  if (localStorage.getItem(SVC_KEY) === "1" && PROJECT) {
+
+    svc.checked = true;
+
+    msg.textContent = "正在启动 Python 服务 · 端口 " + port() + "…";
+
+    svcPollFrom = Date.now();
+
+    startSvc();
+
+    pollSvc();
+
+  }
+
+})();
+
+</script>
+
+</body>
+
+</html>
+
