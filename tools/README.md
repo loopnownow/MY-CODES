@@ -14,6 +14,7 @@
 | `revise/` | 回修包打包 | `pack_docx.py` |
 | `templates/` | 软编码 + dry-run 模板 | `soft_code_template.py` |
 | `orchestrator/` | 00 层 QC 子检查：AI-tell 风格 linter（G-05） | `style_lint.py`；需 `SKILLS_ROOT`（读技能树的 `ban-terms.yaml`） |
+| `office/` | Word 修订机制：`unpack` / `validate` / `pack` + `helpers/` + `validators/`（Anthropic，见 `LICENSE.txt`） | `validate.py --original <pre-edit.docx> --author A` 是硬门；契约在 `{SKILLS}\06_review\base\track-changes\MODULE.md` |
 
 ## 路径与环境（软编码，无绝对盘符）
 
