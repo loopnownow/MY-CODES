@@ -19,6 +19,9 @@
 | `lit-fulltext/` | OA 全文批量取回（Unpaywall / PMC / EuropePMC / OpenAlex / Crossref / arXiv） | `fetch.py`；付费墙只写 `manual_needed.txt`；`LICENSE_NOTE.txt` 记上游 |
 | `manuscript-qc/` | 稿面 QC 检测器：改写保真（数字/引用不漂移）与句长多样性 | `check_rewrite_fidelity.py`、`check_sentence_variety.py`；离线、stdlib |
 | `vocab-harvest/` | 语料措辞计数：重建 IMRAD 段落层、统计句首/句尾短语 | `harvest_sections.py`、`harvest_write_phrases.py`；需 `DOC_BANK_ROOT`（`<0doc>\_bank`）与 `SKILLS_ROOT`（ban 词表），缺则 exit 1 |
+| `draw-flowchart/` | STROBE 流程图生成（type A published / type A′ expanded；`--json` + `--out`，n-audit 缺数即非零） | `draw_strobe_flow.py`、`draw_strobe_flow_expanded.py`；项目常量留在课题 `ref/figure1_strobe.json` |
+| `visualization/` | 技能树可视化编译器（registry / runtime-flow / gates / ARCHITECTURE → typed IR → HTML） | `gen_visualization.py`；需 `SKILLS_ROOT`/`MY_SKILLS`，输出用 `--out` 或 `MY_SKILLS_VIZ_OUT`；需 `pyyaml` |
+| `stats-analysis/` | 统计假设程序化检查（正态性 / 方差 / 离群点） | `assumption_checks.py`；离线、stdlib |
 | `response-qc/` | 审稿回复包 QC：包一致性审计 + tone-polish 机械打磨 | `check_package_consistency.py`、`tone_polish_main.py`；MIT（AIPOCH）见 `LICENSE_NOTE.txt`；离线、stdlib |
 
 ## 网络闸（`verify-refs` / `lit-fulltext`）

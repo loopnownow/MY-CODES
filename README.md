@@ -29,7 +29,7 @@ redirect）。技能 fine-id `stats-analysis` 与别名 `{code_stats}` / `STATS_
 |---|---|
 | `modules/` | 可复用算法库：`config` / `console`（含 `strobe/` 页；控制台已拆为 `schema_ui` / `settings_layer` / `preview` / `dryrun` / `run` / `serve` + `http_impl` 零注入）/ `stats` / `tests` / `utils` |
 | `model-validation/` | 建模 / 验证 / 插补 CLI（校准、DCA、NRI、泄漏检查、研究卡审计、`impute_excel.py`） |
-| `tools/` | 运维 / 加工脚本（`clean-data` / `sync` / `preprocess-imaging` / `fill-protocol` / `lab-reference` / `write-paper` / `revise` / `templates` / `orchestrator` / `office` / `verify-refs` / `lit-fulltext` / `manuscript-qc` / `vocab-harvest` / `response-qc`）。索引与路径口径见 `tools/README.md`。2026-11-01 由 `0doc\_code` 并入；`verify-refs` / `lit-fulltext`（P3-B）与 `manuscript-qc` / `vocab-harvest` / `response-qc`（P3-C）同批从 MY-SKILLS 迁入。 |
+| `tools/` | 运维 / 加工脚本（`clean-data` / `sync` / `preprocess-imaging` / `fill-protocol` / `lab-reference` / `write-paper` / `revise` / `templates` / `orchestrator` / `office` / `verify-refs` / `lit-fulltext` / `manuscript-qc` / `vocab-harvest` / `response-qc` / `draw-flowchart` / `visualization` / `stats-analysis`）。索引与路径口径见 `tools/README.md`。2026-11-01 由 `0doc\_code` 并入；`verify-refs` / `lit-fulltext`（P3-B）与 `manuscript-qc` / `vocab-harvest` / `response-qc`（P3-C）同批从 MY-SKILLS 迁入。 |
 
 运行时要求 **Python ≥ 3.10**（`pyproject.toml` `requires-python`）。标准库 `tomllib` 仅 3.11+；3.10 下测试依赖可选 `tomli`（`pip install -e ".[dev]"`）。
 
