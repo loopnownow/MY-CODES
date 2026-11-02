@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>11111111</PMID>
+      <Article>
+        <ArticleTitle>Highly accurate prediction of <i>ABCD1</i> variants.</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND">Background sentence.</AbstractText>
+          <AbstractText Label="RESULTS">Result sentence.</AbstractText>
+        </Abstract>
+        <AuthorList>
+          <Author><LastName>Jumper</LastName><ForeName>John J</ForeName></Author>
+          <Author><LastName>Evans</LastName></Author>
+        </AuthorList>
+        <Journal>
+          <Title>Nature</Title>
+          <JournalIssue>
+            <Volume>596</Volume>
+            <Issue>7873</Issue>
+            <PubDate><Year>2021</Year></PubDate>
+          </JournalIssue>
+        </Journal>
+        <Pagination><MedlinePgn>583-9</MedlinePgn></Pagination>
+      </Article>
+    </MedlineCitation>
+    <PubmedData>
+      <ArticleIdList>
+        <ArticleId IdType="doi">10.1038/s41586-021-03819-2</ArticleId>
+        <ArticleId IdType="pubmed">11111111</ArticleId>
+      </ArticleIdList>
+    </PubmedData>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation>
+      <PMID>22222222</PMID>
+      <Article>
+        <ArticleTitle>Is the exposure real?</ArticleTitle>
+        <AuthorList>
+          <Author><LastName>Müller</LastName><ForeName>Anna</ForeName></Author>
+        </AuthorList>
+        <Journal>
+          <Title>Ann Neurol</Title>
+          <JournalIssue>
+            <Volume>88</Volume>
+            <Issue>2</Issue>
+            <PubDate><MedlineDate>2020 Nov-Dec</MedlineDate></PubDate>
+          </JournalIssue>
+        </Journal>
+        <Pagination><MedlinePgn>e0123456</MedlinePgn></Pagination>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>

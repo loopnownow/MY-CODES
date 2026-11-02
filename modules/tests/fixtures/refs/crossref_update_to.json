@@ -1,0 +1,16 @@
+{
+  "status": "ok",
+  "message": {
+    "DOI": "10.1000/xyz.2022.7",
+    "type": "journal-article",
+    "title": ["Deep radiomics of ovarian masses"],
+    "container-title": ["Eur Radiol"],
+    "update-to": [
+      {
+        "type": "retraction",
+        "DOI": "10.1000/xyz.2022.7.retract",
+        "updated": {"date-time": "2025-01-09T08:30:00Z"}
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "https://openalex.org/W3333333333",
+  "doi": "https://doi.org/10.1038/s41586-021-03819-2",
+  "title": "Highly accurate protein structure prediction with AlphaFold",
+  "open_access": {"is_oa": true, "oa_url": "https://repo.example.org/oa/1.pdf"},
+  "primary_location": {
+    "pdf_url": "https://publisher.example.org/pdf/1.pdf",
+    "landing_page_url": "https://publisher.example.org/1"
+  }
+}
