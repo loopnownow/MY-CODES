@@ -1,15 +1,18 @@
 """CROSSCHECK_ONLY: Firth logistic and DCA net benefit.
 
 `firthlogist` is BLOCKED on this machine (every release pins Python < 3.11, we run
-3.13.9) and `dcurves` could not be installed (network timeout), so both checks use
-an independent implementation instead of the package:
+3.13.9), so the Firth check uses an independent implementation instead of the
+package:
 
 * Firth: minimise the Jeffreys-penalised log-likelihood with scipy's BFGS using an
   analytically derived score. Our production code uses IRLS with the equivalent
   (but differently derived) `h*(0.5-mu)` form, so agreement is not tautological.
-* DCA: the production path turns sens/spec into net benefit on the rate scale;
-  the cross-check recomputes the same thresholds on the count scale
-  `(TP - FP*pt/(1-pt))/n`, i.e. Vickers' definition.
+
+DCA is checked against `dcurves` (1.1.7, `swap-stats` extra) rather than against a
+second formula written here: the production path turns sensitivity/specificity
+into net benefit on the rate scale, while `dcurves.dca()` recomputes every
+threshold straight from the labels and the predicted risks. The two derivations
+are independent, so agreement is evidence rather than algebra.
 
 Neither production module changes.
 
@@ -18,7 +21,8 @@ Run: python -B -m pytest modules/tests/test_firth_dca_crosscheck.py -q
 from __future__ import annotations
 
 import numpy as np
-import pytest
+import pandas as pd
+from dcurves import dca
 from scipy.optimize import minimize
 from scipy.special import expit
 
@@ -93,19 +97,12 @@ def test_firth_refuses_degenerate_input() -> None:
     assert firth_logit(y, X) is None
 
 
-def _nb_rate(sens, spec, prev, pt):
-    return sens * prev - (1.0 - spec) * (1.0 - prev) * pt / (1.0 - pt)
+def _dcurves_block(result: pd.DataFrame, model: str) -> pd.DataFrame:
+    """One decision strategy out of a `dcurves.dca()` frame, ordered by threshold."""
+    return result[result["model"] == model].sort_values("threshold")
 
 
-def _nb_count(y, pred, pt):
-    n = y.size
-    pred_pos = pred >= pt
-    tp = int(np.sum(pred_pos & (y == 1)))
-    fp = int(np.sum(pred_pos & (y == 0)))
-    return (tp - fp * pt / (1.0 - pt)) / n
-
-
-def test_dca_net_benefit_matches_count_definition() -> None:
+def test_dca_net_benefit_matches_dcurves_oracle() -> None:
     rng = np.random.RandomState(7)
     n = 300
     y = rng.binomial(1, 0.35, n).astype(int)
@@ -114,20 +111,22 @@ def test_dca_net_benefit_matches_count_definition() -> None:
     prev = float(np.mean(y == 1))
 
     sens, spec = _sens_spec_at_thresholds(y, pred, pts)
-    for pt, se, sp in zip(pts, sens, spec):
-        rate = _nb_rate(se, sp, prev, pt)
-        count = _nb_count(y, pred, pt)
-        assert rate == pytest.approx(count, rel=0, abs=TOL_NB)
+    ours_model = sens * prev - (1.0 - spec) * (1.0 - prev) * pts / (1.0 - pts)
+    ours_all = prev - (1.0 - prev) * pts / (1.0 - pts)
 
+    result = dca(
+        data=pd.DataFrame({"y": y, "risk": pred}),
+        outcome="y",
+        modelnames=["risk"],
+        thresholds=pts,
+    )
 
-def test_dca_treat_all_and_none_identities() -> None:
-    rng = np.random.RandomState(11)
-    n = 200
-    y = rng.binomial(1, 0.4, n).astype(int)
-    pred = np.clip(0.4 + rng.normal(0, 0.25, n), 0.001, 0.999)
-    prev = float(np.mean(y == 1))
-    for pt in (0.1, 0.3, 0.5):
-        treat_all = prev - (1.0 - prev) * pt / (1.0 - pt)
-        assert _nb_count(y, np.ones(n), pt) == pytest.approx(treat_all, abs=TOL_NB)
-        assert _nb_count(y, np.zeros(n), pt) == pytest.approx(0.0, abs=TOL_NB)
-        assert _nb_rate(1.0, 0.0, prev, pt) == pytest.approx(treat_all, abs=TOL_NB)
+    expected = {
+        "risk": ours_model,
+        "all": ours_all,
+        "none": np.zeros_like(pts),
+    }
+    for model, ours in expected.items():
+        block = _dcurves_block(result, model)
+        assert np.allclose(block["threshold"].to_numpy(), pts), f"{model}: thresholds drifted"
+        assert np.allclose(block["net_benefit"].to_numpy(), ours, rtol=0, atol=TOL_NB), model
