@@ -79,26 +79,43 @@ def _normalize_name(x: str) -> str:
 #     · 两组均正态 → t 检验，显示 mean±SD
 #     · 非正态     → Mann-Whitney U 检验，显示 median [IQR]
 # ═════════════════════════════════════════════════════════════════
+def _pearson_chi2(table: np.ndarray, row_totals=None, col_totals=None) -> float:
+    """固定边际表的 Pearson χ²：n·Σ O²/(r·c) − n；任一边际为 0 时返回 nan。"""
+    obs = np.asarray(table, dtype=float)
+    rs = obs.sum(axis=1) if row_totals is None else np.asarray(row_totals, dtype=float)
+    cs = obs.sum(axis=0) if col_totals is None else np.asarray(col_totals, dtype=float)
+    if np.any(rs <= 0) or np.any(cs <= 0):
+        return float("nan")
+    n = float(obs.sum())
+    denom = np.outer(rs, cs)
+    return float(n * float((obs * obs / denom).sum()) - n)
+
+
 def _chi2_monte_carlo(table: np.ndarray, n_resamples: int = 2000, seed: int = 66666) -> float:
-    """Freeman-Halton-style Monte Carlo P for sparse RxC tables (fixed margins)."""
+    """Freeman-Halton-style Monte Carlo P for sparse RxC tables (fixed margins).
+
+    RNG 消耗与原实现一致（逐次 `rng.shuffle(col_ids)`）；内层改批量计数 + 闭式 χ²。
+    """
     table = np.asarray(table, dtype=int)
-    obs = float(stats.chi2_contingency(table, correction=False)[0])
     rs = table.sum(axis=1)
     cs = table.sum(axis=0)
-    row_ids = np.repeat(np.arange(len(rs)), rs)
-    col_ids = np.repeat(np.arange(len(cs)), cs)
+    n_rows, n_cols = len(rs), len(cs)
+    obs = _pearson_chi2(table, rs, cs)
+    if not np.isfinite(obs):
+        return float("nan")
+    row_ids = np.repeat(np.arange(n_rows), rs)
+    col_ids = np.repeat(np.arange(n_cols), cs)
+    row_offsets = row_ids * n_cols
+    n_cells = n_rows * n_cols
     rng = np.random.RandomState(seed)
     ge = 0
     n_ok = 0
-    for i in range(int(n_resamples)):
+    for _ in range(int(n_resamples)):
         shuffled = col_ids.copy()
         rng.shuffle(shuffled)
-        sim = np.zeros_like(table)
-        for r, c in zip(row_ids, shuffled):
-            sim[r, c] += 1
-        try:
-            chi = float(stats.chi2_contingency(sim, correction=False)[0])
-        except Exception:
+        sim = np.bincount(row_offsets + shuffled, minlength=n_cells).reshape(n_rows, n_cols)
+        chi = _pearson_chi2(sim, rs, cs)
+        if not np.isfinite(chi):
             continue
         n_ok += 1
         if chi >= obs:
