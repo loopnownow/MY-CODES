@@ -15,40 +15,30 @@ import pandas as pd
 import patsy
 from scipy import stats
 import statsmodels.formula.api as smf
+from statsmodels.stats.multitest import multipletests
 
 from modules import config as cfg
 
 
-def bh_fdr(p: Sequence[float]) -> np.ndarray:
-    """Benjamini–Hochberg。非有限 p 保持 NaN。"""
+def _adjust(p: Sequence[float], method: str) -> np.ndarray:
+    """家族校正：multipletests 只吃有限 p；非有限位保持 NaN。"""
     src = np.asarray(list(p), dtype=float)
     out = np.full(src.shape, np.nan)
     idx = np.flatnonzero(np.isfinite(src))
-    m = int(idx.size)
-    if m == 0:
+    if idx.size == 0:
         return out
-    order = idx[np.argsort(src[idx], kind="mergesort")]
-    ranked = src[order]
-    q = ranked * m / np.arange(1, m + 1)
-    q = np.minimum.accumulate(q[::-1])[::-1]
-    out[order] = np.clip(q, 0.0, 1.0)
+    out[idx] = np.clip(multipletests(src[idx], method=method)[1], 0.0, 1.0)
     return out
+
+
+def bh_fdr(p: Sequence[float]) -> np.ndarray:
+    """Benjamini–Hochberg（statsmodels multipletests `fdr_bh`）。非有限 p 保持 NaN。"""
+    return _adjust(p, "fdr_bh")
 
 
 def holm_fwer(p: Sequence[float]) -> np.ndarray:
-    """Holm step-down。非有限 p 保持 NaN。"""
-    src = np.asarray(list(p), dtype=float)
-    out = np.full(src.shape, np.nan)
-    idx = np.flatnonzero(np.isfinite(src))
-    m = int(idx.size)
-    if m == 0:
-        return out
-    order = idx[np.argsort(src[idx], kind="mergesort")]
-    ranked = src[order]
-    adj = ranked * (m - np.arange(m))
-    adj = np.maximum.accumulate(np.clip(adj, 0.0, None))
-    out[order] = np.clip(adj, 0.0, 1.0)
-    return out
+    """Holm step-down（statsmodels multipletests `holm`）。非有限 p 保持 NaN。"""
+    return _adjust(p, "holm")
 
 
 def _as_name_list(raw: Any) -> list[str]:
