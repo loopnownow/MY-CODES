@@ -130,6 +130,10 @@ class _FakeResponse:
     def json(self):
         return json.loads(self._body.decode("utf-8"))
 
+    @property
+    def reason_phrase(self) -> str:
+        return "OK" if self.status_code < 400 else "Error"
+
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
             raise requests.HTTPError(f"{self.status_code} error for {self.url}")
@@ -187,10 +191,23 @@ def offline(routes: dict[str, tuple]):
         url = request.full_url if isinstance(request, urllib.request.Request) else str(request)
         return router.respond(url)
 
+    def fake_httpx_get(url, params=None, **_kwargs):
+        if params:
+            url = f"{url}?{urllib.parse.urlencode(params, doseq=True)}"
+        return router.respond(url)
+
     with contextlib.ExitStack() as stack:
         stack.enter_context(mock.patch.object(requests.Session, "request", fake_request))
         stack.enter_context(mock.patch.object(urllib.request, "urlopen", fake_urlopen))
         stack.enter_context(mock.patch("time.sleep", lambda *_a, **_k: None))
+        # habanero talks httpx, not requests: intercept it too, so a client swap
+        # can never turn an offline shape test into a real request.
+        try:
+            import httpx
+        except ImportError:
+            pass
+        else:
+            stack.enter_context(mock.patch.object(httpx, "get", fake_httpx_get))
         yield router
 
 
@@ -578,9 +595,26 @@ def test_fetch_pmcid_and_oa_candidate_order() -> None:
         check_snapshot("fetch.openalex_candidates",
                        module.openalex_lookup("10.1038/s41586-021-03819-2", EMAIL))
 
-    with offline({"api.crossref.org/works/": (FIXTURES / "crossref_work.json", 200)}):
-        check_snapshot("fetch.crossref_candidates",
-                       module.crossref_lookup("10.1038/s41586-021-03819-2", EMAIL))
+    with offline({"api.crossref.org/works/": (FIXTURES / "crossref_work.json", 200)}) as router:
+        candidates = module.crossref_lookup("10.1038/s41586-021-03819-2", EMAIL)
+    check_snapshot("fetch.crossref_candidates", candidates)
+    # habanero's works(ids=...) endpoint must stay a single-record fetch.
+    assert [call for call in router.calls if "api.crossref.org" in call] == \
+        ["https://api.crossref.org/works/10.1038/s41586-021-03819-2"]
+
+
+def test_fetch_crossref_fails_loudly_without_habanero() -> None:
+    module = _fetch()
+    real_import = builtins.__import__
+
+    def missing(name, *args, **kwargs):
+        if name == "habanero" or name.startswith("habanero."):
+            raise ImportError("No module named 'habanero'")
+        return real_import(name, *args, **kwargs)
+
+    with mock.patch.object(builtins, "__import__", missing):
+        with pytest.raises(ImportError, match="swap-refs"):
+            module.crossref_lookup("10.1038/s41586-021-03819-2", EMAIL)
 
 
 def test_fetch_safe_doi_name_is_stable() -> None:

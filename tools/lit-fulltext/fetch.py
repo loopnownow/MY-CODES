@@ -53,8 +53,12 @@ def require_network() -> None:
             "call Unpaywall / PMC / OpenAlex / Crossref / arXiv" % NETWORK_ENV)
 
 
+# CROSSREF_TIMEOUT: Crossref 单记录查询超时（秒）；改为 habanero 后仍需保留原 15 秒口径。
+# 运行示例: python fetch.py dois.txt -o pdfs/ -e user@example.com --allow-network
 MIN_PDF_BYTES = 10 * 1024
 USER_AGENT = "medsci-skills/1.0"
+CROSSREF_TIMEOUT = 15
+
 REPORT_SCHEMA_VERSION = 2
 TITLE_MATCH_THRESHOLD = 0.6
 RETRIEVED_STATUSES = ("oa", "pmc", "arxiv", "skip")
@@ -69,6 +73,24 @@ log = logging.getLogger("fetch_oa")
 def _ua(email: str) -> str:
     """Build a polite User-Agent string with contact email."""
     return f"{USER_AGENT} (mailto:{email})"
+
+
+def _habanero():
+    """Import habanero on first use: it is the pack's optional `swap-refs` extra.
+
+    Deferred so the rest of fetch.py (and `--help`) still works without the
+    extra, and so a missing package fails loudly instead of silently falling
+    back to a hand-written Crossref client.
+    """
+    try:
+        import httpx
+        from habanero import Crossref
+        from habanero.exceptions import RequestError
+    except ImportError as error:
+        raise ImportError(
+            "fetch.py crossref_lookup needs habanero: "
+            "pip install \"stats-analysis[swap-refs]\"") from error
+    return Crossref, RequestError, httpx
 
 
 def safe_doi_name(doi: str) -> str:
@@ -506,13 +528,14 @@ def openalex_lookup(doi: str, email: str) -> list[str]:
 
 
 def crossref_lookup(doi: str, email: str) -> list[str]:
-    url = f"https://api.crossref.org/works/{urllib.parse.quote(doi, safe='/')}"
+    # Crossref records carry the publisher's `link` list first, then the
+    # primary resource URL; both are OA candidates and order is the contract.
+    Crossref, RequestError, httpx = _habanero()
     candidates = []
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": _ua(email)})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-        msg = data.get("message", {}) or {}
+        envelope = Crossref(mailto=email, ua_string=USER_AGENT,
+                            timeout=CROSSREF_TIMEOUT).works(ids=doi)
+        msg = (envelope or {}).get("message", {}) or {}
         for link in msg.get("link", []) or []:
             v = link.get("URL")
             if v and v not in candidates:
@@ -520,8 +543,11 @@ def crossref_lookup(doi: str, email: str) -> list[str]:
         primary = ((msg.get("resource") or {}).get("primary") or {}).get("URL")
         if primary and primary not in candidates:
             candidates.append(primary)
-    except (urllib.error.URLError, urllib.error.HTTPError,
+    except (RequestError, httpx.HTTPError, RuntimeError, ValueError,
             json.JSONDecodeError) as e:
+        # habanero wraps transport failures in RuntimeError. A Crossref outage
+        # only means "no OA candidate from this source", which process_doi
+        # already handles by trying the next resolver and then failing loudly.
         log.debug("Crossref error for %s: %s", doi, e)
     return candidates
 
