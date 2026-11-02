@@ -2,18 +2,28 @@
 
 `miceforest` is an *engine swap* (LightGBM instead of BayesianRidge), so the draws
 are legitimately different; it is therefore never selected automatically. These
-tests pin the three behaviours that matter:
+tests pin the four behaviours that matter:
 
 * ``method="iterative"`` still produces m draws with no observed cell moved;
 * an unknown method raises ValueError instead of silently falling back;
 * ``method="miceforest"`` either runs (package present) or raises ImportError with
-  an actionable message (package absent) - and never falls back to sklearn.
+  an actionable message (package absent) - and never falls back to sklearn;
+* the ``mi-forest`` extra keeps ``lightgbm<4.7``: miceforest 6.0.5 (still the
+  latest release) calls ``Booster.__inner_predict(0)``, and lightgbm 4.7 dropped
+  that argument (miceforest issue #104, open). Unpinned, the pair raises TypeError
+  on the first ``mice()`` call.
 
 Run: python -B -m pytest modules/tests/test_mi_backend.py -q
 """
 from __future__ import annotations
 
 import importlib.util
+from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11
+    import tomli as tomllib  # type: ignore
 
 import numpy as np
 import pandas as pd
@@ -22,6 +32,7 @@ import pytest
 from modules.utils.u_mi import MI_BACKENDS, z_impute_mi
 
 HAS_MICEFOREST = importlib.util.find_spec("miceforest") is not None
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture()
@@ -75,3 +86,12 @@ def test_miceforest_is_opt_in_and_never_falls_back(frame: pd.DataFrame) -> None:
     else:
         with pytest.raises(ImportError, match="miceforest"):
             z_impute_mi(frame, m=3, method="miceforest", verbose=False)
+
+
+def test_mi_forest_extra_pins_lightgbm_below_47() -> None:
+    """The extra must not let pip install the pair that raises TypeError."""
+    data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    extra = data["project"]["optional-dependencies"]["mi-forest"]
+    pins = [dep.replace(" ", "") for dep in extra]
+    assert any(dep.startswith("miceforest") for dep in pins), pins
+    assert any(dep.startswith("lightgbm") and "<4.7" in dep for dep in pins), pins

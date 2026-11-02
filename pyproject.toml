@@ -23,6 +23,10 @@ dependencies = [
 shap = ["shap>=0.44"]
 swap-stats = ["tableone>=0.9", "dcurves>=1.1"]
 swap-refs = ["pyalex>=0.21", "habanero>=2.4", "arxiv>=3.0", "bibtexparser>=2.1"]
+# miceforest 6.0.5 (still the latest release) calls Booster.__inner_predict(0);
+# lightgbm 4.7 dropped that argument, so the pair only works below 4.7.
+# Upstream bug, open at https://github.com/AnotherSamWilson/miceforest/issues/104
+mi-forest = ["miceforest>=6.0.5", "lightgbm>=4.6,<4.7"]
 dev = ["pytest>=7.4", "ruff>=0.12", 'tomli>=2.0; python_version < "3.11"', "pyyaml>=6.0"]
 
 [tool.pytest.ini_options]
