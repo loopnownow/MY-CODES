@@ -1,0 +1,12 @@
+{
+  "status": "ok",
+  "message": {
+    "DOI": "10.1038/s41586-021-03819-2",
+    "type": "journal-article",
+    "title": ["Highly accurate protein structure prediction with AlphaFold"],
+    "container-title": ["Nature"],
+    "publisher": "Springer Science and Business Media LLC",
+    "update-type": "retraction",
+    "updated": {"date-time": "2024-03-05T10:00:00Z"}
+  }
+}

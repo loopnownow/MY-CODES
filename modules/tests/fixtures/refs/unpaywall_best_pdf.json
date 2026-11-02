@@ -1,0 +1,12 @@
+{
+  "doi": "10.1038/s41586-021-03819-2",
+  "is_oa": true,
+  "best_oa_location": {
+    "url_for_pdf": "https://europepmc.example.org/pdf/1.pdf",
+    "url": "https://europepmc.example.org/1",
+    "host_type": "repository"
+  },
+  "oa_locations": [
+    {"url_for_pdf": "https://repo.example.org/pdf/2.pdf", "url": "https://repo.example.org/2"}
+  ]
+}

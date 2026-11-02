@@ -1,0 +1,27 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.1038/s41586-021-03819-2",
+    "type": "journal-article",
+    "title": ["Highly accurate protein structure prediction with AlphaFold"],
+    "container-title": ["Nature"],
+    "publisher": "Springer Science and Business Media LLC",
+    "volume": "596",
+    "issue": "7873",
+    "page": "583-589",
+    "ISSN": ["0028-0836", "1476-4687"],
+    "ISBN": [],
+    "author": [
+      {"given": "John", "family": "Jumper"},
+      {"given": "Richard", "family": "Evans"}
+    ],
+    "editor": [{"given": "Jane", "family": "Doe"}],
+    "published-print": {"date-parts": [[2021, 8, 26]]},
+    "published-online": {"date-parts": [[2021, 7, 15]]},
+    "link": [
+      {"URL": "https://link.example.org/pdf/1.pdf", "content-type": "application/pdf"}
+    ],
+    "resource": {"primary": {"URL": "https://landing.example.org/1"}}
+  }
+}
