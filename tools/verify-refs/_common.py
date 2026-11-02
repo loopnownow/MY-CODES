@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 """Shared BibTeX parsing and rendering for the citation-management scripts.
 
-Standard library only.
+Parsing runs through ``bibtexparser`` v2, the pack's optional ``swap-refs``
+extra. Rendering, citation keys and page ranges stay hand-written because they
+are lab rules rather than BibTeX rules.
 
-The parser here is brace-depth aware. That matters more than it sounds: a
-regular expression of the form ``\\{([^}]*)\\}`` stops at the first closing
-brace, so it truncates every title that protects a capitalised term --
-``{Highly accurate prediction with {AlphaFold}}`` -- and writing the truncated
-value back out produces a ``.bib`` file with unbalanced braces that no BibTeX
-engine will read. Capitalisation protection is routine in real bibliographies,
-and ``extract_metadata.py`` emits it deliberately, so the naive form corrupts
-this skill's own output.
+Brace handling is why the gate pins ``{AlphaFold}``: a value such as
+``{Highly accurate prediction with {AlphaFold}}`` has to keep its inner braces
+after the round trip, or the ``.bib`` we write carries unbalanced braces that no
+BibTeX engine will read. Capitalisation protection is routine in real
+bibliographies, and ``extract_metadata.py`` emits it deliberately.
 
 Every producer in this skill renders through :func:`render_entry` and keys
 through :func:`citation_key`, so entries from Crossref, PubMed, OpenAlex, and
@@ -63,59 +62,21 @@ FIELD_ORDER = [
 # @string, @comment and @preamble are not bibliography entries.
 _NON_ENTRY_TYPES = {'string', 'comment', 'preamble'}
 
-_FIELD_NAME = re.compile(r'\s*([A-Za-z][A-Za-z0-9_+:.-]*)\s*=\s*(.*)$', re.DOTALL)
 
+def _bibtexparser():
+    """Import bibtexparser on first use: it is the pack's optional `swap-refs` extra.
 
-def _is_outer_braced(value: str) -> bool:
-    """True when the whole value is wrapped in one matched brace pair."""
-    if not (value.startswith('{') and value.endswith('}')):
-        return False
-    depth = 0
-    for index, char in enumerate(value):
-        if char == '{':
-            depth += 1
-        elif char == '}':
-            depth -= 1
-            if depth == 0:
-                # Only a wrapper if it closes at the very end; `{a} # {b}`
-                # and `{a}{b}` must be left alone.
-                return index == len(value) - 1
-    return False
-
-
-def _unwrap(value: str) -> str:
-    """Strip one layer of delimiters, preserving any nested braces inside."""
-    value = value.strip()
-    if _is_outer_braced(value):
-        return value[1:-1].strip()
-    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
-        return value[1:-1].strip()
-    return value
-
-
-def _split_top_level(body: str) -> List[str]:
-    """Split on commas that sit outside braces and quotes."""
-    parts: List[str] = []
-    buffer: List[str] = []
-    depth = 0
-    in_quote = False
-
-    for char in body:
-        if char == '"' and depth == 0:
-            in_quote = not in_quote
-        elif char == '{':
-            depth += 1
-        elif char == '}':
-            depth -= 1
-
-        if char == ',' and depth == 0 and not in_quote:
-            parts.append(''.join(buffer))
-            buffer = []
-        else:
-            buffer.append(char)
-
-    parts.append(''.join(buffer))
-    return parts
+    Deferred so `--help` and the network gate keep working on a machine without
+    the extra, and so a missing package fails loudly instead of silently falling
+    back to a hand-written parser.
+    """
+    try:
+        import bibtexparser
+    except ImportError as error:
+        raise ImportError(
+            '_common.py needs bibtexparser: pip install "stats-analysis[swap-refs]"'
+        ) from error
+    return bibtexparser
 
 
 def parse_bibtex(content: str) -> List[Dict]:
@@ -125,82 +86,29 @@ def parse_bibtex(content: str) -> List[Dict]:
     ``OrderedDict`` of lowercased field names to their unwrapped values.
     Malformed or unterminated entries are skipped rather than raised on.
     """
+    bibtexparser = _bibtexparser()
+    library = bibtexparser.parse_string(content)
+
     entries: List[Dict] = []
-    length = len(content)
-    position = 0
-
-    while True:
-        at = content.find('@', position)
-        if at < 0:
-            break
-
-        cursor = at + 1
-        while cursor < length and content[cursor].isalpha():
-            cursor += 1
-        entry_type = content[at + 1:cursor].lower()
-
-        if not entry_type:
-            position = at + 1
-            continue
-
-        while cursor < length and content[cursor].isspace():
-            cursor += 1
-
-        if cursor >= length or content[cursor] not in '{(':
-            position = at + 1
-            continue
-
-        opener = content[cursor]
-        closer = '}' if opener == '{' else ')'
-
-        # Walk to the delimiter that matches the opener, counting depth.
-        depth = 0
-        end = -1
-        scan = cursor
-        while scan < length:
-            char = content[scan]
-            if char == opener:
-                depth += 1
-            elif char == closer:
-                depth -= 1
-                if depth == 0:
-                    end = scan
-                    break
-            scan += 1
-
-        if end < 0:
-            # Unterminated entry: nothing reliable left to read.
-            break
-
-        position = end + 1
+    for entry in library.entries:
+        entry_type = entry.entry_type.lower()
 
         if entry_type in _NON_ENTRY_TYPES:
             continue
 
-        body = content[cursor + 1:end]
-        chunks = _split_top_level(body)
-        if not chunks:
-            continue
-
-        citation_key_text = chunks[0].strip()
-        if not citation_key_text or '=' in citation_key_text:
+        if not entry.key:
             # No citation key -- not an entry we can work with.
             continue
 
         fields: "OrderedDict[str, str]" = OrderedDict()
-        for chunk in chunks[1:]:
-            if not chunk.strip():
-                continue
-            match = _FIELD_NAME.match(chunk)
-            if not match:
-                continue
-            fields[match.group(1).lower()] = _unwrap(match.group(2))
+        for name, field in entry.fields_dict.items():
+            fields[name.lower()] = field.value.strip()
 
         entries.append({
             'type': entry_type,
-            'key': citation_key_text,
+            'key': entry.key,
             'fields': fields,
-            'raw': content[at:end + 1],
+            'raw': entry.raw,
         })
 
     return entries
