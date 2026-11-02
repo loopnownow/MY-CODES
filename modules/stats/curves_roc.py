@@ -17,6 +17,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 from sklearn.metrics import roc_curve, roc_auc_score
+from MLstatkit import Delong_test
 import statsmodels.api as sm
 
 from modules import config as cfg
@@ -139,7 +140,10 @@ def _compute_midrank(x: np.ndarray) -> np.ndarray:
 def delong_roc_test(y: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
     """
     Two-sided paired DeLong test of AUC(p1) vs AUC(p2) on the same cases.
-    Returns p-value; nan if the comparison is not identified.
+
+    计算交给 MLstatkit（Sun & Xu 2014 midranks）；本函数保留 lab 判据：
+    样本不足 → nan，预测完全相同或 AUC 相同（如 Combined 只是 RadScore 的单调变换）→ 1.0。
+    剩余情形里若库报方差退化（完全分离），那不是 DeLong，因此 raise（不写回退）。
     """
     y = np.asarray(y).astype(int)
     a = np.asarray(p1, dtype=float)
@@ -154,34 +158,15 @@ def delong_roc_test(y: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
         return float("nan")
     if np.allclose(a, b, equal_nan=False):
         return 1.0
-    order = np.argsort(-y)  # positives first
-    preds = np.vstack((a, b))[:, order]
-    m, n = n_pos, n_neg
-    k = preds.shape[0]
-    tx = np.empty((k, m), dtype=float)
-    ty = np.empty((k, n), dtype=float)
-    tz = np.empty((k, m + n), dtype=float)
-    for r in range(k):
-        tx[r, :] = _compute_midrank(preds[r, :m])
-        ty[r, :] = _compute_midrank(preds[r, m:])
-        tz[r, :] = _compute_midrank(preds[r, :])
-    aucs = tz[:, :m].sum(axis=1) / m / n - float(m + 1.0) / 2.0 / n
-    v01 = (tz[:, :m] - tx) / n
-    v10 = 1.0 - (tz[:, m:] - ty) / m
-    sx = np.cov(v01, ddof=1)
-    sy = np.cov(v10, ddof=1)
-    sigma = sx / m + sy / n
-    if np.ndim(sigma) == 0:
-        var = float(sigma)
-    else:
-        var = float(sigma[0, 0] + sigma[1, 1] - 2.0 * sigma[0, 1])
-    diff = float(aucs[0] - aucs[1])
-    if not np.isfinite(var) or var <= 0:
-        return 1.0 if abs(diff) < 1e-12 else 0.0
-    z = abs(diff) / np.sqrt(var)
-    if not np.isfinite(z):
-        return float("nan")
-    return float(2.0 * norm.sf(z))
+    # AUC 相等 ⇒ 检验统计量为 0 ⇒ p=1；此时 DeLong 方差必为 0，不能送进库。
+    if abs(float(roc_auc_score(y, a)) - float(roc_auc_score(y, b))) < 1e-12:
+        return 1.0
+    _z, p, _ci_a, _ci_b, _auc_a, _auc_b, info = Delong_test(
+        y, a, b, return_ci=True, return_auc=True, verbose=0
+    )
+    if info.get("method") != "delong":
+        raise RuntimeError("DeLong 方差退化：拒绝 bootstrap 回退")
+    return float(p)
 
 
 def _pairwise_delong(y: np.ndarray, probs: Dict[str, np.ndarray]) -> pd.DataFrame:
