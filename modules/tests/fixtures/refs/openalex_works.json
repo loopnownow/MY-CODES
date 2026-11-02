@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "count": 2,
+    "next_cursor": null
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W1111111111",
+      "doi": "https://doi.org/10.1038/s41586-021-03819-2",
+      "title": "Highly accurate protein structure prediction with AlphaFold",
+      "display_name": "Highly accurate protein structure prediction with AlphaFold",
+      "publication_year": 2021,
+      "type": "journal-article",
+      "cited_by_count": 12345,
+      "open_access": {"is_oa": true},
+      "authorships": [
+        {"author": {"display_name": "John Jumper"}},
+        {"author": {"display_name": "Richard Evans"}},
+        {"author": {"display_name": ""}}
+      ],
+      "primary_location": {
+        "source": {"display_name": "Nature", "host_organization_name": "Springer Nature"}
+      },
+      "biblio": {"volume": "596", "issue": "7873", "first_page": "583", "last_page": "589"},
+      "abstract_inverted_index": {"AlphaFold": [0], "predicts": [1], "structures": [2]}
+    },
+    {
+      "id": "https://openalex.org/W2222222222",
+      "doi": "",
+      "title": "",
+      "display_name": "A preprint without a DOI",
+      "publication_year": null,
+      "type": "preprint",
+      "cited_by_count": 0,
+      "open_access": {},
+      "authorships": [],
+      "primary_location": {"source": {"display_name": "bioRxiv"}},
+      "biblio": {"volume": null, "issue": null, "first_page": "e0123456", "last_page": "e0123456"},
+      "abstract_inverted_index": null
+    }
+  ]
+}

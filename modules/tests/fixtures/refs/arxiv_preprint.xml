@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <entry>
+    <id>http://arxiv.org/abs/2402.05678v3</id>
+    <published>2024-02-08T00:00:00Z</published>
+    <title>Radiomics reproducibility in ovarian cancer</title>
+    <summary>Preprint only.</summary>
+    <author><name>Anna Müller</name></author>
+    <arxiv:doi>10.1000/xyz.2024.9</arxiv:doi>
+  </entry>
+</feed>

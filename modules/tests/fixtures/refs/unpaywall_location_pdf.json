@@ -1,0 +1,12 @@
+{
+  "doi": "10.1000/xyz.2024.1",
+  "is_oa": true,
+  "best_oa_location": {
+    "url_for_pdf": null,
+    "url": "https://repository.example.org/landing/1",
+    "host_type": "repository"
+  },
+  "oa_locations": [
+    {"url_for_pdf": "https://repository.example.org/pdf/1.pdf", "url": "https://repository.example.org/1"}
+  ]
+}
