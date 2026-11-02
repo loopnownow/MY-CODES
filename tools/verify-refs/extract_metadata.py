@@ -25,6 +25,23 @@ from _common import (  # noqa: E402
     require_network,
 )
 
+
+def _arxiv():
+    """Import arxiv on first use: it is the pack's optional `swap-refs` extra.
+
+    Deferred so `--help` and the network gate keep working on a machine without
+    the extra, and so a missing package fails loudly instead of silently falling
+    back to a hand-written client.
+    """
+    try:
+        import arxiv
+    except ImportError as error:
+        raise ImportError(
+            'extract_metadata.py needs arxiv: pip install "stats-analysis[swap-refs]"'
+        ) from error
+    return arxiv
+
+
 class MetadataExtractor:
     """Extract metadata from various sources and generate BibTeX."""
 
@@ -266,11 +283,7 @@ class MetadataExtractor:
         Returns:
             Metadata dictionary or None
         """
-        url = 'https://export.arxiv.org/api/query'
-        params = {
-            'id_list': arxiv_id,
-            'max_results': 1
-        }
+        arxiv = _arxiv()
 
         try:
             # arXiv requests must be at least three seconds apart, including
@@ -278,66 +291,60 @@ class MetadataExtractor:
             if self._last_arxiv_request is not None:
                 time.sleep(max(0, 3.0 - (time.monotonic() - self._last_arxiv_request)))
             self._last_arxiv_request = time.monotonic()
-            response = self.session.get(url, params=params, timeout=15)
 
-            if response.status_code == 200:
-                # Parse Atom XML
-                root = ET.fromstring(response.content)
-                ns = {'atom': 'http://www.w3.org/2005/Atom', 'arxiv': 'http://arxiv.org/schemas/atom'}
+            # num_retries=0: a silent library retry would sleep three seconds
+            # and hide a broken link, which is why pyalex is configured alike.
+            client = arxiv.Client(page_size=1, delay_seconds=3.0, num_retries=0)
+            search = arxiv.Search(id_list=[arxiv_id], max_results=1)
 
-                entry = root.find('atom:entry', ns)
-                if entry is None:
-                    print(f'Error: No entry found for arXiv ID: {arxiv_id}', file=sys.stderr)
-                    return None
+            try:
+                result = next(iter(client.results(search)), None)
+            except arxiv.UnexpectedEmptyPageError:
+                result = None
 
-                if '/api/errors' in entry.findtext('atom:id', '', ns):
-                    print(f'Error: arXiv returned an error entry for {arxiv_id}', file=sys.stderr)
-                    return None
-
-                # Extract DOI if published
-                doi_elem = entry.find('arxiv:doi', ns)
-                doi = doi_elem.text if doi_elem is not None else None
-
-                # Extract journal reference if published
-                journal_ref_elem = entry.find('arxiv:journal_ref', ns)
-                journal_ref = journal_ref_elem.text if journal_ref_elem is not None else None
-
-                # Get publication date
-                published = entry.findtext('atom:published', '', ns)
-                year = published[:4] if published else ''
-
-                # Get authors
-                authors = []
-                for author in entry.findall('atom:author', ns):
-                    name = author.findtext('atom:name', '', ns)
-                    if name:
-                        authors.append(name)
-
-                # Only call it an @article when there is a journal to name.
-                # A DOI alone is not enough -- arXiv mints DataCite DOIs for
-                # unpublished preprints -- and an @article without a `journal`
-                # fails the required-field check in validate_citations.py.
-                journal = self._journal_from_arxiv_ref(journal_ref)
-
-                metadata = {
-                    'type': 'arxiv',
-                    'entry_type': 'article' if journal else 'misc',
-                    'arxiv_id': arxiv_id,
-                    'title': entry.findtext('atom:title', '', ns).strip().replace('\n', ' '),
-                    'authors': ' and '.join(authors),
-                    'year': year,
-                    'doi': doi,
-                    'journal': journal,
-                    'journal_ref': journal_ref,
-                    'abstract': entry.findtext('atom:summary', '', ns).strip().replace('\n', ' '),
-                    'url': f'https://arxiv.org/abs/{arxiv_id}'
-                }
-
-                return metadata
-            else:
-                print(f'Error: arXiv API returned status {response.status_code} for ID: {arxiv_id}', file=sys.stderr)
+            if result is None:
+                print(f'Error: No entry found for arXiv ID: {arxiv_id}', file=sys.stderr)
                 return None
 
+            if '/api/errors' in result.entry_id:
+                print(f'Error: arXiv returned an error entry for {arxiv_id}', file=sys.stderr)
+                return None
+
+            # Extract DOI and journal reference when the preprint is published
+            doi = result.doi or None
+            journal_ref = result.journal_ref or None
+
+            # Get publication date
+            year = str(result.published.year) if result.published.year > 1 else ''
+
+            # Get authors
+            authors = [author.name for author in (result.authors or []) if author.name]
+
+            # Only call it an @article when there is a journal to name.
+            # A DOI alone is not enough -- arXiv mints DataCite DOIs for
+            # unpublished preprints -- and an @article without a `journal`
+            # fails the required-field check in validate_citations.py.
+            journal = self._journal_from_arxiv_ref(journal_ref)
+
+            metadata = {
+                'type': 'arxiv',
+                'entry_type': 'article' if journal else 'misc',
+                'arxiv_id': arxiv_id,
+                'title': result.title.strip().replace('\n', ' '),
+                'authors': ' and '.join(authors),
+                'year': year,
+                'doi': doi,
+                'journal': journal,
+                'journal_ref': journal_ref,
+                'abstract': result.summary.strip().replace('\n', ' '),
+                'url': f'https://arxiv.org/abs/{arxiv_id}'
+            }
+
+            return metadata
+
+        except arxiv.HTTPError as error:
+            print(f'Error: arXiv API returned status {error.status} for ID: {arxiv_id}', file=sys.stderr)
+            return None
         except Exception as e:
             print(f'Error extracting metadata from arXiv {arxiv_id}: {e}', file=sys.stderr)
             return None
