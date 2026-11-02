@@ -3,10 +3,13 @@
 OpenAlex Search Tool
 Search OpenAlex and export results as JSON or BibTeX.
 
-OpenAlex provides a documented REST API. Casual keyless requests are supported;
-set OPENALEX_API_KEY for an account budget. The key is sent only in the OpenAlex
-Authorization header. OPENALEX_EMAIL / --email remains an optional contact
-identifier; it does not establish a higher API quota.
+OpenAlex provides a documented REST API. Requests go through `pyalex` (the
+optional `swap-refs` extra); paging, the degenerate-response guards and the
+output shape stay in this file so a library upgrade cannot change them.
+Casual keyless requests are supported; set OPENALEX_API_KEY for an account
+budget. The key is sent only in the OpenAlex Authorization header.
+OPENALEX_EMAIL / --email is sent as the documented `mailto` parameter; it does
+not establish a higher API quota.
 
 """
 
@@ -31,7 +34,25 @@ from _common import (  # noqa: E402
     require_network,
 )
 
-API_URL = 'https://api.openalex.org/works'
+# Requests were hand-built against this endpoint before; pyalex owns the URL now.
+USER_AGENT = 'OpenAlexSearcher/1.0 (Citation Management Tool)'
+
+
+def _pyalex():
+    """Import pyalex on first use: it is the pack's optional `swap-refs` extra.
+
+    Deferred so `--help` and the network gate keep working on a machine without
+    the extra, and so a missing package fails loudly instead of silently falling
+    back to a hand-written client.
+    """
+    try:
+        from pyalex import Works, config as alex_config
+    except ImportError as error:
+        raise ImportError(
+            'search_openalex.py needs pyalex: pip install "stats-analysis[swap-refs]"'
+        ) from error
+    return Works, alex_config
+
 
 # OpenAlex work types -> BibTeX entry types.
 TYPE_MAP = {
@@ -56,13 +77,16 @@ class OpenAlexSearcher:
 
     def __init__(self, email: Optional[str] = None):
         self.email = email or os.getenv('OPENALEX_EMAIL', '')
-        api_key = os.getenv('OPENALEX_API_KEY', '')
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'OpenAlexSearcher/1.0 (Citation Management Tool)'
-        })
-        if api_key:
-            self.session.headers['Authorization'] = f'Bearer {api_key}'
+        self.api_key = os.getenv('OPENALEX_API_KEY', '')
+        # pyalex keeps this in a process-global config; this script is a CLI, so
+        # configuring the client here is the whole process. The key still travels
+        # only in the Authorization header, never in a URL.
+        _, alex_config = _pyalex()
+        alex_config.api_key = self.api_key or None
+        alex_config.email = None  # the documented `mailto` parameter is sent below
+        alex_config.user_agent = USER_AGENT
+        alex_config.max_retries = 0  # same "no retries" behaviour as before
+
 
     def search(self, query: str, max_results: int = 50,
                year_start: Optional[int] = None, year_end: Optional[int] = None,
@@ -84,25 +108,25 @@ class OpenAlexSearcher:
         """
         if max_results < 1:
             raise ValueError("max_results must be positive")
-        filters = []
+        filters: Dict[str, str] = {}
         if year_start:
-            filters.append(f'from_publication_date:{year_start}-01-01')
+            filters['from_publication_date'] = f'{year_start}-01-01'
         if year_end:
-            filters.append(f'to_publication_date:{year_end}-12-31')
+            filters['to_publication_date'] = f'{year_end}-12-31'
         if work_type:
-            filters.append(f'type:{work_type}')
+            filters['type'] = work_type
 
-        params = {
-            'search': query,
-            'per-page': str(min(100, max_results)),
-            'cursor': '*',
-        }
+        params: Dict[str, object] = {'search': query}
         if filters:
-            params['filter'] = ','.join(filters)
+            params['filter'] = filters
         if sort_by == 'citations':
-            params['sort'] = 'cited_by_count:desc'
+            # pyalex flattens dict values into `field:direction`.
+            params['sort'] = {'cited_by_count': 'desc'}
         if self.email:
             params['mailto'] = self.email
+
+        Works, _ = _pyalex()
+        works_api = Works(params=params)
 
         print(f'Searching OpenAlex: {query}', file=sys.stderr)
 
@@ -110,13 +134,13 @@ class OpenAlexSearcher:
         seen_cursors = {'*'}
         seen_work_ids = set()
         reported_total = False
+        cursor = '*'
 
         while len(results) < max_results:
             try:
-                response = self.session.get(API_URL, params=params, timeout=30)
-                response.raise_for_status()
-                payload = response.json()
-            except (requests.exceptions.RequestException, ValueError) as error:
+                page = works_api.get(per_page=min(100, max_results), cursor=cursor)
+                meta = page.meta
+            except (requests.exceptions.RequestException, ValueError, KeyError) as error:
                 # Partial bibliographies must not look like a completed search.
                 # Avoid printing request URLs or headers in diagnostics.
                 raise RuntimeError(
@@ -125,12 +149,12 @@ class OpenAlexSearcher:
                 ) from None
 
             if not reported_total:
-                total = payload.get('meta', {}).get('count', 0)
+                total = meta.get('count', 0)
                 print(f'Found {total} results, retrieving up to {max_results}', file=sys.stderr)
                 reported_total = True
 
-            works = payload.get('results', [])
-            next_cursor = payload.get('meta', {}).get('next_cursor')
+            works = list(page)
+            next_cursor = meta.get('next_cursor')
             if next_cursor is not None and (
                 not isinstance(next_cursor, str) or next_cursor in seen_cursors
             ):
@@ -160,7 +184,7 @@ class OpenAlexSearcher:
             if next_cursor is None or len(results) >= max_results:
                 break
             seen_cursors.add(next_cursor)
-            params['cursor'] = next_cursor
+            cursor = next_cursor
 
             # Pace requests; quota exhaustion remains an explicit error.
             time.sleep(0.1)
