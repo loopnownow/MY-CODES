@@ -1,0 +1,495 @@
+{
+  "meta": {
+    "file": "ResultsGroup.html",
+    "run_status": "INCOMPLETE",
+    "headings": [
+      "h1:ResultsGroup",
+      "h2:Run status: INCOMPLETE",
+      "h2:A. All Data — Baseline",
+      "h2:B. Table 1",
+      "h2:B2. Table 2 — LASSO-selected Radiomics (Train vs Test)",
+      "h2:C. Training Set",
+      "h3:Univariate Logistic",
+      "h3:Combined Model (Clinical + RadScore)",
+      "h3:RadScore Formula",
+      "h2:D. Figures",
+      "h3:ROC (train | test)",
+      "h4:ROC summary",
+      "h3:DCA (train | test)",
+      "h3:Nomogram & Calibration"
+    ],
+    "table_ids": [
+      "combined-coef-train",
+      "hosmer-lemeshow-internal",
+      "roc-metrics-train-test",
+      "table1-all",
+      "table1-train-test",
+      "table2-all",
+      "table2-lasso-train",
+      "table2-train-test",
+      "uni-train"
+    ]
+  },
+  "tables": {
+    "table1-all": {
+      "id": "table1-all",
+      "caption": "总表",
+      "header": [
+        [
+          "Variable",
+          "Group=93",
+          "0.0=107",
+          "P value"
+        ]
+      ],
+      "rows": [
+        [
+          "Age",
+          "54.30±12.51",
+          "54.59±11.22",
+          "0.866"
+        ],
+        [
+          "Sex",
+          "52.7%",
+          "52.3%",
+          "0.960"
+        ],
+        [
+          "Size_mm",
+          "30.25±3.96",
+          "29.18±4.76",
+          "0.089"
+        ],
+        [
+          "Smoking",
+          "35.5%",
+          "29.9%",
+          "0.401"
+        ]
+      ]
+    },
+    "table2-all": {
+      "id": "table2-all",
+      "caption": "Table 2 — LASSO-selected Radiomics (All)",
+      "header": [
+        [
+          "Variable",
+          "Group=93",
+          "0=107",
+          "P value"
+        ]
+      ],
+      "rows": [
+        [
+          "original_shape_Volume",
+          "541.31±157.17",
+          "439.90±171.59",
+          "<0.001***"
+        ],
+        [
+          "original_shape_SurfaceArea",
+          "501.24±209.47",
+          "539.86±191.88",
+          "0.178"
+        ],
+        [
+          "original_firstorder_Mean",
+          "59.50±14.02",
+          "50.43±13.77",
+          "<0.001***"
+        ],
+        [
+          "original_glcm_Contrast",
+          "198.70±61.50",
+          "166.65±57.52",
+          "<0.001***"
+        ]
+      ]
+    },
+    "table1-train-test": {
+      "id": "table1-train-test",
+      "caption": "Table 1",
+      "header": [
+        [
+          "Variable",
+          "Train",
+          "Test",
+          "P value (Train)",
+          "P value (Test)"
+        ],
+        [
+          "Group",
+          "0",
+          "Group",
+          "0"
+        ],
+        [
+          "n=65",
+          "n=74",
+          "n=28",
+          "n=33"
+        ]
+      ],
+      "rows": [
+        [
+          "Age",
+          "54.47±13.11",
+          "54.78±10.39",
+          "53.92±11.19",
+          "54.15±13.08",
+          "0.877",
+          "0.943"
+        ],
+        [
+          "Sex",
+          "",
+          "",
+          "",
+          "",
+          "0.364",
+          "0.195"
+        ],
+        [
+          "F",
+          "31 (47.7%)",
+          "41 (55.4%)",
+          "13 (46.4%)",
+          "10 (30.3%)",
+          "",
+          ""
+        ],
+        [
+          "M",
+          "34 (52.3%)",
+          "33 (44.6%)",
+          "15 (53.6%)",
+          "23 (69.7%)",
+          "",
+          ""
+        ],
+        [
+          "Size_mm",
+          "30.12±4.15",
+          "29.01±4.62",
+          "30.54±3.53",
+          "29.57±5.10",
+          "0.136",
+          "0.386"
+        ],
+        [
+          "Smoking",
+          "",
+          "",
+          "",
+          "",
+          "0.458",
+          "0.702"
+        ],
+        [
+          "No",
+          "40 (61.5%)",
+          "50 (67.6%)",
+          "20 (71.4%)",
+          "25 (75.8%)",
+          "",
+          ""
+        ],
+        [
+          "Yes",
+          "25 (38.5%)",
+          "24 (32.4%)",
+          "8 (28.6%)",
+          "8 (24.2%)",
+          "",
+          ""
+        ]
+      ]
+    },
+    "table2-train-test": {
+      "id": "table2-train-test",
+      "caption": "Table 2 — LASSO-selected Radiomics",
+      "header": [
+        [
+          "Variable",
+          "Train",
+          "Test",
+          "P value (Train)",
+          "P value (Test)"
+        ],
+        [
+          "Group",
+          "0",
+          "Group",
+          "0"
+        ],
+        [
+          "n=65",
+          "n=74",
+          "n=28",
+          "n=33"
+        ]
+      ],
+      "rows": [
+        [
+          "original_shape_Volume",
+          "544.86±164.18",
+          "424.15±167.68",
+          "533.07±142.02",
+          "475.22±177.57",
+          "<0.001***",
+          "0.163"
+        ],
+        [
+          "original_shape_SurfaceArea",
+          "484.98±206.73",
+          "554.24±181.86",
+          "538.99±214.70",
+          "507.62±212.04",
+          "0.039*",
+          "0.570"
+        ],
+        [
+          "original_firstorder_Mean",
+          "61.29±14.34",
+          "51.29±13.86",
+          "55.34±12.52",
+          "48.51±13.60",
+          "<0.001***",
+          "0.046*"
+        ],
+        [
+          "original_glcm_Contrast",
+          "198.57±67.69",
+          "161.60±57.02",
+          "199.00±45.02",
+          "177.96±57.89",
+          "<0.001***",
+          "0.116"
+        ]
+      ]
+    },
+    "uni-train": {
+      "id": "uni-train",
+      "caption": "",
+      "header": [
+        [
+          "Variable",
+          "OR",
+          "95% CI",
+          "P value",
+          "VIF",
+          "Significance"
+        ]
+      ],
+      "rows": [
+        [
+          "Size_mm",
+          "1.060",
+          "0.981-1.145",
+          "0.140",
+          "1.005",
+          ""
+        ],
+        [
+          "Sex",
+          "1.363",
+          "0.698-2.659",
+          "0.364",
+          "1.007",
+          ""
+        ],
+        [
+          "Smoking",
+          "1.302",
+          "0.648-2.616",
+          "0.458",
+          "1.014",
+          ""
+        ],
+        [
+          "Age",
+          "0.998",
+          "0.970-1.027",
+          "0.874",
+          "1.013",
+          ""
+        ]
+      ]
+    },
+    "table2-lasso-train": {
+      "id": "table2-lasso-train",
+      "caption": "Table 2 — LASSO-selected Radiomics",
+      "header": [
+        [
+          "Variable",
+          "Group=65",
+          "0=74",
+          "P value"
+        ]
+      ],
+      "rows": [
+        [
+          "original_shape_Volume",
+          "544.86±164.18",
+          "424.15±167.68",
+          "<0.001***"
+        ],
+        [
+          "original_shape_SurfaceArea",
+          "484.98±206.73",
+          "554.24±181.86",
+          "0.039*"
+        ],
+        [
+          "original_firstorder_Mean",
+          "61.29±14.34",
+          "51.29±13.86",
+          "<0.001***"
+        ],
+        [
+          "original_glcm_Contrast",
+          "198.57±67.69",
+          "161.60±57.02",
+          "<0.001***"
+        ]
+      ]
+    },
+    "combined-coef-train": {
+      "id": "combined-coef-train",
+      "caption": "",
+      "header": [
+        [
+          "Term",
+          "Coefficient",
+          "OR",
+          "P value"
+        ]
+      ],
+      "rows": [
+        [
+          "const",
+          "-2.9790",
+          "—",
+          "<0.001"
+        ],
+        [
+          "RadScore",
+          "5.9106",
+          "368.912",
+          "<0.001"
+        ]
+      ]
+    },
+    "roc-metrics-train-test": {
+      "id": "roc-metrics-train-test",
+      "caption": "ROC summary — train & test",
+      "header": [
+        [
+          "Split",
+          "Model",
+          "Threshold",
+          "AUC",
+          "95% CI",
+          "ACC",
+          "SEN",
+          "SPE",
+          "NPV",
+          "PPV",
+          "DeLong vs RadScore",
+          "DeLong vs Combined"
+        ]
+      ],
+      "rows": [
+        [
+          "train",
+          "RadScore",
+          "0.479",
+          "0.850",
+          "(0.786-0.905)",
+          "0.784",
+          "0.769",
+          "0.797",
+          "0.797",
+          "0.769",
+          "—",
+          "1.000"
+        ],
+        [
+          "train",
+          "Combined",
+          "0.471",
+          "0.850",
+          "(0.786-0.905)",
+          "0.784",
+          "0.769",
+          "0.797",
+          "0.797",
+          "0.769",
+          "1.000",
+          "—"
+        ],
+        [
+          "test",
+          "RadScore",
+          "0.479",
+          "0.615",
+          "(0.475-0.748)",
+          "0.541",
+          "0.500",
+          "0.576",
+          "0.576",
+          "0.500",
+          "—",
+          "1.000"
+        ],
+        [
+          "test",
+          "Combined",
+          "0.471",
+          "0.615",
+          "(0.475-0.748)",
+          "0.541",
+          "0.500",
+          "0.576",
+          "0.576",
+          "0.500",
+          "1.000",
+          "—"
+        ]
+      ]
+    },
+    "hosmer-lemeshow-internal": {
+      "id": "hosmer-lemeshow-internal",
+      "caption": "Hosmer-Lemeshow goodness-of-fit",
+      "header": [
+        [
+          "Split",
+          "χ²",
+          "df",
+          "P value",
+          "Groups",
+          "N"
+        ]
+      ],
+      "rows": [
+        [
+          "train",
+          "4.07",
+          "6",
+          "0.668",
+          "8",
+          "139"
+        ],
+        [
+          "test",
+          "33.99",
+          "6",
+          "<0.001",
+          "8",
+          "61"
+        ]
+      ]
+    }
+  }
+}

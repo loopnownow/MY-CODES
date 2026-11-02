@@ -1,0 +1,31 @@
+{
+    "project": "test",
+    "data": "test.xlsx",
+    "overlay": {
+        "EXCLUDE_ROW": "",
+        "CORR_REFS": [],
+        "DCA_CURVES": [
+            "Clinical",
+            "RadScore",
+            "Combined"
+        ],
+        "OUTCOME_OVERRIDES": {},
+        "PAIRWISE_OVERRIDES": {},
+        "GROUP_LEVEL_DISPLAY": {},
+        "OUTCOME_OUT_SUBDIR": true,
+        "CORR_PREDICTORS": [],
+        "PARTIAL_X": [],
+        "PARTIAL_Y": [],
+        "RAD_FEATURE_PREFIX_GROUP": {
+            "names": [],
+            "assign": {}
+        },
+        "SKIP_CLIN_FEATURES": [
+            "Patient_ID",
+            "Group"
+        ],
+        "FORCE_REMOVE_FEATURES": [],
+        "ORDINAL_MAX_LEVELS": 5,
+        "CLIN_FORCE_CATEGORICAL": []
+    }
+}
