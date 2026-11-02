@@ -1,11 +1,13 @@
 """Frozen output shapes for the `tools/verify-refs` + `tools/lit-fulltext` packs.
 
 Step 4 of the library swap replaces the hand-written HTTP clients in these
-scripts with `pyalex` / `habanero` / `biopython` / `arxiv` / `unpywall` /
-`bibtexparser`. Nothing may change on the outside: CLI arguments, exit codes,
-output file names, column names, `manual_needed.txt` behaviour and the network
-gate are a lab contract. This module freezes that outside offline, in two
-layers, so each swap commit can be judged without a socket:
+scripts with `pyalex` / `habanero` / `arxiv` / `bibtexparser`. `biopython`
+(Bio.Entrez) and `unpywall` were assessed and left out: both demand an email
+identity the current CLIs do not, so the hand-written `requests`/`urllib` paths
+stay for PubMed and Unpaywall. Nothing may change on the outside: CLI arguments,
+exit codes, output file names, column names, `manual_needed.txt` behaviour and
+the network gate are a lab contract. This module freezes that outside offline,
+in two layers, so each swap commit can be judged without a socket:
 
   * L1 normalisation - canned API payloads (or a library-shaped record) fed
     straight into the script's mapping functions. Survives a client swap
@@ -549,7 +551,7 @@ def test_format_fix_dedupe_rekey_sort() -> None:
 
 
 # ============================================================
-# lit-fulltext/fetch.py - unpywall / Bio.Entrez / arxiv replacements
+# lit-fulltext/fetch.py - the arxiv helpers (Unpaywall and PubMed keep urllib)
 # ============================================================
 
 def _fetch():
