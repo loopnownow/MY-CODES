@@ -1,0 +1,12 @@
+# run products of `python -B test/run_golden.py` (never commit)
+Group/
+ref/cache/
+ref/pipeline/
+ref/tmp/
+ref/qc.html
+*.png
+*.tiff
+*.pdf
+false_classification.xlsx
+test.html
+
