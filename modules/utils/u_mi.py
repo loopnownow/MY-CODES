@@ -67,6 +67,9 @@ from modules.utils.u_impute import (
 # ═════════════════════════════════════════════════════════════════
 MI_DRAWS = 20          # m; 20 is the usual floor when FMI is expected to be moderate
 MI_MIN_DRAWS = 2       # below this there is no between-imputation variance to estimate
+MI_BACKENDS = ("iterative", "missForest", "miceforest")
+MI_MF_ITER = 3         # miceforest: chain iterations (not the number of datasets)
+MI_MF_MEAN_MATCH = 5   # miceforest: PMM candidates; 0 would return conditional means
 
 
 def _posterior_estimator(kind: str, seed: int, trees: int, depth, max_features):
@@ -79,6 +82,59 @@ def _posterior_estimator(kind: str, seed: int, trees: int, depth, max_features):
             n_jobs=-1,
         )
     return BayesianRidge()
+
+
+def _assert_observed_unchanged(df: pd.DataFrame, out: pd.DataFrame, impute_cols: Sequence[str]) -> None:
+    """观察值在不同 draw 之间不得移动（移动到会静默污染分析）。"""
+    observed = df[impute_cols].notna()
+    if not np.array_equal(
+        out[impute_cols].where(observed).to_numpy(),
+        df[impute_cols].where(observed).to_numpy(),
+        equal_nan=True,
+    ):
+        raise AssertionError("an observed cell changed during imputation")
+
+
+def _miceforest_draws(
+    work: pd.DataFrame,
+    df: pd.DataFrame,
+    impute_cols: Sequence[str],
+    m: int,
+    seed: int,
+    code_to_label: Dict[str, Dict[int, object]],
+    verbose: bool,
+) -> List[pd.DataFrame]:
+    """LightGBM MICE 后端：一次跑出 m 份完整数据（缺包则显式 ImportError，不回退）。"""
+    try:
+        import miceforest as mf
+    except ImportError as exc:
+        raise ImportError(
+            "method='miceforest' needs the optional package miceforest "
+            "(pip install miceforest lightgbm)"
+        ) from exc
+
+    kernel = mf.ImputationKernel(
+        work[list(impute_cols)].copy(),
+        num_datasets=m,
+        mean_match_candidates=MI_MF_MEAN_MATCH,
+        random_state=seed,
+    )
+    kernel.mice(MI_MF_ITER)
+
+    draws: List[pd.DataFrame] = []
+    for i in range(m):
+        out = work.copy()
+        filled = kernel.complete_data(dataset=i)
+        out[list(impute_cols)] = filled[list(impute_cols)].to_numpy()
+        if code_to_label:
+            out = _decode_categoricals(out, code_to_label)
+        if "_impute_pool" in out.columns:
+            out = out.drop(columns=["_impute_pool"])
+        _assert_observed_unchanged(df, out, impute_cols)
+        draws.append(out)
+        if verbose:
+            print(f"  draw {i + 1}/{m}: missing after = {int(out[list(impute_cols)].isna().sum().sum())}")
+    return draws
 
 
 def z_impute_mi(
@@ -132,12 +188,17 @@ def z_impute_mi(
     impute_cols = num_cols + cat_cols
     if not impute_cols:
         raise ValueError("no imputable columns")
+    if method not in MI_BACKENDS:
+        raise ValueError(f"unknown MI method {method!r}; choose from {MI_BACKENDS}")
 
     if verbose:
         n_cells = int(work[impute_cols].isna().sum().sum())
         print(f"=== multiple imputation: m={m}, method={method} ===")
         print(f"Data: {work.shape[0]} rows x {work.shape[1]} cols | imputable cols: {len(impute_cols)}")
         print(f"Missing cells: {n_cells}")
+
+    if method == "miceforest":
+        return _miceforest_draws(work, df, impute_cols, m, seed, code_to_label, verbose)
 
     groups = sorted(work[stratify_col].dropna().unique(), key=str)
     draws: List[pd.DataFrame] = []
@@ -178,13 +239,7 @@ def z_impute_mi(
             out = out.drop(columns=["_impute_pool"])
 
         # Observed cells must not move between draws.
-        observed = df[impute_cols].notna()
-        if not np.array_equal(
-            out[impute_cols].where(observed).to_numpy(),
-            df[impute_cols].where(observed).to_numpy(),
-            equal_nan=True,
-        ):
-            raise AssertionError("an observed cell changed during imputation")
+        _assert_observed_unchanged(df, out, impute_cols)
 
         draws.append(out)
         if verbose:

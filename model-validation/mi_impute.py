@@ -25,7 +25,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from modules.utils.u_mi import MI_DRAWS, rubin_pool_frame, z_impute_mi  # noqa: E402
+from modules.utils.u_mi import MI_BACKENDS, MI_DRAWS, rubin_pool_frame, z_impute_mi  # noqa: E402
 
 
 def _cmd_draw(args) -> int:
@@ -112,7 +112,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     draw.add_argument("--input", "-i", required=True, help="input xlsx")
     draw.add_argument("--sheet", "-s", default=None, help="sheet name (default: first)")
     draw.add_argument("--group", "-g", default="Group", help="group column")
-    draw.add_argument("--method", "-m2", default="iterative", choices=["iterative", "missForest"])
+    draw.add_argument("--method", "-m2", default="iterative", choices=list(MI_BACKENDS))
     draw.add_argument("-m", type=int, default=MI_DRAWS, help=f"number of draws (default {MI_DRAWS})")
     draw.add_argument("--seed", type=int, default=66)
     draw.add_argument("--max-iter", type=int, default=10)
