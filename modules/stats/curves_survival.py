@@ -1,5 +1,5 @@
 """
-curves_survival.py — Kaplan–Meier + Cox（无 lifelines；Cox 用 statsmodels PHReg）
+curves_survival.py — Kaplan–Meier + Cox（KM/log-rank 用 statsmodels.survfunc；Cox 用 PHReg）
 ═══════════════════════════════════════════════════════════════════
 时间：config.SURVIVAL_TIME_COL
 事件：二分类结局 label（1=事件，0=删失）
@@ -18,6 +18,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import stats
 from statsmodels.duration.hazard_regression import PHReg
+from statsmodels.duration.survfunc import SurvfuncRight, survdiff
 
 from modules import config as cfg
 
@@ -28,7 +29,9 @@ COX_METRICS: Dict[str, pd.DataFrame] = {}
 def _km_steps(time: np.ndarray, event: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     返回阶梯坐标 (t_plot, s_plot) 与风险集摘要。
-    标准乘积极限估计；并列时间按同一 t 合并。
+
+    S(t) 取 statsmodels 的乘积极限估计；时间网格仍保留「仅删失」时刻（图上阶梯保持水平），
+    风险人数按 t >= ut 计数，与既有 SURVIVAL_METRICS 列一致。
     """
     t = np.asarray(time, dtype=float)
     e = np.asarray(event, dtype=int)
@@ -37,29 +40,20 @@ def _km_steps(time: np.ndarray, event: np.ndarray) -> Tuple[np.ndarray, np.ndarr
     if len(t) == 0:
         return np.array([0.0]), np.array([1.0]), np.array([]), np.array([])
 
-    order = np.argsort(t, kind="mergesort")
-    t, e = t[order], e[order]
     uniq = np.unique(t)
-    n_risk = []
-    n_event = []
-    s = 1.0
-    times_s = [0.0]
-    surv_s = [1.0]
-    for ut in uniq:
-        at = t == ut
-        d = int(e[at].sum())
-        # 进入该时刻的风险人数
-        r = int((t >= ut).sum())
-        n_risk.append(r)
-        n_event.append(d)
-        if r > 0 and d > 0:
-            s *= (1.0 - d / r)
-        times_s.append(float(ut))
-        surv_s.append(float(s))
+    n_risk = len(t) - np.searchsorted(np.sort(t), uniq, side="left")
+    if not np.any(e == 1):
+        s_at = np.ones(len(uniq), dtype=float)
+    else:
+        sf = SurvfuncRight(t, e)
+        lib_t = np.asarray(sf.surv_times, dtype=float)
+        lib_s = np.asarray(sf.surv_prob, dtype=float)
+        pos = np.searchsorted(lib_t, uniq, side="right") - 1
+        s_at = np.where(pos >= 0, lib_s[np.clip(pos, 0, len(lib_s) - 1)], 1.0)
     return (
-        np.asarray(times_s, dtype=float),
-        np.asarray(surv_s, dtype=float),
-        np.asarray(uniq, dtype=float),
+        np.concatenate(([0.0], uniq)),
+        np.concatenate(([1.0], np.asarray(s_at, dtype=float))),
+        uniq,
         np.asarray(n_risk, dtype=int),
     )
 
@@ -75,42 +69,18 @@ def _median_survival(t_steps: np.ndarray, s_steps: np.ndarray) -> float:
 def logrank_two_groups(
     time: np.ndarray, event: np.ndarray, group: np.ndarray
 ) -> Tuple[float, float]:
-    """两样本 log-rank（Mantel–Haenszel），返回 (chi2, p)。"""
+    """两样本 log-rank（statsmodels survdiff），返回 (chi2, p)；无事件或分组不足时为 nan。"""
     t = np.asarray(time, dtype=float)
     e = np.asarray(event, dtype=int)
     g = np.asarray(group)
     ok = np.isfinite(t) & (t >= 0) & np.isfinite(e) & pd.notna(g)
     t, e, g = t[ok], e[ok].astype(int), g[ok]
     levels = pd.unique(g)
-    if len(levels) != 2 or len(t) < 4:
+    if len(levels) != 2 or len(t) < 4 or not np.any(e == 1):
         return float("nan"), float("nan")
-    g0, g1 = levels[0], levels[1]
-    # 所有事件时间（有事件发生）
-    event_times = np.unique(t[e == 1])
-    O1 = 0.0
-    E1 = 0.0
-    V = 0.0
-    for ut in event_times:
-        mask_t = t >= ut
-        n0 = int(((g == g0) & mask_t).sum())
-        n1 = int(((g == g1) & mask_t).sum())
-        n = n0 + n1
-        if n == 0:
-            continue
-        d = int(((t == ut) & (e == 1)).sum())
-        d1 = int(((t == ut) & (e == 1) & (g == g1)).sum())
-        if d == 0 or n <= 1:
-            continue
-        e1 = d * (n1 / n)
-        v = (n0 * n1 * d * (n - d)) / (n * n * (n - 1)) if n > 1 else 0.0
-        O1 += d1
-        E1 += e1
-        V += v
-    if V <= 1e-12:
-        return float("nan"), float("nan")
-    chi2 = (O1 - E1) ** 2 / V
-    p = float(1.0 - stats.chi2.cdf(chi2, df=1))
-    return float(chi2), p
+    g2 = levels[1]
+    chi2, p = survdiff(t, e, (g == g2).astype(int))
+    return float(chi2), float(p)
 
 
 def _fmt_cox_p(p: float) -> str:
