@@ -248,7 +248,7 @@ footer{
 </header>
 <main>
   <div id="tplBanner" class="banner" hidden>
-    这是 <code>stats-analysis/modules/console/project.html</code> 金版。复制到课题目录（如 <code><GROK_ROOT>/drafting/demo_study</code>），可改名为 <code>课题名.html</code>，或保持此文件名由文件夹识别课题。
+    这是 <code>MY-CODES/modules/console/project.html</code> 金版。复制到课题目录（如 <code><GROK_ROOT>/drafting/demo_study</code>），可改名为 <code>课题名.html</code>，或保持此文件名由文件夹识别课题。
   </div>
   <div class="grid">
     <section class="card" aria-labelledby="h-cfg">
@@ -267,7 +267,7 @@ footer{
         </div></div>
       <div class="fld"><span class="lab" title="共享算法库路径（必填，写回 settings.ini 的 MODULES_DIR）。">modules</span>
         <div class="pick-row">
-          <input id="modulesDir" type="text" placeholder="必填，如 /path/to/stats-analysis/modules" value=""/>
+          <input id="modulesDir" type="text" placeholder="必填，如 %GROK_ROOT%\...\GitHub\MY-CODES\modules" value=""/>
           <input id="modulesDirPick" type="file" webkitdirectory hidden/>
           <button type="button" id="btnModPick">选择</button>
         </div></div>
@@ -385,7 +385,7 @@ const GENERIC_FOLDERS = {
 };
 const PORT_KEY = "rad-console-port";
 const MOD_KEY = "rad-modules-dir";
-const DEFAULT_MODULES = "";  // set to your stats-analysis/modules absolute path
+const DEFAULT_MODULES = "D:\\0Grok\\0doc\\GitHub\\MY-CODES\\modules";  // 共享算法库默认路径（写回 settings.ini 的 MODULES_DIR）
 const IO_DEFAULTS = {
   RAD_SHEET: "rad",
   CLIN_SHEET: "cln",
@@ -802,6 +802,7 @@ const saved = parseInt(localStorage.getItem(PORT_KEY) || "", 10);
 if (saved >= 1024 && saved <= 65535) portEl.value = saved;
 const savedMod = localStorage.getItem(MOD_KEY);
 if (savedMod !== null && modEl) modEl.value = savedMod;
+else if (modEl && DEFAULT_MODULES) modEl.value = DEFAULT_MODULES;
 applyProject(inferProject());
 const metaTok = ((document.querySelector('meta[name="console-token"]') || {}).content || "").trim();
 if (location.protocol === "file:" && loadMsg) {
