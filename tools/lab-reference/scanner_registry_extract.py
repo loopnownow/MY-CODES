@@ -1,4 +1,4 @@
-﻿"""Crawl 0doc manuscripts for imaging-scanner descriptions.
+"""Crawl 0doc manuscripts for imaging-scanner descriptions.
 
 Stage --extract
     Read 05-manuscript thesis + manuscripts (.docx/.doc), dump plain text to

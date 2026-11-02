@@ -1,4 +1,4 @@
-﻿"""Build the imaging-scanner registry workbook.
+"""Build the imaging-scanner registry workbook.
 
 Input : scanner_registry_rows.py (hand-curated rows, evidence quoted from 0doc)
 Output: D:\\0Grok\\0doc\\_library\\scanner-registry\\scanner-parameter-registry.xlsx  (restored t1553u; was briefly under templates)

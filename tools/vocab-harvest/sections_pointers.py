@@ -11,11 +11,20 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 from pathlib import Path
 
 # ---------------------------------------------------------------- CONFIG
-# GLOSSARY: glossary 席位根（md 四层 + index.csv）。
-GLOSSARY = Path(r"D:\0Grok\0doc\_library\glossary")
+# GLOSSARY_ROOT: glossary 席位根（md 四层 + index.csv），缺则 exit 1。
+GLOSSARY_ROOT_ENV = "GLOSSARY_ROOT"
+
+
+def glossary_root() -> Path:
+    value = (os.environ.get(GLOSSARY_ROOT_ENV) or "").strip()
+    if not value:
+        raise SystemExit("set %s to the 0doc glossary seat (_library\\glossary)" % GLOSSARY_ROOT_ENV)
+    return Path(value)
+
 # SECTIONS: 八个节文件，指针页文件名 == index.csv `sections` 列的取值。
 SECTIONS = ("abstract", "intro", "methods", "results", "discussion",
             "limitation", "conclusion", "other")
@@ -28,7 +37,7 @@ HEADER = ("## 本节点指针（自动生成，勿手改）\n"
 
 
 def load_rows() -> list[dict[str, str]]:
-    with (GLOSSARY / "index.csv").open(encoding="utf-8", newline="") as fh:
+    with (glossary_root() / "index.csv").open(encoding="utf-8", newline="") as fh:
         return list(csv.DictReader(fh))
 
 
@@ -68,7 +77,7 @@ def main() -> int:
     rows = load_rows()
     changed = 0
     for section in SECTIONS:
-        md = GLOSSARY / "sections" / ("%s.md" % section)
+        md = glossary_root() / "sections" / ("%s.md" % section)
         if not md.is_file():
             raise SystemExit("缺节文件: %s" % md)
         old = md.read_text(encoding="utf-8")
