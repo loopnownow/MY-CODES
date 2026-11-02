@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import contextlib
 import difflib
+import builtins
 import importlib.util
 import json
 import os
@@ -273,6 +274,35 @@ def test_openalex_search_normalises_records_and_bibtex() -> None:
     assert len(router.calls) == 1
     assert "per-page=10" in router.calls[0]
     assert "cursor=%2A" in router.calls[0]
+
+
+def test_openalex_request_query_shape_is_preserved() -> None:
+    module = load(VERIFY_REFS, "search_openalex.py")
+    with offline({"api.openalex.org/works": (FIXTURES / "openalex_works.json", 200)}) as router:
+        module.OpenAlexSearcher(email=EMAIL).search(
+            "radiomics", max_results=7, year_start=2019, year_end=2024,
+            work_type="journal-article", sort_by="citations")
+    parsed = urllib.parse.urlparse(router.calls[0])
+    # The query is the part a client swap can silently change: filter separators,
+    # sort direction, the paging size, the cursor start and the mailto identity.
+    check_snapshot("openalex.request_query",
+                   urllib.parse.parse_qs(parsed.query, keep_blank_values=True))
+    assert parsed.netloc == "api.openalex.org"
+    assert parsed.path == "/works"
+
+
+def test_openalex_fails_loudly_without_pyalex() -> None:
+    module = load(VERIFY_REFS, "search_openalex.py")
+    real_import = builtins.__import__
+
+    def missing(name, *args, **kwargs):
+        if name == "pyalex" or name.startswith("pyalex."):
+            raise ImportError("No module named 'pyalex'")
+        return real_import(name, *args, **kwargs)
+
+    with mock.patch.object(builtins, "__import__", missing):
+        with pytest.raises(ImportError, match="swap-refs"):
+            module.OpenAlexSearcher()
 
 
 def _openalex_payload(**overrides) -> bytes:
