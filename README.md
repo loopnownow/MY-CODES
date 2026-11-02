@@ -36,6 +36,21 @@ redirect）。技能 fine-id `stats-analysis` 与别名 `{code_stats}` / `STATS_
 测试用 `pyproject.toml` 的 `[tool.pytest.ini_options]`（`testpaths = modules/tests`，`pythonpath = ["."]`），
 仓根直接 `pytest` 即可，不另设 `pytest.ini`。
 
+### 跑全量测试要装哪些 optional 组
+
+四个 optional 组里有两个是**测试必需**（缺了不是跳过，而是 collect / 调用时直接 `ImportError`）：
+
+```powershell
+pip install -e ".[dev,swap-stats,swap-refs]"    # 全量 pytest 的最小集合
+```
+
+| 组 | 内容 | 谁需要它 |
+|---|---|---|
+| `dev` | `pytest`、`ruff`、`pyyaml`（3.10 另需 `tomli`） | 测试框架本身 |
+| `swap-stats` | `tableone`、`dcurves` | 两个对拍 oracle：`modules/stats/table1_crosscheck.py`、`modules/tests/test_firth_dca_crosscheck.py`（模块级 import，缺即 collect 失败） |
+| `swap-refs` | `pyalex`、`habanero`、`arxiv`、`bibtexparser` | `modules/tests/test_tools_refs_snapshots.py` 走真实库的分支（脚本内**懒导入**，缺库在调用处响亮报错，不静默回退） |
+| `shap` | `shap` | **测试不需要**：`modules/stats/shap_analysis.py` 在函数内部懒导入，未装时 `DO_SHAP` 分支不启用 |
+
 ## 与 `_code` 的关系（该层 2026-11-01 整层退役）
 
 ```
@@ -56,7 +71,8 @@ cd <this-repo>
 PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 ```
 
-2026-10-30 实测基线：**241 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
+2026-11-03 实测基线：**440 passed / 2 skipped / 0 failed**（statsmodels / sklearn 的告警不算失败）。
+装齐 optional 组后本机实测 37–45 秒跑完；数字基线另由 `test/run_golden.py` 端到端对拍（FAIL 0 / WARN 0）。
 
 版本号只有两个位置：`modules/__init__.py` 的 `__version__`（运行时，课题看到的就是它）与
 `pyproject.toml` 的 `version`（打包元数据）。两者必须相同，`modules/tests/test_version_consistency.py` 会卡住。
