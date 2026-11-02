@@ -109,8 +109,9 @@ def _miceforest_draws(
         import miceforest as mf
     except ImportError as exc:
         raise ImportError(
-            "method='miceforest' needs the optional package miceforest "
-            "(pip install miceforest lightgbm)"
+            "method='miceforest' needs the optional extra mi-forest: "
+            'pip install "stats-analysis[mi-forest]" '
+            "(miceforest 6.0.5 requires lightgbm<4.7, miceforest issue #104)"
         ) from exc
 
     kernel = mf.ImputationKernel(
