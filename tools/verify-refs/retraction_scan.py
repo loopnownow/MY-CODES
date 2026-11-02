@@ -609,15 +609,15 @@ def read_file(filepath: str) -> str:
     # Handle PDF
     if path.suffix.lower() == '.pdf':
         try:
-            import PyPDF2
-            with open(path, 'rb') as f:
-                reader = PyPDF2.PdfReader(f)
-                text = ''
-                for page in reader.pages:
-                    text += page.extract_text() + '\n'
-                return text
+            import pypdf
         except ImportError:
-            raise ImportError("PyPDF2 required for PDF processing. Install with: pip install PyPDF2")
+            raise ImportError("pypdf required for PDF processing. Install with: pip install pypdf")
+        with open(path, 'rb') as f:
+            reader = pypdf.PdfReader(f)
+            text = ''
+            for page in reader.pages:
+                text += (page.extract_text() or '') + '\n'
+            return text
 
     # Handle text files
     with open(path, 'r', encoding='utf-8', errors='ignore') as f:
