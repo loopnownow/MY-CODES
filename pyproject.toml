@@ -22,6 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 shap = ["shap>=0.44"]
 swap-stats = ["tableone>=0.9"]
+swap-refs = ["pyalex>=0.21"]
 dev = ["pytest>=7.4", "ruff>=0.12", 'tomli>=2.0; python_version < "3.11"', "pyyaml>=6.0"]
 
 [tool.pytest.ini_options]
