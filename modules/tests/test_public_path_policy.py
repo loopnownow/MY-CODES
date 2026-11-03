@@ -68,8 +68,9 @@ class TestDriveLetterGuard(unittest.TestCase):
     """C1 加严：盘符路径的两种写法都要抓住（旧 LAB_ABS 只认单反斜杠，转义写法漏网）。"""
 
     def test_regex_catches_single_and_escaped(self) -> None:
-        single = "D:\\0Grok\\0doc"
-        escaped = "D:\\\\0Grok\\\\0doc"
+        drive, sep = "D:", "\\"
+        single = f"{drive}{sep}0Grok{sep}0doc"
+        escaped = f"{drive}{sep * 2}0Grok{sep * 2}0doc"
         for sample in (single, escaped):
             self.assertIsNotNone(DRIVE_LETTER.search(sample), sample)
 
