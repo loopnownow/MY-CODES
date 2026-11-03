@@ -38,16 +38,17 @@ redirect）。技能 fine-id `stats-analysis` 与别名 `{code_stats}` / `STATS_
 
 ### 跑全量测试要装哪些 optional 组
 
-五个 optional 组里，`dev` + `swap-stats` + `swap-refs` 是**测试必需**（缺了不是跳过，而是 collect / 调用时直接 `ImportError`）；
+六个 optional 组里，`dev` + `swap-stats` + `swap-refs` + `partial` 是**测试必需**（缺了不是跳过，而是 collect / 调用时直接 `ImportError`）；
 
 ```powershell
-pip install -e ".[dev,swap-stats,swap-refs]"    # 全量 pytest 的最小集合
+pip install -e ".[dev,swap-stats,swap-refs,partial]"    # 全量 pytest 的最小集合
 ```
 
 | 组 | 内容 | 谁需要它 |
 |---|---|---|
 | `dev` | `pytest`、`ruff`、`pyyaml`（3.10 另需 `tomli`） | 测试框架本身 |
-| `swap-stats` | `tableone`、`dcurves` | 两个对拍 oracle：`modules/stats/table1_crosscheck.py`、`modules/tests/test_firth_dca_crosscheck.py`（模块级 import，缺即 collect 失败） |
+| `swap-stats` | `tableone`、`dcurves`、`lifelines` | 三个对拍 oracle：`modules/stats/table1_crosscheck.py`、`modules/tests/test_firth_dca_crosscheck.py`、`modules/tests/test_ipcw_lifelines_parity.py`（模块级 import，缺即 collect 失败）。`lifelines` **不进生产**：`curves_ipcw.py` 的删失 KM 保持自写（换库会丢「事件时间必须在删失表里」的严格查表守卫，且 1e-16 漂移会动 IPCW 数字） |
+| `partial` | `pingouin` | `modules/stats/assoc.py` 的 `partial_corr`（函数内**懒导入**，缺库在调用处响亮报错，不静默回退）+ `modules/tests/test_partial_corr_pingouin_parity.py`（模块级 import，缺即 collect 失败） |
 | `swap-refs` | `pyalex`、`habanero`、`arxiv`、`bibtexparser` | `modules/tests/test_tools_refs_snapshots.py` 走真实库的分支（脚本内**懒导入**，缺库在调用处响亮报错，不静默回退） |
 | `mi-forest` | `miceforest`、`lightgbm<4.7` | **测试不需要**：只有 `method="miceforest"` 才用；`lightgbm<4.7` 是上游兼容 pin（miceforest 6.0.5 调 `Booster.__inner_predict(0)`，4.7 去掉了该参数，issue #104 未修） |
 | `shap` | `shap` | **测试不需要**：`modules/stats/shap_analysis.py` 在函数内部懒导入，未装时 `DO_SHAP` 分支不启用 |
