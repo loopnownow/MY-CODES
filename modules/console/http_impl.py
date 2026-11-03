@@ -447,6 +447,11 @@ class Handler(BaseHTTPRequestHandler):
                     f'<head><meta name="console-token" content="{CONSOLE_TOKEN}">',
                     1,
                 )
+            # 机器无关的算法库默认值：模板里只有 __MODULES_DEFAULT__ 占位，
+            # 注入 json.dumps 得到的 JS 字符串字面量（反斜杠/引号按 JS 转义）
+            html = html.replace(
+                "__MODULES_DEFAULT__", json.dumps(str(MODULES_ROOT))
+            )
             self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
             return
 
