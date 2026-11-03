@@ -12,6 +12,7 @@ const S = {
   ioTab: false,
   extMeta: {},
   pvExcMeta: {},
+  pvExcMetaByFile: {},
   kvFoldOpen: {},
 };
 
@@ -2010,6 +2011,14 @@ function excludeRowsHtml() {
     const note = first
       ? "名单表 / 列 / 内容 由所有名单共用（后端一张表口径）；空内容＝该列整列当 ID。"
       : "这份沿用首卡的名单表 / 列 / 内容。";
+    const metaOf = (S.pvExcMetaByFile || {})[f] || null;
+    const fileNote = !f
+      ? ""
+      : (metaOf && metaOf.error)
+        ? `读不到这份文件：${metaOf.error}`
+        : (metaOf && Array.isArray(metaOf.sheets) && metaOf.sheets.length)
+          ? `该文件 ${metaOf.sheets.length} 张表：${metaOf.sheets.join(" / ")}`
+          : "";
     return `<div class="pv-file-card" data-exc-row="${i}">
       <div class="pv-file-head">
         <span class="pv-file-tag">名单 ${i + 1}</span>
@@ -2020,6 +2029,7 @@ function excludeRowsHtml() {
       </div>
       ${roleArea}
       <p class="hint">${esc(note)}</p>
+      ${fileNote ? `<p class="hint${metaOf && metaOf.error ? " err" : ""}">${esc(fileNote)}</p>` : ""}
     </div>`;
   }).join("");
   return `${cards}
@@ -2049,6 +2059,7 @@ function applyExcFiles(list) {
 
 async function loadExcMeta(file) {
   const name = String(file || "").trim();
+  if (!S.pvExcMetaByFile) S.pvExcMetaByFile = {};
   if (!name) {
     S.pvExcMeta = {};
     return;
@@ -2057,12 +2068,16 @@ async function loadExcMeta(file) {
   const col = String(fieldValue("EXCLUDE_COL") || "");
   try {
     const j = await fetchXlsxMeta(name, sheet, col);
-    S.pvExcMeta = { sheets: j.sheets || [], columns: j.columns || [], values: j.values || [] };
+    S.pvExcMetaByFile[name] = {
+      sheets: j.sheets || [], columns: j.columns || [], values: j.values || [],
+    };
   } catch (e) {
-    S.pvExcMeta = {};
+    S.pvExcMetaByFile[name] = { sheets: [], columns: [], values: [], error: String(e && e.message ? e.message : e) };
     const msg = $("ioMsg");
     if (msg) msg.innerHTML = `<span class="err">排除名单读取失败：${esc(e && e.message ? e.message : e)}</span>`;
   }
+  const first = pvExcFiles()[0] || "";
+  if (first === name) S.pvExcMeta = S.pvExcMetaByFile[name];
 }
 
 function renderProjectInfo() {
@@ -2101,6 +2116,9 @@ async function refreshDataPane() {
   const msg = $("ioMsg");
   if (msg) msg.textContent = "正在更新预览…";
   syncExtRows();
+  for (const f of pvExcFiles()) {
+    await loadExcMeta(f);
+  }
   await loadExcMeta(pvExcFiles()[0] || "");
   await reloadPreview();
   renderDataPane();
@@ -2183,7 +2201,11 @@ function bindDataPane() {
       if (t.matches("[data-exc=file]")) {
         const list = readExcFiles();
         applyExcFiles(list);
-        loadExcMeta(list[0] || "").then(() => renderDataPane()).catch(() => {});
+        const self = String(t.value || "").trim();
+        Promise.all([
+          loadExcMeta(list[0] || ""),
+          self && self !== list[0] ? loadExcMeta(self) : Promise.resolve(),
+        ]).then(() => renderDataPane()).catch(() => {});
         return;
       }
       const key = t.getAttribute("data-exc");
