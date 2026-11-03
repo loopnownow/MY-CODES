@@ -283,9 +283,9 @@ def test_sections_place_new_switches():
     assert sec["DO_RAD_LOGISTIC"] == "radlog"
     assert SECTION_OF["DO_RAD_LOGISTIC"][0] == "radlog"
     ids = [sid for sid, _t, _ks in SECTION_DEFS]
-    assert ids.index("io") < ids.index("exclude") < ids.index("valmode") < ids.index("clinprep")
-    assert ids.index("clinprep") + 1 == ids.index("encode")
-    assert ids.index("encode") + 1 == ids.index("clin")
+    assert ids.index("io") + 1 == ids.index("encode")
+    assert ids.index("encode") < ids.index("exclude") < ids.index("valmode") < ids.index("clinprep")
+    assert ids.index("clinprep") + 1 == ids.index("clin")
     assert ids.index("clin") + 1 == ids.index("roc")
     assert ids.index("roc") + 1 == ids.index("surv")
     assert ids.index("surv") < ids.index("ancova") < ids.index("mlr")
