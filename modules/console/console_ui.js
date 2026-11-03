@@ -2334,10 +2334,7 @@ function renderForm() {
       const order = [
         "ORDINAL_MAX_LEVELS", "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
       ];
-      const hiddenTxt = new Set([
-        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
-      ]);
-      const vis = fields.filter(f => !isHiddenField(f) && !hiddenTxt.has(f.key));
+      const vis = fields.filter(f => !isHiddenField(f));
       const byKey = new Map(vis.map(f => [f.key, f]));
       const left = order.map(k => byKey.get(k)).filter(Boolean);
       for (const f of vis) {
@@ -2345,13 +2342,19 @@ function renderForm() {
         left.push(f);
       }
       if (!left.length) return "";
-      const hint = "计数/计量等级、强制类型，以及文本编码。文本编码面板里：搜索 → 自动识别（≤等级上限自动填码）→ 逐条可改。";
+      const hint = "计数/计量等级与强制类型。都不在临床筛选模块。文本编码在下一个模块。";
       const head = sectionHead("clinprep", g.title, left.length, hint);
       return `<div class="sec-block${head.dim}" data-sec="clinprep">
       ${head.html}
-      <div class="sec-body clinprep-body">${left.map(renderField).join("")}
-        <div class="txt-encode-wrap">${textEncodePanel()}</div>
-      </div>
+      <div class="sec-body clinprep-body">${left.map(renderField).join("")}</div>
+    </div>`;
+    }
+    if (g.id === "encode") {
+      const hint = "文本列 → 编码：搜索列名 → 自动识别并编码（≤等级上限自动填码）→ 逐条可改；超过上限的列不自动编码、不进建模。";
+      const head = sectionHead("encode", g.title, "", hint);
+      return `<div class="sec-block${head.dim}" data-sec="encode">
+      ${head.html}
+      <div class="sec-body encode-body">${textEncodePanel()}</div>
     </div>`;
     }
     if (g.id === "clin") {

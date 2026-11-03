@@ -60,6 +60,8 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
     ("clinprep", "临床 / 预处理", [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+    ]),
+    ("encode", "文本编码", [
         "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]),
     ("clin", "临床筛选", [
