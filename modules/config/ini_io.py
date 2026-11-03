@@ -126,6 +126,10 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
         "DO_RAD_LOGISTIC",
         "RAD_LOGIT_UNI_P", "RAD_LOGIT_MV_P", "DO_RAD_FIRTH",
     ]),
+    ("blocks", "模态块", [
+        "MODALITY_BLOCKS", "COMBINED_BLOCKS", "COMBINED_EXCLUDE",
+        "COMBINED_MODE", "CLIN_BLOCK_METHOD",
+    ]),
     ("fig", "图与显示", [
         "DO_FIGURE_PANELS",
         "DO_PLOT_TIFF", "DO_PLOT_PDF",
