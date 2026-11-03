@@ -306,7 +306,6 @@ def audit_study(spec: dict) -> None:
     if balance not in (None, "", "downsample", "smote"):
         problems.append("balance must be downsample, smote, or omitted")
     if balance in ("downsample", "smote") and spec.get("balance_n") not in (None, ""):
-        # Optional removed count. Not drawn as an eligibility exclusion.
         if _count(spec.get("balance_n")) is None:
             problems.append("balance_n must be an integer when set")
     for key, allowed in (("models", _MODELS), ("metrics", _METRICS), ("explain", _EXPLAIN)):

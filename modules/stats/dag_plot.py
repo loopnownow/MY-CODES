@@ -14,7 +14,6 @@ from modules import config as cfg
 
 Edge = Tuple[str, str]
 
-# ── 发表级柔和配色 ──
 _COLOR_CLIN = "#7EB6A4"
 _COLOR_RAD = "#6BA3D0"
 _COLOR_OUT = "#E8A060"
@@ -98,7 +97,6 @@ def _layout(nodes: Sequence[str]) -> dict:
 
     pos: dict = {}
     n_c = len(clin_sorted)
-    # 竖向均匀排布，顶/底留白；中心间距 ≥ 单盒高度 + 间隙
     if n_c == 0:
         pass
     elif n_c == 1:
@@ -140,7 +138,6 @@ def _rect_edge_point(
     dy = toward[1] - cy
     if abs(dx) < 1e-12 and abs(dy) < 1e-12:
         return cx + hw, cy
-    # 射线与轴对齐矩形相交
     scale_x = hw / abs(dx) if abs(dx) > 1e-12 else np.inf
     scale_y = hh / abs(dy) if abs(dy) > 1e-12 else np.inf
     t = min(scale_x, scale_y)
@@ -223,7 +220,6 @@ def plot_assumed_dag(
     sizes = {n: _node_size(labels[n]) for n in G.nodes()}
 
     n_clin = sum(1 for n in G.nodes() if n not in _outcome_names() and n != "RadScore")
-    # 节点多时加高画布，避免挤压
     fig_h = max(7.2, 1.15 * max(n_clin, 4) + 1.5)
     fig_w = 13.0
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=120)
@@ -236,10 +232,8 @@ def plot_assumed_dag(
     normal = [(u, v) for u, v in G.edges() if (u, v) not in highlight]
     hi = [(u, v) for u, v in G.edges() if (u, v) in highlight]
 
-    # 弧度：同向多边轻微错开，避免完全重合；过大弧易造成“方向反了”的错觉
     def _rad_for(u, v, i: int, scale: float) -> float:
         yu, yv = pos[u][1], pos[v][1]
-        # 源在上则弧向上弯，源在下则向下
         sign = 1.0 if yu > yv + 0.02 else (-1.0 if yu < yv - 0.02 else (1.0 if i % 2 else -1.0))
         return sign * scale * (0.35 + 0.12 * (i % 3))
 
@@ -295,7 +289,6 @@ def plot_assumed_dag(
     frame.set_edgecolor("#D1D5DB")
     frame.set_linewidth(1.0)
 
-    # 根据节点盒体外扩坐标范围
     xs, ys = [], []
     for n, (x, y) in pos.items():
         w, h = sizes[n]

@@ -28,10 +28,6 @@ from modules.stats.curves_ipcw import IPCW_ROC_METRICS
 from modules.stats.curves_calibration import HL_METRICS
 
 
-# ═════════════════════════════════════════════════════════════════
-# 辅助：三线表 + 统一表头 + 缩写表注
-# ═════════════════════════════════════════════════════════════════
-# 表头显示名统一（Title Case / 固定缩写大写）
 _HEADER_MAP = {
     "feature": "Variable",
     "variable": "Variable",
@@ -89,7 +85,6 @@ _HEADER_MAP = {
     "pass fwer": "Pass FWER",
 }
 
-# 缩写 → 全称（仅收录报告中实际可能出现的；表注按首字母排序）
 _ABBREV_GLOSSARY = {
     "ACC": "accuracy",
     "AUC": "area under the receiver operating characteristic curve",
@@ -130,16 +125,13 @@ def _format_header(col: str) -> str:
     low = key.lower()
     if low in _HEADER_MAP:
         return _HEADER_MAP[low]
-    # 已知全大写缩写保持
     if key.upper() in _ABBREV_GLOSSARY and key.isupper():
         return key.upper()
     if key in _ABBREV_GLOSSARY:
         return key
-    # 结局展示标签：LNM=n / non_LNM=n —— 保留 non_ 下划线
     import re
     if re.match(r"^(non_)?[A-Za-z0-9]+(=\d+)?$", key):
         return key
-    # 默认：下划线转空格
     return key.replace("_", " ")
 
 
@@ -151,12 +143,10 @@ def _collect_abbrevs_from_df(df: pd.DataFrame) -> set:
         for v in df[col].astype(str).tolist()[:200]:
             text_bits.append(v)
     blob = " | ".join(text_bits)
-    # 按全称长度降序匹配，避免短串误伤；仅匹配词边界式缩写
     import re
     for abbr in _ABBREV_GLOSSARY:
         if re.search(rf"(?i)(?<![A-Za-z0-9]){re.escape(abbr)}(?![A-Za-z0-9])", blob):
             found.add(abbr)
-    # 表头映射后的显示名
     for c in df.columns:
         h = _format_header(c)
         for abbr in _ABBREV_GLOSSARY:
@@ -212,7 +202,6 @@ def df_to_html(df: Optional[pd.DataFrame], elem_id: Optional[str] = None,
     for _, row in df.iterrows():
         cells = []
         for i, v in enumerate(row):
-            # 首列左对齐；Table1 分类水平子行（前导空格）缩进
             txt = "" if pd.isna(v) else str(v)
             is_indent = i == 0 and (txt.startswith("  ") or txt.startswith("\u00a0"))
             if i == 0:
@@ -248,7 +237,6 @@ def _f_exists(png_name: str, out_dir: Optional[str] = None) -> bool:
 
 
 def _img_tag(png_name: str, alt: str = "", out_dir: Optional[str] = None) -> str:
-    # 图总闸关：结果 HTML 不嵌任何图，也不留占位。
     if not cfg.figures_on():
         return ""
     if out_dir is None:
@@ -304,7 +292,6 @@ def _merge_ci_cols(df: pd.DataFrame) -> pd.DataFrame:
             return f"{_one(lo)}-{_one(hi)}"
         out["CI"] = [_fmt_pair(lo, hi) for lo, hi in zip(out["CI_low"], out["CI_high"])]
         out = out.drop(columns=["CI_low", "CI_high"])
-        # 列序：Feature/OR/CI/p/VIF 优先
         preferred = [c for c in ("Feature", "Term", "OR", "CI", "p", "FDR P", "FWER P", "Pass FDR", "Pass FWER", "VIF", "Sig")
                      if c in out.columns]
         rest = [c for c in out.columns if c not in preferred]
@@ -580,7 +567,6 @@ def _shap_inline_html(advanced_info: Optional[Dict[str, Any]], out_dir: str) -> 
     imp = sh.get("importance")
     if imp is not None and len(imp):
         disp = imp.copy()
-        # 不展示内部全名列
         if "Feature_full" in disp.columns:
             disp = disp.drop(columns=["Feature_full"])
         for col in disp.columns:
@@ -834,7 +820,6 @@ def _clean_table1_df(clin_res) -> Optional[pd.DataFrame]:
     if len(clin_res.table1) == 0:
         return None
     t1 = clin_res.table1.copy()
-    # 保留 _is_level 供简化用
     has_level = "_is_level" in t1.columns
     drop_internal = [c for c in t1.columns if c.startswith("_") and c != "_is_level"]
     t1 = t1.drop(columns=drop_internal, errors="ignore")
@@ -864,7 +849,6 @@ def _clean_table2_df(rad_res) -> Optional[pd.DataFrame]:
         return None
     if len(rad_res.table2) == 0:
         return None
-    # Reuse Table1 cleaner by duck-typing .table1
     class _T:
         pass
     tmp = _T()
@@ -949,7 +933,6 @@ def _positive_level_key(lab: str) -> bool:
     不把 Grade_3/Grade_4 等有序多分类水平当作阳性，避免多水平变量被压成单行。
     """
     s = str(lab).strip().lower().replace(" ", "_")
-    # 整词匹配；不含 grade_1–4（那些是 ≥3 水平有序分类）
     pos_exact = {
         "positive", "pos", "yes", "true", "high", "high_grade",
         "dmi", "csi", "lnm", "lvsi",
@@ -1030,7 +1013,6 @@ def _simplify_table1_all(t1: pd.DataFrame) -> pd.DataFrame:
             j += 1
 
         if not levels:
-            # 连续变量或无水平展开
             row = {"Variable": r["Variable"]}
             for c in gcols:
                 row[c] = r[c] if c in r.index else ""
@@ -1039,14 +1021,12 @@ def _simplify_table1_all(t1: pd.DataFrame) -> pd.DataFrame:
                 row[c] = r[c] if c in r.index else ""
             rows.append(row)
         elif len(levels) == 2:
-            # 仅二分类压成阳性 %；多水平绝不进入此分支
             pos_row = None
             for lv in levels:
                 if _positive_level_key(lv["Variable"]):
                     pos_row = lv
                     break
             if pos_row is None:
-                # 无明确标签时取第二水平为阳性（0/1 编码常见）
                 pos_row = levels[1]
             row = {"Variable": r["Variable"]}
             for c in gcols:
@@ -1056,7 +1036,6 @@ def _simplify_table1_all(t1: pd.DataFrame) -> pd.DataFrame:
                 row[c] = r[c] if c in r.index else ""
             rows.append(row)
         else:
-            # 多水平分类（Histology、FIGO、Grade_1–4 等）：保留各水平，仅 %
             rows.append({
                 "Variable": r["Variable"],
                 **{c: "" for c in gcols},
@@ -1323,7 +1302,6 @@ def _multigroup_split_tables(data):
 
 def _table1_train_test_section(res_train, res_test, data=None) -> str:
     """B. Table 1 合并 Train/Test（三行表头 + 按父变量对齐水平行）。"""
-    # 关=不写这一节。队列和建模拆分已经完成，这里不再改它们。
     if not bool(getattr(cfg, "DO_BASELINE_TRAIN_TEST", True)):
         return ""
     multi = _multigroup_split_tables(data)
@@ -1334,7 +1312,6 @@ def _table1_train_test_section(res_train, res_test, data=None) -> str:
         t_te = _clean_table1_df(res_test["clin"] if res_test else None)
     if t_tr is None and t_te is None:
         return ""
-    # Keep `_is_level` so repeated Negative/Positive labels stay under their parent.
     if t_tr is not None:
         t_tr = t_tr.drop(
             columns=[c for c in t_tr.columns if str(c).startswith("_") and c != "_is_level"],
@@ -1345,7 +1322,6 @@ def _table1_train_test_section(res_train, res_test, data=None) -> str:
             columns=[c for c in t_te.columns if str(c).startswith("_") and c != "_is_level"],
             errors="ignore",
         )
-    # ≥3 组的表已经含全部原始水平。不再把 HC 另贴一列，否则组和 P 会对不上。
     if data is not None and multi is None:
         from modules.stats.clinical import apply_hc_to_table1
         hc_from = str(getattr(data, "hc_relabel_from", "") or "")
@@ -1570,7 +1546,6 @@ def _figures_section_html(
     if _roc_enabled() and _f_exists("panel_roc.png", out_dir):
         parts += ["<h3>ROC (train | test)</h3>", _img_tag("panel_roc.png", "ROC panel", out_dir)]
         any_fig = True
-        # train + test ROC summary 合并为一表（首列 Split）
         roc_tbl = _roc_metrics_train_test_html(res_train, res_test, data)
         if roc_tbl:
             parts.append(roc_tbl)
@@ -1673,7 +1648,6 @@ def _survival_section_html(out_dir: str) -> str:
         for col in ("N", "Events"):
             if col in disp.columns:
                 disp[col] = disp[col].map(lambda v: "NA" if pd.isna(v) else f"{int(v)}")
-        # keep Predictor, Contrast, HR, 95% CI, P, N, Events, PH_p
         order = [c for c in ("Predictor", "Contrast", "HR", "95% CI", "P", "N", "Events", "PH_p") if c in disp.columns]
         disp = disp[order] if order else disp
         parts += [
@@ -1904,7 +1878,6 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
     is_val = _is_validation_panel(panel_label)
     is_all = panel_label == "all"
 
-    # ① Table1（All：简化显示）。DO_BASELINE_ALL 只关这一张，组学 Table 2 仍写。
     show_base_all = bool(getattr(cfg, "DO_BASELINE_ALL", True))
     if include_table1 and clin_res is not None and getattr(clin_res, "table1", None) is not None and len(clin_res.table1) > 0:
         t1 = _clean_table1_df(clin_res)
@@ -1925,7 +1898,6 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
                 df_to_html(t1, f"table1-{panel_label}", caption=f"Table 1 — {tag}")
             )
 
-    # ①b Radiomics Table 2（All / optional layers）
     if include_table1 and rad_res is not None and getattr(rad_res, "table2", None) is not None and len(rad_res.table2) > 0:
         t2 = _clean_table2_df(rad_res)
         if t2 is not None:
@@ -1940,7 +1912,6 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
             return ""
         return '<section>\n' + '\n'.join(parts) + '\n</section>'
 
-    # ② Univariate（train only）。开关只决定写出，不改变已经算好的筛选。
     show_uni = bool(getattr(cfg, "DO_UNI_LOGISTIC_TABLE", True))
     if show_uni and (not is_val) and clin_res is not None and getattr(clin_res, "uni_res", None) is not None \
             and len(clin_res.uni_res) > 0:
@@ -1977,9 +1948,6 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
             ),
         ]
 
-    # ③ Multivar（train）→ Selected clinical → Selected radiomics
-    # 多因素表开关不关 Firth，也不关已选变量那一行。
-    # 单因素表开关同样不关 Firth。Firth 仍只看 DO_FIRTH。
     show_mv = bool(getattr(cfg, "DO_MV_LOGISTIC_TABLE", True))
     if not is_val:
         parts.append(_firth_uni_html(clin_res, panel_label))
@@ -2028,7 +1996,6 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
                     f'<p class="sel-feat"><b>{title} '
                     f'({tag}, {len(rfeats)}):</b> {", ".join(shown)}{more}</p>'
                 )
-                # LASSO Table 2 — after selection / C training narrative
                 if not groups and method != "logistic":
                     t2 = _clean_table2_df(src)
                     if t2 is not None:
@@ -2049,27 +2016,20 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
                             "(median-imputed) scale; same format as Baseline Table 1.</p>"
                         )
 
-    # ④ Combined：系数/列线图 → ROC+summary → Calibration → DCA
     parts.extend(_combined_block_html(
         panel_label, combined_info, is_val,
         rad_res=rad_res, ds=ds, out_dir=out_dir,
     ))
 
-    # 单图 ROC 等已迁至 D. Figures（panel_*）
 
-    # ⑤ RadScore Formula（分类时每类一条，不合成一份）
     if not is_val:
         formula_html = _radiomics_formula_html(rad_res)
         if formula_html:
             parts.append(formula_html)
 
-    # SHAP 表在 D. Figures 中与 panel_shap 一并展示
     return '<section>\n' + '\n'.join(parts) + '\n</section>'
 
 
-# ═════════════════════════════════════════════════════════════════
-# 主函数：生成完整的 Results{子项目}.html 报告
-# ═════════════════════════════════════════════════════════════════
 def _fmt_p(v) -> str:
     try:
         x = float(v)
@@ -2191,7 +2151,6 @@ def _radiomics_logistic_html(rad_res, panel_label: str) -> str:
             )
         return "\n".join(blocks)
     parts: List[str] = []
-    # Table 2 baseline is rendered in A / B2 (parallel to clinical Table 1), not here.
     uni = getattr(rad_res, "uni_res", None)
     if uni is not None and len(uni) > 0:
         u = _logistic_display(_radiomics_feature_names(uni))
@@ -2438,7 +2397,6 @@ def _partial_rows(assoc: Optional[dict]) -> list[dict]:
 
 
 def _partial_html(assoc: Optional[dict]) -> str:
-    # DO_CORR 关了也不许把偏相关一起关掉；这里只看偏相关自己的开关。
     if not bool(getattr(cfg, "DO_PARTIAL", False)):
         return ""
     rows = _partial_rows(assoc)
@@ -2554,7 +2512,6 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
     html_parts = [
         f'<header>\n<h1>{page_title}</h1>\n</header>',
     ]
-    # C2: modules provenance note under page header (best-effort).
     try:
         from modules import __version__ as _mod_ver
         from modules.provenance import collect as _prov_collect, format_html_note
@@ -2575,7 +2532,6 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
             f"<ul>{items}</ul></section>"
         )
 
-    # A. All Table1
     html_parts.append(_build_panel(
         "all", data.all, res_all["rad"], res_all["clin"],
         "A. All Data — Baseline", out_dir=out_dir,
@@ -2583,17 +2539,14 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
     ))
     html_parts.extend(_assoc_sections_html(assoc_info))
 
-    # B. Train | Test Table1 并排
     t1_dual = _table1_train_test_section(res_train, res_test, data=data)
     if t1_dual:
         html_parts.append(t1_dual)
 
-    # B2. Radiomics Table 2 Train | Test（logistic pool 或 LASSO-selected）
     t2_dual = _table2_train_test_section(res_train, res_test)
     if t2_dual:
         html_parts.append(t2_dual)
 
-    # C. Training（无 Table1、无单图）
     if res_train is not None:
         html_parts.append(_build_panel(
             "train", data.train, res_train["rad"], res_train["clin"],
@@ -2602,7 +2555,6 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
             include_table1=False,
         ))
 
-    # D. Figures（panel 合成图）
     fig_sec = _figures_section_html(
         out_dir, res_train=res_train, res_test=res_test,
         data=data, advanced_info=advanced_info,
@@ -2622,12 +2574,10 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
     if ext_sec:
         html_parts.append(ext_sec)
 
-    # F. NRI / IDI
     nri_sec = _nri_idi_section_html(combined_info, out_dir)
     if nri_sec:
         html_parts.append(nri_sec)
 
-    # G. Correlation
     corr_bits = ['<section><h2>G. Correlation</h2>']
     corr_png = "correlation_heatmap_selected.png"
     corr_group = str(getattr(cfg, "CORR_GROUP", "") or "").strip()
@@ -2660,7 +2610,6 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
         for col in ("spearman_rho", "p_value"):
             if col in disp.columns:
                 disp[col] = disp[col].map(lambda v: f"{v:.4f}" if pd.notna(v) else "NA")
-        # Keep Predictor first; the caller inserts Reference as the second column.
         prefer = [c for c in ("predictor", "spearman_rho", "p_value", "95% CI")
                   if c in disp.columns]
         rest = [c for c in disp.columns if c not in prefer and c != "ref"]
@@ -2673,8 +2622,6 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
                 return vals[0]
         return default_ref
 
-    # 参考变量相关表（CORR_REFS），只出表不出图。关相关表时不写，即使上游还留着表。
-    # 不能在关了之后再落到 corr_egfr_df，否则 DO_CORR 关不掉这张表。
     corr_frames: List[pd.DataFrame] = []
     if not bool(getattr(cfg, "DO_CORR", True)):
         tables = []
@@ -2712,12 +2659,10 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
         corr_bits.append("</section>")
         html_parts.append("\n".join(corr_bits))
 
-    # H. DAG
     dag_sec = _dag_section_html(out_dir)
     if dag_sec:
         html_parts.append(dag_sec)
 
-    # I. Mediation
     med_sec = _mediation_section_html(advanced_info, out_dir)
     if med_sec:
         html_parts.append(med_sec)

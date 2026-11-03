@@ -18,7 +18,6 @@ def _fit_sklearn_logit(X: np.ndarray, y: np.ndarray) -> LogisticRegression:
         penalty=None if hasattr(LogisticRegression(), "penalty") else "none",
         solver="lbfgs", max_iter=2000, random_state=cfg.SEED,
     )
-    # sklearn 新旧 API：penalty=None (1.2+) vs penalty='none'
     try:
         clf = LogisticRegression(penalty=None, solver="lbfgs", max_iter=2000,
                                  random_state=cfg.SEED)
@@ -63,7 +62,6 @@ def run_shap(
         print("  ⚠ insufficient data for SHAP — skip")
         return {"method": None, "importance": None}
 
-    # 标准化便于线性解释
     mu = X.mean()
     sd = X.std().replace(0, 1.0)
     Xs = (X - mu) / sd
@@ -76,7 +74,6 @@ def run_shap(
 
     try:
         import shap
-        # LinearExplainer on logistic (link=logit of decision function ≈ linear)
         explainer = shap.LinearExplainer(clf, Xmat, feature_perturbation="interventional")
         n_exp = min(len(Xmat), max_samples)
         rng = np.random.RandomState(seed)
@@ -98,7 +95,6 @@ def run_shap(
         }).sort_values("mean_|SHAP|", ascending=False).reset_index(drop=True)
         method = "SHAP LinearExplainer"
 
-        # bar（备用，HTML 默认不展示）
         h = max(2.8, 0.42 * len(feats) + 1.2)
         fig, ax = cfg.style_new_axes(figsize=(7.2, h))
         imp = importance.iloc[::-1]
@@ -118,7 +114,6 @@ def run_shap(
             print("  shap_bar.png saved")
         plt.close(fig)
 
-        # beeswarm summary
         try:
             try:
                 from modules.stats.radiomics import display_rad_feature
@@ -173,7 +168,6 @@ def run_shap(
             "mean_importance": r.importances_mean,
             "std": r.importances_std,
         }).sort_values("mean_importance", ascending=False).reset_index(drop=True)
-        # alias column for HTML
         importance["mean_|SHAP|"] = importance["mean_importance"]
 
         h = max(2.8, 0.42 * len(feats) + 1.2)

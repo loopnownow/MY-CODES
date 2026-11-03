@@ -104,7 +104,6 @@ def _draw_label(im: "Image.Image", text: str, pos: str = "lower_left") -> "Image
     draw = ImageDraw.Draw(out)
     font = _font(max(22, im.height // 28))
     pad = max(8, im.height // 80)
-    # text bbox
     try:
         bbox = draw.textbbox((0, 0), text, font=font)
         tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
@@ -116,7 +115,6 @@ def _draw_label(im: "Image.Image", text: str, pos: str = "lower_left") -> "Image
         x, y = pad, pad
     else:
         x, y = pad, im.height - th - pad * 2
-    # 半透明白底
     box = [x - 4, y - 2, x + tw + 8, y + th + 6]
     try:
         overlay = Image.new("RGBA", out.size, (0, 0, 0, 0))
@@ -309,7 +307,6 @@ def stitch_grid(
     pos = _label_pos()
     imgs = [_draw_label(_load(p), lab, pos) for p, lab in zip(valid, labs)]
 
-    # 每行统一高度
     rows: List[List[Image.Image]] = []
     for i in range(0, len(imgs), ncols):
         chunk = imgs[i : i + ncols]
@@ -317,7 +314,6 @@ def stitch_grid(
         chunk = [_resize_to_height(im, th) for im in chunk]
         rows.append(chunk)
 
-    # 每列最大宽（全局）便于对齐
     col_w = [0] * ncols
     for chunk in rows:
         for j, im in enumerate(chunk):
@@ -325,7 +321,6 @@ def stitch_grid(
 
     row_imgs: List[Image.Image] = []
     for chunk in rows:
-        # pad each cell to col width (center)
         cells = []
         for j, im in enumerate(chunk):
             if im.width < col_w[j]:

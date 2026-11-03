@@ -23,19 +23,12 @@ import statsmodels.api as sm
 from modules import config as cfg
 from modules.stats.val_mode import resolve_val_mode
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数
-# ═════════════════════════════════════════════════════════════════
-N_BOOT_AUC = 1000                # Bootstrap AUC CI 默认；运行时优先 cfg.BOOTSTRAP_N
+N_BOOT_AUC = 1000
 
-# 每次 plot_roc() 计算出的指标表存放于此，供 report 直接读取。
 ROC_METRICS: Dict[str, pd.DataFrame] = {}
 
-# Train 层各模型的 logistic 校准 + Youden，供 lock_threshold 套用。
-# {dataset_label: {model: {intercept, slope, threshold}}}
 ROC_LOCK: Dict[str, Dict[str, Dict[str, float]]] = {}
 
-# 未知模型名的稳定配色缓存（同一次进程内同名同色）
 _FALLBACK_COLOR_CACHE: Dict[str, str] = {}
 
 
@@ -58,7 +51,6 @@ def _resolve_color_map(model_names, color_map: Optional[Dict[str, str]] = None) 
         elif nm in _FALLBACK_COLOR_CACHE:
             out[nm] = _FALLBACK_COLOR_CACHE[nm]
         else:
-            # 避开已用色
             used = set(out.values()) | set(base.values()) | set(_FALLBACK_COLOR_CACHE.values())
             pick = None
             for c in palette:
@@ -158,7 +150,6 @@ def delong_roc_test(y: np.ndarray, p1: np.ndarray, p2: np.ndarray) -> float:
         return float("nan")
     if np.allclose(a, b, equal_nan=False):
         return 1.0
-    # AUC 相等 ⇒ 检验统计量为 0 ⇒ p=1；此时 DeLong 方差必为 0，不能送进库。
     if abs(float(roc_auc_score(y, a)) - float(roc_auc_score(y, b))) < 1e-12:
         return 1.0
     _z, p, _ci_a, _ci_b, _auc_a, _auc_b, info = Delong_test(
@@ -361,8 +352,6 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
             sens_y, spec_y = cm["SEN"], cm["SPE"]
             thr_source = "train"
         elif is_val and mode == "lock_threshold":
-            # Missing train ROC_LOCK: never refit GLM / Youden on eval y.
-            # Raw continuous AUC only, labeled unlocked; threshold metrics skipped.
             print(
                 f"  FAIL {nm}: lock_threshold missing train ROC_LOCK — "
                 "unlocked raw AUC only; threshold metrics skipped (no eval-y GLM)"
@@ -379,8 +368,6 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
             sens_y = spec_y = float("nan")
             thr_source = "unlocked_no_train_lock"
         else:
-            # apply_formula / refit / train layer: logistic recalibration on this
-            # set + Youden on this set (threshold adaptation, not independent lock).
             X = sm.add_constant(pred[ok])
             fit = sm.GLM(lab, X, family=sm.families.Binomial()).fit()
             params = np.asarray(fit.params, dtype=float).ravel()
@@ -427,7 +414,6 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
             "Val_mode": mode,
         })
 
-        # Clinical 等：只进 ROC summary，不进图
         if plot_skip:
             continue
         display_name = f"{nm}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
@@ -473,7 +459,6 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
     return draw_roc_curves(curves, title, roc_fn, color_map)
 
 
-# 同一套分数在各时间点标签上的 AUC。不是按时间点重开的子结局。
 LANDMARK_ROC_METRICS: Dict[str, pd.DataFrame] = {}
 
 

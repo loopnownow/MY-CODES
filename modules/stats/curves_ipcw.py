@@ -17,7 +17,7 @@ from modules.stats.curves_roc import (
     roc_time_token,
 )
 
-if TYPE_CHECKING:  # 仅用于返回注解（本模块有 from __future__ import annotations）
+if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 IPCW_ROC_METRICS: Dict[str, pd.DataFrame] = {}

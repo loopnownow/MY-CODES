@@ -21,16 +21,10 @@ import statsmodels.api as sm
 
 from modules import config as cfg
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层参数（可覆盖）
-# ═════════════════════════════════════════════════════════════════
-# 两个内部切点 → 低 / 中 / 高；仅 (0, 0.5, 1) 实际只有两档
 NRI_CUTOFF: Sequence[float] = (0.0, 0.3, 0.7, 1.0)
-# 原弦图配色；扇区顺序 [PC0, PC1, SC0, SC1]
 CIR_GRID_COLORS: Sequence[str] = ("#0073C2FF", "#EFC000FF", "#0073C2FF", "#EFC000FF")
-CIR_LINK_COLORS_0: Sequence[str] = ("#E5E5E5", "#5A9367", "#B84A39", "#D9D9D9")  # label=0
-CIR_LINK_COLORS_1: Sequence[str] = ("#E5E5E5", "#B84A39", "#5A9367", "#D9D9D9")  # label=1 正误反转
-# 90°=正上方起逆时针：前半圈=PC(左)，后半圈=SC(右)
+CIR_LINK_COLORS_0: Sequence[str] = ("#E5E5E5", "#5A9367", "#B84A39", "#D9D9D9")
+CIR_LINK_COLORS_1: Sequence[str] = ("#E5E5E5", "#B84A39", "#5A9367", "#D9D9D9")
 CIR_START_DEGREE: float = 90.0
 CIR_TITLE_0: str = "Reclassification (label = 0)"
 CIR_TITLE_1: str = "Reclassification (label = 1)"
@@ -54,7 +48,6 @@ def _complete_cases(x1: pd.DataFrame, x2: pd.DataFrame, y: np.ndarray):
 
 def _fit_prob(X: pd.DataFrame, y: np.ndarray) -> np.ndarray:
     Xc = sm.add_constant(X, has_constant="add")
-    # 再剔一次（防御）
     arr = Xc.to_numpy(dtype=float)
     ok = np.isfinite(arr).all(axis=1) & np.isfinite(y.astype(float))
     if ok.sum() < Xc.shape[1] + 2:
@@ -399,11 +392,6 @@ def plot_idi(idi_res: Dict, dataset_label: str = "train",
         print(f"  {stem}.png saved")
 
 
-# ═════════════════════════════════════════════════════════════════
-# §2  弦图 (chord diagram) — 左 PC / 右 SC
-#   灰 / 红 / 绿：均为原 circlize 全宽填充弦
-#   红 / 绿：额外画 PC→SC 方向箭头（灰带不加）
-# ═════════════════════════════════════════════════════════════════
 def _sector_arc(ax, theta0: float, theta1: float, r_in: float, r_out: float, color: str, label: str):
     """绘制一个扇区（环形段）并在中点标注文字。"""
     n = 60
@@ -466,13 +454,11 @@ def _chord_direction_arrow(
     tb = 0.5 * (theta_b0 + theta_b1)
     p_src = np.array([r_in * np.cos(ta), r_in * np.sin(ta)])
     p_tgt = np.array([r_in * np.cos(tb), r_in * np.sin(tb)])
-    # 中线二次贝塞尔（控制点圆心）：取中后段作为箭头
     def _bez(t: float) -> np.ndarray:
         u = 1.0 - t
         return (u * u) * p_src + (t * t) * p_tgt
 
     q0, q1 = _bez(0.42), _bez(0.78)
-    # 箭头颜色淡 50%（与白色 1:1 混合）
     arrow_color = _lighten_hex(color, 0.5)
     ax.add_patch(patches.FancyArrowPatch(
         q0, q1,
@@ -539,7 +525,6 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
         cursor[to] = b1
         col = link_colors[color_idx % len(link_colors)]
         _chord_ribbon(ax, a0, a1, b0, b1, r_in=0.95, color=col)
-        # 红/绿：标 PC→SC 方向；灰带不加
         if (int(color_idx) % 4) in (1, 2) and not _is_gray_link(col):
             _chord_direction_arrow(ax, a0, a1, b0, b1, r_in=0.95, color=col)
 
@@ -580,10 +565,10 @@ def cir_plot(data: Sequence[float], a: str, b: str, c: str, d: str,
                                           (axes[1], d1, link_colors_1, title_1)]:
         sector_names = [a, b, c, d]
         sector_sizes = {
-            a: vals[0] + vals[2],  # a→c + a→d
-            b: vals[1] + vals[3],  # b→c + b→d
-            c: vals[0] + vals[1],  # a→c + b→c
-            d: vals[2] + vals[3],  # a→d + b→d
+            a: vals[0] + vals[2],
+            b: vals[1] + vals[3],
+            c: vals[0] + vals[1],
+            d: vals[2] + vals[3],
         }
         links = [(a, c, vals[0], 0), (b, c, vals[1], 1), (a, d, vals[2], 2), (b, d, vals[3], 3)]
         _draw_chord_diagram(ax, sector_names, sector_sizes, links,

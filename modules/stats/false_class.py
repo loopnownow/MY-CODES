@@ -193,7 +193,6 @@ def enrich_false_classification_wide(
         groups.append(g)
         patterns.append(_pattern_for(classes))
 
-    # insert after Split: Group then Pattern
     if "Split" in df.columns:
         split_idx = list(df.columns).index("Split")
         df.insert(split_idx + 1, "Group", groups)
@@ -299,14 +298,13 @@ def print_false_classification(
     return wide
 
 
-# 单元格底色：FN 红、FP 橙；Pattern all_FN / all_FP 同色
 _FC_FILLS = {
-    "FN": "FFC7CE",       # 浅红
-    "FP": "FCE4D6",       # 浅橙
+    "FN": "FFC7CE",
+    "FP": "FCE4D6",
     "all_FN": "FFC7CE",
     "all_FP": "FCE4D6",
-    "TP": "C6EFCE",       # 浅绿（可选）
-    "TN": "DDEBF7",       # 浅蓝（可选）
+    "TP": "C6EFCE",
+    "TN": "DDEBF7",
 }
 _FC_FONTS = {
     "FN": "9C0006",

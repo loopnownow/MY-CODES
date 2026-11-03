@@ -37,33 +37,27 @@ import statsmodels.api as sm
 
 from modules import config as cfg
 
-# 缓存：同一 INPUT 只读一次 ICC 表
 _ICC_CACHE: Dict[str, Optional[pd.DataFrame]] = {}
 
-# saga 在较小数据集或严格容差下可能未完全收敛，忽略该警告以保持日志可读。
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数
-# ═════════════════════════════════════════════════════════════════
-# near-zero-variance 判据：频率比阈值、唯一值占比(%) 阈值
 NZV_FREQ_CUT = 95 / 5
 NZV_UNIQUE_CUT = 10
 
 
 @dataclass
 class RadiomicsResult:
-    features: List[str]                    # LASSO 选中的特征名
-    coefs: np.ndarray                      # LASSO 系数（标准化尺度）
-    radscore: Optional[np.ndarray]         # RadScore 向量（原始尺度 OLS 线性组合）
-    intercept: Optional[float]             # OLS 截距
-    betas: Optional[pd.Series]             # OLS 各特征系数（原始尺度）
-    ols: Optional[sm.OLS]                  # statsmodels OLS 拟合结果
-    lambda_used: float                     # 最优正则化强度（1/C）
-    formula_df: Optional[pd.DataFrame]     # 公式系数表
-    formula_text: Optional[str]            # 公式文本（HTML 格式，供报告使用）
-    method: str = "lasso"                  # lasso | logistic
-    preprocess: Optional[dict] = None      # 训练集预处理参数；logistic 套公式时使用
+    features: List[str]
+    coefs: np.ndarray
+    radscore: Optional[np.ndarray]
+    intercept: Optional[float]
+    betas: Optional[pd.Series]
+    ols: Optional[sm.OLS]
+    lambda_used: float
+    formula_df: Optional[pd.DataFrame]
+    formula_text: Optional[str]
+    method: str = "lasso"
+    preprocess: Optional[dict] = None
     uni_res: Optional[pd.DataFrame] = None
     mv_df: Optional[pd.DataFrame] = None
     mv_note: Optional[str] = None
@@ -73,8 +67,8 @@ class RadiomicsResult:
     select_source: Optional[str] = None
     firth_uni: Optional[pd.DataFrame] = None
     firth_mv: Optional[pd.DataFrame] = None
-    table2: Optional[pd.DataFrame] = None  # Baseline-style group table for rad pool
-    groups: Optional[list] = None          # per-category logistic results; no pooled score
+    table2: Optional[pd.DataFrame] = None
+    groups: Optional[list] = None
     group_name: Optional[str] = None
     score_name: Optional[str] = None
 
@@ -211,7 +205,7 @@ def _filter_rad_by_source(full_rad: pd.DataFrame,
         print(f"  特征源过滤 [both]: {n0}/{n0} 保留")
         return full_rad
 
-    token = source  # fbn_32 or fbs_16
+    token = source
     kept = [c for c in feat_cols if token in str(c)]
     if len(kept) == 0:
         raise ValueError(
@@ -721,7 +715,7 @@ def _fit_lasso_cv_path(
         )
         for tr, va in splits
     )
-    score_mat = np.vstack(fold_scores)  # (nfolds, n_cs)
+    score_mat = np.vstack(fold_scores)
     mean_scores = np.nanmean(score_mat, axis=0)
     if np.all(~np.isfinite(mean_scores)):
         best_i = len(Cs) - 1
@@ -735,7 +729,6 @@ def _fit_lasso_cv_path(
         flush=True,
     )
 
-    # Full-training preprocess + prefilter, then refit at best C
     X_scaled, _params = _fit_preprocess(
         X_df, cutoff=cutoff, enable_corr=enable_corr, verbose=True,
     )
@@ -794,16 +787,13 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
             formula_df=None, formula_text=None, method="lasso",
         )
 
-    # ── Step 0: 特征源过滤（MRI fbn_32 / CT fbs_16 / both）──
     full_rad = _filter_rad_by_source(full_rad)
 
-    # ── Step 0.5: ICC 预筛选（intra & inter ≥ 0.75；不使用分析结局 y）──
     full_rad = _filter_rad_by_icc(full_rad)
 
     X_raw = _rad_feature_frame(full_rad)
     print(f"  候选特征: {X_raw.shape[1]}", flush=True)
 
-    # ── Step 1–2: 折内预处理 + LASSO C 路径 CV；全训练集重拟合 ──
     topk = int(getattr(cfg, "LASSO_PREFILTER_TOPK", 25) or 0)
     n_cs = int(getattr(cfg, "LASSO_N_LAMBDAS", 15))
     max_iter = int(getattr(cfg, "LASSO_MAX_ITER", 500))
@@ -822,16 +812,13 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
     sel_idx = np.where(coef_vec != 0)[0]
     lasso_features = list(X_scaled.columns[sel_idx])
     lasso_coefs = coef_vec[sel_idx]
-    # C = 1/lambda；报告 lambda 尺度便于解读正则化强度
     lambda_used = float(1.0 / best_C)
     print(f"  λ={lambda_used:.4f}  入选: {len(lasso_features)} 特征", flush=True)
     for f, c in zip(lasso_features, lasso_coefs):
         print(f"    {display_rad_feature(f):<50s}  {c:+.4f}")
 
-    # ── 绘制并保存 LASSO 图（默认不重拟合路径，显著加速） ──
     _plot_lasso(X_scaled, y_group, lrcv, lambda_used, dataset_label, seed, nfolds, alpha)
 
-    # ── Step 3: 构建 RadScore（原始尺度 OLS） ──
     if len(lasso_features) == 0:
         print("  ⚠ LASSO selected 0 features — skipping RadScore computation")
         return RadiomicsResult(features=[], coefs=np.array([]), radscore=None,
@@ -842,11 +829,10 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
     df_ols["y"] = y_group
     df_ols = df_ols.dropna()
     Xd = sm.add_constant(df_ols[lasso_features])
-    ols = sm.OLS(df_ols["y"], Xd).fit()  # 原始尺度 OLS（identity link），系数用于构建 RadScore
+    ols = sm.OLS(df_ols["y"], Xd).fit()
     intercept = float(ols.params["const"])
     betas = ols.params.drop("const")
 
-    # 公式/结果表用缩短显示名；内部 features/betas 索引仍为完整列名
     disp_names = [display_rad_feature(n) for n in betas.index]
     formula_parts = " ".join(
         f"{'+' if b >= 0 else '−'} {abs(b):.6f} · <i>{dn}</i>"
@@ -869,7 +855,6 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
     print(f"  RadScore: [{np.nanmin(radscore):.3f}, {np.nanmax(radscore):.3f}]  "
           f"mean={np.nanmean(radscore):.3f}")
 
-    # Table 2 on LASSO-selected features (original scale; same format as clinical Table 1)
     table2 = None
     try:
         table2 = build_rad_table2(
@@ -1683,16 +1668,13 @@ def _plot_lasso(X_scaled: pd.DataFrame, y: np.ndarray, lrcv,
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
         ax0, ax1 = axes[0], axes[1]
         path = None
-        # sklearn: coefs_paths_[class] shape (n_folds, n_cs, n_features) for multi-class list
         try:
             cp = lrcv.coefs_paths_
-            # binary: often dict {1: ndarray} or list
             if isinstance(cp, dict):
                 arr = cp.get(1, list(cp.values())[0])
             else:
                 arr = cp[1] if isinstance(cp, (list, tuple)) else cp
             arr = np.asarray(arr)
-            # (n_folds, n_cs, n_features) → mean over folds
             if arr.ndim == 3:
                 path = arr.mean(axis=0)
             elif arr.ndim == 2:
@@ -1705,7 +1687,6 @@ def _plot_lasso(X_scaled: pd.DataFrame, y: np.ndarray, lrcv,
                 ax0.plot(log_lambda, path[:, j], linewidth=0.6, color="steelblue", alpha=0.5)
             ax0.set_title("LASSO Path (from CV)")
         else:
-            # 慢路径回退
             from sklearn.linear_model import LogisticRegression
             path = np.zeros((len(Cs), X_scaled.shape[1]))
             pen = "l1" if float(alpha) >= 1.0 - 1e-12 else "elasticnet"

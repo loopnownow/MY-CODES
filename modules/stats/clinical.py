@@ -26,27 +26,24 @@ import statsmodels.api as sm
 
 from modules import config as cfg
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数（可在调用 select_clinical() 时覆盖）
-# ═════════════════════════════════════════════════════════════════
-DEFAULT_P_THRESHOLD = 0.1  # Table1 初筛 p 值阈值；调用时以 cfg.TABLE1_P_THRESHOLD 为准
-MIN_GROUP_N_FOR_CONTINUOUS = 3                 # 连续变量最小组内样本量（低于此值跳过该变量）
-MIN_UNIVARIATE_N = 10                          # 单变量回归最小样本量
+DEFAULT_P_THRESHOLD = 0.1
+MIN_GROUP_N_FOR_CONTINUOUS = 3
+MIN_UNIVARIATE_N = 10
 
 
 @dataclass
 class ClinSelectResult:
-    features: List[str]                 # Selected：手动 FORCE_MODEL，否则多因素 p 默认
-    uni_res: pd.DataFrame                # 单变量分析结果（可含 VIF 列）
-    table1: pd.DataFrame                 # 基线描述表
-    clinscore: Optional[np.ndarray]      # 最终模型的线性预测值 (log-odds)
-    model: Optional[sm.GLM]              # 最终 statsmodels GLM（Selected 特征）
-    mv_df: Optional[pd.DataFrame] = None  # 候选池全模型多因素表
-    mv_note: Optional[str] = None         # 候选池表注（含 AIC stepwise）
-    candidates: Optional[List[str]] = None       # 单因素筛后的候选池
-    stepwise_features: Optional[List[str]] = None  # AIC stepwise 保留（仅报告）
-    mv_selected: Optional[pd.DataFrame] = None  # Selected 终模型多因素表
-    select_source: Optional[str] = None  # "manual" | "mv_p"
+    features: List[str]
+    uni_res: pd.DataFrame
+    table1: pd.DataFrame
+    clinscore: Optional[np.ndarray]
+    model: Optional[sm.GLM]
+    mv_df: Optional[pd.DataFrame] = None
+    mv_note: Optional[str] = None
+    candidates: Optional[List[str]] = None
+    stepwise_features: Optional[List[str]] = None
+    mv_selected: Optional[pd.DataFrame] = None
+    select_source: Optional[str] = None
     firth_uni: Optional[pd.DataFrame] = None
     firth_mv: Optional[pd.DataFrame] = None
 
@@ -71,14 +68,6 @@ def _normalize_name(x: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-# ═════════════════════════════════════════════════════════════════
-# Step 1: 构建 Table1 基线表
-#   对每个变量自动判断类型：
-#   - 分类变量（非数值 或 唯一值 ≤ 5）→ 卡方检验 或 Fisher 精确检验
-#   - 连续变量 → Shapiro-Wilk 正态性检验
-#     · 两组均正态 → t 检验，显示 mean±SD
-#     · 非正态     → Mann-Whitney U 检验，显示 median [IQR]
-# ═════════════════════════════════════════════════════════════════
 def _pearson_chi2(table: np.ndarray, row_totals=None, col_totals=None) -> float:
     """固定边际表的 Pearson χ²：n·Σ O²/(r·c) − n；任一边际为 0 时返回 nan。"""
     obs = np.asarray(table, dtype=float)
@@ -151,7 +140,6 @@ def _level_label(col: str, code) -> str:
         key = code
     if key in m:
         return str(m[key])
-    # float 键兼容 int 编码
     if isinstance(key, float) and key == int(key) and float(int(key)) in m:
         return str(m[float(int(key))])
     s = str(code).strip()
@@ -169,10 +157,9 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
     连续变量：mean±SD 或 median [IQR]。
     """
     n0, n1 = len(idx0), len(idx1)
-    col_pos = f"{lbl1}={n1}"   # 阳性在前
+    col_pos = f"{lbl1}={n1}"
     col_neg = f"{lbl0}={n0}"
 
-    # 因子编码后的分类列登记在 data_io.CLIN_LEVEL_MAPS（如 Histology 6 水平）
     try:
         from modules.stats import data_io as _dio
         _level_maps = getattr(_dio, "CLIN_LEVEL_MAPS", {}) or {}
@@ -194,7 +181,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
                 return _dio.classify_clin_series(col, series, level_maps=_level_maps) == "categorical"
         except Exception as e:
             print(f"  ⚠ classify_clin fallback for {col}: {e}", flush=True)
-        # 兜底：文本 / 已登记 level map → 分类；其余数值 → 计量
         if col in _level_maps:
             return True
         return not pd.api.types.is_numeric_dtype(series)
@@ -211,7 +197,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
             N1 = int(x1.notna().sum())
             if N0 == 0 or N1 == 0:
                 continue
-            # 稳定水平顺序：数值按 code 排序，文本按标签
             levels_raw = list(pd.unique(x.dropna()))
             try:
                 levels_raw = sorted(levels_raw, key=lambda z: float(z))
@@ -220,7 +205,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
             if len(levels_raw) < 2:
                 continue
 
-            # 列联表：各水平 × 两组 → 总体 P
             table = []
             level_counts = []
             for lev in levels_raw:
@@ -229,7 +213,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
                 table.append([c0, c1])
                 level_counts.append((lev, c0, c1))
             table = np.asarray(table, dtype=int)
-            # 去掉全零水平
             keep = table.sum(axis=1) > 0
             table_use = table[keep]
             if table_use.shape[0] < 2 or table_use.shape[1] < 2:
@@ -243,7 +226,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
                 "<0.001" if (isinstance(p, float) and np.isfinite(p) and p < 0.001)
                 else (f"{p:.3f}" if np.isfinite(p) else "NA")
             )
-            # 头行：变量名 + P
             rows.append({
                 "Variable": v,
                 col_pos: "",
@@ -252,7 +234,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
                 "_p_num": p if np.isfinite(p) else np.nan,
                 "_is_level": False,
             })
-            # 子行：各水平 n (%)
             for lev, c0, c1 in level_counts:
                 lab = _level_label(v, lev)
                 d0 = f"{c0} ({100 * c0 / N0:.1f}%)" if N0 > 0 else "0 (0.0%)"
@@ -275,7 +256,6 @@ def _build_table1(clin: pd.DataFrame, idx0: np.ndarray, idx1: np.ndarray,
             p_norm0 = stats.shapiro(x0)[1] if 3 <= len(x0) <= 5000 else 0.0
             p_norm1 = stats.shapiro(x1)[1] if 3 <= len(x1) <= 5000 else 0.0
             if p_norm0 > 0.05 and p_norm1 > 0.05:
-                # Welch t-test: do not assume equal variances
                 p = stats.ttest_ind(x0, x1, equal_var=False).pvalue
                 d0 = f"{x0.mean():.2f}±{x0.std(ddof=1):.2f}"
                 d1 = f"{x1.mean():.2f}±{x1.std(ddof=1):.2f}"
@@ -372,10 +352,8 @@ def _baseline_display_names(raw_levels: Sequence[str]) -> list[str]:
             else:
                 d = raw
         mapped.append(d)
-    # 冲突（含 HC 并进 CN）→ 原始水平名，不造合并列
     if len(set(mapped)) != len(mapped):
         return list(raws)
-    # 无冲突但 HC 被映走：仍显示 HC，避免总表跟建模展示名合并
     out = []
     for raw, d in zip(raws, mapped):
         if raw == "HC" and d != "HC":
@@ -465,7 +443,6 @@ def _build_table1_by_groups(
     raw_levels = [str(x) for x in pd.unique(g) if str(x).strip() and str(x).strip().lower() != "nan"]
     if len(raw_levels) < 2:
         raise ValueError(f"总表至少需要 2 个组水平；当前: {raw_levels}")
-    # 稳定顺序：阳性优先，其余按出现顺序。0/1 编码时 1 视为阳性。
     pos_lab = str(getattr(cfg, "POSITIVE_GROUP_LABEL", "") or "").strip()
     ordered = []
     if pos_lab and pos_lab in raw_levels:
@@ -508,7 +485,6 @@ def _build_table1_by_groups(
         return "<0.001" if p < 0.001 else f"{p:.3f}"
 
     rows = []
-    # ≥3 组才写两两列。两组的 P 就是那一次比较，不再重复一列。
     vs_pairs = []
     if len(ordered) >= 3:
         for i in range(len(ordered)):
@@ -592,7 +568,6 @@ def _build_table1_by_groups(
                     if p_norm <= 0.05:
                         prefer_median = True
             if any(len(c) < MIN_GROUP_N_FOR_CONTINUOUS for c in chunks):
-                # 某组太小则跳过该变量（不造假描述）
                 if sum(len(c) >= MIN_GROUP_N_FOR_CONTINUOUS for c in chunks) < 2:
                     continue
             for h, arr in zip(headers, chunks):
@@ -634,7 +609,6 @@ def _build_table1_by_groups(
     tbl = pd.DataFrame(rows)
     if tbl.empty:
         return tbl
-    # 列顺序：Variable | 各组 | P value | VS… | Significance
     front = ["Variable"] + headers + ["P value"]
     vs_names = [name for _a, _b, name in vs_pairs]
     col_order = front + vs_names + ["Significance", "_p_num", "_is_level"]
@@ -676,7 +650,6 @@ def _hc_continuous_cell(frame: pd.DataFrame, var: str, sample: str) -> str:
     x = x[np.isfinite(x)]
     if len(x) == 0:
         return "NA"
-    # 与建模两组同一行的写法对齐。空单元格时用 mean±SD。
     if "[" in sample and "±" not in sample:
         q = np.percentile(x, [25, 75])
         return f"{np.median(x):.2f} [{q[0]:.2f}-{q[1]:.2f}]"
@@ -771,10 +744,6 @@ def apply_hc_to_table1(table: Optional[pd.DataFrame], hc_frame, relabel_from: st
     return out
 
 
-# ═════════════════════════════════════════════════════════════════
-# Step 2: 单变量 Logistic 回归
-#   对每个临床特征单独拟合 y ~ x，计算 OR (优势比) 及 95% Wald CI
-# ═════════════════════════════════════════════════════════════════
 def _univariate_logistic(clin: pd.DataFrame, y: np.ndarray) -> pd.DataFrame:
     rows = []
     for col in clin.columns:
@@ -914,9 +883,6 @@ def _multivar_firth(clin: pd.DataFrame, y: np.ndarray, features: Sequence[str]) 
     return out
 
 
-# ═════════════════════════════════════════════════════════════════
-# Step 3: backward-stepwise 多变量 logistic（AIC 驱动）
-# ═════════════════════════════════════════════════════════════════
 def _backward_stepwise(clin: pd.DataFrame, y: np.ndarray, candidates: Sequence[str]) -> List[str]:
     """
     以 AIC 为准则的向后逐步选择：从全变量模型开始，每步尝试移除一个
@@ -1011,7 +977,7 @@ def _candidates_from_univariate(
     """
     if uni_df is None or uni_df.empty or "Feature" not in uni_df.columns:
         return []
-    _ = vif_high  # retired: no high-cutoff exclude
+    _ = vif_high
     out: List[str] = []
     dropped: List[str] = []
     seen = set()
@@ -1091,9 +1057,6 @@ def _pool_note(candidates: Sequence[str], stepwise: Sequence[str], p_threshold: 
     return " ".join(parts)
 
 
-# ═════════════════════════════════════════════════════════════════
-# 主函数
-# ═════════════════════════════════════════════════════════════════
 def parse_p_value(p) -> float:
     """将 mv_df / 报告中的 p 单元格解析为 float（支持 '<0.001'）。"""
     if p is None or (isinstance(p, float) and np.isnan(p)):
@@ -1107,7 +1070,7 @@ def parse_p_value(p) -> float:
         try:
             return float(s[1:].strip())
         except ValueError:
-            return 0.0  # e.g. <0.001
+            return 0.0
     try:
         return float(s)
     except ValueError:
@@ -1251,7 +1214,6 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
     lbl1 = str(group.iloc[idx1[0]]) if len(idx1) else "1"
     print(f"  {lbl0} N={len(idx0)}, {lbl1} N={len(idx1)}")
 
-    # ── Step 1: Table1 ──
     tbl = _build_table1(clin, idx0, idx1, lbl0, lbl1)
     print(f"  Table1: {len(tbl)} rows")
 
@@ -1269,8 +1231,6 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
             stepwise_features=[],
         )
 
-    # ── Step 2 & 3: 单变量 + 候选池 + stepwise（或强制使用 fixed_features）──
-    # Test/外部验证：fixed_features 锁定 train 特征 → 不筛选、不单变量/多变量表
     if fixed_features is not None:
         final_feat = [c for c in fixed_features if c in clin.columns]
         print(f"  验证模式 — 锁定 TRAIN 特征({len(final_feat)}): {', '.join(final_feat)}")
@@ -1290,7 +1250,6 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
     uni_df = _univariate_logistic(clin, y_group)
     print(f"  Univariate: {len(uni_df)} features")
 
-    # VIF 并入 Univariate 表（在单因素列出的变量之间计算）
     if not uni_df.empty and "Feature" in uni_df.columns:
         try:
             from modules.stats.vif_analysis import compute_vif
@@ -1321,7 +1280,6 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
     if rm_set:
         print(f"  强制剔除（不进模型）: {', '.join(sorted(rm_set))}")
 
-    # 候选池多因素表（单因素 p + VIF）；Selected 另取手动名单或其中 p < mv_p_cut
     skip_and_rm = set(skip_set) | rm_set
     candidates = _candidates_from_univariate(
         uni_df, clin, p_threshold, skip_and_rm,
@@ -1354,7 +1312,6 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
             f"{', '.join(stepwise_features) or '（无）'}"
         )
 
-    # Selected：手动 FORCE_MODEL 优先；空则用多因素 p < mv_p_cut
     _rs = {"radscore", "rad_score"}
     manual_feat = [
         f for f in force_model_features
