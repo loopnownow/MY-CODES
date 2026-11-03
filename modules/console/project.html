@@ -267,7 +267,7 @@ footer{
         </div></div>
       <div class="fld"><span class="lab" title="共享算法库路径（必填，写回 settings.ini 的 MODULES_DIR）。">modules</span>
         <div class="pick-row">
-          <input id="modulesDir" type="text" placeholder="必填，如 %GROK_ROOT%\...\GitHub\MY-CODES\modules" value=""/>
+          <input id="modulesDir" type="text" placeholder="必填：用 GROK_ROOT 拼，或填本机实际路径（如 <GROK_ROOT>\0doc\GitHub\MY-CODES\modules）" value=""/>
           <input id="modulesDirPick" type="file" webkitdirectory hidden/>
           <button type="button" id="btnModPick">选择</button>
         </div></div>
@@ -385,7 +385,7 @@ const GENERIC_FOLDERS = {
 };
 const PORT_KEY = "rad-console-port";
 const MOD_KEY = "rad-modules-dir";
-const DEFAULT_MODULES = "D:\\0Grok\\0doc\\GitHub\\MY-CODES\\modules";  // 共享算法库默认路径（写回 settings.ini 的 MODULES_DIR）
+const DEFAULT_MODULES = __MODULES_DEFAULT__;  // 共享算法库默认路径（写回 settings.ini 的 MODULES_DIR；serve 时注入）
 const IO_DEFAULTS = {
   RAD_SHEET: "rad",
   CLIN_SHEET: "cln",
