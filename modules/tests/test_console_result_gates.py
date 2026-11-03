@@ -565,3 +565,20 @@ def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypat
     by_sheet = {r["sheet"]: r for r in pv["role_sheets"]}
     assert by_sheet["CTA"]["n_id"] == 3 and by_sheet["US"]["n_id"] == 2
 
+
+
+
+def test_sync_external_tests_keeps_role_sheets():
+    """外验卡上选的质控 / ICC 工作表现在随 EXTERNAL_TESTS 一起保留。"""
+    from modules.console.ops import sync_external_tests
+
+    out = sync_external_tests({
+        "EXTERNAL_TESTS": [{
+            "file": "ext.xlsx", "clin_sheet": "cln", "rad_sheet": "CTA",
+            "rad_id_col": "Patient_ID", "qc_sheet": "qc", "icc_sheet": "icc",
+        }],
+    })
+    spec = out["EXTERNAL_TESTS"][0]
+    assert spec["clin_sheet"] == "cln" and spec["rad_sheet"] == "CTA"
+    assert spec["qc_sheet"] == "qc" and spec["icc_sheet"] == "icc"
+    assert out["EXTERNAL_FILE"] == "ext.xlsx"
