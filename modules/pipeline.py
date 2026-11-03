@@ -716,6 +716,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             ext_layer = data_io.load_external_layer(
                 ext_file, clin_sheet=cs, rad_sheet=rs, name=name,
                 rad_id_col=str(spec.get("rad_id_col") or "").strip(),
+                block_sheets=(spec.get("sheets") or None),
             )
             external_layers.append({"name": name, "data": ext_layer})
         except Exception as e:
@@ -1880,7 +1881,8 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
 
 def _resolve_external_specs(input_file: str) -> list:
     """控制台三格（文件/临床sheet/组学sheet）或旧 EXTERNAL_TESTS 列表。
-    必须有外验文件 + 临床 sheet + 组学 sheet；仅默认 sheet 名、无文件 = 不做外验。
+    必须有外验文件 + 临床 sheet；组学 sheet 或 sheets（块表映射）二者其一。
+    仅默认 sheet 名、无文件 = 不做外验。
     （与 console sync_external_tests 一致；勿把主表 input 冒充外验。）
     """
     specs = list(getattr(cfg, "EXTERNAL_TESTS", []) or [])
@@ -1890,6 +1892,7 @@ def _resolve_external_specs(input_file: str) -> list:
         f = str(getattr(cfg, "EXTERNAL_FILE", "") or "").strip()
         if f and cs and rs:
             specs = [{"name": "ext", "file": f, "clin_sheet": cs, "rad_sheet": rs}]
+    blocks = active_blocks()
     out = []
     for spec in specs:
         if not isinstance(spec, dict):
@@ -1897,14 +1900,32 @@ def _resolve_external_specs(input_file: str) -> list:
         cs = str(spec.get("clin_sheet") or "").strip()
         rs = str(spec.get("rad_sheet") or "").strip()
         f = str(spec.get("file") or "").strip()
-        if not f or not cs or not rs:
+        raw_sheets = spec.get("sheets")
+        sheets: dict = {}
+        if isinstance(raw_sheets, dict):
+            for k, v in raw_sheets.items():
+                kk = str(k).strip()
+                vv = str(v or "").strip()
+                if kk and vv:
+                    sheets[kk] = vv
+        if not f or not cs:
             continue
+        if blocks:
+            block_sheets = {b.name: sheets.get(b.name) or b.resolved_sheet for b in blocks}
+        else:
+            block_sheets = dict(sheets)
+        if not rs and not block_sheets:
+            continue
+        if not rs and block_sheets:
+            rs = next(iter(block_sheets.values()))
         item = {
             "name": str(spec.get("name") or "ext"),
             "file": f,
             "clin_sheet": cs,
             "rad_sheet": rs,
         }
+        if block_sheets:
+            item["sheets"] = block_sheets
         rid = str(spec.get("rad_id_col") or "").strip()
         if rid:
             item["rad_id_col"] = rid

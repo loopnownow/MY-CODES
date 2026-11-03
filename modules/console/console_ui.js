@@ -1840,7 +1840,25 @@ function emptyExtRow() {
     clin_sheet: IO_DEFAULTS.CLIN_SHEET,
     rad_sheet: IO_DEFAULTS.RAD_SHEET,
     rad_id_col: IO_DEFAULTS.RAD_ID_COL,
+    sheets: {},
   };
+}
+function sheetsTextOf(sheets) {
+  if (!sheets || typeof sheets !== "object") return "";
+  return Object.keys(sheets).map(k => `${k}=${sheets[k]}`).join("; ");
+}
+function parseSheetsText(text) {
+  const out = {};
+  String(text || "").split(/[;,\n]+/).forEach((chunk) => {
+    const s = chunk.trim();
+    if (!s) return;
+    const m = s.split(/[=:]/);
+    if (m.length < 2) return;
+    const k = m[0].trim();
+    const v = m.slice(1).join(":").trim();
+    if (k && v) out[k] = v;
+  });
+  return out;
 }
 function readExtRows() {
   const box = $("extRows");
@@ -1853,15 +1871,18 @@ function readExtRows() {
     const rs = val("[data-ext=rad]");
     const rid = val("[data-ext=radid]");
     const name = val("[data-ext=name]");
+    const sheets = parseSheetsText(val("[data-ext=sheets]"));
     if (!file) return;
-    out.push({
+    const rec = {
       name: name, file: file,
       clin_sheet: cs || IO_DEFAULTS.CLIN_SHEET,
       rad_sheet: rs || IO_DEFAULTS.RAD_SHEET,
       rad_id_col: rid || IO_DEFAULTS.RAD_ID_COL,
-    });
+    };
+    if (Object.keys(sheets).length) rec.sheets = sheets;
+    out.push(rec);
   });
-  return out.filter(r => r.clin_sheet && r.rad_sheet);
+  return out.filter(r => r.clin_sheet && (r.rad_sheet || (r.sheets && Object.keys(r.sheets).length)));
 }
 function bindExtRowEvents() {
   const box = $("extRows");
@@ -1906,6 +1927,7 @@ function renderExtRows(list) {
     const cs = (r && (r.clin_sheet || r.EXTERNAL_CLIN_SHEET)) || IO_DEFAULTS.CLIN_SHEET;
     const rs = (r && (r.rad_sheet || r.EXTERNAL_RAD_SHEET)) || IO_DEFAULTS.RAD_SHEET;
     const rid = (r && (r.rad_id_col || r.EXTERNAL_RAD_ID_COL)) || IO_DEFAULTS.RAD_ID_COL;
+    const shTxt = sheetsTextOf(r && r.sheets);
     return `<div class="ext-row" data-ext-row="${i}">
       <input data-ext="name" type="text" placeholder="名称，可空" value="${esc(name)}"/>
       <input data-ext="file" type="text" list="xlsxList" placeholder="文件，可空" autocomplete="off" spellcheck="false" value="${esc(file)}"/>
@@ -1914,6 +1936,7 @@ function renderExtRows(list) {
       <select data-ext="clin"></select>
       <select data-ext="rad"></select>
       <select data-ext="radid"></select>
+      <input data-ext="sheets" type="text" placeholder="块表 块=表;块=表" spellcheck="false" value="${esc(shTxt)}" title="多模态块：写 块名=工作表；留空=按本工程块的默认工作表名"/>
       <button type="button" class="btn sec" data-ext-del title="删这一条">删</button>
     </div>`;
   }).join("");
