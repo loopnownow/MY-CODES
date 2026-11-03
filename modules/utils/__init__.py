@@ -1,1 +1,1 @@
-"""Optional utilities (impute / ICC / QC)."""
+"""Optional utilities (impute / QC)."""
