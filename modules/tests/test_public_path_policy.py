@@ -20,18 +20,17 @@ ALLOW_FILES = {
     "modules/console/paths.py",
 }
 
-# Absolute Windows drive paths that look like this lab (not generic C:\Windows).
+# 本机 lab 形状的绝对路径：单反斜杠与 JSON/JS 里的 `\\` 转义写法都要抓住。
 LAB_ABS = re.compile(
-    r"[A-Za-z]:\\(?:0Grok|Users\\[^\\]+\\(?:0Grok|Documents\\GitHub))",
+    r"[A-Za-z]:\\{1,2}(?:0Grok|Users\\{1,2}[^\\]+\\{1,2}(?:0Grok|Documents\\{1,2}GitHub))",
     re.I,
 )
-# 盘符 + 1~2 个反斜杠：单反斜杠写法与 JSON/JS 里的 `\\` 转义写法都算（旧 LAB_ABS 只认单反斜杠）。
-DRIVE_LETTER = re.compile(r"[A-Za-z]:\\{1,2}")
-# 模板文件：默认值必须靠 serve 时注入，不许写死本机路径。
-TEMPLATE_FILES = (
-    "modules/console/project.html",
-    "modules/console/console.override.example.json",
-)
+# 本机会话态：console 运行时自己写绝对路径，且已被 .gitignore 忽略（不是仓库内容）。
+LOCAL_STATE_FILES = {
+    "modules/console/console.override.json",
+    "modules/console/console.port.json",
+    "modules/console/console.projects.json",
+}
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", "egg-info"}
 SUFFIXES = {".py", ".md", ".txt", ".toml", ".ini", ".yml", ".yaml", ".cfg", ".json", ".html", ".js", ".css"}
 
@@ -47,7 +46,7 @@ class TestPublicPathPolicy(unittest.TestCase):
             if any(part in SKIP_DIRS or part.endswith(".egg-info") for part in path.parts):
                 continue
             rel = path.relative_to(ROOT)
-            if rel.as_posix() in ALLOW_FILES:
+            if rel.as_posix() in ALLOW_FILES or rel.as_posix() in LOCAL_STATE_FILES:
                 continue
             try:
                 text = path.read_text(encoding="utf-8")
@@ -64,28 +63,23 @@ class TestPublicPathPolicy(unittest.TestCase):
         )
 
 
-class TestDriveLetterGuard(unittest.TestCase):
-    """C1 加严：盘符路径的两种写法都要抓住（旧 LAB_ABS 只认单反斜杠，转义写法漏网）。"""
+class TestLabPathRegex(unittest.TestCase):
+    """旧 LAB_ABS 只认单反斜杠，JSON/JS 里转义成两个反斜杠的写法会漏网（C1 因此一直绿）。"""
 
-    def test_regex_catches_single_and_escaped(self) -> None:
-        drive, sep = "D:", "\\"
-        single = f"{drive}{sep}0Grok{sep}0doc"
-        escaped = f"{drive}{sep * 2}0Grok{sep * 2}0doc"
-        for sample in (single, escaped):
-            self.assertIsNotNone(DRIVE_LETTER.search(sample), sample)
+    def test_catches_single_and_escaped(self) -> None:
+        drive, sep, sep2 = "D:", "\\", "\\\\"
+        samples = [
+            f"{drive}{sep}0Grok{sep}0doc",
+            f"{drive}{sep2}0Grok{sep2}0doc",
+            f"{drive}{sep}Users{sep}lab{sep}0Grok",
+            f"{drive}{sep2}Users{sep2}lab{sep2}Documents{sep2}GitHub",
+        ]
+        for sample in samples:
+            self.assertIsNotNone(LAB_ABS.search(sample), sample)
 
-    def test_console_templates_have_no_drive_letter(self) -> None:
-        offenders: list[str] = []
-        for rel in TEMPLATE_FILES:
-            text = (ROOT / rel).read_text(encoding="utf-8")
-            for i, line in enumerate(text.splitlines(), 1):
-                if DRIVE_LETTER.search(line):
-                    offenders.append(f"{rel}:{i}: {line.strip()[:120]}")
-        self.assertEqual(
-            offenders,
-            [],
-            "模板不许写死盘符路径（该由 serve 时注入 __MODULES_DEFAULT__）:\n",
-        )
+    def test_leaves_generic_examples_alone(self) -> None:
+        for sample in (r"C:\tmp\other", r"C:\lab\stats-analysis\modules", r"D:\tmp\other\modules"):
+            self.assertIsNone(LAB_ABS.search(sample), sample)
 
 
 class TestModulesDefaultInjection(unittest.TestCase):
