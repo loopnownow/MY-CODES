@@ -3315,6 +3315,23 @@ function defaultTextCodes(levels) {
     lv.forEach((x, i) => { out[x] = nums[i]; });
     return out;
   }
+  if (lv.length === 2) {
+    const zero = new Set(["0", "negative", "neg", "no", "false", "absent", "none", "normal", "n", "无", "否", "阴性", "没有", "正常", "未"]);
+    const one = new Set(["1", "positive", "pos", "yes", "true", "present", "abnormal", "y", "有", "是", "阳性", "异常", "已"]);
+    const sem = {};
+    let ok = true;
+    for (const x of lv) {
+      const t = x.toLowerCase();
+      if (one.has(t)) sem[x] = 1;
+      else if (zero.has(t)) sem[x] = 0;
+      else { ok = false; break; }
+    }
+    if (ok && new Set(Object.values(sem)).size === 2) return sem;
+    const out = {};
+    out[lv[0]] = 0;
+    out[lv[1]] = 1;
+    return out;
+  }
   const out = {};
   lv.forEach((x, i) => { out[x] = i + 1; });
   return out;

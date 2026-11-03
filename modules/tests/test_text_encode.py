@@ -36,7 +36,12 @@ def test_detect_and_auto_codes():
     assert cols["echo"]["levels"] == ["Hyperechoic", "Isoechoic", "Mixed"]
     assert cols["many"]["over_cap"] is True
     assert text_encode.default_codes(["10", "2"]) == {"10": 10.0, "2": 2.0}
-    assert text_encode.default_codes(sorted(["b", "a"])) == {"a": 1.0, "b": 2.0}
+    assert text_encode.default_codes(["Negative", "Positive"]) == {"Negative": 0.0, "Positive": 1.0}
+    assert text_encode.default_codes(["Yes", "No"]) == {"Yes": 1.0, "No": 0.0}
+    assert text_encode.default_codes(["B", "A"]) == {"B": 0.0, "A": 1.0}
+    assert text_encode.default_codes(["Hyperechoic", "Hypoechoic", "Isoechoic", "Mixed"]) == {
+        "Hyperechoic": 1.0, "Hypoechoic": 2.0, "Isoechoic": 3.0, "Mixed": 4.0,
+    }
 
 
 def test_normalize_spec_rejects_non_numeric():
