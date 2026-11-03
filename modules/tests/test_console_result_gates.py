@@ -501,3 +501,67 @@ def test_console_preview_tab_and_wider_run_column():
     assert "ICC 与相关过滤阈值" not in schema
     compact = css.replace(" ", "").replace("\n", "")
     assert "#paneConfig[hidden]" in compact and "display:none!important" in compact
+
+
+def test_data_pane_uses_one_file_card_for_all_three_inputs():
+    """数据文件 / 外验 / 排除名单共用一张文件卡：选文件 → 自动读表 → 手动选角色。"""
+    base = ROOT / "modules" / "console"
+    html = (base / "console.html").read_text(encoding="utf-8")
+    ui = (base / "console_ui.js").read_text(encoding="utf-8")
+    css = (base / "console.css").read_text(encoding="utf-8")
+    api = (base / "console_api.js").read_text(encoding="utf-8")
+    assert 'data-file-card="main"' in html
+    assert "pv-file-card" in css and "pv-file-head" in css
+    assert "data-ext-card" in ui and "data-exc-row" in ui
+    assert "data-ext-role" in ui and "EXT_ROLE_LABELS" in ui
+    assert "fetchXlsxMeta" in api and "loadExtMeta" in ui
+    # 旧的「块表 块=表」文本入口已删，不再有第二套外验表单
+    assert "data-ext=sheets" not in ui and "parseSheetsText" not in ui
+    assert "previewIntoExtRow" not in api and "previewIntoExtRow" not in ui
+    # 主数据卡也有「选择」按钮（与另两处同形）
+    assert 'id="btnDataPick"' in html and 'id="ioDataPick"' in html
+
+
+def test_reader_direction_lives_only_in_the_encode_card():
+    """READER_VALUE_MAP 只在文本编码卡渲染；io/分组区不再重复一份。"""
+    from modules.console import schema
+
+    assert "READER_VALUE_MAP" not in schema.SECTION_OF
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    assert "function readerDirPanel" in ui
+    assert "captureFoldState" in ui
+
+
+def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypatch):
+    """预览覆盖所有已分配角色的工作表，并给出 ID 交集合计。"""
+    from modules.console import preview as prev_mod
+
+    monkeypatch.setattr(prev_mod, "under_root", lambda p: Path(p))
+    book = tmp_path / "demo.xlsx"
+    clin = pd.DataFrame({
+        "Patient_ID": ["a", "b", "c"],
+        "Stroke": ["y", "n", "y"],
+        "Age": [1, 2, 3],
+    })
+    cta = pd.DataFrame({"Patient_ID": ["a", "b", "c"], "f1": [1.0, 2.0, 3.0], "f2": [4.0, 5.0, 6.0]})
+    us = pd.DataFrame({"Patient_ID": ["a", "b"], "g1": [1.0, 2.0]})
+    with pd.ExcelWriter(book) as xw:
+        clin.to_excel(xw, sheet_name="cln", index=False)
+        cta.to_excel(xw, sheet_name="CTA", index=False)
+        us.to_excel(xw, sheet_name="US", index=False)
+    settings = {
+        "CLIN_SHEET": "cln", "CLIN_ID_COL": "Patient_ID",
+        "RAD_ID_COL": "Patient_ID", "OUTCOME_COLS": ["Stroke"],
+        "MODALITY_BLOCKS": [
+            {"name": "CTA", "sheet": "CTA", "method": "logistic"},
+            {"name": "US", "sheet": "US", "method": "logistic"},
+        ],
+    }
+    pv = prev_mod.preview_workbook(book, dict(settings))
+    roles = {(r["role"], r["sheet"]) for r in pv["role_sheets"]}
+    assert ("clin", "cln") in roles
+    assert ("rad", "CTA") in roles and ("rad", "US") in roles
+    assert pv["role_intersection"] == 2  # US 只有 a, b
+    by_sheet = {r["sheet"]: r for r in pv["role_sheets"]}
+    assert by_sheet["CTA"]["n_id"] == 3 and by_sheet["US"]["n_id"] == 2
+
