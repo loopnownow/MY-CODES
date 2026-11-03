@@ -29,6 +29,9 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
         "GROUP_FROM_ID", "GROUP_FROM_ID_SEP", "GROUP_LEVEL_DISPLAY",
         "SUBGROUP_COL",
     ]),
+    ("encode", "文本编码", [
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
+    ]),
     ("exclude", "样本排除名单", [
         "DO_EXCLUDE_SAMPLES",
         "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS",
@@ -39,9 +42,6 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("clinprep", "临床 / 预处理", [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
-    ]),
-    ("encode", "文本编码", [
-        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]),
     ("clin", "临床筛选", [
         "DO_CLIN",

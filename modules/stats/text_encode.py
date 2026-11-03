@@ -141,8 +141,36 @@ def detect_text_columns(
     return out
 
 
+_ZERO_WORDS = {
+    "0", "negative", "neg", "no", "false", "absent", "none", "normal", "n",
+    "无", "否", "阴性", "没有", "正常", "未",
+}
+_ONE_WORDS = {
+    "1", "positive", "pos", "yes", "true", "present", "abnormal", "y",
+    "有", "是", "阳性", "异常", "已",
+}
+
+
+def semantic_binary(levels: List[str]) -> Optional[Dict[str, float]]:
+    """两级文本按语义词表判 0/1；判不出返回 None（不猜）。"""
+    if len(levels) != 2:
+        return None
+    out: Dict[str, float] = {}
+    for lv in levels:
+        tok = str(lv).strip().lower()
+        if tok in _ONE_WORDS:
+            out[lv] = 1.0
+        elif tok in _ZERO_WORDS:
+            out[lv] = 0.0
+        else:
+            return None
+    if len(set(out.values())) != 2:
+        return None
+    return out
+
+
 def default_codes(levels: List[str]) -> Dict[str, float]:
-    """默认编码：能整体当数字就用数字，否则字典序 1..k。"""
+    """默认编码：整体能当数字→数字；两级→语义词表 0/1，否则 0/1；多级→字典序 1..k。"""
     nums: List[float] = []
     for lv in levels:
         try:
@@ -156,6 +184,11 @@ def default_codes(levels: List[str]) -> Dict[str, float]:
         nums.append(f)
     if nums and len(set(nums)) == len(nums):
         return {lv: float(n) for lv, n in zip(levels, nums)}
+    if len(levels) == 2:
+        sem = semantic_binary(levels)
+        if sem:
+            return sem
+        return {levels[0]: 0.0, levels[1]: 1.0}
     return {lv: float(i + 1) for i, lv in enumerate(levels)}
 
 
