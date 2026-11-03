@@ -2345,14 +2345,11 @@ function renderForm() {
         left.push(f);
       }
       if (!left.length) return "";
-      const hint = "计数/计量等级、强制类型、文本编码。文本编码：搜索列名 → 自动识别（≤上限等级自动填码）→ 逐条可改。";
+      const hint = "计数/计量等级、强制类型，以及文本编码。文本编码面板里：搜索 → 自动识别（≤等级上限自动填码）→ 逐条可改。";
       const head = sectionHead("clinprep", g.title, left.length, hint);
-      const autoF = fields.find(f => f.key === "TEXT_ENCODE_AUTO");
-      const capF = fields.find(f => f.key === "TEXT_ENCODE_MAX_LEVELS");
-      const extras = [autoF, capF].filter(Boolean).map(renderField).join("");
       return `<div class="sec-block${head.dim}" data-sec="clinprep">
       ${head.html}
-      <div class="sec-body clinprep-body">${left.map(renderField).join("")}${extras}
+      <div class="sec-body clinprep-body">${left.map(renderField).join("")}
         <div class="txt-encode-wrap">${textEncodePanel()}</div>
       </div>
     </div>`;
@@ -3378,8 +3375,10 @@ function textEncodePanel() {
   return `<div class="kv-rows txt-encode" data-key="TEXT_ENCODE">
     <div class="kv-row txt-tools">
       <input data-txt-q="1" type="text" placeholder="搜索列名 / 来源" value="${esc(S.txtQ || "")}" spellcheck="false"/>
-      <button type="button" class="btn sec" data-txt-scan="1" title="把 ≤ 上限等级的文本列全部按默认顺序填上编码">自动识别</button>
-      <span class="kv-sum">${cands.length} 个文本列 · 上限 ${cap} 等级 · 自动${auto ? "开" : "关"}${over.length ? ` · ${over.length} 列超限` : ""}</span>
+      <label class="pexcl" title="≤上限等级的文本列自动按默认顺序编码；手写码优先"><input type="checkbox" data-txt-auto-on="1"${auto ? " checked" : ""}/> 自动识别并编码</label>
+      <label class="txt-cap" title="自动编码的等级上限；超过上限的列不自动编码">等级上限 <input type="number" min="2" max="20" step="1" data-txt-cap="1" value="${esc(cap)}"/></label>
+      <button type="button" class="btn sec" data-txt-scan="1" title="现在就把 ≤ 上限等级的文本列全部按默认顺序填上编码">自动识别</button>
+      <span class="kv-sum">${cands.length} 个文本列${over.length ? ` · ${over.length} 列超限` : ""}</span>
     </div>
     ${body}
   </div>`;
@@ -4053,6 +4052,22 @@ function bindDelegates() {
   document.body.addEventListener("change", (e) => {
     const t = e.target;
     if (!t || !t.matches) return;
+    if (t.matches("[data-txt-auto-on]")) {
+      setFieldValue("TEXT_ENCODE_AUTO", !!t.checked);
+      renderForm();
+      return;
+    }
+    if (t.matches("[data-txt-cap]")) {
+      const n = parseInt(t.value, 10);
+      if (!isFinite(n) || n < 2) {
+        alert("等级上限须为 ≥2 的整数");
+        renderForm();
+        return;
+      }
+      setFieldValue("TEXT_ENCODE_MAX_LEVELS", n);
+      renderForm();
+      return;
+    }
     if (t.matches("[data-txt-level]")) {
       applyTxtLevel(t.getAttribute("data-txt-level"), t.getAttribute("data-txt-lev"), t.value);
       return;

@@ -565,6 +565,9 @@ table.mini th{background:#eef3f1;text-align:left}
   padding:6px 0;border-bottom:1px dashed var(--line);margin-bottom:4px;
 }
 .txt-encode .txt-tools input{flex:1 1 12em;min-width:8em}
+.txt-encode .txt-tools .txt-cap{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:12px}
+.txt-encode .txt-tools .txt-cap input{flex:0 0 4.5em;min-width:4.5em}
+.txt-encode .txt-tools .pexcl{white-space:nowrap}
 .txt-encode .txt-row{
   display:grid;grid-template-columns:minmax(8em,1fr) minmax(6em,8em);
   align-items:center;gap:8px;
