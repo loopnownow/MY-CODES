@@ -1,5 +1,5 @@
 """
-console.py — RAD 统计控制台后端（modules/console/console.html）
+console.py — 统计控制台后端（modules/console/console.html）
 
 页面配置（console.html / overlay JSON）优先于 settings.ini。
 
@@ -536,7 +536,7 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
-    parser = argparse.ArgumentParser(description="RAD 统计控制台")
+    parser = argparse.ArgumentParser(description="统计控制台")
     sub = parser.add_subparsers(dest="cmd")
 
     p_serve = sub.add_parser("serve", help="启动网页")
