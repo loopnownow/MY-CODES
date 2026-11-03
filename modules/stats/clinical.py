@@ -69,15 +69,13 @@ def _normalize_name(x: str) -> str:
 
 
 def _pearson_chi2(table: np.ndarray, row_totals=None, col_totals=None) -> float:
-    """固定边际表的 Pearson χ²：n·Σ O²/(r·c) − n；任一边际为 0 时返回 nan。"""
+    """固定边际表的 Pearson χ²（scipy.stats.chi2_contingency，不带 Yates）；任一边际为 0 返回 nan。"""
     obs = np.asarray(table, dtype=float)
     rs = obs.sum(axis=1) if row_totals is None else np.asarray(row_totals, dtype=float)
     cs = obs.sum(axis=0) if col_totals is None else np.asarray(col_totals, dtype=float)
     if np.any(rs <= 0) or np.any(cs <= 0):
         return float("nan")
-    n = float(obs.sum())
-    denom = np.outer(rs, cs)
-    return float(n * float((obs * obs / denom).sum()) - n)
+    return float(stats.chi2_contingency(obs, correction=False)[0])
 
 
 def _chi2_monte_carlo(table: np.ndarray, n_resamples: int = 2000, seed: int = 66666) -> float:
