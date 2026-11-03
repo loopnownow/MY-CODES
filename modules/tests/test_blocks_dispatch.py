@@ -82,6 +82,23 @@ def test_unknown_param_raises():
         selectors.run_block("D", a, y, specs[0], dataset_label="t3")
 
 
+def test_external_specs_carry_block_sheets(monkeypatch):
+    """外验 spec 的 sheets 覆盖：未写的块回落到本工程块的工作表名。"""
+    from modules.pipeline import _resolve_external_specs
+
+    monkeypatch.setattr(cfg, "MODALITY_BLOCKS", [
+        {"name": "A", "sheet": "A", "method": "lasso"},
+        {"name": "B", "method": "logistic"},
+    ], raising=False)
+    monkeypatch.setattr(cfg, "EXTERNAL_TESTS", [
+        {"name": "ext", "file": "x.xlsx", "clin_sheet": "cln", "sheets": {"B": "B_ext"}},
+    ], raising=False)
+    specs = _resolve_external_specs("main.xlsx")
+    assert len(specs) == 1
+    assert specs[0]["sheets"] == {"A": "A", "B": "B_ext"}
+    assert specs[0]["rad_sheet"] == "A"
+
+
 def test_missing_block_data_raises():
     y = _y()
     a = _frame(y, seed=5, prefix="e")

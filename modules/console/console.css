@@ -810,7 +810,7 @@ table.mini th{background:#eef3f1;text-align:left}
 #ioCard .subh:first-of-type{margin-top:4px;padding-top:0;border-top:0}
 #ioCard .ext-head,#ioCard .ext-row{
   display:grid;
-  grid-template-columns:minmax(4.5em,.55fr) minmax(8em,1.4fr) auto minmax(8.5em,1fr) minmax(8.5em,1fr) minmax(8.5em,1fr) auto;
+  grid-template-columns:minmax(4.5em,.55fr) minmax(8em,1.4fr) auto minmax(8.5em,1fr) minmax(8.5em,1fr) minmax(8.5em,1fr) minmax(9em,1.1fr) auto;
   gap:6px;align-items:center;margin:6px 0;
 }
 #ioCard .ext-head{margin-bottom:0;color:var(--muted);font-size:12px}
