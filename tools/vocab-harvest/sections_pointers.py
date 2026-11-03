@@ -1,8 +1,8 @@
 """sections_pointers.py — 从 `_library\\glossary\\index.csv` 生成各节 md 的指针表块。
 
 运行（2026-11-02 起在本仓 `{code_stats}\\tools\\vocab-harvest\\`，不再从 {DEL} 跑）：
-    python -B D:\\0Grok\\0doc\\GitHub\\MY-CODES\\tools\\vocab-harvest\\sections_pointers.py            # dry-run
-    python -B D:\\0Grok\\0doc\\GitHub\\MY-CODES\\tools\\vocab-harvest\\sections_pointers.py --apply    # 写回 md
+    python -B tools\\vocab-harvest\\sections_pointers.py            # dry-run
+    python -B tools\\vocab-harvest\\sections_pointers.py --apply    # 写回 md
 
 指针块落在 `<!-- POINTERS:BEGIN -->` 与 `<!-- POINTERS:END -->` 之间；不存在时插在第一个 `## ` 标题之前。
 **必须先跑 sync_glossary_index.py --apply**，本脚本读 index.csv（串行，勿并行）。

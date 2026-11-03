@@ -1,4 +1,4 @@
-"""Hand-curated scanner registry rows extracted from D:\\0Grok\\0doc (01/02/03).
+"""Hand-curated scanner registry rows extracted from <GROK_ROOT>\\0doc (01/02/03).
 
 Rules used while reading the sources:
 - Every value is copied from the sentence quoted in the same row.

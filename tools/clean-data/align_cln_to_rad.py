@@ -6,8 +6,8 @@ reference columns whose labels agree with the current cln on overlapping IDs.
 Exact ID text is kept (double-space nodule ids are distinct). Fuzzy ID
 normalization is not used: it would collapse those pairs.
 
-    python D:\\0Grok\\0doc\\_code\\02-data-processing/clean-data\\align_cln_to_rad.py           # report only
-    python D:\\0Grok\\0doc\\_code\\02-data-processing/clean-data\\align_cln_to_rad.py --apply   # backup + write cln
+    python -B tools\\clean-data\\align_cln_to_rad.py           # report only
+    python -B tools\\clean-data\\align_cln_to_rad.py --apply   # backup + write cln
 """
 from __future__ import annotations
 

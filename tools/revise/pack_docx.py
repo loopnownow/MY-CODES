@@ -9,7 +9,7 @@
 未设置或目录无效时直接报错，不退回默认路径。
 
     set PACK_DOCX_OFFICE_DIR=<含 pack.py 的目录>
-    python D:\\0Grok\\0doc\\_code\\07-response/revise\\pack_docx.py ^
+    python -B tools\\revise\\pack_docx.py ^
         --unpacked <解包目录> --original <原docx> --dest <修订稿.docx>
 """
 from __future__ import annotations
