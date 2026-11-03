@@ -74,7 +74,7 @@ async function loadDataModule() {
   try {
     await loadAll();
     fillIoModule();
-    if (msg) msg.textContent = "已载入。工作表和 ID 列在起始页。";
+    if (msg) msg.textContent = "已载入。文件、工作表与 ID 列在「数据预览」页。";
   } catch (e) {
     if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
     throw e;

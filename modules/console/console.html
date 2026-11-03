@@ -4,26 +4,26 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="console-token" content="__CONSOLE_TOKEN__"/>
-<title>console.html · RAD 统计控制台</title>
+<title>console.html · 统计控制台</title>
 <link rel="stylesheet" href="console.css"/>
 </head>
 <body>
 <div class="app">
 <header>
   <div class="brand">
-    <h1>console.html</h1>
-    <div class="sub lockline" title="工作表、ID 列和姓名列在起始页选定。本页改分析设置。">
+    <h1>统计控制台</h1>
+    <div class="sub lockline" title="数据文件、工作表、ID 列、外验与排除名单在「数据预览」页设置。本页改分析设置。">
       <span><b>项目</b> <span id="lockProject">—</span></span>
       <span><b>数据</b> <span id="lockData">—</span></span>
       <span><b>外验</b> <span id="lockExt">—</span></span>
       <span><b>settings</b> <span id="lockSettings">—</span></span>
       <span><b>modules</b> <span id="lockModules">—</span></span>
     </div>
-    <p class="hint" id="loadHint">由起始页加载后进入。工作表、ID 列和姓名列在起始页选定。</p>
+    <p class="hint" id="loadHint">由起始页开启服务后自动进入。数据文件、工作表、外验与排除名单在「数据预览」页设置。</p>
   </div>
   <nav class="tabs">
-    <button type="button" class="tab on" id="tabBtnConfig" data-tip="配置页：改分析设置。右侧运行统计、日志和结果。">配置</button>
-    <button type="button" class="tab" id="tabBtnPreview" data-tip="数据预览 / QC。载入后看 sheet、例数、结局分布、排除名单和 ICC。只预览，不建模。">数据预览</button>
+    <button type="button" class="tab on" id="tabBtnPreview" data-tip="数据预览：选数据文件、工作表、ID 列、外验与排除名单，再看 sheet、例数、结局分布和 ICC。只预览，不建模。">数据预览</button>
+    <button type="button" class="tab" id="tabBtnConfig" data-tip="统计配置：改分析设置。右侧运行统计、日志和结果。">统计配置</button>
     <button type="button" class="tab" id="tabBtnFlow" data-tip="STROBE / 流程图。按当前课题打开，不跑统计。">流程图</button>
   </nav>
   <span class="pill" data-tip="本机 console.py 是否连上。绿=空闲，橙=正在跑，红=出错或未启动。"><i id="statusDot"></i><span id="srv">检测服务…</span></span>
@@ -49,20 +49,9 @@
     </div>
     </div>
   </section>
-  <div id="ioCard" hidden>
-    <select id="project" hidden></select>
-    <input id="data" type="hidden"/>
-    <input id="settings" type="hidden"/>
-    <input id="modulesDir" type="hidden"/>
-    <input id="ioData" type="hidden"/>
-    <input id="ioExtSplit" type="checkbox" checked hidden/>
-    <div id="extRows" hidden></div>
-    <datalist id="xlsxList"></datalist>
-    <span id="ioMsg" hidden></span>
-  </div>
   <section class="col mid">
     <div class="col-inner">
-    <div class="banner" id="diffBanner">数据已在起始页加载。工作表和 ID 列在起始页选定。</div>
+    <div class="banner" id="diffBanner">数据已在「数据预览」页载入。工作表、ID 列、外验与排除名单在那一页改。</div>
     <div id="outcomeTabBar" class="outcome-tabs" hidden></div>
     <div id="pairTabBar" class="outcome-tabs pair-tabs" hidden></div>
     <div id="formRoot"></div>
@@ -118,15 +107,78 @@
 </main>
 <div id="panePreview" hidden>
   <div class="preview-page">
-    <div class="card" id="previewCard">
-      <div class="row" style="align-items:center;margin:0 0 8px;gap:8px;flex-wrap:wrap">
-        <h2 style="margin:0;flex:1" data-tip="载入后看 sheet、例数、结局分布、排除名单和 ICC。外验预览在主表预览的下方，格式相同。只预览，不建模。">数据预览</h2>
-        <button type="button" class="btn" id="btnDataQc" data-tip="对整体数据做 QC（临床缺失、组学矩阵、ID 对齐、结局完整、ICC、影像质控）。主表写 ref/qc.html；每条外验写 ref/qc-ext.html 或 ref/qc-ext-{名称}.html。不覆盖主表 qc.html。不建模。">整体 QC</button>
+    <section class="pv-col" data-pvcol="left">
+      <div class="card" id="pvInfoCard">
+        <h2 data-tip="当前课题与数据落点。数据文件、工作表角色与排除名单在中间列改。">项目信息</h2>
+        <div id="pvProjectBox" class="pv-kv"></div>
       </div>
-      <p class="hint" id="qcHint"></p>
-      <div id="previewBox" class="hint">载入后显示 sheet、n、结局分布、排除名单、ICC。</div>
-      <div id="extPreviewBox" hidden></div>
-    </div>
+    </section>
+    <section class="pv-col" data-pvcol="mid">
+      <div class="card" id="pvDataCard">
+        <h2 data-tip="工作表自动读取；给每张表指定角色（临床 / 组学模块 / QC / ICC）。ID 列随所选工作表自动列出。">数据预览</h2>
+        <p class="hint" id="pvHint">工作表 → 角色 → ID 列 → 外验 → 排除名单。改完点右侧「更新预览」。</p>
+        <div id="pvDataForm">
+          <section class="pv-sec" data-pvsec="file">
+            <h3 class="pv-h">数据文件与工作表</h3>
+            <div class="fld">
+              <span class="lab" title="工程根下的 Excel。可空＝默认与课题同名。">数据文件</span>
+              <div class="pick-row">
+                <input id="ioData" type="text" list="xlsxList" placeholder="默认 课题名.xlsx" autocomplete="off" spellcheck="false"/>
+              </div>
+            </div>
+            <div id="pvSheets"></div>
+          </section>
+          <section class="pv-sec" data-pvsec="ids">
+            <h3 class="pv-h">ID 列 / 非特征列</h3>
+            <div id="pvIds"></div>
+          </section>
+          <section class="pv-sec" data-pvsec="ext">
+            <h3 class="pv-h">外部验证</h3>
+            <div id="ioCard">
+              <p class="hint">可多条。填了文件且临床、组学 sheet 都有才启用。多条横拼，一条不拼。</p>
+              <div class="ext-wrap">
+                <div class="ext-head">
+                  <span>名称</span><span>文件</span><span>选择</span><span>临床 sheet</span><span>组学 sheet</span><span>组学 ID</span><span>块表</span><span></span>
+                </div>
+                <div id="extRows"></div>
+              </div>
+              <div class="save-row">
+                <button type="button" id="btnExtAdd">+ 外验</button>
+                <label class="check" title="已有外验时是否仍做内部训练/验证。">
+                  <input type="checkbox" id="ioExtSplit" checked/> 有外验仍做内拆
+                </label>
+              </div>
+              <select id="project" hidden></select>
+              <input id="data" type="hidden"/>
+              <input id="settings" type="hidden"/>
+              <input id="modulesDir" type="hidden"/>
+              <datalist id="xlsxList"></datalist>
+            </div>
+          </section>
+          <section class="pv-sec" data-pvsec="exclude">
+            <h3 class="pv-h">样本排除名单</h3>
+            <div id="pvExclude"></div>
+          </section>
+        </div>
+      </div>
+      <div class="card" id="previewCard">
+        <h2 data-tip="sheet 表头、例数、结局分布、排除后例数与 ICC。外验预览在主表下方，格式相同。">预览结果</h2>
+        <div id="previewBox" class="hint">载入后显示 sheet、n、结局分布、排除名单、ICC。</div>
+        <div id="extPreviewBox" hidden></div>
+      </div>
+    </section>
+    <section class="pv-col" data-pvcol="right">
+      <div class="card" id="pvActionCard">
+        <h2 data-tip="先更新预览核对例数与分布，再进统计配置。整体 QC 只写 QC 报告，不建模。">操作</h2>
+        <div class="pv-actions pv-actions-col">
+          <button type="button" class="btn" id="btnPreviewReload" data-tip="用当前选择重算预览：工作表、例数、结局分布、排除后例数、ICC。不建模。">更新预览</button>
+          <button type="button" class="btn sec" id="btnDataQc" data-tip="对整体数据做 QC（临床缺失、组学矩阵、ID 对齐、结局完整、ICC、影像质控）。主表写 ref/qc.html；每条外验写 ref/qc-ext.html 或 ref/qc-ext-{名称}.html。不覆盖主表 qc.html。不建模。">整体 QC</button>
+          <button type="button" class="btn warn" id="btnToConfig" data-tip="进入统计配置。这里选的文件、工作表、ID 列、外验与排除名单会带过去。">进入统计配置</button>
+        </div>
+        <p class="hint" id="qcHint"></p>
+        <p class="hint" id="ioMsg"></p>
+      </div>
+    </section>
   </div>
 </div>
 <div id="paneFlow" hidden>
