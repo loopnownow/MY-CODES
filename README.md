@@ -87,4 +87,4 @@ PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 - 公网仓：示例课题名用 `demo_study`；路径用相对路径或 `GROK_ROOT` / `STATS_ROOT` / `PROJECT_ROOT` / `RAD_MODULES`。
 - **Public-path policy (C1)**：README、代码注释、测试夹具优先写 env / 相对路径 / 示例名；不要把本机绝对盘符（如 lab drive under 0Grok）散落到公开路径。唯一文档化的 lab 例外是 `modules.console.paths.DEFAULT_GROK_ROOT`（`GROK_ROOT` 未设时的冻结回退）。Lab 拓扑与 `{code_stats}` / `{code_modules}` 仍以 MY-SKILLS `lab-paths.yaml` 为 SSOT，本仓不另起一套。
   - 算法库默认值**不在模板里写死**：`modules/console/project.html` 只留 `__MODULES_DEFAULT__` 占位，`serve` 时由 `http_impl.py` 注入 `json.dumps(str(MODULES_ROOT))`（同一范式已在用的 `__CONSOLE_TOKEN__`）；因此换机器不用改文件。`console.override.example.json` 同样只放空模板。
-  - 守卫：`modules/tests/test_public_path_policy.py` 的 `DRIVE_LETTER` 正则**同时**盖住单反斜杠与转义成两个反斜杠两种写法（旧的 `LAB_ABS` 只认单反斜杠，JSON/JS 里转义过的盘符路径因此一直漏网），并起服务实测 `/project.html` 已被注入。
+  - 守卫：`modules/tests/test_public_path_policy.py` 的 `LAB_ABS` **同时**盖住单反斜杠与转义成两个反斜杠两种写法（旧版只认单反斜杠，JSON/JS 里转义过的路径因此一直漏网），并起服务实测 `/project.html` 已被注入。除 `ALLOW_FILES`（`paths.py` 的 lab 回退）外，另有 `LOCAL_STATE_FILES` 例外：`console.override.json` / `console.port.json` / `console.projects.json` 是 console 运行时自己写的**本机会话态**，已被 `.gitignore` 忽略，不属于仓库内容。
