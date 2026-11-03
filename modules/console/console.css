@@ -41,6 +41,51 @@ header #loadHint .err{color:#ffc9c9}
 .preview-page{max-width:none;width:100%;box-sizing:border-box;margin:0;padding:12px 16px 40px}
 #panePreview #previewBox{max-height:none}
 #panePreview #previewCard{overflow:visible}
+/* 数据预览页：三列（项目信息 / 数据+结果 / 操作） */
+.preview-page{display:grid;grid-template-columns:minmax(230px,270px) minmax(0,1fr) minmax(210px,280px);gap:12px;align-items:start}
+.pv-col{display:grid;gap:12px;min-width:0}
+#pvDataCard,#pvInfoCard,#pvActionCard{overflow:visible;min-width:0}
+.pv-kv{display:grid;gap:8px;font-size:13px}
+.pv-kv .kv-k{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.pv-kv .kv-v{word-break:break-all;line-height:1.35}
+#pvDataForm{display:grid;gap:10px;margin:0}
+.pv-sec{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r8);background:#fbfaf7}
+.pv-sec>.pv-h{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.pv-sec>.hint{margin:0}
+.pv-sec .field-group{border-top:none;padding-top:0}
+#pvDataForm .field-group.ids>.grp-rest{grid-template-columns:repeat(2,minmax(0,1fr))}
+#pvDataForm .field-group.ids>.grp-lab,
+#pvDataForm .field-group.exclude>.grp-lab,
+#pvDataForm .field-group.sheets>.grp-lab,
+#pvDataForm .field-group.sheets>.hint{display:none}
+#pvDataForm .field-group.exclude>.grp-rest{grid-template-columns:repeat(4,minmax(0,1fr))}
+#pvDataForm .pick-row input[type=text]{flex:1 1 18em;width:100%}
+#pvDataForm #ioCard{padding:0;background:transparent;box-shadow:none}
+/* 工作表角色表 */
+.pv-role{display:grid;gap:4px}
+.pv-role-head,.pv-role-row{display:grid;grid-template-columns:minmax(6em,1.1fr) 5.5em minmax(7em,1fr) minmax(7em,1fr) minmax(7em,1fr);gap:6px;align-items:center}
+.pv-role-head{color:var(--muted);font-size:11px;letter-spacing:.04em}
+.pv-role-row{padding:4px 0;border-top:1px dashed var(--line)}
+.pv-role-row .sheet{font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-role-row .dim{color:var(--muted);font-size:11px}
+.pv-role-row.is-rad .sheet{font-weight:600;color:var(--accent)}
+.pv-role-row.is-off{opacity:.55}
+.pv-role select,.pv-role input{width:100%;min-width:0;font-size:12px;padding:4px 6px}
+/* 样本排除名单（多文件，共用第一行的 sheet / 列 / 内容） */
+.pv-exc{display:grid;gap:4px}
+.pv-exc-head,.pv-exc-row{display:grid;grid-template-columns:minmax(9em,1.4fr) auto minmax(7em,1fr) minmax(7em,1fr) minmax(8em,1fr) auto;gap:6px;align-items:center}
+.pv-exc-head{color:var(--muted);font-size:11px;letter-spacing:.04em}
+.pv-exc-row{padding:4px 0;border-top:1px dashed var(--line)}
+.pv-exc-row input,.pv-exc-row select{width:100%;min-width:0;font-size:12px;padding:4px 6px}
+.pv-exc-row select:disabled{opacity:.45}
+.pv-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 8px}
+.pv-actions-col{display:grid;grid-template-columns:1fr;gap:8px;margin:0 0 8px}
+.pv-actions-col .btn{width:100%}
+.enc-sub{margin:10px 0 0}
+.enc-sub>.subh{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
+@media (max-width:1280px){
+  .preview-page{grid-template-columns:minmax(0,1fr)}
+}
 #flowFrame{width:100%;height:100%;border:0;display:block;background:#e8edf2}
 main{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-height:0;height:100%}
 main:has(#runCol:not([hidden])){grid-template-columns:minmax(220px,280px) minmax(0,1fr) 440px}

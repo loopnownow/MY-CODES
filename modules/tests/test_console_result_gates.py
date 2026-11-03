@@ -460,7 +460,20 @@ def test_console_preview_tab_and_wider_run_column():
     ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
     assert 'id="tabBtnPreview"' in html
     assert 'id="panePreview"' in html
-    assert html.index('id="tabBtnConfig"') < html.index('id="tabBtnPreview"') < html.index('id="tabBtnFlow"')
+    assert html.index('id="tabBtnPreview"') < html.index('id="tabBtnConfig"') < html.index('id="tabBtnFlow"')
+    assert ">数据预览</button>" in html and ">统计配置</button>" in html
+    assert 'id="pvDataForm"' in html and 'id="pvSheets"' in html and 'id="pvExclude"' in html
+    assert 'id="extRows"' in html and 'id="ioData"' in html
+    assert 'id="btnPreviewReload"' in html and 'id="btnToConfig"' in html
+    assert "function renderDataPane" in ui and "DATA_PANE_KEYS" in ui
+    assert 'id="pvProjectBox"' in html and 'data-pvcol="left"' in html
+    assert 'data-pvcol="mid"' in html and 'data-pvcol="right"' in html
+    assert "function renderRoleTable" in ui and "data-role-row" in ui
+    assert "data-exc-row" in ui and "data-reader-add" in ui
+    proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
+    assert 'id="radToggle"' not in proj and 'id="step5"' not in proj
+    flow = proj.split('<ol class="flow"', 1)[1].split("</ol>", 1)[0]
+    assert flow.count("<li>") == 3
     assert 'id="lockCard"' not in html
     assert "lockline" in html and 'id="lockProject"' in html
     assert "配置档案" not in html
