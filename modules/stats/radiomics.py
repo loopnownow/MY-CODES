@@ -659,7 +659,7 @@ def _lasso_cache_hit(
         f"  LASSO cache hit {digest[:8]}  best C={best_C:.4g}  mean AUC={auc:.3f}",
         flush=True,
     )
-    return best_C, coef, mean_scores, Cs, view, X_scaled
+    return best_C, coef, mean_scores, Cs, view, X_scaled, _params
 
 
 def _fit_lasso_cv_path(
@@ -753,13 +753,15 @@ def _fit_lasso_cv_path(
             digest, best_C, coef_vec, mean_scores, Cs, score_mat,
             list(X_scaled.columns), cache_params,
         )
-    return best_C, coef_vec, mean_scores, Cs, view, X_scaled
+    return best_C, coef_vec, mean_scores, Cs, view, X_scaled, _params
 
 
 def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
                    dataset_label: str = "all", nfolds: Optional[int] = None,
                    alpha: Optional[float] = None, seed: Optional[int] = None,
-                   group: Optional[pd.Series] = None) -> RadiomicsResult:
+                   group: Optional[pd.Series] = None,
+                   score_name: str = "RadScore",
+                   group_name: str = "") -> RadiomicsResult:
     """影像组学主函数：ICC/源过滤 → 折内预处理的 LASSO CV → 全训练集重拟合 RadScore。
 
     交叉验证不是 nested CV：仍是 TRAIN 上 StratifiedKFold 的 C 路径。
@@ -785,6 +787,7 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
             features=[], coefs=np.array([]), radscore=None,
             intercept=None, betas=None, ols=None, lambda_used=float("nan"),
             formula_df=None, formula_text=None, method="lasso",
+            score_name=score_name, group_name=group_name,
         )
 
     full_rad = _filter_rad_by_source(full_rad)
@@ -803,10 +806,14 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
         f"max_iter={max_iter}",
         flush=True,
     )
-    best_C, coef_vec, _mean_scores, _Cs, lrcv, X_scaled = _fit_lasso_cv_path(
+    best_C, coef_vec, _mean_scores, _Cs, lrcv, X_scaled, _pp = _fit_lasso_cv_path(
         X_raw, y_group, nfolds=nfolds, n_cs=n_cs, seed=seed,
         max_iter=max_iter, alpha=float(alpha), topk=topk,
     )
+    preprocess: Optional[dict] = None
+    if _pp:
+        preprocess = dict(_pp)
+        preprocess["keep_cols"] = [str(c) for c in X_scaled.columns]
     print(f"  全训练集预处理保留: {X_scaled.shape[1]} 特征", flush=True)
 
     sel_idx = np.where(coef_vec != 0)[0]
@@ -823,7 +830,9 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
         print("  ⚠ LASSO selected 0 features — skipping RadScore computation")
         return RadiomicsResult(features=[], coefs=np.array([]), radscore=None,
                                 intercept=None, betas=None, ols=None,
-                                lambda_used=lambda_used, formula_df=None, formula_text=None)
+                                lambda_used=lambda_used, formula_df=None, formula_text=None,
+                                method="lasso", preprocess=preprocess,
+                                score_name=score_name, group_name=group_name)
 
     df_ols = full_rad[lasso_features].apply(pd.to_numeric, errors="coerce")
     df_ols["y"] = y_group
@@ -838,8 +847,8 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
         f"{'+' if b >= 0 else '−'} {abs(b):.6f} · <i>{dn}</i>"
         for dn, b in zip(disp_names, betas.values)
     )
-    formula_text = f"<b>RadScore</b> = {intercept:.6f} {formula_parts}"
-    print(f"  RadScore = {intercept:.6f}", end="")
+    formula_text = f"<b>{score_name}</b> = {intercept:.6f} {formula_parts}"
+    print(f"  {score_name} = {intercept:.6f}", end="")
     for dn, b in zip(disp_names, betas.values):
         print(f" {'+' if b >= 0 else '−'}{abs(b):.6f}×{dn}", end="")
     print()
@@ -852,7 +861,7 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
 
     radscore = intercept + (full_rad[lasso_features].apply(pd.to_numeric, errors="coerce")
                              .to_numpy() @ betas.to_numpy())
-    print(f"  RadScore: [{np.nanmin(radscore):.3f}, {np.nanmax(radscore):.3f}]  "
+    print(f"  {score_name}: [{np.nanmin(radscore):.3f}, {np.nanmax(radscore):.3f}]  "
           f"mean={np.nanmean(radscore):.3f}")
 
     table2 = None
@@ -867,7 +876,9 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
     return RadiomicsResult(features=lasso_features, coefs=lasso_coefs, radscore=radscore,
                             intercept=intercept, betas=betas, ols=ols,
                             lambda_used=lambda_used, formula_df=formula_df,
-                            formula_text=formula_text, table2=table2)
+                            formula_text=formula_text, table2=table2,
+                            method="lasso", preprocess=preprocess,
+                            score_name=score_name, group_name=group_name)
 
 
 def apply_locked_radscore(result: RadiomicsResult, full_rad: pd.DataFrame) -> np.ndarray:
@@ -880,7 +891,9 @@ def apply_locked_radscore(result: RadiomicsResult, full_rad: pd.DataFrame) -> np
     if result.intercept is None or result.betas is None or not feats:
         raise ValueError("RadScore formula is empty")
     params = getattr(result, "preprocess", None)
-    if params:
+    # 只有 Logistic 的系数是在标准化尺度上估的；LASSO 的 OLS 系数原本就在原始尺度。
+    use_scaling = bool(params) and str(getattr(result, "method", "") or "") == "logistic"
+    if use_scaling:
         X = _apply_preprocess(full_rad, params).reindex(columns=feats).to_numpy(dtype=float)
     else:
         X = (
