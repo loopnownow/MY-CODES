@@ -193,6 +193,19 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "RAD_MARKER_MIN_N": 5,
     # names: category order; assign: prefix -> category. Empty = one logistic.
     "RAD_FEATURE_PREFIX_GROUP": {"names": [], "assign": {}},
+    # blocks：一块一张工作表。空 = 走旧的单块路径（RAD_SHEET + DO_LASSO/DO_RAD_LOGISTIC）。
+    "MODALITY_BLOCKS": [],
+    # 文本编码：{列: {原文: 编码}}；自动识别 ≤N 等级的文本列并编码，可手改。
+    "TEXT_ENCODE": {},
+    "TEXT_ENCODE_AUTO": True,
+    "TEXT_ENCODE_MAX_LEVELS": 5,
+    # Combined：空 = 全部块分数进联合模型；COMBINED_EXCLUDE 手动剔除（只影响联合）。
+    "COMBINED_BLOCKS": [],
+    "COMBINED_EXCLUDE": [],
+    # per_block（默认）= 临床 + 每块分别；joint = 临床 + 全部块分数一次 GLM。
+    "COMBINED_MODE": "per_block",
+    # 临床块固定走临床筛选，不进 LASSO。
+    "CLIN_BLOCK_METHOD": "logistic",
     # fig
     "DO_PLOT": False,
     "DO_PLOT_TIFF": False,

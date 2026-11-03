@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional, List
 
@@ -42,6 +42,8 @@ class DataLayer:
     landmark: Optional[dict] = None
     ipcw: Optional[dict] = None
     event: Optional[np.ndarray] = None
+    # 模态块：块名（工作表名）-> 特征表（含 Name 列）。空 = 旧的单块模式。
+    blocks: Dict[str, pd.DataFrame] = field(default_factory=dict)
 
 
 @dataclass
@@ -1262,24 +1264,162 @@ def drop_excluded_rad_columns(rad: pd.DataFrame, prefixes=None, id_cols=None) ->
     return rad.drop(columns=drop)
 
 
-def _prepare_rad_frame(rad_raw: pd.DataFrame) -> pd.DataFrame:
+def _merge_block_frames(blocks: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """多块按行序横向合并成一张宽表（Name 只保留一次）。
+
+    各块在 _prepare_blocks 里已按主表 ID 排好，行序一致。
+    """
+    if not blocks:
+        return pd.DataFrame()
+    frames: List[pd.DataFrame] = []
+    name: Optional[pd.Series] = None
+    for df in blocks.values():
+        d = df.reset_index(drop=True)
+        if "Name" in d.columns:
+            if name is None:
+                name = d["Name"]
+            d = d.drop(columns=["Name"])
+        frames.append(d)
+    merged = pd.concat(frames, axis=1)
+    if name is not None:
+        merged.insert(0, "Name", name)
+    return merged
+
+
+def _prepare_rad_frame(rad_raw: pd.DataFrame, id_col: str = "") -> pd.DataFrame:
     """统一组学表 ID 列为 Name，去掉 Group，并丢掉前缀筛选命中的特征。"""
     rad = rad_raw.copy()
     if "Name" not in rad.columns:
-        id_col = None
-        preferred = str(getattr(cfg, "RAD_ID_COL", "") or "").strip()
+        preferred = str(id_col or getattr(cfg, "RAD_ID_COL", "") or "").strip()
+        found = None
         for c in [preferred, "patient_id", "PatientID", "Patient_ID", "ID", "Unnamed: 0"]:
             if c and c in rad.columns:
-                id_col = c
+                found = c
                 break
-        if id_col is None and len(rad.columns):
+        if found is None and len(rad.columns):
             c0 = rad.columns[0]
             if not str(c0).startswith("h"):
-                id_col = c0
-        if id_col is not None:
-            rad = rad.rename(columns={id_col: "Name"})
+                found = c0
+        if found is not None:
+            rad = rad.rename(columns={found: "Name"})
     rad = rad.drop(columns=["Group"], errors="ignore")
     return drop_excluded_rad_columns(rad)
+
+
+def _block_sheet_specs() -> list:
+    """MODALITY_BLOCKS 里启用的块（空 = 旧的单块路径）。"""
+    from modules.config.blocks import explicit_blocks
+
+    return [b for b in explicit_blocks() if b.enabled]
+
+
+def _workbook_sheet_names(path: str) -> list[str]:
+    """工作簿里的工作表名（用于块自动发现与报错提示）。"""
+    from modules.utils.xlsx_sheet import workbook_info
+
+    return [str(s.get("name") or "") for s in workbook_info(path)]
+
+
+def _match_sheet_name(wanted: str, sheets: list[str]) -> Optional[str]:
+    """按名字找工作表：先精确，再忽略大小写。找不到返回 None。"""
+    if wanted in sheets:
+        return wanted
+    low = wanted.lower()
+    return next((s for s in sheets if s.lower() == low), None)
+
+
+def _reindex_frame_to_ids(
+    frame: pd.DataFrame, ids, block_name: str = "",
+) -> pd.DataFrame:
+    """把一块按给定 ID 顺序重排。
+
+    ID 可重复（同一患者多条记录）：按出现顺序一一对应。
+    块里缺少某个出现次序时 raise；块里多出的行按主表丢弃并打印条数。
+    """
+    if frame is None or frame.empty:
+        return frame
+    if "Name" not in frame.columns:
+        raise ValueError(
+            f"模态块 {block_name!r} 找不到 ID 列（Name / {cfg.RAD_ID_COL} 均未命中）"
+        )
+    raw = frame["Name"].astype(str).str.strip().tolist()
+    pos_by_key: Dict[str, List[int]] = {}
+    for i, k in enumerate(raw):
+        pos_by_key.setdefault(k, []).append(i)
+    dup_keys = [k for k, v in pos_by_key.items() if len(v) > 1]
+    if dup_keys:
+        print(
+            f"  ⚠ 模态块 {block_name!r} 有 {len(dup_keys)} 个重复 ID（按出现顺序对齐）: "
+            f"{dup_keys[:5]}"
+        )
+    order: List[int] = []
+    taken: Dict[str, int] = {}
+    missing: List[str] = []
+    for x in list(ids):
+        key = str(x).strip()
+        pool = pos_by_key.get(key)
+        if pool is None:
+            nk = _norm_patient_id(key)
+            pool = [i for k, v in pos_by_key.items() if _norm_patient_id(k) == nk for i in v]
+        if not pool:
+            missing.append(key)
+            continue
+        n = taken.get(key, 0)
+        if n >= len(pool):
+            missing.append(key)
+            continue
+        order.append(pool[n])
+        taken[key] = n + 1
+    if missing:
+        raise ValueError(
+            f"模态块 {block_name!r} 缺 {len(missing)} 条 ID（示例 {missing[:5]}）"
+        )
+    extra = len(raw) - len(order)
+    if extra > 0:
+        print(f"  模态块 {block_name!r}: 主表未纳入 {extra} 行（排除名单/无效行），已略过")
+    return frame.iloc[order].reset_index(drop=True)
+
+
+def _prepare_blocks(
+    blocks_raw: Dict[str, pd.DataFrame],
+    ids,
+    specs: Optional[Dict[str, object]] = None,
+) -> Dict[str, pd.DataFrame]:
+    """逐块统一 ID 列名 → 按主表 ID 顺序对齐 → 检查跨块特征重名。"""
+    specs = specs or {}
+    out: Dict[str, pd.DataFrame] = {}
+    owner: Dict[str, str] = {}
+    for name, raw in blocks_raw.items():
+        spec = specs.get(name)
+        id_col = str(getattr(spec, "id_col", "") or "") if spec is not None else ""
+        frame = _prepare_rad_frame(raw, id_col=id_col)
+        frame = _reindex_frame_to_ids(frame, ids, block_name=name)
+        # 手写映射对所有块生效；自动编码只对 kind="clin" 的块开（组学块仍只吃数值）
+        from modules.stats import text_encode
+
+        frame = text_encode.prepare_frame(
+            frame, frame_label=name, auto=(str(getattr(spec, "kind", "rad") or "rad") == "clin")
+        )
+        text_cols = [
+            str(c) for c in frame.columns
+            if c != "Name" and not pd.api.types.is_numeric_dtype(frame[c])
+        ]
+        if text_cols:
+            print(
+                f"  ⚠ 模态块 {name!r}: {len(text_cols)} 个非数值列不进组学建模 "
+                f"（如需使用请先编码为数值，或放进 cln）: {text_cols[:8]}"
+            )
+        for col in frame.columns:
+            if col == "Name":
+                continue
+            if col in owner:
+                raise ValueError(
+                    f"特征列跨块重复: {col!r} 同时出现在 {owner[col]!r} 与 {name!r}；"
+                    "请只在一张工作表里保留该列"
+                )
+            owner[col] = name
+        out[name] = frame
+    return out
 
 
 def _group_from_id_series(ids: pd.Series) -> pd.Series:
@@ -1779,14 +1919,17 @@ def _load_raw_tables(file: Optional[str] = None):
             rad_raw, clin_raw, data_file=excel_file or clin_path or rad_path, stage="raw-dual"
         )
         rad, clin = _align_and_prepare(rad_raw, clin_raw)
-        return rad, clin, True
+        return rad, {"rad": rad_raw}, clin, True
 
     xfile = excel_file or cfg.INPUT
     print(f"  Excel dual-sheet mode: {xfile}")
     rad_sheet = str(getattr(cfg, "RAD_SHEET", "") or "").strip()
     clin_sheet = str(getattr(cfg, "CLIN_SHEET", "") or "").strip()
+    block_specs = _block_sheet_specs()
     print(f"    sheets: rad={rad_sheet!r}, clin={clin_sheet!r}")
-    if not rad_sheet and not clin_sheet:
+    if block_specs:
+        print("    blocks: " + ", ".join(f"{b.name}→{b.resolved_sheet}" for b in block_specs))
+    if not rad_sheet and not clin_sheet and not block_specs:
         raise ValueError(
             "CLIN_SHEET 与 RAD_SHEET 必须二选一（可同时为空以外的任意工作表名，但不能都空）"
         )
@@ -1794,27 +1937,41 @@ def _load_raw_tables(file: Optional[str] = None):
         for ex_path in resolve_exclude_files():
             if os.path.isfile(ex_path):
                 ensure_blank_exc_sheet(ex_path, create_if_missing_file=False)
-    cache_key = f"xlsx::{xfile}::{rad_sheet}::{clin_sheet}"
+    block_sig = "|".join(f"{b.name}:{b.resolved_sheet}" for b in block_specs)
+    cache_key = f"xlsx::{xfile}::{rad_sheet}::{clin_sheet}::blocks={block_sig}"
     if cache_key in _RAW_TABLE_CACHE:
-        rad_raw, clin_raw = _RAW_TABLE_CACHE[cache_key]
+        blocks_raw, clin_raw = _RAW_TABLE_CACHE[cache_key]
         print("  (raw tables cache hit)")
     else:
         t0 = time.perf_counter()
-        if not rad_sheet:
+        blocks_raw = {}
+        if block_specs:
+            sheets = _workbook_sheet_names(xfile)
+            for spec in block_specs:
+                hit = _match_sheet_name(spec.resolved_sheet, sheets)
+                if hit is None:
+                    raise ValueError(
+                        f"模态块 {spec.name!r} 的工作表 {spec.resolved_sheet!r} 不在 {xfile}；"
+                        f"可用工作表: {sheets}"
+                    )
+                blocks_raw[spec.name] = _read_xlsx(xfile, hit)
+            rad_raw = blocks_raw[block_specs[0].name]
+        elif not rad_sheet:
             rad_raw = pd.DataFrame()
         else:
             rad_raw = _read_xlsx(xfile, rad_sheet)
+            blocks_raw[rad_sheet] = rad_raw
         if not clin_sheet:
             clin_raw = _synth_clin_from_rad(rad_raw)
         else:
             clin_raw = pd.read_excel(xfile, sheet_name=clin_sheet)
-        _RAW_TABLE_CACHE[cache_key] = (rad_raw, clin_raw)
+        _RAW_TABLE_CACHE[cache_key] = (blocks_raw, clin_raw)
         print(f"  raw tables loaded & cached in {time.perf_counter() - t0:.1f}s")
     rad_raw, clin_raw = apply_sample_exclusion(
         rad_raw, clin_raw, data_file=xfile, stage="raw"
     )
     rad, clin = _align_and_prepare(rad_raw, clin_raw)
-    return rad, clin, False
+    return rad, blocks_raw, clin, False
 
 
 def _mapped_level_name(raw: str) -> str:
@@ -1888,15 +2045,20 @@ def _encode_group_column(group_col: pd.Series):
 
 def load_external_layer(file: str, clin_sheet: str, rad_sheet: str,
                          name: str = "external",
-                         rad_id_col: str = "") -> DataLayer:
-    """从同一 xlsx 的 clin/rad sheet 对加载一个外部验证 DataLayer。"""
+                         rad_id_col: str = "",
+                         block_sheets: Optional[Dict[str, str]] = None) -> DataLayer:
+    """从同一 xlsx 的 clin/rad sheet 对加载一个外部验证 DataLayer。
+
+    block_sheets 给出 {块名: 工作表} 时按多块加载（缺块 raise）。
+    """
     print(f"  External [{name}]: clin={clin_sheet!r}, rad={rad_sheet!r}"
-          + (f"  rad_id={rad_id_col!r}" if rad_id_col else ""))
+          + (f"  rad_id={rad_id_col!r}" if rad_id_col else "")
+          + (f"  blocks={block_sheets}" if block_sheets else ""))
     old_rid = getattr(cfg, "RAD_ID_COL", None)
     if rad_id_col:
         cfg.RAD_ID_COL = rad_id_col
     try:
-        return _load_external_layer_body(file, clin_sheet, rad_sheet, name)
+        return _load_external_layer_body(file, clin_sheet, rad_sheet, name, block_sheets)
     finally:
         if rad_id_col:
             if old_rid is None:
@@ -1909,9 +2071,24 @@ def load_external_layer(file: str, clin_sheet: str, rad_sheet: str,
 
 
 def _load_external_layer_body(file: str, clin_sheet: str, rad_sheet: str,
-                              name: str) -> DataLayer:
+                              name: str,
+                              block_sheets: Optional[Dict[str, str]] = None) -> DataLayer:
     """load_external_layer 主体（可临时覆盖 RAD_ID_COL）。"""
-    rad_raw = _read_xlsx(file, rad_sheet)
+    blocks_raw: Dict[str, pd.DataFrame] = {}
+    if block_sheets:
+        sheets = _workbook_sheet_names(file)
+        for bname, sheet in block_sheets.items():
+            hit = _match_sheet_name(str(sheet or bname), sheets)
+            if hit is None:
+                raise ValueError(
+                    f"外验 [{name}] 块 {bname!r} 的工作表 {sheet!r} 不存在；可用: {sheets}"
+                )
+            blocks_raw[str(bname)] = _read_xlsx(file, hit)
+        rad_raw = next(iter(blocks_raw.values()))
+    else:
+        rad_raw = _read_xlsx(file, rad_sheet)
+        if rad_sheet:
+            blocks_raw[rad_sheet] = rad_raw
     clin_raw = pd.read_excel(file, sheet_name=clin_sheet)
     rad_raw, clin_raw = apply_sample_exclusion(
         rad_raw, clin_raw, data_file=file, stage=f"external:{name}"
@@ -1941,6 +2118,15 @@ def _load_external_layer_body(file: str, clin_sheet: str, rad_sheet: str,
     print(f"    N={len(clin)}  ({lbl1}={n1}, {lbl0}={n0})")
 
     rad = rad.drop(columns=["Group"], errors="ignore").reset_index(drop=True)
+    blocks_ext: Dict[str, pd.DataFrame] = {}
+    if blocks_raw:
+        base_ids = rad["Name"].astype(str).tolist() if "Name" in rad.columns else []
+        if not base_ids:
+            raise ValueError(f"外验 [{name}] 块表缺 Name/ID 列，无法按块对齐")
+        specs = {b.name: b for b in _block_sheet_specs()}
+        blocks_ext = _prepare_blocks(blocks_raw, base_ids, specs)
+        if blocks_ext:
+            rad = _merge_block_frames(blocks_ext)
     return DataLayer(
         rad=rad,
         clin=clin.reset_index(drop=True),
@@ -1949,6 +2135,7 @@ def _load_external_layer_body(file: str, clin_sheet: str, rad_sheet: str,
         sample_labels=sample_labels,
         landmark=collect_landmark_labels(clin_aligned),
         ipcw=external_ipcw_labels(clin_aligned, name),
+        blocks=blocks_ext,
     )
 
 
@@ -2156,7 +2343,7 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
         seed = int(getattr(cfg, "SEED", 66666) or 66666)
     print("═══ DATA LOADING & SPLIT ═══")
 
-    rad_raw, clin_raw, dual = _load_raw_tables(file)
+    rad_raw, blocks_raw, clin_raw, dual = _load_raw_tables(file)
 
     clin_raw = _assign_group_from_source(clin_raw)
     if "Group" not in clin_raw.columns:
@@ -2233,6 +2420,27 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
 
     rad = rad_raw.drop(columns=["Group"], errors="ignore")
 
+    block_specs = {b.name: b for b in _block_sheet_specs()}
+    blocks_all: Dict[str, pd.DataFrame] = {}
+    if block_specs and blocks_raw:
+        base_ids: List[str] = rad["Name"].astype(str).tolist() if (
+            "Name" in rad.columns and len(rad)
+        ) else []
+        if not base_ids:
+            idc0 = _cfg_col("CLIN_ID_COL", "PatientID")
+            if idc0 and idc0 in clin_raw.columns:
+                base_ids = [str(x).strip() for x in clin_raw[idc0].tolist()]
+        if not base_ids:
+            raise ValueError(
+                "模态块：拿不到主表 ID（块表无 Name 列，且 CLIN_ID_COL 不在临床表）"
+            )
+        blocks_all = _prepare_blocks(blocks_raw, base_ids, block_specs)
+        print(
+            "  模态块: "
+            + ", ".join(f"{k}({max(v.shape[1] - 1, 0)} 特征)" for k, v in blocks_all.items())
+        )
+        rad = _merge_block_frames(blocks_all)
+
     if not rad.empty and len(rad) != len(clin_raw):
         raise ValueError(
             f"rad/clin 行数不一致: rad={len(rad)}, clin={len(clin_raw)} "
@@ -2301,6 +2509,7 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
         landmark=landmark_all,
         ipcw=ipcw_all,
         event=None if survival_event is None else survival_event.copy(),
+        blocks={k: v.reset_index(drop=True) for k, v in blocks_all.items()},
     )
 
     external_specs = list(getattr(cfg, "EXTERNAL_TESTS", []) or [])
@@ -2387,6 +2596,14 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
             return subgroup_raw.iloc[0:0].reset_index(drop=True)
         return subgroup_raw.iloc[idx].reset_index(drop=True)
 
+    def _blocks_sub(idx: np.ndarray) -> Dict[str, pd.DataFrame]:
+        if not blocks_all:
+            return {}
+        return {
+            k: v.reset_index(drop=True).iloc[idx].reset_index(drop=True)
+            for k, v in blocks_all.items()
+        }
+
     def _subset(idx: np.ndarray) -> DataLayer:
         if len(idx) == 0:
             return DataLayer(
@@ -2400,6 +2617,7 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
                 landmark=_slice_landmark(landmark_all, idx),
                 ipcw=_slice_ipcw(ipcw_all, idx),
                 event=_event_sub(idx),
+                blocks=_blocks_sub(idx),
             )
         if rad.empty:
             rad_sub = rad.iloc[0:0].reset_index(drop=True)
@@ -2416,6 +2634,7 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
             landmark=_slice_landmark(landmark_all, idx),
             ipcw=_slice_ipcw(ipcw_all, idx),
             event=_event_sub(idx),
+            blocks=_blocks_sub(idx),
         )
 
     train = _subset(train_idx)
@@ -2485,6 +2704,14 @@ def slice_layer(layer: DataLayer, mask) -> DataLayer:
             return None
         return sg.iloc[idx].reset_index(drop=True)
 
+    raw_blocks = getattr(layer, "blocks", None) or {}
+
+    def _blocks_sub():
+        return {
+            k: v.reset_index(drop=True).iloc[idx].reset_index(drop=True)
+            for k, v in raw_blocks.items()
+        }
+
     if len(idx) == 0:
         rad = layer.rad.iloc[0:0].reset_index(drop=True)
         clin = layer.clin.iloc[0:0].reset_index(drop=True)
@@ -2497,6 +2724,7 @@ def slice_layer(layer: DataLayer, mask) -> DataLayer:
             landmark=_slice_landmark(getattr(layer, "landmark", None), idx),
             ipcw=_slice_ipcw(getattr(layer, "ipcw", None), idx),
             event=ev,
+            blocks=_blocks_sub(),
         )
     rad = layer.rad
     if rad is None or rad.empty:
@@ -2516,4 +2744,5 @@ def slice_layer(layer: DataLayer, mask) -> DataLayer:
         landmark=_slice_landmark(getattr(layer, "landmark", None), idx),
         ipcw=_slice_ipcw(getattr(layer, "ipcw", None), idx),
         event=ev,
+        blocks=_blocks_sub(),
     )

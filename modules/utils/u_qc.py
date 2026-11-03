@@ -25,6 +25,8 @@ summarized with available-n noted.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import html
 import json
 from datetime import datetime
 from pathlib import Path
@@ -470,6 +472,108 @@ def _series_desc(s: pd.Series) -> Dict[str, Any]:
     }
 
 
+def _qc_fingerprint(xlsx: Path, settings: Dict[str, Any]) -> str:
+    """QC 新鲜度指纹：数据文件（名/大小/mtime）+ 影响 QC 的设置。"""
+    st = xlsx.stat()
+    payload = {
+        "file": str(xlsx),
+        "size": int(st.st_size),
+        "mtime": int(st.st_mtime),
+        "clin": settings.get("CLIN_SHEET"),
+        "rad": settings.get("RAD_SHEET"),
+        "qc": settings.get("QC_SHEET"),
+        "icc": settings.get("ICC_SHEET"),
+        "nin": settings.get("SKIP_CLIN_FEATURES"),
+        "oc": settings.get("OUTCOME_COLS"),
+        "blocks": settings.get("MODALITY_BLOCKS"),
+    }
+    blob = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
+
+
+def qc_is_fresh(path: str | Path, fingerprint: str) -> bool:
+    """已有 qc.html 且指纹一致 → 可跳过重算。指纹缺失/不一致 = 过期。"""
+    p = Path(path)
+    if not p.is_file() or p.stat().st_size <= 200:
+        return False
+    try:
+        head = p.read_text(encoding="utf-8")[:4000]
+    except (OSError, UnicodeDecodeError):
+        return False
+    return f"qc-fingerprint: {fingerprint}" in head
+
+
+def _block_qc_sections(
+    xl: pd.ExcelFile,
+    sheets: list[str],
+    settings: Dict[str, Any],
+    cdf: pd.DataFrame,
+    clin_id: str,
+) -> list[str]:
+    """每个模态块：行数、ID 覆盖、缺失率。空 MODALITY_BLOCKS = 用 RAD_SHEET 单块。"""
+    blocks: list[tuple[str, str]] = []
+    raw = settings.get("MODALITY_BLOCKS") or []
+    if isinstance(raw, list):
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name or item.get("enabled") is False:
+                continue
+            blocks.append((name, str(item.get("sheet") or name).strip()))
+    if not blocks:
+        rad = str(settings.get("RAD_SHEET") or "").strip()
+        if rad:
+            blocks.append((rad, rad))
+    if not blocks:
+        return []
+    have = {s.lower(): s for s in sheets}
+    cset = (
+        {str(x).strip() for x in cdf[clin_id].dropna().tolist()}
+        if clin_id in cdf.columns else set()
+    )
+    rows: list[list[Any]] = []
+    parts: list[str] = ["<h2>7. Modality blocks</h2>"]
+    for name, sheet in blocks:
+        hit = have.get(str(sheet).lower())
+        if hit is None:
+            parts.append(
+                f"<p class='warn'>块 {html.escape(name)}：工作表 {html.escape(sheet)} 不存在</p>"
+            )
+            continue
+        bdf = xl.parse(hit)
+        id_col = next(
+            (c for c in ("Patient_ID", "PatientID", "patient_id", "Name", "ID") if c in bdf.columns),
+            str(bdf.columns[0]) if len(bdf.columns) else "",
+        )
+        bset = (
+            {str(x).strip() for x in bdf[id_col].dropna().tolist()}
+            if id_col in bdf.columns else set()
+        )
+        feats = [c for c in bdf.columns if c != id_col]
+        miss = (
+            float(bdf[feats].isna().to_numpy().mean()) * 100.0 if feats else float("nan")
+        )
+        const = 0
+        for c in feats:
+            if pd.to_numeric(bdf[c], errors="coerce").nunique(dropna=True) <= 1:
+                const += 1
+        rows.append([
+            name, hit, len(bdf), len(feats), len(bset),
+            len(bset & cset) if cset else 0,
+            f"{miss:.1f}" if np.isfinite(miss) else "NA",
+            const,
+        ])
+    if rows:
+        parts.append(_html_table(
+            ["Block", "Sheet", "n rows", "n features", "n ids",
+             "ids in clin", "missing %", "constant cols"],
+            rows,
+            caption="每块一行；constant cols 只含数值列判定",
+        ))
+    return parts
+
+
 def _qc_html_shell(title: str, body_parts: list[str]) -> str:
     return "\n".join([
         "<!DOCTYPE html><html><head><meta charset='utf-8'/>",
@@ -874,10 +978,26 @@ def write_project_data_qc(
     if not qdf.empty:
         parts.append("<h2>6. Imaging pipeline QC</h2>")
         parts.append(f"<p class='muted'>From sheet {qc_sheet!r} · N = {len(qdf)}</p>")
-        parts.extend(_imaging_qc_sections(qdf))
+        if "block" in {str(c).lower() for c in qdf.columns}:
+            blk_col = next(c for c in qdf.columns if str(c).lower() == "block")
+            parts.append(
+                "<p class='muted'>按块分段（通表 block 列）: "
+                + ", ".join(sorted({str(v) for v in qdf[blk_col].dropna().unique()}))
+                + "</p>"
+            )
+            for blk, sub in qdf.groupby(blk_col, dropna=False):
+                parts.append(f"<h3>QC — block {html.escape(str(blk))}</h3>")
+                parts.extend(_imaging_qc_sections(sub))
+        else:
+            parts.extend(_imaging_qc_sections(qdf))
+
+    parts.extend(_block_qc_sections(xl, sheets, settings, cdf, clin_id))
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(_qc_html_shell(title, parts), encoding="utf-8")
+    fp = _qc_fingerprint(xlsx, settings)
+    body = _qc_html_shell(title, parts)
+    body = f"<!-- qc-fingerprint: {fp} -->\n" + body
+    out.write_text(body, encoding="utf-8")
     print(f"  ✓ Project data QC → {out}  (clin={len(cdf)} rad={len(rdf)} overlap={len(overlap)})")
     return {
         "html": str(out),

@@ -60,6 +60,7 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
     ("clinprep", "临床 / 预处理", [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]),
     ("clin", "临床筛选", [
         "DO_CLIN",
@@ -125,6 +126,10 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
     ("radlog", "组学 / Logistic", [
         "DO_RAD_LOGISTIC",
         "RAD_LOGIT_UNI_P", "RAD_LOGIT_MV_P", "DO_RAD_FIRTH",
+    ]),
+    ("blocks", "模态块", [
+        "MODALITY_BLOCKS", "COMBINED_BLOCKS", "COMBINED_EXCLUDE",
+        "COMBINED_MODE", "CLIN_BLOCK_METHOD",
     ]),
     ("fig", "图与显示", [
         "DO_FIGURE_PANELS",

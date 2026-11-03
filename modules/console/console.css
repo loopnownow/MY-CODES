@@ -560,6 +560,17 @@ table.mini th{background:#eef3f1;text-align:left}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .encode-head .kv-del{flex:none}
+.txt-encode .txt-tools{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:6px 0;border-bottom:1px dashed var(--line);margin-bottom:4px;
+}
+.txt-encode .txt-tools input{flex:1 1 12em;min-width:8em}
+.txt-encode .txt-row{
+  display:grid;grid-template-columns:minmax(8em,1fr) minmax(6em,8em);
+  align-items:center;gap:8px;
+}
+.txt-encode .txt-row input{width:100%;min-width:0}
+.txt-encode .kv-sum{color:var(--muted);font-size:12px}
 .kv-del{
   width:1.75em;height:1.7em;padding:0;margin:0;
   border:1px solid var(--line);border-radius:4px;
@@ -810,7 +821,7 @@ table.mini th{background:#eef3f1;text-align:left}
 #ioCard .subh:first-of-type{margin-top:4px;padding-top:0;border-top:0}
 #ioCard .ext-head,#ioCard .ext-row{
   display:grid;
-  grid-template-columns:minmax(4.5em,.55fr) minmax(8em,1.4fr) auto minmax(8.5em,1fr) minmax(8.5em,1fr) minmax(8.5em,1fr) auto;
+  grid-template-columns:minmax(4.5em,.55fr) minmax(8em,1.4fr) auto minmax(8.5em,1fr) minmax(8.5em,1fr) minmax(8.5em,1fr) minmax(9em,1.1fr) auto;
   gap:6px;align-items:center;margin:6px 0;
 }
 #ioCard .ext-head{margin-bottom:0;color:var(--muted);font-size:12px}
