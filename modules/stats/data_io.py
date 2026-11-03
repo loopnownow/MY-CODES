@@ -1394,10 +1394,12 @@ def _prepare_blocks(
         id_col = str(getattr(spec, "id_col", "") or "") if spec is not None else ""
         frame = _prepare_rad_frame(raw, id_col=id_col)
         frame = _reindex_frame_to_ids(frame, ids, block_name=name)
-        if str(getattr(spec, "kind", "rad") or "rad") == "clin":
-            from modules.stats import text_encode
+        # 手写映射对所有块生效；自动编码只对 kind="clin" 的块开（组学块仍只吃数值）
+        from modules.stats import text_encode
 
-            frame = text_encode.prepare_frame(frame, frame_label=name)
+        frame = text_encode.prepare_frame(
+            frame, frame_label=name, auto=(str(getattr(spec, "kind", "rad") or "rad") == "clin")
+        )
         text_cols = [
             str(c) for c in frame.columns
             if c != "Name" and not pd.api.types.is_numeric_dtype(frame[c])
