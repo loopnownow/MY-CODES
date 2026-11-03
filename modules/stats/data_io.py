@@ -22,31 +22,26 @@ import pandas as pd
 
 from modules import config as cfg
 
-# 编码后 code → 原始类别标签（供 Table1 显示 male/female、Positive 等）
-# 结构: {col_name: {0.0: "Negative", 1.0: "Positive", ...}}
 CLIN_LEVEL_MAPS: Dict[str, Dict[float, str]] = {}
 
-# 临床列统计类型：col → "continuous"（计量）| "categorical"（计数）
-# 由 load 阶段登记。原始整列都是数字 → 计量；英文标签 / 罗马数字 token → 计数。
 CLIN_VAR_TYPES: Dict[str, str] = {}
 
-# 原始表并非整列纯数字（罗马数字、Ⅰ/Ⅱ 与阿拉伯混排等）→ 计数候选
 CLIN_ORDINAL_TOKEN_COLS: set[str] = set()
 
 
 @dataclass
 class DataLayer:
     """单个数据层（all / train / test）的容器。"""
-    rad: pd.DataFrame                       # 影像组学特征矩阵
-    clin: pd.DataFrame                      # 临床特征矩阵（已剔除 SKIP_CLIN_FEATURES）
-    group: pd.Series                        # 分组标签（字符串因子，如 "CKD"/"non-CKD"）
-    label: np.ndarray                       # 二分类结局 (0/1) — int 数组
-    sample_labels: Optional[List[str]] = None  # 原始样本标签（可用于图注/ID），可为 None
-    time: Optional[np.ndarray] = None  # 生存/随访时间（不进临床模型）
-    subgroup: Optional[pd.Series] = None  # 亚组列原文（评估主模型用，不进建模）
-    landmark: Optional[dict] = None  # 时间列向量、状态列 0/1、两个列名。不是月份到标签。
+    rad: pd.DataFrame
+    clin: pd.DataFrame
+    group: pd.Series
+    label: np.ndarray
+    sample_labels: Optional[List[str]] = None
+    time: Optional[np.ndarray] = None
+    subgroup: Optional[pd.Series] = None
+    landmark: Optional[dict] = None
     ipcw: Optional[dict] = None
-    event: Optional[np.ndarray] = None  # KM 与 IPCW 共用的状态。空则 KM 用当前结局。
+    event: Optional[np.ndarray] = None
 
 
 @dataclass
@@ -55,15 +50,11 @@ class SplitData:
     all: DataLayer
     train: DataLayer
     test: DataLayer
-    # 选两组把 HC 留在建模队列外时的描述用帧。不进建模拆分。
     hc_train: Optional[pd.DataFrame] = None
     hc_test: Optional[pd.DataFrame] = None
-    # 建模组原始水平已是 HC，但展示名被映走。这张 Train vs Test 表把该列改回 HC。
     hc_relabel_from: str = ""
-    # GROUP_KEEP 前的全水平临床帧 + 原始组标签，只供总表。不进建模。
     baseline_clin: Optional[pd.DataFrame] = None
     baseline_group: Optional[pd.Series] = None
-    # 同一套全水平，按建模拆分切到 Train / Test，只供 Table 1。不进建模。
     baseline_train_clin: Optional[pd.DataFrame] = None
     baseline_train_group: Optional[pd.Series] = None
     baseline_test_clin: Optional[pd.DataFrame] = None
@@ -108,7 +99,6 @@ def _assign_group_from_source(clin: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-# Excel 中允许的英文分类取值 → 分析用数值（与 heatmap 约定一致）
 _ENGLISH_CAT_MAP = {
     "male": 1,
     "female": 0,
@@ -122,7 +112,6 @@ _ENGLISH_CAT_MAP = {
     "false": 0,
     "positive": 1,
     "negative": 0,
-    # 常见错拼 / 数据表笔误
     "negstive": 0,
     "positve": 1,
     "unclear": 1,
@@ -133,21 +122,17 @@ _ENGLISH_CAT_MAP = {
     "dedifferentiated": 1,
     "well-differentiated": 0,
     "well differentiated": 0,
-    # PCSR / ring integrity
     "complete": 1,
     "interrupted": 0,
     "intact": 1,
     "disrupted": 0,
-    # Lung subtype (rough solid-component ordinal; override via factor if needed)
     "homogeneous nonsolid": 0,
     "heterogeneous nonsolid": 1,
-    # 数据表常见拼写（Negstive）
     "homogeneous negstivensolid": 0,
     "heterogeneous negstivensolid": 1,
     "part-solid": 2,
     "part solid": 2,
     "solid": 3,
-    # FIGO simplified stage (ordinal)
     "i": 1,
     "ii": 2,
     "iii": 3,
@@ -156,14 +141,12 @@ _ENGLISH_CAT_MAP = {
     "2": 2,
     "3": 3,
     "4": 4,
-    # Unicode roman numerals sometimes seen in exports
     "ⅰ": 1,
     "ⅱ": 2,
     "ⅲ": 3,
     "ⅳ": 4,
 }
 
-# 有序分级：罗马数字 / 半角罗马 → 整数（Fazekas、MTA 等）
 _ORDINAL_TOKEN_MAP = {
     "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6,
     "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5,
@@ -185,7 +168,6 @@ def _lookup_english_cat(v) -> float:
     key = _norm_cat_key(v)
     if key in _ENGLISH_CAT_MAP:
         return float(_ENGLISH_CAT_MAP[key])
-    # 去连字符再试（fat-like 等已在表中；Part-Solid → part solid）
     key2 = key.replace("-", " ")
     if key2 in _ENGLISH_CAT_MAP:
         return float(_ENGLISH_CAT_MAP[key2])
@@ -222,7 +204,6 @@ def _try_ordinal_token(v):
     key = _norm_cat_key(v)
     if key in _ORDINAL_TOKEN_MAP:
         return int(_ORDINAL_TOKEN_MAP[key])
-    # 纯数字字符串
     try:
         fv = float(key)
         if abs(fv - round(fv)) < 1e-9:
@@ -256,7 +237,6 @@ def _coerce_numeric_strings(clin: pd.DataFrame) -> pd.DataFrame:
             out[col] = num.astype(float)
             coerced.append(col)
             continue
-        # 罗马数字 / 混排 0,'Ⅰ','Ⅱ'
         tokens = []
         good = True
         for v in s:
@@ -272,7 +252,6 @@ def _coerce_numeric_strings(clin: pd.DataFrame) -> pd.DataFrame:
             out[col] = pd.Series(tokens, index=s.index, dtype=float)
             ordinalized.append(col)
             CLIN_ORDINAL_TOKEN_COLS.add(str(col))
-            # 建模用整数码；Table1 / 列线图刻度保留原文（I/II/Ⅲ…，不是 1/2/3）
             level_map: Dict[float, str] = {}
             for raw, code in zip(s, tokens):
                 if pd.isna(code):
@@ -320,7 +299,6 @@ def classify_clin_series(
     if n_unique <= _ordinal_max_levels():
         return "categorical"
     if not pd.api.types.is_numeric_dtype(series):
-        # 文本且水平很多：仍按计数（Table1 展开水平）；不因阈值改成计量
         return "categorical"
     return "continuous"
 
@@ -392,7 +370,6 @@ def _encode_english_categoricals(clin: pd.DataFrame) -> pd.DataFrame:
         s = out[col]
         if pd.api.types.is_numeric_dtype(s):
             continue
-        # 原文标签（保留首次出现的展示形式）
         raw_labels = {}
         for v in s.dropna():
             key = _norm_cat_key(v)
@@ -400,7 +377,6 @@ def _encode_english_categoricals(clin: pd.DataFrame) -> pd.DataFrame:
                 raw_labels[key] = str(v).strip()
 
         mapped = s.map(_lookup_english_cat)
-        # 仅当非空值全部成功映射时才替换
         ok = s.isna() | mapped.notna()
         if ok.all() and mapped.notna().any():
             out[col] = mapped.astype("float")
@@ -412,7 +388,6 @@ def _encode_english_categoricals(clin: pd.DataFrame) -> pd.DataFrame:
             CLIN_LEVEL_MAPS[col] = level_map
             encoded.append(col)
             continue
-        # 多水平/未映射文本：稳定 factor 编码，避免 GLM 时 to_numeric 全变 NaN
         n_unique = s.dropna().nunique()
         unmapped = sorted({
             str(v).strip()
@@ -556,7 +531,6 @@ def _id_match_keys(raw) -> set:
     return {k for k in keys if k}
 
 
-# 展示姓名列（≠ CLIN_ID_COL）。ID 用来对齐/排除/按人划分；本列只用于错分表/图注。
 _LABEL_DISPLAY_CANDS = (
     "patient_name", "PatientName", "Chinese name", "Chinese_name",
     "ChineseName", "姓名",
@@ -668,7 +642,6 @@ def _skip_nonfeature_cols(df: pd.DataFrame) -> List[str]:
     return out
 
 
-# 排除列表缓存：path::sheet::col → frozenset of match keys
 _EXCLUDE_CACHE: Dict[str, frozenset] = {}
 
 
@@ -784,7 +757,6 @@ def ensure_blank_exc_sheet(
         with pd.ExcelWriter(path, engine="openpyxl") as xw:
             blank_exc_dataframe(col).to_excel(xw, sheet_name=sheet, index=False)
         print(f"  Created new workbook with blank sheet {sheet!r}.{col}: {path}")
-        # 清缓存，避免读到旧空集
         for k in list(_EXCLUDE_CACHE.keys()):
             if path in k or os.path.abspath(path) in k:
                 _EXCLUDE_CACHE.pop(k, None)
@@ -812,7 +784,6 @@ def ensure_blank_exc_sheet(
             return True
 
         ws = wb[hit]
-        # 已有表头或任意单元格内容则保留
         first = ws.cell(1, 1).value
         if first is None or str(first).strip() == "":
             ws.cell(1, 1, value=col)
@@ -822,7 +793,6 @@ def ensure_blank_exc_sheet(
                 if path in k or os.path.abspath(path) in k:
                     _EXCLUDE_CACHE.pop(k, None)
             return True
-        # 已有内容：不改
         return False
     except Exception as e:
         print(f"  ⚠ ensure_blank_exc_sheet failed ({path}): {e}")
@@ -1063,7 +1033,6 @@ def _pick_id_series(df: pd.DataFrame, preferred: Optional[str] = None) -> Option
         seen.add(c)
         if c in df.columns:
             return df[c]
-    # 首列若像 ID（非纯特征）
     if len(df.columns) > 0:
         c0 = df.columns[0]
         if not str(c0).startswith("h") and "intensity" not in str(c0).lower():
@@ -1251,7 +1220,7 @@ def _column_matches_prefix(name: str, prefix: str) -> bool:
     if s.startswith(part):
         return True
     if part.endswith("__"):
-        broad = part[:-1]  # foo__ → foo_
+        broad = part[:-1]
         if broad and s.startswith(broad):
             return True
     return False
@@ -1345,7 +1314,6 @@ def _map_series_by_dict(s: pd.Series, value_map: dict, col_name: str) -> pd.Seri
     """
     if s is None:
         return s
-    # 规范化 map：小写 key
     norm_map = {str(k).strip().lower(): int(v) for k, v in value_map.items()}
     allowed = set(norm_map.values())
 
@@ -1353,7 +1321,6 @@ def _map_series_by_dict(s: pd.Series, value_map: dict, col_name: str) -> pd.Seri
         uniq = {int(x) for x in s.dropna().unique()}
         if uniq and uniq.issubset(allowed):
             return s.astype(float)
-        # 数值但不在约定编码内，仍尝试按字符串映射
 
     def _one(v):
         if pd.isna(v):
@@ -1361,7 +1328,6 @@ def _map_series_by_dict(s: pd.Series, value_map: dict, col_name: str) -> pd.Seri
         key = str(v).strip().lower()
         if key in norm_map:
             return float(norm_map[key])
-        # 已是 "0"/"1"
         if key in ("0", "1"):
             return float(key)
         return np.nan
@@ -1645,7 +1611,6 @@ def _apply_reader_value_map(clin: pd.DataFrame) -> pd.DataFrame:
     for c in list(getattr(cfg, "FORCE_CLIN_FOR_ROC", None) or []):
         if c and c not in readers:
             readers.append(c)
-    # 兜底：列名含 Reader 的列
     if not readers:
         readers = [c for c in out.columns if "reader" in str(c).lower()]
 
@@ -1655,11 +1620,8 @@ def _apply_reader_value_map(clin: pd.DataFrame) -> pd.DataFrame:
         if col not in out.columns:
             continue
         s = out[col]
-        # 已是数值（有序分级/连续评分）→ 保留，不做 Positive/Negative 映射
         if pd.api.types.is_numeric_dtype(s):
             continue
-        # 仅当非空值能按 READER_VALUE_MAP（或 0/1）解释时才编码；
-        # 避免把 Fazekas/MTA 等对照列误当成二分类 Reader。
         def _reader_token_ok(v) -> bool:
             if pd.isna(v):
                 return True
@@ -1675,7 +1637,6 @@ def _apply_reader_value_map(clin: pd.DataFrame) -> pd.DataFrame:
         if s.dropna().empty or not bool(s.map(_reader_token_ok).all()):
             continue
 
-        # 原文标签 → code（优先保留数据中首次出现的英文展示形式）
         level_map: Dict[float, str] = {}
         for v in s.dropna():
             key = str(v).strip().lower()
@@ -1716,7 +1677,6 @@ def _prepare_clin_frame(clin_raw: pd.DataFrame) -> pd.DataFrame:
     """统一临床表 Name / Group 列；应用结局二分类与 Reader 编码。"""
     clin = clin_raw.copy()
 
-    # 展示姓名 → 内部 Name（复制，不改 CLIN_ID_COL；两列可以同名也可以不同）
     if "Name" not in clin.columns:
         lab = resolve_label_col(clin.columns)
         if lab and lab in clin.columns:
@@ -1728,12 +1688,9 @@ def _prepare_clin_frame(clin_raw: pd.DataFrame) -> pd.DataFrame:
                     clin["Name"] = clin[c].astype(str)
                     break
 
-    # 当前结局二分类（多类如 Pathologic_MI → Deep MI 0/1）
     clin = _apply_outcome_binarize(clin)
-    # Reader 文本 → 0/1（含 Suspicious→1）
     clin = _apply_reader_value_map(clin)
 
-    # 结局 → Group（当前子结局列优先，覆盖表里残留的公共 Group）
     clin = _assign_group_from_source(clin)
     if "Group" not in clin.columns:
         gcol = _find_group_column(list(clin.columns))
@@ -1756,7 +1713,6 @@ def _align_and_prepare(rad_raw: pd.DataFrame, clin_raw: pd.DataFrame):
         clin = _prepare_clin_frame(clin_raw.reset_index(drop=True))
         return rad, clin
     rad_ids = rad["Name"] if "Name" in rad.columns else rad_raw.iloc[:, 0]
-    # 若临床侧找不到可用 ID 列，则假定已与 rad 同行序对齐
     if clin_id_col not in clin_raw.columns:
         print("  ⚠ 临床表无 ID 列，按行序对齐（不校验 ID）")
         if len(clin_raw) != len(rad):
@@ -1771,7 +1727,6 @@ def _align_and_prepare(rad_raw: pd.DataFrame, clin_raw: pd.DataFrame):
     return rad, clin
 
 
-# 多终点循环时避免重复读 13MB+ xlsx（每结局仅重做 clin 结局编码）
 _RAW_TABLE_CACHE: Dict[str, tuple] = {}
 
 
@@ -1795,14 +1750,11 @@ def _load_raw_tables(file: Optional[str] = None):
     rad_path = getattr(cfg, "RAD_PATH", "") or ""
     clin_path = getattr(cfg, "CLIN_PATH", "") or ""
 
-    # 显式 --input：覆盖主 Excel 路径（单文件双 sheet）
     excel_file = None
     if file and str(file).strip():
         excel_file = file
 
-    # 双文件模式（两者均配置）
     if rad_path and clin_path:
-        # --input 若给出且 RAD_PATH 存在，则 file 视为临床表覆盖
         if excel_file and str(excel_file) != cfg.INPUT:
             clin_path = excel_file
         print("  Dual-file mode")
@@ -1823,14 +1775,12 @@ def _load_raw_tables(file: Optional[str] = None):
             else:
                 clin_raw = pd.read_excel(clin_path, sheet_name=clin_sheet)
             _RAW_TABLE_CACHE[cache_key] = (rad_raw, clin_raw)
-        # 【最先】按 exc 列表剔除样本，再对齐/编码/统计
         rad_raw, clin_raw = apply_sample_exclusion(
             rad_raw, clin_raw, data_file=excel_file or clin_path or rad_path, stage="raw-dual"
         )
         rad, clin = _align_and_prepare(rad_raw, clin_raw)
         return rad, clin, True
 
-    # 主模式：单 Excel 双 sheet；RAD_SHEET 为空则纯临床
     xfile = excel_file or cfg.INPUT
     print(f"  Excel dual-sheet mode: {xfile}")
     rad_sheet = str(getattr(cfg, "RAD_SHEET", "") or "").strip()
@@ -1840,7 +1790,6 @@ def _load_raw_tables(file: Optional[str] = None):
         raise ValueError(
             "CLIN_SHEET 与 RAD_SHEET 必须二选一（可同时为空以外的任意工作表名，但不能都空）"
         )
-    # 排除名单：仅当文件已存在时补 exc 表头，不在工程根凭空新建空表
     if bool(getattr(cfg, "DO_EXCLUDE_SAMPLES", True)):
         for ex_path in resolve_exclude_files():
             if os.path.isfile(ex_path):
@@ -1861,7 +1810,6 @@ def _load_raw_tables(file: Optional[str] = None):
             clin_raw = pd.read_excel(xfile, sheet_name=clin_sheet)
         _RAW_TABLE_CACHE[cache_key] = (rad_raw, clin_raw)
         print(f"  raw tables loaded & cached in {time.perf_counter() - t0:.1f}s")
-    # 【最先】按 exc 列表剔除样本，再对齐/编码/统计
     rad_raw, clin_raw = apply_sample_exclusion(
         rad_raw, clin_raw, data_file=xfile, stage="raw"
     )
@@ -1891,7 +1839,6 @@ def _display_group_labels(lbl0: str, lbl1: str) -> tuple:
     d1 = _mapped_level_name(lbl1)
     pos = str(getattr(cfg, "GROUP_DISPLAY_POS", "") or "").strip()
     neg = str(getattr(cfg, "GROUP_DISPLAY_NEG", "") or "").strip()
-    # 展示名空时用列值原文。不造 non_ 前缀，也不用结局列名顶替分组卡。
     if not d0:
         d0 = neg or str(lbl0)
     if not d1:
@@ -1966,21 +1913,17 @@ def _load_external_layer_body(file: str, clin_sheet: str, rad_sheet: str,
     """load_external_layer 主体（可临时覆盖 RAD_ID_COL）。"""
     rad_raw = _read_xlsx(file, rad_sheet)
     clin_raw = pd.read_excel(file, sheet_name=clin_sheet)
-    # 【最先】排除列表与主队列同一规则
     rad_raw, clin_raw = apply_sample_exclusion(
         rad_raw, clin_raw, data_file=file, stage=f"external:{name}"
     )
     rad, clin_prep = _align_and_prepare(rad_raw, clin_raw)
 
     if "Group" not in clin_prep.columns:
-        # _prepare_clin_frame 可能已处理；再查 clin_raw
         if "Group" not in clin_raw.columns:
             gsrc = getattr(cfg, "GROUP_SOURCE_COL", "LVSI")
             if gsrc in clin_raw.columns:
                 clin_prep = clin_prep.copy()
-                # align used prepared frame — re-prepare from aligned raw
                 pass
-    # 用对齐后的 clin：保证有 Group
     clin_aligned = clin_prep
     if "Group" not in clin_aligned.columns:
         raise ValueError(f"External [{name}] 缺少 Group/结局列")
@@ -2215,7 +2158,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
 
     rad_raw, clin_raw, dual = _load_raw_tables(file)
 
-    # ── 当前子结局列 → Group（覆盖公共 Group；无结局列才回退关键词）──
     clin_raw = _assign_group_from_source(clin_raw)
     if "Group" not in clin_raw.columns:
         gcol = _find_group_column(list(clin_raw.columns))
@@ -2223,7 +2165,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
             clin_raw = clin_raw.rename(columns={gcol: "Group"})
 
     if bool(getattr(cfg, "GROUP_FROM_ID", False)):
-        # 分组前缀来自临床 ID，不是展示姓名
         idc = _cfg_col("CLIN_ID_COL", "PatientID")
         src = None
         if idc and idc in clin_raw.columns:
@@ -2246,10 +2187,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     if subgroup_eval:
         print(f"  亚组评估列 {sub_col!r}（主模型锁死后分层 ROC，不按此列筛训练）")
 
-    # ── 行筛选：只保留指定组（两两比较前先收成 2 类）──
-    # HC 若被「选两组」留在建模队列外，先抄出来。只给 Train vs Test 描述列，不进建模。
-    # 总表用筛前全水平副本：选两组时仍写出 MCI|CN-ESRD|HC（实际有的水平）。
-    # _prekeep_id 把建模拆分指回这份副本，Table 1 才能把留在外面的组加回去。
     keep = [str(x).strip() for x in (getattr(cfg, "GROUP_KEEP", None) or []) if str(x).strip()]
     clin_raw = clin_raw.copy()
     clin_raw["_prekeep_id"] = np.arange(len(clin_raw), dtype=int)
@@ -2272,7 +2209,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
         if len(clin_raw) == 0:
             raise ValueError(f"GROUP_KEEP={keep} 后 N=0")
 
-    # 结局缺失 / 二值化后非 0/1 的行不能进模型
     if "Group" in clin_raw.columns:
         g = clin_raw["Group"]
         if pd.api.types.is_numeric_dtype(g):
@@ -2295,17 +2231,14 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     if subgroup_eval and sub_col in clin_raw.columns:
         subgroup_raw = clin_raw[sub_col].astype(str).reset_index(drop=True)
 
-    # ── 若 rad 表中也含 Group 列（历史文件可能包含），合并前删除，避免 Group_x/Group_y ──
     rad = rad_raw.drop(columns=["Group"], errors="ignore")
 
-    # 行数一致性（无组学表时 rad 为空，允许不一致）
     if not rad.empty and len(rad) != len(clin_raw):
         raise ValueError(
             f"rad/clin 行数不一致: rad={len(rad)}, clin={len(clin_raw)} "
             f"(dual_file={dual})"
         )
 
-    # ── 生存时间（跳过临床特征前单独保留，不进预测模型）──
     survival_time: Optional[np.ndarray] = None
     time_col = str(getattr(cfg, "SURVIVAL_TIME_COL", "") or "").strip()
     if time_col and time_col in clin_raw.columns:
@@ -2332,8 +2265,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     landmark_all = collect_landmark_labels(clin_raw)
     ipcw_all = collect_ipcw_labels(clin_raw)
 
-    # ── 提取样本标签（false_class / 图注用姓名；与 CLIN_ID_COL 可以不同）──
-    #     在过滤 SKIP 列之前读取，确保 LABEL_COL 不会被移除
     lab_s = _pick_label_series(clin_raw, rad)
     sample_labels = lab_s.astype(str).tolist() if lab_s is not None else None
     resolved_lab = resolve_label_col(clin_raw.columns)
@@ -2341,18 +2272,13 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     if resolved_lab and resolved_lab != cfg_lab:
         print(f"  LABEL_COL {cfg_lab!r} → {resolved_lab!r}（展示姓名 ≠ 临床 ID）")
 
-    # ── 移除跳过列（ID、姓名、Group 等非特征列），得到纯特征矩阵 ──
     skip_hit = _skip_nonfeature_cols(clin_raw)
     clin = clin_raw.drop(columns=list(skip_hit) + ["_prekeep_id"], errors="ignore")
     if skip_hit:
         print(f"  Skipped: {', '.join(skip_hit)}")
 
-    # ── 英文分类变量（Positive/Negative 等）→ 分析用数值 ──
     clin = _encode_english_categoricals(clin)
 
-    # ── Group → 0/1（优先 POSITIVE_GROUP_LABEL 为 y=1）──
-    # 全部组留下 3 个以上水平时，只把建模用的 Group 收成阳性 / 其余。
-    # prekeep 仍是原始水平，总表和 Table 1 按原始水平做 ANOVA 与 LSD。
     clin_raw = _collapse_extra_groups_for_model(clin_raw)
     group_num, group_factor, lbl0, lbl1 = _encode_group_column(clin_raw["Group"])
     hc_relabel_from = _hc_relabel_stem(clin_raw["Group"], group_num, lbl0, lbl1)
@@ -2384,8 +2310,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
         print("  EXTERNAL_TESTS 已配置 → 主表全部作为 TRAIN（不做内部拆分）")
 
     if use_internal:
-        # Patient-level split: all nodules from one patient stay in the same set.
-        # Patient key = CLIN_ID_COL (not the display LABEL_COL), trailing nodule index stripped.
         idc = _cfg_col("CLIN_ID_COL", "PatientID")
         if idc and idc in clin_raw.columns:
             keys = [_patient_key_for_exclude(x) for x in clin_raw[idc].astype(str).tolist()]
@@ -2400,7 +2324,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
         if locked is not None:
             train_idx, test_idx = locked
         else:
-            # Patient-level label = 1 if any nodule is growth (for stratification)
             key_to_idx: dict = {}
             key_to_y: dict = {}
             y_arr = group_num.to_numpy()
@@ -2502,8 +2425,6 @@ def load_data(file: Optional[str] = None, ratio: Optional[float] = None,
     print(f"  All N={n_all} ({lbl1}={n1}, {lbl0}={n0})  "
           f"Train N={len(train.clin)}  InternalTest N={len(test.clin)}")
 
-    # 总表帧：筛前全水平。列与建模 clin 对齐；缺水平不造列。
-    # Train / Test 用同一帧按建模拆分切开，留在 GROUP_KEEP 外的组只进 Table 1。
     baseline_clin = None
     baseline_group = None
     baseline_train_clin = None

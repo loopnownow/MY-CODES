@@ -19,7 +19,7 @@ def compute_vif(df: pd.DataFrame, features: Sequence[str],
     仅用 VIF_THRESHOLD_WARN 打警告旗；high 参数保留兼容但不再区分高阈值档。
     """
     warn = cfg.VIF_THRESHOLD_WARN if warn is None else warn
-    _ = high  # retired high cutoff
+    _ = high
     feats = [f for f in features if f in df.columns]
     if len(feats) < 2:
         return pd.DataFrame(columns=["Variable", "VIF", "Flag"])
@@ -30,7 +30,6 @@ def compute_vif(df: pd.DataFrame, features: Sequence[str],
     if len(X) < len(feats) + 2:
         return pd.DataFrame(columns=["Variable", "VIF", "Flag"])
 
-    # 常数列 + 标准化减轻尺度影响（VIF 对线性变换不敏感，但数值更稳）
     Xs = X.copy()
     for c in Xs.columns:
         s = Xs[c].std()
@@ -41,7 +40,7 @@ def compute_vif(df: pd.DataFrame, features: Sequence[str],
     rows = []
     for i, name in enumerate(feats):
         try:
-            v = float(variance_inflation_factor(Xmat, i + 1))  # skip intercept
+            v = float(variance_inflation_factor(Xmat, i + 1))
         except Exception:
             v = float("nan")
         if not np.isfinite(v):
@@ -61,7 +60,7 @@ def plot_vif_bar(vif_df: pd.DataFrame, dataset_label: str = "combined",
     if vif_df is None or len(vif_df) == 0:
         return
     warn = cfg.VIF_THRESHOLD_WARN if warn is None else warn
-    _ = high  # retired high cutoff
+    _ = high
     df = vif_df.copy()
     df = df[np.isfinite(pd.to_numeric(df["VIF"], errors="coerce"))]
     if len(df) == 0:

@@ -27,7 +27,6 @@ def _fit_ols(y, X_cols: pd.DataFrame):
 
 def _fit_logit(y, X_cols: pd.DataFrame):
     X = sm.add_constant(X_cols, has_constant="add")
-    # 完整病例
     return sm.GLM(y, X, family=sm.families.Binomial()).fit()
 
 
@@ -43,10 +42,8 @@ def _effects_once(x: np.ndarray, m: np.ndarray, y: np.ndarray
     if len(df) < 20:
         return None
     try:
-        # a: M ~ X
         fa = _fit_ols(df["m"].to_numpy(), df[["x"]])
         a = float(fa.params["x"])
-        # c: Y ~ X
         if _is_binary(df["y"].to_numpy()):
             fc = _fit_logit(df["y"].to_numpy(), df[["x"]])
             fcp = _fit_logit(df["y"].to_numpy(), df[["x", "m"]])
@@ -152,7 +149,6 @@ def _wrap_med_label(s: str, max_chars: int = 14) -> str:
                 cur = p
         lines.append(cur)
         return "\n".join(lines[:3])
-    # 硬折
     return "\n".join(s[i:i + max_chars] for i in range(0, min(len(s), max_chars * 2), max_chars))
 
 
@@ -174,9 +170,8 @@ def plot_mediation_path(res: Dict[str, Any], path_id: str, label: str) -> None:
     fig.patch.set_facecolor(c_bg)
 
     fs = cfg.FIG_FONT_SIZE
-    # 节点中心与半宽/半高
     nodes = {
-        "x": (1.7, 2.2, 1.15, 0.55),   # cx, cy, hw, hh
+        "x": (1.7, 2.2, 1.15, 0.55),
         "m": (5.0, 4.35, 1.25, 0.58),
         "y": (8.3, 2.2, 1.15, 0.55),
     }
@@ -221,14 +216,12 @@ def plot_mediation_path(res: Dict[str, Any], path_id: str, label: str) -> None:
     draw_box("m", mlab, c_m)
     draw_box("y", ylab, c_y)
 
-    # a: X→M  b: M→Y  c′: X→Y（直达）
     arrow("x", "m", c_path, lw=2.0, rad=0.0)
     arrow("m", "y", c_path, lw=2.0, rad=0.0)
     arrow("x", "y", c_direct, lw=2.1, rad=0.0)
 
     a, b = res.get("a", np.nan), res.get("b", np.nan)
     cp, acme = res.get("c_prime", np.nan), res.get("ACME", np.nan)
-    # 系数注记放在路径旁，避开节点
     ax.text(3.15, 3.55, f"a = {_fmt_coef(a)}", fontsize=fs, color=c_path,
             ha="center",
             bbox=dict(boxstyle="round,pad=0.18", facecolor="white",
@@ -259,7 +252,6 @@ def resolve_vector(name: str, frame: pd.DataFrame,
     """从 frame / extras 解析变量向量。"""
     extras = extras or {}
     key = str(name).strip()
-    # 令牌
     low = key.lower().replace(" ", "").replace("_", "")
     outcome = str(getattr(cfg, "GROUP_SOURCE_COL", "") or "").strip()
     if low in ("group", "y", "label") or (outcome and key == outcome):
@@ -275,7 +267,6 @@ def resolve_vector(name: str, frame: pd.DataFrame,
         return np.asarray(extras["ClinicalScore"], dtype=float)
     if key in frame.columns:
         return _as_num(frame[key])
-    # 大小写不敏感
     cmap = {c.lower().replace(" ", ""): c for c in frame.columns}
     if low in cmap:
         return _as_num(frame[cmap[low]])
@@ -315,7 +306,6 @@ def run_mediation_paths(
         return {"paths": [], "dry_run": True}
     extras = extras or {}
 
-    # 清除旧 mediation_M*.png，避免 panel 拼入过期路径图
     try:
         import os
         import re as _re
@@ -347,7 +337,6 @@ def run_mediation_paths(
             if x is None or m is None or y is None:
                 print(f"  ⚠ {mid}: missing variable x={xlab!r} m={mname!r} y={ylab!r} — skip")
                 continue
-            # 对齐长度
             n = min(len(x), len(m), len(y))
             res = bootstrap_mediation(x[:n], m[:n], y[:n], n_boot=n_boot, seed=seed)
             if res is None:

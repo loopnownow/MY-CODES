@@ -26,13 +26,9 @@ import statsmodels.api as sm
 
 from modules import config as cfg
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数
-# ═════════════════════════════════════════════════════════════════
-NOMOGRAM_POINTS_MAX = 100     # 得分尺满分
-NOMOGRAM_DPI = 300            # 输出分辨率（投稿级）
-NOMOGRAM_FIG_WIDTH = 11.5     # 英寸
-# 变量显示名与单位（便于临床解读；未列出的保留原名）
+NOMOGRAM_POINTS_MAX = 100
+NOMOGRAM_DPI = 300
+NOMOGRAM_FIG_WIDTH = 11.5
 FEATURE_DISPLAY: Dict[str, str] = {
     "RadScore": "RadScore",
     "age": "Age (years)",
@@ -51,25 +47,24 @@ FEATURE_DISPLAY: Dict[str, str] = {
     "Number of Lesions": "Number of lesions",
 }
 
-# 风险分层（用于概率轴着色与解读）
 RISK_BANDS = [
-    (0.00, 0.30, "#2E7D32", "Low"),       # 绿
-    (0.30, 0.70, "#F9A825", "Intermediate"),  # 琥珀
-    (0.70, 1.00, "#C62828", "High"),      # 红
+    (0.00, 0.30, "#2E7D32", "Low"),
+    (0.30, 0.70, "#F9A825", "Intermediate"),
+    (0.70, 1.00, "#C62828", "High"),
 ]
 
 
 @dataclass
 class NomogramResult:
-    model: sm.GLM                       # 拟合的逻辑回归模型
-    train_prob: np.ndarray              # 训练集预测概率
-    test_prob: Optional[np.ndarray]     # 测试集预测概率（若提供）
-    features: List[str]                 # 模型中使用的特征（RadScore + 临床特征）
+    model: sm.GLM
+    train_prob: np.ndarray
+    test_prob: Optional[np.ndarray]
+    features: List[str]
     df_train: pd.DataFrame
     df_test: Optional[pd.DataFrame]
-    points_table: Optional[pd.DataFrame] = None  # 各变量得分换算表
-    lp0: float = 0.0                    # 最低风险线性预测子
-    scale: float = 1.0                  # 点数 ↔ LP 换算系数
+    points_table: Optional[pd.DataFrame] = None
+    lp0: float = 0.0
+    scale: float = 1.0
     train_auc: float = np.nan
     test_auc: float = np.nan
 
@@ -101,7 +96,6 @@ def build_nomogram(train_label: np.ndarray, radscore_train: Optional[np.ndarray]
             df_test=None,
         )
 
-    # ── Step 1: 筛选可用特征并构建训练数据 ──
     if score_train is None:
         score_train = {}
         if radscore_train is not None:
@@ -156,22 +150,18 @@ def build_nomogram(train_label: np.ndarray, radscore_train: Optional[np.ndarray]
     else:
         print(f"  Features: {len(all_feat)} (clinical only, no RadScore)")
 
-    # ── Step 2: 拟合逻辑回归（logit + MLE） ──
     X = sm.add_constant(df_tr[all_feat], has_constant="add")
     model = sm.GLM(df_tr["y"], X, family=sm.families.Binomial()).fit()
     design_cols = list(model.params.index)
 
-    # ── Step 3: 绘制并保存点数换算列线图 ──
     plot_feat = [c for c in all_feat if c in design_cols]
     points_table, lp0, scale = _plot_nomogram(model, df_tr[plot_feat], plot_feat)
 
-    # ── Step 4: 评估模型性能 ──
     X_aligned = X.reindex(columns=design_cols, fill_value=0.0)
     train_prob = np.asarray(model.predict(X_aligned), dtype=float)
     train_auc = float(roc_auc_score(df_tr["y"], train_prob))
     print(f"  Train AUC: {train_auc:.3f}")
 
-    # ── Step 5: 测试集验证（仅当提供测试数据时） ──
     test_prob, df_te, test_auc = None, None, np.nan
     score_kept = [f for f in plot_feat if f in score_train]
     want_test = test_label is not None and test_clin is not None
@@ -214,9 +204,6 @@ def build_nomogram(train_label: np.ndarray, radscore_train: Optional[np.ndarray]
     )
 
 
-# ═════════════════════════════════════════════════════════════════
-# §2  内部工具
-# ═════════════════════════════════════════════════════════════════
 def _display_name(feat: str) -> str:
     return FEATURE_DISPLAY.get(feat, feat.replace("_", " ").title())
 
@@ -296,7 +283,6 @@ def _pretty_ticks(lo: float, hi: float, n_target: int = 6) -> np.ndarray:
     if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
         return np.array([lo if np.isfinite(lo) else 0.0])
     span = hi - lo
-    # 量级自适应步长
     raw = span / max(n_target - 1, 1)
     exp = np.floor(np.log10(raw)) if raw > 0 else 0
     base = 10 ** exp
@@ -377,7 +363,6 @@ def _points_of(x: float, feat: str, betas, min_contrib: Dict[str, float], scale:
 
 def _total_points_to_prob(tp: float, lp0: float, scale: float) -> float:
     lp = lp0 + tp / scale if scale != 0 else lp0
-    # 数值稳定 sigmoid
     if lp >= 0:
         z = np.exp(-lp)
         return float(1.0 / (1.0 + z))
@@ -422,21 +407,16 @@ def _build_points_table(
     return pd.DataFrame(rows)
 
 
-# ═════════════════════════════════════════════════════════════════
-# §3  绘图
-# ═════════════════════════════════════════════════════════════════
 def _thin_labels(xs: List[float], labs: List[str], min_dx: float) -> List[str]:
     """按 x 间距抽稀标签，始终保留首尾非空标签。"""
     if not xs:
         return labs
     out = [""] * len(labs)
     last = -1e18
-    # 先放端点
     for i in (0, len(xs) - 1):
         if labs[i]:
             out[i] = labs[i]
             last = xs[i] if i == 0 else last
-    # 端点强制保留
     out[0] = labs[0]
     out[-1] = labs[-1]
     last = xs[0]
@@ -464,7 +444,6 @@ def _plot_nomogram(
     points_table = _build_points_table(all_feat, X_feat, ranges, betas, min_contrib, scale)
 
     n_vars = len(all_feat)
-    # 紧凑布局：每行 ~0.85"，底部至风险图例为止（不含 howto）
     fig_h = 1.15 + 0.72 * (n_vars + 4) + 0.45
     fig, ax = plt.subplots(figsize=(NOMOGRAM_FIG_WIDTH, fig_h), facecolor="white")
     ax.set_facecolor("white")
@@ -472,7 +451,6 @@ def _plot_nomogram(
     total_max = sum(beta_effect[f] * scale for f in all_feat)
     canvas = 100.0
 
-    # Y 坐标（从上到下，间距均匀）
     y_title = n_vars + 2.85
     y_points = n_vars + 1.95
     y_vars = {f: float(n_vars - i) for i, f in enumerate(all_feat)}
@@ -510,12 +488,10 @@ def _plot_nomogram(
         ax.text(-2.8, y, text, ha="right", va="center", fontsize=fontsize,
                 fontweight="bold", color=C_AXIS, clip_on=False)
 
-    # ── 标题（不加粗）──
     ax.text(canvas / 2, y_title + 0.12,
             "Nomogram for Individualized Risk Prediction",
             ha="center", va="center", fontsize=13, fontweight="normal", color=C_AXIS)
 
-    # ── Points 参考尺 ──
     _left_label(y_points, "Points")
     _draw_axis(y_points, 0, canvas, C_POINTS, lw=1.9)
     pts_ticks = np.linspace(0, 100, 11)
@@ -524,13 +500,11 @@ def _plot_nomogram(
     for t in np.linspace(0, 100, 21):
         if t not in pts_ticks:
             ax.plot([t, t], [y_points - 0.06, y_points + 0.06], color=C_POINTS, lw=0.45)
-    # 读分辅助虚线（仅覆盖变量区）
     y_var_min = min(y_vars.values())
     for t in pts_ticks:
         ax.plot([t, t], [y_points - 0.28, y_var_min - 0.28],
                 color=C_GRID, lw=0.55, zorder=0, linestyle=":")
 
-    # ── 各变量得分尺 ──
     for f in all_feat:
         y = y_vars[f]
         lo, hi = ranges[f]
@@ -544,7 +518,6 @@ def _plot_nomogram(
         ax.plot(max_pts, y, "o", color=C_VAR, ms=4.2, zorder=4,
                 markeredgecolor="white", markeredgewidth=0.5)
 
-        # 刻度候选：离散取全部水平；连续按轴长度自适应数量
         if discrete:
             vals = np.sort(X_feat[f].dropna().unique())
         else:
@@ -560,7 +533,6 @@ def _plot_nomogram(
             named = named or bool(_lookup_level(f, float(v)))
             labs.append(lab)
 
-        # 分类字符串：尽量保留全部水平；连续短轴才抽稀
         if named:
             stagger = True
             fs = 6.2
@@ -576,7 +548,6 @@ def _plot_nomogram(
         _draw_ticks(y, xs, labs, C_VAR, label_above=True, fontsize=fs, stagger=stagger)
 
 
-    # ── Total Points ──
     def tp_to_x(tp: float) -> float:
         if total_max <= 0:
             return 0.0
@@ -600,7 +571,6 @@ def _plot_nomogram(
         C_TOTAL, label_above=False, fontsize=7.5,
     )
 
-    # ── Predicted Probability（精确 logit 映射）──
     _left_label(y_prob, "Predicted\nProbability", fontsize=8.8)
     p_at_0 = _total_points_to_prob(0, lp0, scale)
     p_at_max = _total_points_to_prob(total_max, lp0, scale)
@@ -621,9 +591,8 @@ def _plot_nomogram(
         ))
     _draw_axis(y_prob, 0, canvas, C_AXIS, lw=1.9)
 
-    # 概率刻度：优先临床阈值 (10/30/50/70)，再补两端
     preferred = [0.10, 0.20, 0.30, 0.50, 0.70, 0.80, 0.90]
-    must = [0.30, 0.50, 0.70]  # 风险分层边界尽量保留
+    must = [0.30, 0.50, 0.70]
     cand = [p for p in preferred if p_lo - 1e-6 <= p <= p_hi + 1e-6]
     xs_p, labs_p, must_idx = [], [], set()
     for p in sorted(set(np.round(cand, 4))):
@@ -633,7 +602,6 @@ def _plot_nomogram(
                 must_idx.add(len(xs_p))
             xs_p.append(tp_to_x(tp))
             labs_p.append(f"{p:.0%}")
-    # 抽稀，但强制保留 must 与端点
     thinned = _thin_labels(xs_p, labs_p, min_dx=6.0)
     for i in must_idx:
         thinned[i] = labs_p[i]
@@ -642,7 +610,6 @@ def _plot_nomogram(
         thinned[-1] = labs_p[-1]
     _draw_ticks(y_prob, xs_p, thinned, C_AXIS, label_above=False, fontsize=7.2)
 
-    # 风险分层图例（紧贴概率轴下方，手动定位）
     for i, (lo, hi, c, name) in enumerate(RISK_BANDS):
         x = 18 + i * 28
         ax.plot([x, x + 4], [y_legend, y_legend], color=c, lw=7, alpha=0.55,
@@ -666,7 +633,6 @@ def _plot_nomogram(
     fig.savefig(png_path, **save_kw)
     print(f"  → {png_path}", flush=True)
 
-    # TIFF / PDF 投稿格式（PNG 始终写）
     if cfg.want_tiff():
         tiff_path = f"{cfg.OUT_DIR}/nomogram.tiff"
         try:

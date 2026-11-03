@@ -22,12 +22,9 @@ from scipy import stats
 
 from modules import config as cfg
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数
-# ═════════════════════════════════════════════════════════════════
-DEFAULT_NBOOT = 1000         # check_correlation() 的 Bootstrap 重复次数；优先 cfg.BOOTSTRAP_N
-DEFAULT_CONF_LEVEL = 0.95    # Bootstrap CI 置信水平
-MAX_HEATMAP_FEATURES = 40    # 热图最多特征数（过多时截断，避免 TIFF/内存爆炸）
+DEFAULT_NBOOT = 1000
+DEFAULT_CONF_LEVEL = 0.95
+MAX_HEATMAP_FEATURES = 40
 
 
 def _col_token(name: str) -> str:
@@ -289,7 +286,6 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
         if d is None or d.shape[1] == 0:
             continue
         dd = d.copy()
-        # Heatmap axis/legend: show positive outcome display name, not generic Group
         if pos_lab:
             ren = {}
             for c in dd.columns:
@@ -303,7 +299,6 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
         return
     df_full = pd.concat(frames, axis=1)
 
-    # ── 自动编码：分类变量（字符/对象）→ 整数编码 ──
     for col in df_full.columns:
         if not pd.api.types.is_numeric_dtype(df_full[col]):
             df_full[col] = pd.factorize(df_full[col])[0].astype(float)
@@ -314,7 +309,6 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
     nf = df_full.shape[1]
     print(f"  Features: {nf}")
     if nf > MAX_HEATMAP_FEATURES:
-        # 优先保留 clin 侧列，再按方差取 rad 侧高变特征
         clin_n = 0 if clin_df is None else clin_df.shape[1]
         keep = list(df_full.columns[:clin_n]) if clin_n else []
         rest = [c for c in df_full.columns if c not in keep]
@@ -326,15 +320,12 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
         nf = df_full.shape[1]
         print(f"  Heatmap truncated to top {nf} features (cap={MAX_HEATMAP_FEATURES})")
 
-    # ── Spearman 相关矩阵（pairwise complete） ──
     rho_mat = df_full.corr(method="spearman")
-    # ── 每对变量的有效观测数 ──
     notna = df_full.notna().astype(float)
     n_obs = notna.T @ notna
     n_obs = np.minimum(n_obs.to_numpy(), n_obs.to_numpy().T)
     n_obs = pd.DataFrame(n_obs, index=rho_mat.index, columns=rho_mat.columns)
 
-    # ── t 统计量与双侧 p 值 ──
     with np.errstate(divide="ignore", invalid="ignore"):
         t_mat = rho_mat.to_numpy() * np.sqrt((n_obs.to_numpy() - 2) / (1 - rho_mat.to_numpy() ** 2))
     df_ = n_obs.to_numpy() - 2
@@ -348,10 +339,8 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
     except Exception:
         def _disp_rad(x):  # type: ignore
             return str(x)
-    # 轴标签缩短组学全名（standard_fbn_32_ 等）；矩阵索引仍用 orig_names
     disp_names = [_disp_rad(n) for n in orig_names]
 
-    # ── 绘制热图（显式索引，确保 X/Y 轴标签与矩阵条目一一对应） ──
     fig, ax = plt.subplots(figsize=(max(9, nf * 0.7 + 3), max(7, nf * 0.6 + 2.5)))
     rho_plot = rho_mat.loc[orig_names, orig_names].to_numpy()
     pval_plot = pd.DataFrame(pval_mat, index=orig_names, columns=orig_names).to_numpy()
@@ -454,7 +443,6 @@ def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
         targets = list(getattr(cfg, "CORR_PREDICTORS", ["RadScore", "Clinical", "Combined"]))
     extra_predictors = extra_predictors or {}
 
-    # 名称归一：方便匹配 RadScore / Clinical / Combined
     def _key(name: str) -> str:
         return str(name).strip().lower().replace(" ", "")
 
@@ -464,7 +452,6 @@ def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
         extra_predictors = dict(extra_predictors)
         extra_predictors.setdefault("RadScore", radscore)
     clin_cols = list(data_all.clin.columns)
-    # 参考名对不上列时直接报错。不把 Spearman ρ / P / CI 写成 NA。
     resolved_ref = resolve_named_column(
         egfr_col, clin_cols, extras=extra_predictors, allow_group_token=True,
     )
@@ -499,7 +486,6 @@ def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
         rad_cols = []
         if rad_df is not None and getattr(rad_df, "columns", None) is not None:
             rad_cols = [str(c) for c in rad_df.columns]
-        # 预测因子同样对列名。对不上就停，不留 NA 行。
         resolved_pred = resolve_named_column(
             pred_name, clin_cols + rad_cols, extras=extra_predictors,
         )

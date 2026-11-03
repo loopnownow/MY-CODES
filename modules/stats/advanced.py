@@ -23,19 +23,16 @@ def build_analysis_frame(
     df = clin.copy().reset_index(drop=True)
     y = np.asarray(label).astype(float)
     df["Group"] = y
-    # 结局列名别名（DAG/mediation 用 LVSI 等，不再写死 Group）
     outcome = str(getattr(cfg, "GROUP_SOURCE_COL", "") or "").strip()
     if outcome and outcome not in df.columns:
         df[outcome] = y
     if radscore is not None:
         df["RadScore"] = np.asarray(radscore, dtype=float)
     if clin_score is not None:
-        # ClinicalScore 可能短于 n（dropna 后）；对齐失败则仅写有限值
         cs = np.asarray(clin_score, dtype=float)
         if len(cs) == len(df):
             df["ClinicalScore"] = cs
         else:
-            # 用 clin model 完整预测更稳妥——调用方应传入长度匹配的向量
             out = np.full(len(df), np.nan)
             out[: min(len(cs), len(df))] = cs[: min(len(cs), len(df))]
             df["ClinicalScore"] = out
@@ -90,7 +87,6 @@ def run_advanced_stats(
 
     extras["__label__"] = label
 
-    # 本数据里实际存在的列（大小写不敏感）；派生节点始终保留
     col_lut = {str(c).lower(): str(c) for c in frame.columns}
     for extra in ("RadScore", "Group", "Combined", "ClinicalScore"):
         col_lut.setdefault(extra.lower(), extra)
@@ -100,7 +96,6 @@ def run_advanced_stats(
             return None
         return col_lut.get(str(name).strip().lower())
 
-    # ── Mediation 路径：RadScore → selected clinical → 结局 ──
     outcome = str(getattr(cfg, "GROUP_SOURCE_COL", "") or "Group").strip() or "Group"
     outcome = _in_data(outcome) or "Group"
     sel = [str(f) for f in (selected_features or []) if f]
@@ -139,7 +134,6 @@ def run_advanced_stats(
         else:
             print("  ⚠ Mediation: no selected clinical features — skip paths")
 
-    # 同步 cfg 供 DAG 使用：丢掉本数据没有的模板节点（如别的课题的 mmse/phq15）
     try:
         cfg.MEDIATION_PATHS = list(med_paths)
         raw_nodes = list(getattr(cfg, "DAG_NODES", []) or [])
@@ -198,7 +192,6 @@ def run_advanced_stats(
     except Exception as e:
         print(f"  ⚠ Mediation/DAG path sync: {e}")
 
-    # ── DAG ──
     if getattr(cfg, "DO_DAG", False):
         try:
             info["dag"] = dag_plot.run_dag(
@@ -211,7 +204,6 @@ def run_advanced_stats(
     else:
         info["dag"] = None
 
-    # ── SHAP：仅组学（LASSO 入选特征）──
     if getattr(cfg, "DO_SHAP", True):
         try:
             if rad_feature_df is not None and len(getattr(rad_feature_df, "columns", [])) > 0:
@@ -232,7 +224,6 @@ def run_advanced_stats(
     else:
         info["shap"] = None
 
-    # ── Mediation ──
     if getattr(cfg, "DO_MEDIATION", False):
         try:
             if med_paths:

@@ -608,7 +608,6 @@ def run_assoc(
         print("  Partial group: 全部")
     for px, py in pairs:
         try:
-            # 短名（Age）对到展示列（Age (years)）。对不上就停，不写成警告。
             names = list(partial_frame.columns)
             rx = resolve_named_column(px, names)
             ry = resolve_named_column(py, names)

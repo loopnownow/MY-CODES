@@ -21,9 +21,6 @@ import matplotlib.pyplot as plt
 
 from modules import config as cfg
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数
-# ═════════════════════════════════════════════════════════════════
 DCA_THRESHOLD_MIN = 0.01
 DCA_THRESHOLD_MAX = 0.99
 DCA_N_POINTS = 99
@@ -84,7 +81,6 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
         rows.append(pd.DataFrame({"threshold": pts, "NB": nb, "Model": nm}))
     dca_df = pd.concat(rows, ignore_index=True)
 
-    # ── 参考策略：Treat-All 和 Treat-None ──
     nb_all = prev - (1 - prev) * pts / (1 - pts)
     nb_none = np.zeros_like(pts)
     ref_df = pd.concat([
@@ -94,7 +90,6 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     dca_df = pd.concat([dca_df, ref_df], ignore_index=True)
 
     names = list(model_list.keys())
-    # 与 ROC 统一：同一模型名同色（Combined 用独立紫）
     roc_map = dict(getattr(cfg, "ROC_COLOR_MAP", {}) or {})
     model_colors = {}
     for i, nm in enumerate(names):

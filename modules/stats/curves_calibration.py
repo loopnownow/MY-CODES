@@ -24,20 +24,16 @@ from scipy.stats import chi2 as chi2_dist
 
 from modules import config as cfg
 
-# ═════════════════════════════════════════════════════════════════
-# §1  顶层可调参数
-# ═════════════════════════════════════════════════════════════════
-DEFAULT_N_BINS = 8   # 默认分箱数（按预测概率分位数分组）
+DEFAULT_N_BINS = 8
 HL_DENOM_MIN = 1e-12
 
-# dataset_label → {chi2, df, p, n_groups, n}
 HL_METRICS: Dict[str, dict] = {}
 
 
 def _quantile_bins(pr: np.ndarray, n_bins: int) -> pd.Series:
     """与校准曲线共用的分位数切分；箱数不足时返回全 NA。"""
     quantiles = np.quantile(pr, np.linspace(0, 1, n_bins + 1))
-    quantiles[0] -= 1e-9  # pd.cut 左开右闭，保证最小值落入第一箱
+    quantiles[0] -= 1e-9
     edges = np.unique(quantiles)
     if len(edges) < 3:
         return pd.Series([pd.NA] * len(pr))
@@ -122,7 +118,6 @@ def plot_calibration(pred: np.ndarray, y: np.ndarray, n_bins: int = DEFAULT_N_BI
     y = np.asarray(y).astype(int)
     ok = np.isfinite(pred)
 
-    # ── Step 1: 可选：用 pred 对 y 拟合 logistic 获得校准概率 ──
     if recalibrate:
         X = sm.add_constant(pred[ok])
         fit = sm.GLM(y[ok], X, family=sm.families.Binomial()).fit()
@@ -131,10 +126,8 @@ def plot_calibration(pred: np.ndarray, y: np.ndarray, n_bins: int = DEFAULT_N_BI
         pr = pred[ok].astype(float)
     y_ok = y[ok]
 
-    # ── Step 2: 按预测概率分位数分组 ──
     bins = _quantile_bins(pr, n_bins)
 
-    # ── Step 3: 组内汇总 ──
     df = pd.DataFrame({"pr": pr, "y": y_ok, "bin": bins})
     cal = df.groupby("bin", observed=True).agg(mean_pred=("pr", "mean"),
                                                  frac_pos=("y", "mean")).dropna()
@@ -149,7 +142,6 @@ def plot_calibration(pred: np.ndarray, y: np.ndarray, n_bins: int = DEFAULT_N_BI
     else:
         print("  Hosmer-Lemeshow: not estimable")
 
-    # ── 绘图（发表级；HL 数字只进 HTML / 日志，不画进图）──
     fig, ax = cfg.style_new_axes(figsize=(6.2, 5.8))
     ax.plot([0, 1], [0, 1], linestyle="--", color="#888888", linewidth=1.0, zorder=1)
     ax.plot(cal["mean_pred"], cal["frac_pos"], marker="o", markersize=7.5,
