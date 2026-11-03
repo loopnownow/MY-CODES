@@ -113,9 +113,12 @@ def test_sections_place_new_switches():
     assert sec["PARTIAL_X"] == "pcorr"
     clin_ini = next(ks for sid, _t, ks in INI_SECTIONS if sid == "clin")
     clinprep_ini = next(ks for sid, _t, ks in INI_SECTIONS if sid == "clinprep")
+    encode_ini = next(ks for sid, _t, ks in INI_SECTIONS if sid == "encode")
     assert clinprep_ini == [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+    ]
+    assert encode_ini == [
         "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]
     assert "SKIP_CLIN_FEATURES" not in clin_ini
@@ -127,6 +130,7 @@ def test_sections_place_new_switches():
     io_ui = next(ks for sid, _t, ks in SECTION_DEFS if sid == "io")
     clin_ui = next(ks for sid, _t, ks in SECTION_DEFS if sid == "clin")
     clinprep_ui = next(ks for sid, _t, ks in SECTION_DEFS if sid == "clinprep")
+    encode_ui = next(ks for sid, _t, ks in SECTION_DEFS if sid == "encode")
     assert "SKIP_CLIN_FEATURES" not in io_ui
     assert "SKIP_CLIN_FEATURES" not in clin_ui
     assert "ORDINAL_MAX_LEVELS" not in clin_ui
@@ -134,8 +138,13 @@ def test_sections_place_new_switches():
     assert clinprep_ui == [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+    ]
+    assert encode_ui == [
         "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]
+    assert SECTION_OF["TEXT_ENCODE"][0] == "encode"
+    assert SECTION_OF["TEXT_ENCODE_AUTO"][0] == "encode"
+    assert SECTION_OF["TEXT_ENCODE_MAX_LEVELS"][0] == "encode"
     assert SECTION_OF["SKIP_CLIN_FEATURES"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CONTINUOUS"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CATEGORICAL"][0] == "clinprep"
@@ -275,7 +284,8 @@ def test_sections_place_new_switches():
     assert SECTION_OF["DO_RAD_LOGISTIC"][0] == "radlog"
     ids = [sid for sid, _t, _ks in SECTION_DEFS]
     assert ids.index("io") < ids.index("exclude") < ids.index("valmode") < ids.index("clinprep")
-    assert ids.index("clinprep") + 1 == ids.index("clin")
+    assert ids.index("clinprep") + 1 == ids.index("encode")
+    assert ids.index("encode") + 1 == ids.index("clin")
     assert ids.index("clin") + 1 == ids.index("roc")
     assert ids.index("roc") + 1 == ids.index("surv")
     assert ids.index("surv") < ids.index("ancova") < ids.index("mlr")
