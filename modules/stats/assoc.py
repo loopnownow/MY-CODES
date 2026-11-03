@@ -427,7 +427,12 @@ def tables_from_fits(fits: dict[str, Any], outcomes: Sequence[str], group: str,
 
 def partial_corr(df: pd.DataFrame, x: str, y: str, controls: Sequence[str],
                  method: str = "spearman") -> dict[str, Any]:
-    """残差偏相关。Spearman：连续变量先秩变换，分类控制变量保持哑变量。"""
+    """偏相关（pingouin 实现，method=spearman 时由库内部做秩变换）。
+
+    分类控制变量转哑变量（drop_first）。需要 pingouin：pip install "stats-analysis[partial]"。
+    """
+    from pingouin import partial_corr as _pg_partial_corr
+
     method = str(method or "spearman").strip().lower()
     if method not in ("spearman", "pearson"):
         method = "spearman"
@@ -447,36 +452,23 @@ def partial_corr(df: pd.DataFrame, x: str, y: str, controls: Sequence[str],
     n = int(len(sub))
     if n < len(controls) + 5:
         raise ValueError(f"完整例数 {n} 过少")
-    work = sub.copy()
-    if method == "spearman":
-        for col in [x, y, *num_cols]:
-            work[col] = work[col].rank(method="average")
-    pieces = [np.ones(n)]
-    for col in num_cols:
-        pieces.append(pd.to_numeric(work[col], errors="coerce").to_numpy(dtype=float))
+    work = sub.drop(columns=cat_cols) if cat_cols else sub
     if cat_cols:
-        dummies = pd.get_dummies(work[cat_cols], drop_first=True, dtype=float)
-        if dummies.shape[1]:
-            pieces.append(dummies.to_numpy(dtype=float))
-    Z = np.column_stack(pieces)
-    k = int(Z.shape[1] - 1)
-
-    def _resid(vec: np.ndarray) -> np.ndarray:
-        coef, *_rest = np.linalg.lstsq(Z, vec, rcond=None)
-        return vec - Z @ coef
-
-    vx = work[x].to_numpy(dtype=float)
-    vy = work[y].to_numpy(dtype=float)
-    rx, ry = _resid(vx), _resid(vy)
-    if np.allclose(rx, rx[0]) or np.allclose(ry, ry[0]):
+        dummies = pd.get_dummies(sub[cat_cols], drop_first=True, dtype=float)
+        if not dummies.shape[1]:
+            raise ValueError("分类控制变量只剩一个水平")
+        work = pd.concat([work, dummies], axis=1)
+    frame = work.apply(pd.to_numeric, errors="coerce").dropna()
+    n = int(len(frame))
+    k = int(frame.shape[1] - 2)
+    covar = [c for c in frame.columns if c not in (x, y)]
+    got = _pg_partial_corr(data=frame, x=x, y=y, covar=covar, method=method)
+    p_col = next(c for c in got.columns if str(c).lower().startswith("p"))
+    r = float(got["r"].iloc[0])
+    p_val = float(got[p_col].iloc[0])
+    if not np.isfinite(r):
         raise ValueError("残差没有变异")
-    r = float(np.corrcoef(rx, ry)[0, 1])
     df = n - 2 - k
-    if df <= 0 or not np.isfinite(r) or abs(r) >= 1:
-        p_val = float("nan")
-    else:
-        t_val = r * np.sqrt(df / max(1e-15, 1.0 - r * r))
-        p_val = float(2 * stats.t.sf(abs(t_val), df))
     se_z = 1.0 / np.sqrt(max(n - k - 3, 1))
     z = np.arctanh(np.clip(r, -0.999999, 0.999999))
     lo, hi = float(np.tanh(z - 1.96 * se_z)), float(np.tanh(z + 1.96 * se_z))
