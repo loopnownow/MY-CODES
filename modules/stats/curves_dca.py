@@ -18,6 +18,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve
 
 from modules import config as cfg
 
@@ -31,23 +32,28 @@ DEFAULT_MODEL_COLORS = list(getattr(cfg, "ROC_FALLBACK_COLORS", [
 
 
 def _sens_spec_at_thresholds(y: np.ndarray, pred: np.ndarray, pts: np.ndarray):
+    """在给定阈值概率 pts 上取（灵敏度，特异度）。
+
+    sklearn 的 roc_curve 只在观测分值上给阶梯点，这里把「分值升序 → tpr/fpr」
+    取出来，再按「判阳 = 分值 ≥ 阈值」查找，与逐点计数口径一致（并列与越界都覆盖）。
     """
-    在给定的一组阈值概率 pts 上，为每个阈值找到对应的（灵敏度，特异度）。
-    以预测分数本身作为阈值刻度（不做额外校准），直接在该刻度上
-    切分阳性/阴性预测。
-    """
-    sens = np.empty_like(pts)
-    spec = np.empty_like(pts)
     y_pos = y == 1
     y_neg = y == 0
-    n_pos = y_pos.sum()
-    n_neg = y_neg.sum()
-    for i, pt in enumerate(pts):
-        pred_pos = pred >= pt
-        tp = np.sum(pred_pos & y_pos)
-        tn = np.sum(~pred_pos & y_neg)
-        sens[i] = tp / n_pos if n_pos > 0 else np.nan
-        spec[i] = tn / n_neg if n_neg > 0 else np.nan
+    n_pos = int(y_pos.sum())
+    n_neg = int(y_neg.sum())
+    if n_pos == 0 or n_neg == 0:
+        nan = np.full(len(pts), np.nan, dtype=float)
+        return nan, nan
+    if not np.all(np.isfinite(pred)):
+        raise ValueError("DCA 预测分数含非有限值")
+    fpr, tpr, thr = roc_curve(y, pred, drop_intermediate=False)
+    order = np.argsort(thr, kind="mergesort")
+    thr, tpr, fpr = thr[order], tpr[order], fpr[order]
+    idx = np.searchsorted(thr, np.asarray(pts, dtype=float), side="left")
+    over = idx >= len(thr)
+    safe = np.clip(idx, 0, len(thr) - 1)
+    sens = np.where(over, 0.0, tpr[safe]).astype(float)
+    spec = np.where(over, 1.0, 1.0 - fpr[safe]).astype(float)
     return sens, spec
 
 
