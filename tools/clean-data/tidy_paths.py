@@ -3,11 +3,11 @@
 
 合并来源：`lxj_AN/*.py` 里的 `BASE` 常量 + `ssd/ssd_paths.py`。
 
-目录约定（见 `D:\\0Grok\\drafting\\lxj_AN\\ref\\AGENTS.md`）::
+目录约定（见 `<GROK_ROOT>\\drafting\\lxj_AN\\ref\\AGENTS.md`）::
 
-    脚本   → D:\\0Grok\\0doc\\_code\\02-data-processing/clean-data\\   本包
-    数据   → D:\\0Grok\\<阶段>\\<子工程>\\         如 D:\\0Grok\\drafting\\lxj_AN
-    临时   → D:\\0del\\                            所有子工程共用，只搬不删（DEL_ROOT 可覆盖）
+    脚本   → tools\\clean-data\\                       本包（{code_stats}）
+    数据   → <GROK_ROOT>\\<阶段>\\<子工程>\\            如 <GROK_ROOT>\\drafting\\lxj_AN
+    临时   → <GROK_ROOT> 之外的 {DEL} 根              所有子工程共用，只搬不删（DEL_ROOT 可覆盖）
 
 ORAD_ROOT（准备中课题根）::
 

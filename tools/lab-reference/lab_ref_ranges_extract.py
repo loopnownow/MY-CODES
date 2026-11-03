@@ -6,7 +6,7 @@ Peer-review numeric plausibility KB only — NOT clinical decision support.
 Never invents ref_low/ref_high/mean/sd. Quotes only what appears in source text.
 
 Outputs under %TEMP%\\lab-scratch\\lab-ref-ranges\\ (env SCRATCH_ROOT overrides) and inventory under
-D:\\0Grok\\0doc\\_library\\lab-ref-ranges\\inventory\\
+<GROK_ROOT>\\0doc\\_library\\lab-ref-ranges\\inventory\\
 
 Run: python lab_ref_ranges_extract.py
 """
