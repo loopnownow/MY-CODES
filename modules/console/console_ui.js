@@ -3696,13 +3696,6 @@ function blkRows() {
       score: String(x.score || ""),
     }));
 }
-function blkSheetOptions(cur) {
-  const sheets = (typeof workbookSheets === "function" ? workbookSheets() : []) || [];
-  const out = [""].concat(sheets.map(s => String(s)));
-  const c = String(cur || "");
-  if (c && out.indexOf(c) < 0) out.push(c);
-  return out.map(s => `<option value="${esc(s)}"${s === c ? " selected" : ""}>${esc(s || "（选工作表）")}</option>`).join("");
-}
 function textEncodeSpec() {
   const v = fieldValue("TEXT_ENCODE");
   const out = {};
@@ -3983,24 +3976,6 @@ function applyBlkRow(el) {
     const nameInput = row.querySelector("[data-blk=name]");
     if (nameInput && !nameInput.value.trim() && cur.name) nameInput.value = cur.name;
   }
-}
-function addBlkRow(name) {
-  const rows = blkRows();
-  const nm = String(name || "").trim();
-  if (!nm) return alert("先写块名（通常等于工作表名）");
-  if (rows.some(r => r.name.toLowerCase() === nm.toLowerCase())) {
-    return alert("已有同名块：" + nm);
-  }
-  rows.push({ name: nm, sheet: nm, method: "", enabled: true, prep: {}, params: {}, score: "" });
-  setFieldValue("MODALITY_BLOCKS", rows);
-  renderForm();
-}
-function delBlkRow(i) {
-  const rows = blkRows();
-  if (i < 0 || i >= rows.length) return;
-  rows.splice(i, 1);
-  setFieldValue("MODALITY_BLOCKS", rows);
-  renderForm();
 }
 
 function radPrefixStripCombo(prefixF, stripF, asSection) {
@@ -4585,13 +4560,6 @@ function bindDelegates() {
       setFieldValue(key, vals);
     }
   });
-  document.body.addEventListener("keydown", (e) => {
-    const t = e.target;
-    if (!t || !t.matches || !t.matches("[data-blk-add]")) return;
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    addBlkRow(t.value);
-  });
   document.body.addEventListener("click", (e) => {
     const scan = e.target.closest && e.target.closest("[data-txt-scan]");
     if (scan) {
@@ -4611,11 +4579,6 @@ function bindDelegates() {
       delTxtColumn(dcol.getAttribute("data-txt-del"));
       return;
     }
-    const del = e.target.closest && e.target.closest("[data-blk-del]");
-    if (!del) return;
-    e.preventDefault();
-    e.stopPropagation();
-    delBlkRow(Number(del.getAttribute("data-blk-del")));
   });
   document.body.addEventListener("mousedown", (e) => {
     if (e.target.closest && e.target.closest("[data-marker-ctl]")) e.stopPropagation();
