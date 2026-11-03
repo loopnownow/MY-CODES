@@ -37,19 +37,6 @@ async function fetchPreview(file) {
   return j;
 }
 
-async function previewIntoExtRow(row, file) {
-  if (!row || !file) return;
-  try {
-    const j = await fetchPreview(file);
-    const prev = (j && j.preview) || {};
-    const sheets = prev.sheets || ioSheetOpts;
-    const ids = prev.rad_id_cols || prev.id_options || ioRadIdOpts;
-    fillSelect(row.querySelector("[data-ext=clin]"), sheets, null, IO_DEFAULTS.CLIN_SHEET);
-    fillSelect(row.querySelector("[data-ext=rad]"), sheets, null, IO_DEFAULTS.RAD_SHEET);
-    fillSelect(row.querySelector("[data-ext=radid]"), ids, null, IO_DEFAULTS.RAD_ID_COL);
-  } catch (e) {}
-}
-
 async function refreshIoLists() {
   const msg = $("ioMsg");
   try {
