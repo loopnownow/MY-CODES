@@ -613,12 +613,41 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
             "QC_SHEET": qh or "",
             "ICC_SHEET": ih or "",
         },
+        "blocks": _preview_blocks(settings, sheets, info),
         "sheet_rule": (
             "CLIN_SHEET 与 RAD_SHEET 必须二选一"
             if not (ch or rh)
             else ""
         ),
     }
+
+def _preview_blocks(settings: dict[str, Any], sheets: list[str], info: dict) -> list[dict]:
+    """预览用：每块的工作表、列名与行数（不参与建模范畴，仅供控制台显示）。"""
+    out: list[dict] = []
+    raw = settings.get("MODALITY_BLOCKS") or []
+    if not isinstance(raw, list):
+        return out
+    low = {str(s).lower(): str(s) for s in sheets}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        sheet = str(item.get("sheet") or name).strip()
+        hit = low.get(sheet.lower())
+        cols = list((info.get(hit) or {}).get("columns") or []) if hit else []
+        out.append({
+            "name": name,
+            "sheet": sheet,
+            "resolved": hit or "",
+            "method": str(item.get("method") or ""),
+            "enabled": item.get("enabled") is not False,
+            "n_cols": len(cols),
+            "columns": cols[:40],
+        })
+    return out
+
 
 def _resolve_ext_xlsx(file: str, data_path: Path) -> Path:
     src = Path(str(file or "").strip())
@@ -686,7 +715,7 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
         "EXCLUDE_COL", "EXCLUDE_ROW",
         "ICC_THRESHOLD", "ICC_INTRA_COL", "ICC_INTER_COL",
         "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
-        "EXTERNAL_TESTS",
+        "EXTERNAL_TESTS", "MODALITY_BLOCKS",
     )
     blob = []
     for key in keep:

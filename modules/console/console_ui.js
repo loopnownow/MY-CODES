@@ -2358,7 +2358,7 @@ function renderForm() {
       const titleSet = new Set(titleKeys);
       const hasRad = !!pickExistingSheet(
         (S.values && S.values.RAD_SHEET) || "", workbookSheets(), ""
-      );
+      ) || blkRows().length > 0;
       if (!hasRad) {
         const head = sectionHead("radprep", g.title, "未用", "未指定组学 sheet，跳过预处理。要做组学请回起始页选择组学表。", titleKeys);
         return `<div class="sec-block off${head.dim}" data-sec="radprep">
@@ -2376,12 +2376,19 @@ function renderForm() {
       for (const f of vis) {
         if (left.indexOf(f) < 0) left.push(f);
       }
-      if (!left.length && !titleKeys.length) return "";
-      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。标记的筛选、分类、剥离在单独模块。";
-      const head = sectionHead("radprep", g.title, left.length, hint, titleKeys);
+      const hiddenPanel = new Set([
+        "MODALITY_BLOCKS", "COMBINED_BLOCKS", "COMBINED_EXCLUDE",
+        "COMBINED_MODE", "CLIN_BLOCK_METHOD",
+      ]);
+      const shown = left.filter(f => !hiddenPanel.has(f.key));
+      if (!shown.length && !titleKeys.length) return "";
+      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。下面是模态块：每块一张工作表、各自选 LASSO 或 Logistic。标记的筛选、分类、剥离在单独模块。";
+      const head = sectionHead("radprep", g.title, shown.length, hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="radprep">
       ${head.html}
-      <div class="sec-body radprep-body">${left.map(renderField).join("")}</div>
+      <div class="sec-body radprep-body">${shown.map(renderField).join("")}
+        <div class="rad-blocks-wrap">${modalityBlocksPanel()}</div>
+      </div>
     </div>`;
     }
     if (g.id === "radmark") {
@@ -3227,6 +3234,104 @@ function radPrefixStripComboRow(prefix, n, exclOn, stripVal, names, assigned) {
   const del = `<button type="button" class="kv-del" data-kv-del="RAD_PREFIX_STRIP_COMBO" data-kvl="${esc(prefix)}" title="去掉这一行（需要时可下方手写加回）">−</button>`;
   return `<div class="kv-row">${chip}${pexcl}${grp}${strip}${del}</div>`;
 }
+function blkRows() {
+  const v = fieldValue("MODALITY_BLOCKS");
+  const arr = Array.isArray(v) ? v : [];
+  return arr
+    .filter(x => x && typeof x === "object")
+    .map(x => ({
+      name: String(x.name || ""),
+      sheet: String(x.sheet || ""),
+      method: String(x.method || ""),
+      enabled: x.enabled === false ? false : true,
+      prep: (x.prep && typeof x.prep === "object") ? x.prep : {},
+      params: (x.params && typeof x.params === "object") ? x.params : {},
+      score: String(x.score || ""),
+    }));
+}
+function blkSheetOptions(cur) {
+  const sheets = (typeof workbookSheets === "function" ? workbookSheets() : []) || [];
+  const out = [""].concat(sheets.map(s => String(s)));
+  const c = String(cur || "");
+  if (c && out.indexOf(c) < 0) out.push(c);
+  return out.map(s => `<option value="${esc(s)}"${s === c ? " selected" : ""}>${esc(s || "（选工作表）")}</option>`).join("");
+}
+function modalityBlocksPanel() {
+  const rows = blkRows();
+  const body = rows.length
+    ? rows.map((b, i) => `<div class="kv-row blk-row" data-blk-row="${i}">
+      <input data-blk="name" value="${esc(b.name)}" placeholder="块名=工作表名" spellcheck="false"/>
+      <select data-blk="sheet">${blkSheetOptions(b.sheet || b.name)}</select>
+      <select data-blk="method">${[["", "（跳过）"], ["lasso", "LASSO"], ["logistic", "Logistic"]]
+        .map(([v, t]) => `<option value="${v}"${b.method === v ? " selected" : ""}>${t}</option>`).join("")}</select>
+      <label class="pexcl"><input type="checkbox" data-blk="enabled"${b.enabled ? " checked" : ""}/> 启用</label>
+      <button type="button" class="kv-del" data-blk-del="${i}" title="删掉这一块">−</button>
+    </div>`).join("")
+    : `<span class="kv-empty">还没有块。每块一张工作表（cln 之外）；下方回车添加，块名=工作表名。</span>`;
+  const mode = String(fieldValue("COMBINED_MODE") || "per_block");
+  const inc = asList(fieldValue("COMBINED_BLOCKS")).join(", ");
+  const exc = asList(fieldValue("COMBINED_EXCLUDE")).join(", ");
+  const clin = String(fieldValue("CLIN_BLOCK_METHOD") || "logistic");
+  return `<div class="kv-rows rad-blocks" data-key="MODALITY_BLOCKS">
+    <div class="kv-row rad-prefix-head"><span>块名</span><span>工作表</span><span>方法（第2/3行）</span><span>启用</span><span></span></div>
+    ${body}
+    <input class="kv-add" data-blk-add="1" placeholder="+ 块名（=工作表名），回车" spellcheck="false"/>
+    <div class="kv-row blk-combined">
+      <label>临床块
+        <select data-blk-clin="1">
+          ${[["logistic", "Logistic"], ["", "（跳过临床筛选）"]]
+            .map(([v, t]) => `<option value="${v}"${clin === v ? " selected" : ""}>${t}</option>`).join("")}
+        </select>
+      </label>
+      <label>Combined 主模型
+        <select data-blk-mode="1">
+          <option value="per_block"${mode !== "joint" ? " selected" : ""}>per_block（临床 + 每块分别）</option>
+          <option value="joint"${mode === "joint" ? " selected" : ""}>joint（临床 + 全部块）</option>
+        </select>
+      </label>
+      <input data-blk-list="COMBINED_BLOCKS" value="${esc(inc)}" placeholder="联合纳入块（空=全部）" spellcheck="false"/>
+      <input data-blk-list="COMBINED_EXCLUDE" value="${esc(exc)}" placeholder="联合剔除块" spellcheck="false"/>
+    </div>
+    <span class="kv-empty">预处理（第1行）用上面的相关/ICC 阈值；每块的参数覆盖留空=用默认。分数字段名固定 RadScore_块名。</span>
+  </div>`;
+}
+function applyBlkRow(el) {
+  const row = el.closest && el.closest("[data-blk-row]");
+  if (!row) return;
+  const i = Number(row.getAttribute("data-blk-row"));
+  const rows = blkRows();
+  const cur = rows[i];
+  if (!cur) return;
+  const field = el.getAttribute("data-blk");
+  if (field === "enabled") cur.enabled = !!el.checked;
+  else if (field) cur[field] = String(el.value || "").trim();
+  if (field === "name" && !cur.name) return;
+  rows[i] = cur;
+  setFieldValue("MODALITY_BLOCKS", rows);
+  if (field === "name" || field === "sheet") {
+    const nameInput = row.querySelector("[data-blk=name]");
+    if (nameInput && !nameInput.value.trim() && cur.name) nameInput.value = cur.name;
+  }
+}
+function addBlkRow(name) {
+  const rows = blkRows();
+  const nm = String(name || "").trim();
+  if (!nm) return alert("先写块名（通常等于工作表名）");
+  if (rows.some(r => r.name.toLowerCase() === nm.toLowerCase())) {
+    return alert("已有同名块：" + nm);
+  }
+  rows.push({ name: nm, sheet: nm, method: "", enabled: true, prep: {}, params: {}, score: "" });
+  setFieldValue("MODALITY_BLOCKS", rows);
+  renderForm();
+}
+function delBlkRow(i) {
+  const rows = blkRows();
+  if (i < 0 || i >= rows.length) return;
+  rows.splice(i, 1);
+  setFieldValue("MODALITY_BLOCKS", rows);
+  renderForm();
+}
+
 function radPrefixStripCombo(prefixF, stripF, asSection) {
   if (!prefixF && !stripF) return "";
   const open = S.kvFoldOpen && S.kvFoldOpen.RAD_PREFIX_STRIP_COMBO ? " open" : "";
@@ -3770,6 +3875,36 @@ function bindField(el) {
 }
 
 function bindDelegates() {
+  document.body.addEventListener("change", (e) => {
+    const t = e.target;
+    if (!t || !t.matches) return;
+    if (t.matches("[data-blk]")) { applyBlkRow(t); return; }
+    if (t.matches("[data-blk-clin]")) { setFieldValue("CLIN_BLOCK_METHOD", t.value); return; }
+    if (t.matches("[data-blk-mode]")) {
+      setFieldValue("COMBINED_MODE", t.value);
+      renderForm();
+      return;
+    }
+    if (t.matches("[data-blk-list]")) {
+      const key = t.getAttribute("data-blk-list");
+      const vals = String(t.value || "").split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+      setFieldValue(key, vals);
+    }
+  });
+  document.body.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (!t || !t.matches || !t.matches("[data-blk-add]")) return;
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    addBlkRow(t.value);
+  });
+  document.body.addEventListener("click", (e) => {
+    const del = e.target.closest && e.target.closest("[data-blk-del]");
+    if (!del) return;
+    e.preventDefault();
+    e.stopPropagation();
+    delBlkRow(Number(del.getAttribute("data-blk-del")));
+  });
   document.body.addEventListener("mousedown", (e) => {
     if (e.target.closest && e.target.closest("[data-marker-ctl]")) e.stopPropagation();
     const sheet = e.target.closest && e.target.closest("[data-add-sheet]");
