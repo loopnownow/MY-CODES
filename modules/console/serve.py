@@ -364,7 +364,7 @@ def register_protocol() -> None:
     # bootstrap at top of this file makes PYTHONPATH unnecessary
     cmd = f'"{exe}" "{script}" "%1"'
     key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\radconsole")
-    winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "URL:RAD Console")
+    winreg.SetValueEx(key, "", 0, winreg.REG_SZ, "URL:统计控制台")
     winreg.SetValueEx(key, "URL Protocol", 0, winreg.REG_SZ, "")
     sub = winreg.CreateKey(key, r"shell\open\command")
     winreg.SetValueEx(sub, "", 0, winreg.REG_SZ, cmd)
@@ -377,6 +377,7 @@ def _serve_url(port: int, project: str | None, data: str | None = None) -> str:
     q: dict[str, str] = {}
     if project:
         q["project"] = str(project)
+        q["tab"] = "preview"
     if data:
         q["data"] = str(data)
     if q:

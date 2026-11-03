@@ -134,14 +134,14 @@ const FIELD_BUNDLES = [
     id: "sheets",
     keys: ["RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET"],
     title: "工作表",
-    hint: "空=本次不做该项。起始页已选过，可在此改。",
+    hint: "空=本次不做该项。在「数据预览」页选择。",
     cls: "sheets",
   },
   {
     id: "external",
     keys: ["EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET", "USE_INTERNAL_SPLIT_WHEN_EXTERNAL"],
     title: "外部验证",
-    hint: "外验在起始页填写。主模型锁死后整队列评估（同亚组：不重筛）。多条横拼，一条不拼。",
+    hint: "在「数据预览」页填写。主模型锁死后整队列评估（同亚组：不重筛）。多条横拼，一条不拼。",
     cls: "external",
   },
 
@@ -153,13 +153,6 @@ const FIELD_BUNDLES = [
     cls: "sub3",
   },
   {
-    id: "maps",
-    keys: ["READER_VALUE_MAP"],
-    title: "文本编码",
-    hint: "CR/PR/SD/PD 在分组卡每个水平的阴/阳里设定，这里不重复。其余文字先选列，再选 1 或 0。Positive→1、Negative→0 不列出。行尾 − 只收起列，已有编码保留。",
-    cls: "kvmap",
-  },
-  {
     id: "nomoVars",
     keys: ["FORCE_MODEL_FEATURES"],
     title: "列线图变量",
@@ -168,9 +161,9 @@ const FIELD_BUNDLES = [
   },
   {
     id: "exclude",
-    keys: ["DO_EXCLUDE_SAMPLES", "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW"],
+    keys: ["DO_EXCLUDE_SAMPLES", "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS"],
     title: "样本排除名单",
-    hint: "工程级设置（不按结局覆盖）。选完一个文件，下面再出一行选其他文件。sheet / 列 / 内容仍是一套，套到每个文件。空 sheet/列=运行时默认 exc；空内容=该列整列当 ID。",
+    hint: "在「数据预览」页设置（工程级，不按结局覆盖）。选完一个文件，下面再出一行选其他文件。sheet / 列 / 内容仍是一套，套到每个文件。空 sheet/列=运行时默认 exc；空内容=该列整列当 ID。",
     cls: "exclude",
   },
   {
@@ -225,6 +218,9 @@ const FIELD_BUNDLES = [
     cls: "maps",
   },
 ];
+
+// 这三个 bundle 在「数据预览」页渲染，不进配置页的 io 段。
+const DATA_PANE_BUNDLES = new Set(["sheets", "external", "exclude"]);
 
 const PAL_ORDER = [
   "npg", "okabe", "tol", "radiology", "ibm", "aaas", "nejm", "lancet", "jama", "jco",

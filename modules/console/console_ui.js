@@ -80,6 +80,8 @@ function showPane(name) {
   else url.searchParams.delete("tab");
   history.replaceState(null, "", url);
   if (flow) loadFlowFrame();
+  else if (preview) renderDataPane();
+  else if (S.schema && S.schema.length) renderForm();
 }
 
 function loadFlowFrame() {
@@ -1812,11 +1814,391 @@ function applyPreviewLists(prev) {
   ioRadIdOpts = prev.rad_id_cols || prev.id_options || [];
   ioClinIdOpts = prev.clin_cols || prev.id_options || [];
 }
+
+// 数据预览页的字段：这些键只在 renderDataPane 里渲染，不进配置页。
+const DATA_PANE_KEYS = new Set([
+  "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET",
+  "RAD_ID_COL", "CLIN_ID_COL", "LABEL_COL", "RAD_ID_COLS",
+  "DO_EXCLUDE_SAMPLES", "EXCLUDE_FILE", "EXCLUDE_SHEET",
+  "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS",
+  "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
+  "USE_INTERNAL_SPLIT_WHEN_EXTERNAL",
+]);
+
+function paneField(key) {
+  return (S.schema || []).find(f => f.key === key) || null;
+}
+
+const ROLE_LABELS = { "": "不用", clin: "临床信息", rad: "组学模块", qc: "质控", icc: "ICC" };
+
+function pvSheets() {
+  const info = (S.preview && S.preview.sheet_info) || {};
+  return workbookSheets()
+    .map((s) => String(s || "").trim())
+    .filter(Boolean)
+    .map((name) => ({ name, info: info[name] || {} }));
+}
+
+function pvCols(sheet) {
+  const info = ((S.preview && S.preview.sheet_info) || {})[sheet] || {};
+  return Array.isArray(info.columns) ? info.columns.map(String) : [];
+}
+
+function pvRole(sheet) {
+  const v = S.values || {};
+  if (String(v.CLIN_SHEET || "") === sheet) return "clin";
+  if (String(v.QC_SHEET || "") === sheet) return "qc";
+  if (String(v.ICC_SHEET || "") === sheet) return "icc";
+  if (blkRows().some((b) => String(b.sheet || b.name) === sheet)) return "rad";
+  return "";
+}
+
+function pvBlockOf(sheet) {
+  return blkRows().find((b) => String(b.sheet || b.name) === sheet) || null;
+}
+
+function pvDefaultScore(sheet) {
+  const idx = blkRows().findIndex((b) => String(b.sheet || b.name) === sheet);
+  return idx <= 0 ? "RadScore" : "RadScore_" + sheet;
+}
+
+function optHtml(items, cur, blank) {
+  const have = uniqOpts(items);
+  let html = `<option value="">${esc(blank || "（不设）")}</option>`;
+  have.forEach((s) => {
+    html += `<option value="${esc(s)}"${s === String(cur || "") ? " selected" : ""}>${esc(s)}</option>`;
+  });
+  if (cur && have.indexOf(String(cur)) < 0) {
+    html += `<option value="${esc(cur)}" selected>${esc(cur)}</option>`;
+  }
+  return html;
+}
+
+function roleSelectHtml(sheet, role) {
+  const opts = ["", "clin", "rad", "qc", "icc"].map((v) => (
+    `<option value="${v}"${v === role ? " selected" : ""}>${esc(ROLE_LABELS[v])}</option>`
+  )).join("");
+  return `<select data-role="${esc(sheet)}">${opts}</select>`;
+}
+
+function renderRoleTable() {
+  const rows = pvSheets();
+  if (!rows.length) return '<p class="hint">载入数据文件后自动读出工作表。</p>';
+  const head = `<div class="pv-role-head"><span>工作表</span><span>尺寸</span><span>角色</span><span>ID 列</span><span>分数名</span></div>`;
+  const body = rows.map(({ name, info }) => {
+    const role = pvRole(name);
+    const dim = (info && info.n_rows != null) ? `${info.n_rows}×${info.n_cols}` : "—";
+    const cls = "pv-role-row" + (role === "rad" ? " is-rad" : "") + (role ? "" : " is-off");
+    const cols = pvCols(name);
+    let idCell = '<span class="dim">—</span>';
+    let scoreCell = '<span class="dim">—</span>';
+    if (role === "clin") {
+      idCell = `<select data-role-id="${esc(name)}">${optHtml(cols, String((S.values || {}).CLIN_ID_COL || ""), "（不设）")}</select>`;
+    } else if (role === "rad") {
+      const b = pvBlockOf(name) || {};
+      idCell = `<select data-role-id="${esc(name)}">${optHtml(cols, String(b.id_col || ""), "（用组学 ID 列）")}</select>`;
+      scoreCell = `<input data-role-score="${esc(name)}" value="${esc(b.score || "")}" placeholder="${esc(pvDefaultScore(name))}" spellcheck="false"/>`;
+    }
+    return `<div class="${cls}" data-role-row="${esc(name)}">
+      <span class="sheet" title="${esc(name)}">${esc(name)}</span>
+      <span class="dim">${esc(dim)}</span>
+      ${roleSelectHtml(name, role)}
+      ${idCell}
+      ${scoreCell}
+    </div>`;
+  }).join("");
+  return `<div class="pv-role">${head}${body}</div>`;
+}
+
+function setSheetRole(sheet, role) {
+  const v = S.values || (S.values = {});
+  if (String(v.CLIN_SHEET || "") === sheet) v.CLIN_SHEET = "";
+  if (String(v.QC_SHEET || "") === sheet) v.QC_SHEET = "";
+  if (String(v.ICC_SHEET || "") === sheet) v.ICC_SHEET = "";
+  const next = blkRows().filter((b) => String(b.sheet || b.name) !== sheet);
+  if (role === "clin") v.CLIN_SHEET = sheet;
+  else if (role === "qc") v.QC_SHEET = sheet;
+  else if (role === "icc") v.ICC_SHEET = sheet;
+  else if (role === "rad") {
+    next.push({ name: sheet, sheet: sheet, method: "logistic", enabled: true, kind: "rad", prep: {}, params: {}, score: "", id_col: "" });
+  }
+  next.forEach((b, i) => {
+    if (!String(b.score || "").trim()) b.score = i === 0 ? "RadScore" : "RadScore_" + b.name;
+  });
+  setFieldValue("MODALITY_BLOCKS", next);
+  setFieldValue("RAD_SHEET", next.length ? String(next[0].sheet || next[0].name) : "");
+  markDirty();
+  refreshDataPane().catch((e) => {
+    const msg = $("ioMsg");
+    if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
+  });
+}
+
+function setSheetIdCol(sheet, col) {
+  const role = pvRole(sheet);
+  if (role === "clin") {
+    setFieldValue("CLIN_ID_COL", col);
+  } else if (role === "rad") {
+    const rows = blkRows();
+    const i = rows.findIndex((b) => String(b.sheet || b.name) === sheet);
+    if (i < 0) return;
+    rows[i].id_col = col;
+    setFieldValue("MODALITY_BLOCKS", rows);
+  }
+  markDirty();
+}
+
+function setSheetScore(sheet, val) {
+  const rows = blkRows();
+  const i = rows.findIndex((b) => String(b.sheet || b.name) === sheet);
+  if (i < 0) return;
+  rows[i].score = String(val || "").trim();
+  setFieldValue("MODALITY_BLOCKS", rows);
+  markDirty();
+}
+
+function renderDataPane() {
+  const form = $("pvDataForm");
+  if (!form) return;
+  renderProjectInfo();
+  const sheets = $("pvSheets");
+  if (sheets) sheets.innerHTML = renderRoleTable();
+  const ids = $("pvIds");
+  if (ids) {
+    const fields = ["RAD_ID_COL", "LABEL_COL", "RAD_ID_COLS"].map(paneField).filter(Boolean);
+    ids.innerHTML = fields.length
+      ? `<div class="field-group ids">${fields.map(renderField).join("")}</div>`
+      : '<p class="hint">载入数据文件后显示 ID 列与非特征列。</p>';
+  }
+  const ex = $("pvExclude");
+  if (ex) ex.innerHTML = excludeRowsHtml();
+  form.querySelectorAll("[data-key]").forEach(bindField);
+  form.querySelectorAll(".grow-rows").forEach(bindGrowRows);
+  bindExcludeRows();
+  fillIoModule();
+}
+
+function pvExcFiles() {
+  return growItems(fieldValue("EXCLUDE_FILE"));
+}
+
+function excludeRowsHtml() {
+  const files = pvExcFiles();
+  const rows = files.length ? files : [""];
+  const meta = S.pvExcMeta || {};
+  const sheet = String(fieldValue("EXCLUDE_SHEET") || "");
+  const col = String(fieldValue("EXCLUDE_COL") || "");
+  const row = String(fieldValue("EXCLUDE_ROW") || "");
+  const head = `<div class="pv-exc-head"><span>文件</span><span>选择</span><span>sheet</span><span>列</span><span>内容</span><span></span></div>`;
+  const body = rows.map((f, i) => {
+    const first = i === 0;
+    const dis = first ? "" : " disabled";
+    const shared = "（共用第一行）";
+    return `<div class="pv-exc-row" data-exc-row="${i}">
+      <input data-exc="file" type="text" list="xlsxList" value="${esc(f)}" placeholder="排除名单 xlsx" autocomplete="off" spellcheck="false"/>
+      <input data-exc-filepick type="file" accept=".xlsx,.xls" hidden/>
+      <button type="button" class="btn sec" data-exc-pick>选择</button>
+      <select data-exc="sheet"${dis}>${optHtml(first ? (meta.sheets || []) : [], sheet, first ? "（默认 exc）" : shared)}</select>
+      <select data-exc="col"${dis}>${optHtml(first ? (meta.columns || []) : [], col, first ? "（默认 exc）" : shared)}</select>
+      <select data-exc="row"${dis}>${optHtml(first ? (meta.values || []) : [], row, first ? "（整列当 ID）" : shared)}</select>
+      <button type="button" class="btn sec" data-exc-del title="删这一行">删</button>
+    </div>`;
+  }).join("");
+  return `<div class="pv-exc">${head}${body}</div>
+    <div class="save-row">
+      <button type="button" id="btnExcAdd">+ 文件</button>
+      <span class="hint">名单非空才排除；空＝不排除。多个文件共用第一行的 sheet / 列 / 内容。</span>
+    </div>`;
+}
+
+function readExcFiles() {
+  const box = $("pvExclude");
+  if (!box) return pvExcFiles();
+  const out = [];
+  box.querySelectorAll("[data-exc-row]").forEach((row) => {
+    const inp = row.querySelector("[data-exc=file]");
+    const v = inp ? String(inp.value || "").trim() : "";
+    if (v) out.push(v);
+  });
+  return out;
+}
+
+function applyExcFiles(list) {
+  setFieldValue("EXCLUDE_FILE", list);
+  setFieldValue("DO_EXCLUDE_SAMPLES", list.length > 0);
+  markDirty();
+}
+
+async function loadExcMeta(file) {
+  const name = String(file || "").trim();
+  if (!name) {
+    S.pvExcMeta = {};
+    return;
+  }
+  const sheet = String(fieldValue("EXCLUDE_SHEET") || "");
+  const col = String(fieldValue("EXCLUDE_COL") || "");
+  try {
+    const j = await fetchXlsxMeta(name, sheet, col);
+    S.pvExcMeta = { sheets: j.sheets || [], columns: j.columns || [], values: j.values || [] };
+  } catch (e) {
+    S.pvExcMeta = {};
+    const msg = $("ioMsg");
+    if (msg) msg.innerHTML = `<span class="err">排除名单读取失败：${esc(e && e.message ? e.message : e)}</span>`;
+  }
+}
+
+function renderProjectInfo() {
+  const box = $("pvProjectBox");
+  if (!box) return;
+  const proj = ($("project") && $("project").value) || "—";
+  const p = (S.projects || []).find((x) => x.name === proj) || {};
+  const data = String(($("data") && $("data").value) || "").trim();
+  const settings = String(($("settings") && $("settings").value) || "").trim();
+  const mods = String(($("modulesDir") && $("modulesDir").value) || "").trim();
+  const prev = S.preview || {};
+  const sheets = (prev.sheets || []).length;
+  const exts = Array.isArray(prev.external) ? prev.external.length : 0;
+  const nClin = prev.n_clin != null ? prev.n_clin : prev.clin_n;
+  const nRad = prev.n_rad != null ? prev.n_rad : prev.rad_n;
+  const nOv = prev.n_overlap != null ? prev.n_overlap : prev.overlap;
+  const ratio = (nClin != null || nRad != null)
+    ? `clin ${nClin == null ? "—" : nClin} / rad ${nRad == null ? "—" : nRad} / 重叠 ${nOv == null ? "—" : nOv}`
+    : "—";
+  const rows = [
+    ["课题", proj],
+    ["数据文件", data ? (data.split(/[/\\]/).pop() || data) : "—"],
+    ["数据位置", p.dir || "—"],
+    ["settings", settings || "ref/settings.ini"],
+    ["modules", mods || "—"],
+    ["工作表", sheets ? String(sheets) : "—"],
+    ["例数", ratio],
+    ["外验", exts ? String(exts) : "—"],
+  ];
+  box.innerHTML = rows.map(([k, v]) => (
+    `<div><div class="kv-k">${esc(k)}</div><div class="kv-v">${esc(String(v))}</div></div>`
+  )).join("");
+}
+
+async function refreshDataPane() {
+  const msg = $("ioMsg");
+  if (msg) msg.textContent = "正在更新预览…";
+  syncExtRows();
+  await loadExcMeta(pvExcFiles()[0] || "");
+  await reloadPreview();
+  renderDataPane();
+  if (msg) msg.textContent = "已更新预览。";
+}
+
+function syncExtRows() {
+  const tests = readExtRows();
+  const first = tests[0] || emptyExtRow();
+  if (!S.values) S.values = {};
+  S.values.EXTERNAL_FILE = first.file || "";
+  S.values.EXTERNAL_CLIN_SHEET = first.clin_sheet || "";
+  S.values.EXTERNAL_RAD_SHEET = first.rad_sheet || "";
+  S.values.EXTERNAL_TESTS = tests;
+  if ($("ioExtSplit")) S.values.USE_INTERNAL_SPLIT_WHEN_EXTERNAL = !!$("ioExtSplit").checked;
+  persistIoLock();
+}
+
+function bindDataPane() {
+  const data = $("ioData");
+  if (data && !data.dataset.bound) {
+    data.dataset.bound = "1";
+    data.addEventListener("change", () => {
+      refreshDataPane().catch((e) => {
+        const msg = $("ioMsg");
+        if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
+      });
+    });
+  }
+  const btn = $("btnPreviewReload");
+  if (btn && !btn.dataset.bound) {
+    btn.dataset.bound = "1";
+    btn.onclick = () => refreshDataPane().catch((e) => alert(e.message));
+  }
+  const toCfg = $("btnToConfig");
+  if (toCfg && !toCfg.dataset.bound) {
+    toCfg.dataset.bound = "1";
+    toCfg.onclick = () => showPane("config");
+  }
+  const sheets = $("pvSheets");
+  if (sheets && !sheets.dataset.bound) {
+    sheets.dataset.bound = "1";
+    sheets.addEventListener("change", (e) => {
+      const t = e.target;
+      if (!t) return;
+      const roleSheet = t.getAttribute("data-role");
+      if (roleSheet) { setSheetRole(roleSheet, String(t.value || "")); return; }
+      const idSheet = t.getAttribute("data-role-id");
+      if (idSheet) setSheetIdCol(idSheet, String(t.value || ""));
+    });
+    sheets.addEventListener("input", (e) => {
+      const t = e.target;
+      const scSheet = t && t.getAttribute("data-role-score");
+      if (scSheet) setSheetScore(scSheet, t.value);
+    });
+  }
+  const exc = $("pvExclude");
+  if (exc && !exc.dataset.bound) {
+    exc.dataset.bound = "1";
+    exc.addEventListener("change", (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.matches("[data-exc=file]")) {
+        const list = readExcFiles();
+        applyExcFiles(list);
+        loadExcMeta(list[0] || "").then(() => renderDataPane()).catch(() => {});
+        return;
+      }
+      const key = t.getAttribute("data-exc");
+      const map = { sheet: "EXCLUDE_SHEET", col: "EXCLUDE_COL", row: "EXCLUDE_ROW" };
+      if (!key || !map[key]) return;
+      setFieldValue(map[key], String(t.value || ""));
+      if (key === "sheet") setFieldValue("EXCLUDE_COL", "");
+      if (key === "sheet" || key === "col") setFieldValue("EXCLUDE_ROW", "");
+      markDirty();
+      loadExcMeta(pvExcFiles()[0] || "").then(() => renderDataPane()).catch(() => {});
+    });
+    exc.addEventListener("input", (e) => {
+      const inp = e.target;
+      if (!inp || !inp.matches("[data-exc-filepick]")) return;
+      const f = inp.files && inp.files[0];
+      const row = inp.closest("[data-exc-row]");
+      const dest = row && row.querySelector("[data-exc=file]");
+      if (f && dest) dest.value = f.name;
+    });
+    exc.addEventListener("click", (e) => {
+      const t = e.target;
+      if (!t) return;
+      if (t.id === "btnExcAdd") {
+        const list = readExcFiles();
+        list.push("");
+        setFieldValue("EXCLUDE_FILE", list);
+        renderDataPane();
+        return;
+      }
+      if (t.matches("[data-exc-del]")) {
+        const row = t.closest("[data-exc-row]");
+        const idx = row ? Number(row.getAttribute("data-exc-row")) : -1;
+        const list = readExcFiles();
+        if (idx >= 0) list.splice(Math.min(idx, list.length - 1), 1);
+        applyExcFiles(list);
+        renderDataPane();
+        return;
+      }
+      if (t.matches("[data-exc-pick]")) {
+        const row = t.closest("[data-exc-row]");
+        const inp = row && row.querySelector("[data-exc-filepick]");
+        if (inp) inp.click();
+      }
+    });
+  }
+}
 function fillAllIoSelects(keep) {
   const k = keep || (S.values || {});
   const setSheet = (id, key, fallback) => {
     const resolved = pickExistingSheet(k[key], ioSheetOpts, fallback);
-    if (S.values) S.values[key] = resolved;
     fillSelect(id, ioSheetOpts, resolved, "");
     fillSelect(document.querySelector('[data-key="' + key + '"]'), ioSheetOpts, resolved, "");
   };
@@ -1992,7 +2374,6 @@ function collectIoModule() {
     const el = document.querySelector('[data-key="' + key + '"]');
     if (el) S.values[key] = (el.value || "").trim();
   });
-  applyIoDefaults(S.values);
   const tests = readExtRows();
   const first = tests[0] || emptyExtRow();
   S.values.EXTERNAL_FILE = first.file || "";
@@ -2246,8 +2627,6 @@ function renderForm() {
   renderOutcomeTabs();
   renderPairTabs();
   const root = $("formRoot");
-  const ioCard = $("ioCard");
-  if (ioCard) ioCard.hidden = true;
   if (root) root.hidden = false;
   fillIoModule();
   S.ioTab = false;
@@ -2277,6 +2656,24 @@ function renderForm() {
     }
     map.get(f.section).fields.push(f);
   }
+  const moveAfterClin = ["radprep", "rad", "radlog"];
+  if (groups.some((g) => moveAfterClin.indexOf(g.id) >= 0)) {
+    const moved = [];
+    const rest = groups.filter((g) => {
+      if (moveAfterClin.indexOf(g.id) < 0) return true;
+      moved.push(g);
+      return false;
+    });
+    const clinAt = rest.findIndex((g) => g.id === "clin");
+    rest.splice(clinAt >= 0 ? clinAt + 1 : rest.length, 0, ...moved);
+    groups.length = 0;
+    rest.forEach((g) => groups.push(g));
+  }
+  if (blkRows().length) {
+    const keep = groups.filter((g) => g.id !== "rad" && g.id !== "radlog");
+    groups.length = 0;
+    keep.forEach((g) => groups.push(g));
+  }
   const markGroup = groups.find((g) => g.id === "radmark");
   if (markGroup) {
     const rest = groups.filter((g) => g.id !== "radmark");
@@ -2303,13 +2700,13 @@ function renderForm() {
     }
     const parts = chunks.map(c => c.html);
     if (g.id === "io") {
-      if (!parts.length) return "";
-      const pull = (id) => chunks.filter(c => c.id === id).map(c => c.html).join("");
-      const rest = chunks.filter(c => c.id !== "subproj" && c.id !== "maps").map(c => c.html).join("");
-      const head = sectionHead("io", "工作表", "");
+      const rest = chunks.filter(c => !DATA_PANE_BUNDLES.has(c.id) && c.id !== "subproj").map(c => c.html).join("");
+      const sub = chunks.filter(c => c.id === "subproj").map(c => c.html).join("");
+      if (!sub && !rest) return "";
+      const head = sectionHead("io", "结局 / 子工程", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页。");
       return `<div class="sec-block${head.dim}" data-sec="io">
       ${head.html}
-      <div class="sec-body io-sheets">${pull("subproj")}<div id="ioGrpSlot"></div>${pull("maps")}${rest}</div>
+      <div class="sec-body io-sheets">${sub}<div id="ioGrpSlot"></div>${rest}</div>
     </div>`;
     }
     if (!parts.length && g.id !== "switch" && !moduleSwitchKey(g.id)) return "";
@@ -2350,11 +2747,23 @@ function renderForm() {
     </div>`;
     }
     if (g.id === "encode") {
-      const hint = "文本列 → 编码：搜索列名 → 自动识别并编码（≤等级上限自动填码）→ 逐条可改；超过上限的列不自动编码、不进建模。";
+      const hint = "文本列 → 编码：2 等级自动 0/1；3–5 等级自动识别、逐条可改；超过上限的列不自动编码（可展开手填）。阅片列的方向在同一张卡里设。";
       const head = sectionHead("encode", g.title, "", hint);
+      const outc = S.schema.find(f => f.key === "OUTCOME_BINARIZE");
+      const open = S.kvFoldOpen && S.kvFoldOpen.encode ? " open" : "";
+      const outcHtml = outc
+        ? `<div class="enc-sub"><div class="subh">结局编码</div>${renderField(outc)}</div>`
+        : "";
       return `<div class="sec-block${head.dim}" data-sec="encode">
       ${head.html}
-      <div class="sec-body encode-body">${textEncodePanel()}</div>
+      <div class="sec-body encode-body">
+        <details class="kv-fold" data-fold="encode"${open}>
+          <summary>文本编码（自动识别 + 手改 + 阅片方向）</summary>
+          <div class="enc-sub">${textEncodePanel()}</div>
+          ${readerDirPanel()}
+          ${outcHtml}
+        </details>
+      </div>
     </div>`;
     }
     if (g.id === "clin") {
@@ -2391,7 +2800,7 @@ function renderForm() {
         (S.values && S.values.RAD_SHEET) || "", workbookSheets(), ""
       ) || blkRows().length > 0;
       if (!hasRad) {
-        const head = sectionHead("radprep", g.title, "未用", "未指定组学 sheet，跳过预处理。要做组学请回起始页选择组学表。", titleKeys);
+        const head = sectionHead("radprep", g.title, "未用", "未指定组学 sheet，跳过预处理。要做组学请回「数据预览」选择组学表。", titleKeys);
         return `<div class="sec-block off${head.dim}" data-sec="radprep">
       ${head.html}
       <div class="sec-body radprep-body"></div>
@@ -2413,7 +2822,7 @@ function renderForm() {
       ]);
       const shown = left.filter(f => !hiddenPanel.has(f.key));
       if (!shown.length && !titleKeys.length) return "";
-      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。下面是模态块：每块一张工作表、各自选 LASSO 或 Logistic。标记的筛选、分类、剥离在单独模块。";
+      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。下面是组学模块：工作表与 ID 列在「数据预览」页分配，这里给每块选 LASSO 或 Logistic。标记的筛选、分类、剥离在单独模块。";
       const head = sectionHead("radprep", g.title, shown.length, hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="radprep">
       ${head.html}
@@ -2430,7 +2839,7 @@ function renderForm() {
       const stripF = fields.find(f => f.key === "RAD_FEATURE_DISPLAY_STRIP");
       const hint = "先按标记侧和最少列数识别，再勾选筛选、分类、剥离。勾选排除的不进任何分析。手填分类后，未排除的标记可分进各类，每一类单独做 Logistic。都不填则仍是一份 RadScore。剥离只改显示名。";
       if (!hasRad) {
-        const head = sectionHead("radmark", g.title, "未用", "未指定组学 sheet，跳过标记。要做组学请回起始页选择组学表。");
+        const head = sectionHead("radmark", g.title, "未用", "未指定组学 sheet，跳过标记。要做组学请回「数据预览」选择组学表。");
         return `<div class="sec-block off${head.dim}" data-sec="radmark">
       ${head.html}
       <div class="sec-body radmark-body"></div>
@@ -2460,7 +2869,7 @@ function renderForm() {
         left.push(f);
       }
       if (!hasRad) {
-        const head = sectionHead("rad", g.title, "未用", "未指定组学 sheet，跳过 LASSO。列线图用临床变量。要做组学请回起始页选择组学表。", titleKeys);
+        const head = sectionHead("rad", g.title, "未用", "未指定组学 sheet，跳过 LASSO。列线图用临床变量。要做组学请回「数据预览」选择组学表。", titleKeys);
         return `<div class="sec-block off${head.dim}" data-sec="rad">
       ${head.html}
       <div class="sec-body rad-body"></div>
@@ -2491,7 +2900,7 @@ function renderForm() {
       }
       const hint = hasRad
         ? "单因素 / 多因素 Logistic p 筛组学并生成 RadScore。Firth 在标题行。打开则本趟不跑 LASSO。VIF 仅警告（见「开关」）。不重筛；验证模式跟随三个下拉。"
-        : "未指定组学 sheet，跳过。要做组学请回起始页选择组学表。";
+        : "未指定组学 sheet，跳过。要做组学请回「数据预览」选择组学表。";
       const head = sectionHead("radlog", g.title, hasRad ? left.length : "未用", hint, titleKeys);
       return `<div class="sec-block${hasRad ? "" : " off"}${head.dim}" data-sec="radlog">
       ${head.html}
@@ -2738,6 +3147,12 @@ function renderForm() {
   root.querySelectorAll(".grow-rows").forEach(bindGrowRows);
   root.querySelectorAll("[data-td-pair]").forEach(bindTdRocPair);
   bindExcludeCascade();
+  root.querySelectorAll("[data-reader-del]").forEach((btn) => {
+    btn.onclick = () => delReaderCol(btn.getAttribute("data-reader-del"));
+  });
+  root.querySelectorAll("[data-reader-add]").forEach((sel) => {
+    sel.onchange = () => addReaderCol(sel.value);
+  });
   syncQcHtmlToggle();
   placeGrpCard();
   syncBaselineToggles();
@@ -3396,7 +3811,12 @@ function textEncodePanel() {
     <div class="kv-row txt-tools">
       <input data-txt-q="1" type="text" placeholder="搜索列名 / 来源" value="${esc(S.txtQ || "")}" spellcheck="false"/>
       <label class="pexcl" title="≤上限等级的文本列自动按默认顺序编码；手写码优先"><input type="checkbox" data-txt-auto-on="1"${auto ? " checked" : ""}/> 自动识别并编码</label>
-      <label class="txt-cap" title="自动编码的等级上限；超过上限的列不自动编码">等级上限 <input type="number" min="2" max="20" step="1" data-txt-cap="1" value="${esc(cap)}"/></label>
+      <label class="txt-cap" title="自动编码的等级上限；2 等级固定自动 0/1，不用手填。超过上限的列不自动编码，可展开手填">等级上限 <select data-txt-cap="1">${(() => {
+        const opts = [3, 4, 5];
+        const cur = Number(cap) || 5;
+        if (opts.indexOf(cur) < 0) opts.push(cur);
+        return opts.map((n) => `<option value="${n}"${n === cur ? " selected" : ""}>${n}</option>`).join("");
+      })()}</select></label>
       <button type="button" class="btn sec" data-txt-scan="1" title="现在就把 ≤ 上限等级的文本列全部按默认顺序填上编码">自动识别</button>
       <span class="kv-sum">${cands.length} 个文本列${over.length ? ` · ${over.length} 列超限` : ""}</span>
     </div>
@@ -3446,34 +3866,79 @@ function delTxtColumn(col) {
   renderForm();
 }
 
+function readerDirPanel() {
+  const cols = growItems(fieldValue("READER_COLS"));
+  const pool = clinPool().filter((c) => cols.indexOf(c) < 0);
+  const rmap = asMap(fieldValue("READER_VALUE_MAP"));
+  const addSel = `<select class="kv-add" data-reader-add="1">
+    <option value="">+ 阅片列…</option>${pool.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}
+  </select>`;
+  const body = cols.length
+    ? cols.map((col) => {
+      const levels = columnLevels(col);
+      const rows = levels.length
+        ? levels.map((lv) => {
+          const cur = rmap[lv];
+          const sel = ["", 1, 0].map((v) => {
+            const on = (v === "" && cur == null) || (v !== "" && Number(cur) === Number(v));
+            return `<option value="${v}"${on ? " selected" : ""}>${v === "" ? "（不设）" : v}</option>`;
+          }).join("");
+          return `<div class="kv-row"><span class="grp-chip">${esc(lv)}</span><select data-kv="READER_VALUE_MAP" data-kvl="${esc(lv)}">${sel}</select></div>`;
+        }).join("")
+        : '<span class="kv-empty">载入后显示这一列的文字取值。</span>';
+      return `<div class="encode-col"><div class="encode-head"><span class="grp-chip">${esc(col)}</span><button type="button" class="kv-del" data-reader-del="${esc(col)}" title="移出阅片列">−</button></div>${rows}</div>`;
+    }).join("")
+    : '<span class="kv-empty">还没选阅片列。选一列（如 Reader_1），再把它的原始文字设为 1 或 0。</span>';
+  return `<div class="enc-sub"><div class="subh">阅片列方向（0/1）</div>
+    <div class="kv-rows encode" data-key="READER_VALUE_MAP"><div class="kv-row txt-tools">${addSel}<span class="kv-sum">${cols.length} 列</span></div>${body}</div>
+  </div>`;
+}
+
+function addReaderCol(col) {
+  const c = String(col || "").trim();
+  if (!c) return;
+  const cols = growItems(fieldValue("READER_COLS"));
+  if (cols.indexOf(c) < 0) cols.push(c);
+  setFieldValue("READER_COLS", cols);
+  renderForm();
+}
+
+function delReaderCol(col) {
+  const c = String(col || "").trim();
+  setFieldValue("READER_COLS", growItems(fieldValue("READER_COLS")).filter((x) => x !== c));
+  renderForm();
+}
+
 function modalityBlocksPanel() {
   const rows = blkRows();
   const body = rows.length
-    ? rows.map((b, i) => `<div class="kv-row blk-row" data-blk-row="${i}">
-      <input data-blk="name" value="${esc(b.name)}" placeholder="块名=工作表名" spellcheck="false"/>
-      <select data-blk="sheet">${blkSheetOptions(b.sheet || b.name)}</select>
-      <select data-blk="method">${[["", "（跳过）"], ["lasso", "LASSO"], ["logistic", "Logistic"]]
+    ? rows.map((b, i) => {
+      const icc = !(b.prep && b.prep.icc === false);
+      const corr = !(b.prep && b.prep.corr === false);
+      const cut = (b.prep && b.prep.corr_cutoff != null) ? b.prep.corr_cutoff : "";
+      return `<div class="kv-row blk-row" data-blk-row="${i}">
+      <span class="grp-chip">${i + 1}</span>
+      <span class="blk-sheet" title="${esc(b.sheet || b.name)}">${esc(b.sheet || b.name)}</span>
+      <select data-blk="method" title="该块的筛选方法；跳过=该块不建模">${[["", "（跳过）"], ["lasso", "LASSO"], ["logistic", "Logistic"]]
         .map(([v, t]) => `<option value="${v}"${b.method === v ? " selected" : ""}>${t}</option>`).join("")}</select>
-      <select data-blk="kind" title="组学=数值矩阵；临床式=文本列先按 TEXT_ENCODE 编码">
-        ${[["rad", "组学"], ["clin", "临床式"]]
-          .map(([v, t]) => `<option value="${v}"${b.kind === v ? " selected" : ""}>${t}</option>`).join("")}
-      </select>
-      <label class="pexcl"><input type="checkbox" data-blk="enabled"${b.enabled ? " checked" : ""}/> 启用</label>
-      <button type="button" class="kv-del" data-blk-del="${i}" title="删掉这一块">−</button>
-    </div>`).join("")
-    : `<span class="kv-empty">还没有块。每块一张工作表（cln 之外）；下方回车添加，块名=工作表名。</span>`;
+      <label class="pexcl" title="开=该块先做 ICC 稳定性过滤"><input type="checkbox" data-blk-prep="icc"${icc ? " checked" : ""}/> ICC</label>
+      <label class="pexcl" title="开=该块先做相关过滤"><input type="checkbox" data-blk-prep="corr"${corr ? " checked" : ""}/> 相关</label>
+      <input data-blk-prep-val="corr_cutoff" value="${esc(cut)}" placeholder="相关界值 0.95" spellcheck="false"/>
+      <span class="blk-score mono" title="分数列名">${esc(b.score || ("RadScore" + (i === 0 ? "" : "_" + (b.name || ""))))}</span>
+    </div>`;
+    }).join("")
+    : `<span class="kv-empty">还没有组学模块。到「数据预览」页把工作表设成「组学模块」。</span>`;
   const mode = String(fieldValue("COMBINED_MODE") || "per_block");
   const inc = asList(fieldValue("COMBINED_BLOCKS")).join(", ");
   const exc = asList(fieldValue("COMBINED_EXCLUDE")).join(", ");
   const clin = String(fieldValue("CLIN_BLOCK_METHOD") || "logistic");
   return `<div class="kv-rows rad-blocks" data-key="MODALITY_BLOCKS">
-    <div class="kv-row rad-prefix-head"><span>块名</span><span>工作表</span><span>方法（第2/3行）</span><span>类型</span><span>启用</span><span></span></div>
+    <div class="kv-row rad-prefix-head"><span>#</span><span>工作表</span><span>方法</span><span>ICC</span><span>相关</span><span>界值</span><span>分数名</span></div>
     ${body}
-    <input class="kv-add" data-blk-add="1" placeholder="+ 块名（=工作表名），回车" spellcheck="false"/>
     <div class="kv-row blk-combined">
       <label>临床块
         <select data-blk-clin="1">
-          ${[["logistic", "Logistic"], ["", "（跳过临床筛选）"]]
+          ${[["logistic", "Logistic（固定）"]]
             .map(([v, t]) => `<option value="${v}"${clin === v ? " selected" : ""}>${t}</option>`).join("")}
         </select>
       </label>
@@ -3486,7 +3951,7 @@ function modalityBlocksPanel() {
       <input data-blk-list="COMBINED_BLOCKS" value="${esc(inc)}" placeholder="联合纳入块（空=全部）" spellcheck="false"/>
       <input data-blk-list="COMBINED_EXCLUDE" value="${esc(exc)}" placeholder="联合剔除块" spellcheck="false"/>
     </div>
-    <span class="kv-empty">预处理（第1行）用上面的相关/ICC 阈值；每块的参数覆盖留空=用默认。分数字段名固定 RadScore_块名。</span>
+    <span class="kv-empty">模块的工作表与 ID 列在「数据预览」页定；这里选方法与预处理。分数名第 1 块默认 RadScore，其余 RadScore_块名。</span>
   </div>`;
 }
 function applyBlkRow(el) {
@@ -3500,6 +3965,18 @@ function applyBlkRow(el) {
   if (field === "enabled") cur.enabled = !!el.checked;
   else if (field) cur[field] = String(el.value || "").trim();
   if (field === "name" && !cur.name) return;
+  const prep = el.getAttribute("data-blk-prep");
+  if (prep) {
+    cur.prep = Object.assign({}, cur.prep || {});
+    cur.prep[prep] = !!el.checked;
+  }
+  const prepVal = el.getAttribute("data-blk-prep-val");
+  if (prepVal) {
+    cur.prep = Object.assign({}, cur.prep || {});
+    const v = Number(el.value);
+    if (!String(el.value || "").trim() || !isFinite(v)) delete cur.prep[prepVal];
+    else cur.prep[prepVal] = v;
+  }
   rows[i] = cur;
   setFieldValue("MODALITY_BLOCKS", rows);
   if (field === "name" || field === "sheet") {
@@ -3757,10 +4234,7 @@ function renderBundle(b, fields) {
     ${bools.length ? `<div class="grp-bools">${bools.map(renderField).join("")}</div>` : ""}
     ${rest.length ? `<div class="grp-rest">${subLabs}${rest.map(renderField).join("")}</div>` : ""}
   </div>`;
-  if (b.id !== "maps") return inner;
-  // 文本编码默认收起。打开状态记在 kvFoldOpen.maps，不删 READER_VALUE_MAP。
-  const open = S.kvFoldOpen && S.kvFoldOpen.maps ? " open" : "";
-  return `<details class="kv-fold encode-fold" data-fold="maps"${open}><summary>${esc(b.title)}</summary>${inner}</details>`;
+  return inner;
 }
 
 function renderGrowSelect(f) {
@@ -4098,6 +4572,7 @@ function bindDelegates() {
       return;
     }
     if (t.matches("[data-blk]")) { applyBlkRow(t); return; }
+    if (t.matches("[data-blk-prep], [data-blk-prep-val]")) { applyBlkRow(t); return; }
     if (t.matches("[data-blk-clin]")) { setFieldValue("CLIN_BLOCK_METHOD", t.value); return; }
     if (t.matches("[data-blk-mode]")) {
       setFieldValue("COMBINED_MODE", t.value);
@@ -4462,6 +4937,10 @@ function refreshField(key) {
   if (clinAddselectKeys().indexOf(key) >= 0) {
     refreshClinRoleDropdowns();
   }
+  if (DATA_PANE_KEYS.has(key)) {
+    renderDataPane();
+    return;
+  }
   renderForm();
 }
 
@@ -4647,6 +5126,7 @@ function renderPreview(p) {
   else if (typeof renderGroupCard === "function") renderGroupCard();
   $("previewBox").innerHTML = previewBlockHtml(p, "");
   renderExtPreview(p);
+  renderDataPane();
 }
 
 function startPageQs() {
@@ -4722,6 +5202,7 @@ async function boot() {
   bindOutcomeTabs();
   bindPairTabs();
   bindIoModule();
+  bindDataPane();
   bindTips();
   try {
     const h = await api("/api/health");
@@ -4798,7 +5279,8 @@ async function boot() {
   $("tabBtnFlow").onclick = () => showPane("flow");
   const wantTab = new URLSearchParams(location.search).get("tab");
   if (wantTab === "flow") showPane("flow");
-  else if (wantTab === "preview") showPane("preview");
+  else if (wantTab === "config" || wantTab === "public") showPane("config");
+  else showPane("preview");
   try {
     await loadAll();
     if (wantTab === "public" || wantTab === "config") {
@@ -4814,11 +5296,11 @@ async function boot() {
   } catch (e) {
     $("loadHint").innerHTML = `<span class="err">${esc(e.message)}</span>`;
     S.ioTab = false;
-    if ($("ioCard")) $("ioCard").hidden = true;
     if ($("formRoot")) $("formRoot").hidden = false;
     fillIoModule();
     renderOutcomeTabs();
     renderForm();
+    renderDataPane();
   }
 }
 
