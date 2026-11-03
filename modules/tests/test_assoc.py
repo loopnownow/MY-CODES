@@ -116,6 +116,7 @@ def test_sections_place_new_switches():
     assert clinprep_ini == [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]
     assert "SKIP_CLIN_FEATURES" not in clin_ini
     assert "ORDINAL_MAX_LEVELS" not in clin_ini
@@ -133,6 +134,7 @@ def test_sections_place_new_switches():
     assert clinprep_ui == [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]
     assert SECTION_OF["SKIP_CLIN_FEATURES"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CONTINUOUS"][0] == "clinprep"

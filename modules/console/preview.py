@@ -613,7 +613,7 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
             "QC_SHEET": qh or "",
             "ICC_SHEET": ih or "",
         },
-        "blocks": _preview_blocks(settings, sheets, info),
+        "blocks": _preview_blocks(settings, sheets, info, frame_of=_frame),
         "sheet_rule": (
             "CLIN_SHEET 与 RAD_SHEET 必须二选一"
             if not (ch or rh)
@@ -621,8 +621,10 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         ),
     }
 
-def _preview_blocks(settings: dict[str, Any], sheets: list[str], info: dict) -> list[dict]:
-    """预览用：每块的工作表、列名与行数（不参与建模范畴，仅供控制台显示）。"""
+def _preview_blocks(
+    settings: dict[str, Any], sheets: list[str], info: dict, frame_of=None
+) -> list[dict]:
+    """预览用：每块的工作表、列名、文本列等级（供控制台文本编码面板）。"""
     out: list[dict] = []
     raw = settings.get("MODALITY_BLOCKS") or []
     if not isinstance(raw, list):
@@ -637,14 +639,31 @@ def _preview_blocks(settings: dict[str, Any], sheets: list[str], info: dict) -> 
         sheet = str(item.get("sheet") or name).strip()
         hit = low.get(sheet.lower())
         cols = list((info.get(hit) or {}).get("columns") or []) if hit else []
+        text_levels: dict[str, list[str]] = {}
+        if hit and frame_of is not None and 0 < len(cols) <= 200:
+            try:
+                df = frame_of(hit)
+            except Exception:
+                df = None
+            if df is not None and not df.empty:
+                for c in df.columns:
+                    s = df[c]
+                    if pd.api.types.is_numeric_dtype(s):
+                        continue
+                    vals = [str(v).strip() for v in s.dropna().tolist()]
+                    levels = sorted({v for v in vals if v})[:20]
+                    if levels:
+                        text_levels[str(c)] = levels
         out.append({
             "name": name,
             "sheet": sheet,
             "resolved": hit or "",
             "method": str(item.get("method") or ""),
+            "kind": str(item.get("kind") or "rad"),
             "enabled": item.get("enabled") is not False,
             "n_cols": len(cols),
             "columns": cols[:40],
+            "text_levels": text_levels,
         })
     return out
 

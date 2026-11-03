@@ -39,6 +39,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("clinprep", "临床 / 预处理", [
         "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
         "ORDINAL_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
     ]),
     ("clin", "临床筛选", [
         "DO_CLIN",
@@ -311,6 +312,9 @@ LABELS = {
     "COMBINED_EXCLUDE": "联合模型剔除块",
     "COMBINED_MODE": "Combined 主模型",
     "CLIN_BLOCK_METHOD": "临床块方法",
+    "TEXT_ENCODE": "文本编码（列 → 原文 → 编码）",
+    "TEXT_ENCODE_AUTO": "自动识别并编码文本",
+    "TEXT_ENCODE_MAX_LEVELS": "自动编码等级上限",
     "FIGURE_PANEL_DPI": "拼板 DPI",
     "FIGURE_PANEL_MEDIATION_NCOLS": "中介拼板列数",
     "FIGURE_PANEL_LABEL_POS": "拼板字母位置",
@@ -509,6 +513,9 @@ HINTS: dict[str, str] = {
     "COMBINED_EXCLUDE": "手动剔除块分数：写块名（工作表名），从联合模型里去掉，单块结果照旧出。",
     "COMBINED_MODE": "per_block=主模型为「临床 + 每块分别」（默认）；joint=主模型为「临床 + 全部块分数一次 GLM」。两组都算，开关只决定主图/主校准/主列线图用哪一组。",
     "CLIN_BLOCK_METHOD": "临床块固定走临床筛选（单因素→多因素 p），不进 LASSO。",
+    "TEXT_ENCODE": "文本列的编码表：{列名: {原文: 数字}}。控制台「文本编码」面板里点自动识别会按上限自动填，可逐条改。手写的优先于自动。",
+    "TEXT_ENCODE_AUTO": "开=自动识别文本列并把 ≤上限等级的取值自动编码（默认开）。关=只用 TEXT_ENCODE 里手写的映射。",
+    "TEXT_ENCODE_MAX_LEVELS": "自动编码的等级上限（默认 5）。超过上限的列不自动编码、不进建模，日志会点名。",
     "RAD_FEATURE_DISPLAY_STRIP": "左=检出的标记，右=要剥掉的字（通常就是该标记）。只剥它所在的那一端，不改名称中间。空=不剥。只改图/表显示，不改内部列名。",
     "FIGURE_PANEL_DPI": "拼板 PNG 分辨率。",
     "FIGURE_PANEL_MEDIATION_NCOLS": "中介拼板每行列数。",

@@ -195,6 +195,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "RAD_FEATURE_PREFIX_GROUP": {"names": [], "assign": {}},
     # blocks：一块一张工作表。空 = 走旧的单块路径（RAD_SHEET + DO_LASSO/DO_RAD_LOGISTIC）。
     "MODALITY_BLOCKS": [],
+    # 文本编码：{列: {原文: 编码}}；自动识别 ≤N 等级的文本列并编码，可手改。
+    "TEXT_ENCODE": {},
+    "TEXT_ENCODE_AUTO": True,
+    "TEXT_ENCODE_MAX_LEVELS": 5,
     # Combined：空 = 全部块分数进联合模型；COMBINED_EXCLUDE 手动剔除（只影响联合）。
     "COMBINED_BLOCKS": [],
     "COMBINED_EXCLUDE": [],

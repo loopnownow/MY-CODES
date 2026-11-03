@@ -86,6 +86,7 @@ def _as_blocks(value: Any) -> list[dict[str, Any]]:
             "id_col": s.id_col,
             "method": s.method,
             "enabled": s.enabled,
+            "kind": s.kind,
             "prep": dict(s.prep),
             "params": dict(s.params),
             "score": s.score,
@@ -210,6 +211,10 @@ def hydrate_console_settings(settings: dict[str, Any]) -> dict[str, Any]:
     )
     if "MODALITY_BLOCKS" in settings:
         settings["MODALITY_BLOCKS"] = _as_blocks(settings.get("MODALITY_BLOCKS"))
+    if "TEXT_ENCODE" in settings:
+        from modules.stats.text_encode import normalize_spec
+
+        settings["TEXT_ENCODE"] = normalize_spec(settings.get("TEXT_ENCODE"))
     for _k in ("COMBINED_BLOCKS", "COMBINED_EXCLUDE"):
         if _k in settings:
             settings[_k] = _as_name_list(settings.get(_k))
