@@ -2334,7 +2334,10 @@ function renderForm() {
       const order = [
         "ORDINAL_MAX_LEVELS", "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
       ];
-      const vis = fields.filter(f => !isHiddenField(f));
+      const hiddenTxt = new Set([
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
+      ]);
+      const vis = fields.filter(f => !isHiddenField(f) && !hiddenTxt.has(f.key));
       const byKey = new Map(vis.map(f => [f.key, f]));
       const left = order.map(k => byKey.get(k)).filter(Boolean);
       for (const f of vis) {
@@ -2342,11 +2345,16 @@ function renderForm() {
         left.push(f);
       }
       if (!left.length) return "";
-      const hint = "计数/计量等级与强制计数在 body。都不在临床筛选模块。";
+      const hint = "计数/计量等级、强制类型、文本编码。文本编码：搜索列名 → 自动识别（≤上限等级自动填码）→ 逐条可改。";
       const head = sectionHead("clinprep", g.title, left.length, hint);
+      const autoF = fields.find(f => f.key === "TEXT_ENCODE_AUTO");
+      const capF = fields.find(f => f.key === "TEXT_ENCODE_MAX_LEVELS");
+      const extras = [autoF, capF].filter(Boolean).map(renderField).join("");
       return `<div class="sec-block${head.dim}" data-sec="clinprep">
       ${head.html}
-      <div class="sec-body clinprep-body">${left.map(renderField).join("")}</div>
+      <div class="sec-body clinprep-body">${left.map(renderField).join("")}${extras}
+        <div class="txt-encode-wrap">${textEncodePanel()}</div>
+      </div>
     </div>`;
     }
     if (g.id === "clin") {
@@ -3267,6 +3275,7 @@ function blkRows() {
       sheet: String(x.sheet || ""),
       method: String(x.method || ""),
       enabled: x.enabled === false ? false : true,
+      kind: String(x.kind || "rad"),
       prep: (x.prep && typeof x.prep === "object") ? x.prep : {},
       params: (x.params && typeof x.params === "object") ? x.params : {},
       score: String(x.score || ""),
@@ -3279,6 +3288,145 @@ function blkSheetOptions(cur) {
   if (c && out.indexOf(c) < 0) out.push(c);
   return out.map(s => `<option value="${esc(s)}"${s === c ? " selected" : ""}>${esc(s || "（选工作表）")}</option>`).join("");
 }
+function textEncodeSpec() {
+  const v = fieldValue("TEXT_ENCODE");
+  const out = {};
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    Object.keys(v).forEach((col) => {
+      const inner = v[col];
+      if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+        out[col] = Object.assign({}, inner);
+      }
+    });
+  }
+  return out;
+}
+function defaultTextCodes(levels) {
+  const lv = (levels || []).map((x) => String(x).trim()).filter(Boolean);
+  const nums = [];
+  let allNum = true;
+  for (const x of lv) {
+    const f = Number(x);
+    if (!isFinite(f)) { allNum = false; break; }
+    nums.push(f);
+  }
+  if (allNum && nums.length === new Set(nums).size) {
+    const out = {};
+    lv.forEach((x, i) => { out[x] = nums[i]; });
+    return out;
+  }
+  const out = {};
+  lv.forEach((x, i) => { out[x] = i + 1; });
+  return out;
+}
+function textEncodeCandidates() {
+  const out = [];
+  const seen = new Set();
+  const push = (col, owner, sheet, levels) => {
+    const c = String(col || "").trim();
+    if (!c || seen.has(c)) return;
+    const lv = (levels || []).map((x) => String(x)).filter(Boolean);
+    if (!lv.length) return;
+    seen.add(c);
+    out.push({ col: c, owner: owner || "", sheet: sheet || "", levels: lv });
+  };
+  ((S.preview && S.preview.blocks) || []).forEach((b) => {
+    const tl = (b && b.text_levels) || {};
+    Object.keys(tl).forEach((col) => push(col, b.name, b.sheet, tl[col]));
+  });
+  ((S.preview && S.preview.clin_cols) || []).forEach((col) => {
+    const lv = columnLevels(col);
+    if (lv.length && lv.length <= 30) push(col, "cln", String(fieldValue("CLIN_SHEET") || "cln"), lv);
+  });
+  const spec = textEncodeSpec();
+  Object.keys(spec).forEach((col) => push(col, "", "", Object.keys(spec[col])));
+  return out;
+}
+function textEncodeRow(cand) {
+  const spec = textEncodeSpec();
+  const cur = spec[cand.col] || {};
+  const body = cand.levels.map((lv) => {
+    const code = Object.prototype.hasOwnProperty.call(cur, lv) ? cur[lv] : "";
+    return `<div class="kv-row txt-row">
+      <span class="grp-chip" title="${esc(lv)}">${esc(lv)}</span>
+      <input type="number" step="any" data-txt-level="${esc(cand.col)}" data-txt-lev="${esc(lv)}" value="${esc(code)}" placeholder="编码"/>
+    </div>`;
+  }).join("");
+  const owner = cand.owner ? `${cand.owner}` : "（未识别）";
+  return `<div class="encode-col" data-txt-col="${esc(cand.col)}">
+    <div class="encode-head">
+      <span class="grp-chip" title="${esc(cand.col)}">${esc(cand.col)}</span>
+      <span class="kv-sum">${esc(owner)} · ${cand.levels.length} 等级</span>
+      <button type="button" class="btn sec" data-txt-auto="${esc(cand.col)}" title="按默认顺序填这一列的编码">自动</button>
+      <button type="button" class="kv-del" data-txt-del="${esc(cand.col)}" title="从编码表里删掉这一列">−</button>
+    </div>
+    ${body}
+  </div>`;
+}
+function textEncodePanel() {
+  const q = String(S.txtQ || "").trim().toLowerCase();
+  const cap = Number(fieldValue("TEXT_ENCODE_MAX_LEVELS") || 5);
+  const auto = fieldValue("TEXT_ENCODE_AUTO") !== false;
+  const cands = textEncodeCandidates();
+  const shown = q
+    ? cands.filter((c) => c.col.toLowerCase().indexOf(q) >= 0 || String(c.owner).toLowerCase().indexOf(q) >= 0)
+    : cands;
+  const over = shown.filter((c) => c.levels.length > cap);
+  const body = shown.length
+    ? shown.map(textEncodeRow).join("")
+    : `<span class="kv-empty">${cands.length ? "没有匹配的列。" : "载入数据后自动识别文本列；也可手写列名。"}</span>`;
+  return `<div class="kv-rows txt-encode" data-key="TEXT_ENCODE">
+    <div class="kv-row txt-tools">
+      <input data-txt-q="1" type="text" placeholder="搜索列名 / 来源" value="${esc(S.txtQ || "")}" spellcheck="false"/>
+      <button type="button" class="btn sec" data-txt-scan="1" title="把 ≤ 上限等级的文本列全部按默认顺序填上编码">自动识别</button>
+      <span class="kv-sum">${cands.length} 个文本列 · 上限 ${cap} 等级 · 自动${auto ? "开" : "关"}${over.length ? ` · ${over.length} 列超限` : ""}</span>
+    </div>
+    ${body}
+  </div>`;
+}
+function applyTxtLevel(col, level, raw) {
+  const spec = textEncodeSpec();
+  const cur = Object.assign({}, spec[col] || {});
+  const txt = String(raw == null ? "" : raw).trim();
+  if (!txt) delete cur[level];
+  else {
+    const n = Number(txt);
+    if (!isFinite(n)) return;
+    cur[level] = n;
+  }
+  if (Object.keys(cur).length) spec[col] = cur;
+  else delete spec[col];
+  setFieldValue("TEXT_ENCODE", spec);
+}
+function autoTxtColumn(col) {
+  const cand = textEncodeCandidates().find((c) => c.col === col);
+  if (!cand) return;
+  const spec = textEncodeSpec();
+  spec[col] = defaultTextCodes(cand.levels);
+  setFieldValue("TEXT_ENCODE", spec);
+  renderForm();
+}
+function autoTxtAll() {
+  const cap = Number(fieldValue("TEXT_ENCODE_MAX_LEVELS") || 5);
+  const spec = textEncodeSpec();
+  let n = 0;
+  textEncodeCandidates().forEach((c) => {
+    if (c.levels.length > cap) return;
+    if (Object.prototype.hasOwnProperty.call(spec, c.col)) return;
+    spec[c.col] = defaultTextCodes(c.levels);
+    n += 1;
+  });
+  setFieldValue("TEXT_ENCODE", spec);
+  renderForm();
+  if (!n) alert("没有可自动编码的列（都已有编码，或等级数超过上限）");
+}
+function delTxtColumn(col) {
+  const spec = textEncodeSpec();
+  delete spec[col];
+  setFieldValue("TEXT_ENCODE", spec);
+  renderForm();
+}
+
 function modalityBlocksPanel() {
   const rows = blkRows();
   const body = rows.length
@@ -3287,6 +3435,10 @@ function modalityBlocksPanel() {
       <select data-blk="sheet">${blkSheetOptions(b.sheet || b.name)}</select>
       <select data-blk="method">${[["", "（跳过）"], ["lasso", "LASSO"], ["logistic", "Logistic"]]
         .map(([v, t]) => `<option value="${v}"${b.method === v ? " selected" : ""}>${t}</option>`).join("")}</select>
+      <select data-blk="kind" title="组学=数值矩阵；临床式=文本列先按 TEXT_ENCODE 编码">
+        ${[["rad", "组学"], ["clin", "临床式"]]
+          .map(([v, t]) => `<option value="${v}"${b.kind === v ? " selected" : ""}>${t}</option>`).join("")}
+      </select>
       <label class="pexcl"><input type="checkbox" data-blk="enabled"${b.enabled ? " checked" : ""}/> 启用</label>
       <button type="button" class="kv-del" data-blk-del="${i}" title="删掉这一块">−</button>
     </div>`).join("")
@@ -3296,7 +3448,7 @@ function modalityBlocksPanel() {
   const exc = asList(fieldValue("COMBINED_EXCLUDE")).join(", ");
   const clin = String(fieldValue("CLIN_BLOCK_METHOD") || "logistic");
   return `<div class="kv-rows rad-blocks" data-key="MODALITY_BLOCKS">
-    <div class="kv-row rad-prefix-head"><span>块名</span><span>工作表</span><span>方法（第2/3行）</span><span>启用</span><span></span></div>
+    <div class="kv-row rad-prefix-head"><span>块名</span><span>工作表</span><span>方法（第2/3行）</span><span>类型</span><span>启用</span><span></span></div>
     ${body}
     <input class="kv-add" data-blk-add="1" placeholder="+ 块名（=工作表名），回车" spellcheck="false"/>
     <div class="kv-row blk-combined">
@@ -3901,6 +4053,15 @@ function bindDelegates() {
   document.body.addEventListener("change", (e) => {
     const t = e.target;
     if (!t || !t.matches) return;
+    if (t.matches("[data-txt-level]")) {
+      applyTxtLevel(t.getAttribute("data-txt-level"), t.getAttribute("data-txt-lev"), t.value);
+      return;
+    }
+    if (t.matches("[data-txt-q]")) {
+      S.txtQ = String(t.value || "").trim();
+      renderForm();
+      return;
+    }
     if (t.matches("[data-blk]")) { applyBlkRow(t); return; }
     if (t.matches("[data-blk-clin]")) { setFieldValue("CLIN_BLOCK_METHOD", t.value); return; }
     if (t.matches("[data-blk-mode]")) {
@@ -3922,6 +4083,24 @@ function bindDelegates() {
     addBlkRow(t.value);
   });
   document.body.addEventListener("click", (e) => {
+    const scan = e.target.closest && e.target.closest("[data-txt-scan]");
+    if (scan) {
+      e.preventDefault();
+      autoTxtAll();
+      return;
+    }
+    const one = e.target.closest && e.target.closest("[data-txt-auto]");
+    if (one) {
+      e.preventDefault();
+      autoTxtColumn(one.getAttribute("data-txt-auto"));
+      return;
+    }
+    const dcol = e.target.closest && e.target.closest("[data-txt-del]");
+    if (dcol) {
+      e.preventDefault();
+      delTxtColumn(dcol.getAttribute("data-txt-del"));
+      return;
+    }
     const del = e.target.closest && e.target.closest("[data-blk-del]");
     if (!del) return;
     e.preventDefault();

@@ -28,6 +28,9 @@ BLOCK_METHODS: tuple[str, ...] = ("lasso", "logistic")
 
 COMBINED_MODES: tuple[str, ...] = ("per_block", "joint")
 
+# 块类型：rad=数值组学矩阵；clin=临床式（文本列先按 TEXT_ENCODE 编码）
+BLOCK_KINDS: tuple[str, ...] = ("rad", "clin")
+
 
 @dataclass(frozen=True)
 class BlockSpec:
@@ -38,6 +41,7 @@ class BlockSpec:
     id_col: str = ""
     method: str = ""
     enabled: bool = True
+    kind: str = "rad"
     prep: Dict[str, Any] = field(default_factory=dict)
     params: Dict[str, Any] = field(default_factory=dict)
     score: str = ""
@@ -126,6 +130,11 @@ def normalize_blocks(raw: Any = None) -> List[BlockSpec]:
                 + "（留空 = 该块跳过）"
             )
         prep = _as_mapping(spec.get("prep"), f"{where}.prep")
+        kind = _norm_text(spec.get("kind")).lower() or "rad"
+        if kind not in BLOCK_KINDS:
+            raise ValueError(
+                f"{where} kind={spec.get('kind')!r} 无效；允许: " + " | ".join(BLOCK_KINDS)
+            )
         raw_params = spec.get("params")
         if raw_params is None:
             params: Dict[str, Any] = {}
@@ -141,6 +150,7 @@ def normalize_blocks(raw: Any = None) -> List[BlockSpec]:
                 id_col=_norm_text(spec.get("id_col")),
                 method=method,
                 enabled=_norm_bool(spec.get("enabled"), True),
+                kind=kind,
                 prep=prep,
                 params=params,
                 score=_norm_text(spec.get("score")),

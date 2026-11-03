@@ -1394,6 +1394,10 @@ def _prepare_blocks(
         id_col = str(getattr(spec, "id_col", "") or "") if spec is not None else ""
         frame = _prepare_rad_frame(raw, id_col=id_col)
         frame = _reindex_frame_to_ids(frame, ids, block_name=name)
+        if str(getattr(spec, "kind", "rad") or "rad") == "clin":
+            from modules.stats import text_encode
+
+            frame = text_encode.prepare_frame(frame, frame_label=name)
         text_cols = [
             str(c) for c in frame.columns
             if c != "Name" and not pd.api.types.is_numeric_dtype(frame[c])
