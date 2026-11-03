@@ -613,12 +613,60 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
             "QC_SHEET": qh or "",
             "ICC_SHEET": ih or "",
         },
+        "blocks": _preview_blocks(settings, sheets, info, frame_of=_frame),
         "sheet_rule": (
             "CLIN_SHEET 与 RAD_SHEET 必须二选一"
             if not (ch or rh)
             else ""
         ),
     }
+
+def _preview_blocks(
+    settings: dict[str, Any], sheets: list[str], info: dict, frame_of=None
+) -> list[dict]:
+    """预览用：每块的工作表、列名、文本列等级（供控制台文本编码面板）。"""
+    out: list[dict] = []
+    raw = settings.get("MODALITY_BLOCKS") or []
+    if not isinstance(raw, list):
+        return out
+    low = {str(s).lower(): str(s) for s in sheets}
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        sheet = str(item.get("sheet") or name).strip()
+        hit = low.get(sheet.lower())
+        cols = list((info.get(hit) or {}).get("columns") or []) if hit else []
+        text_levels: dict[str, list[str]] = {}
+        if hit and frame_of is not None and 0 < len(cols) <= 200:
+            try:
+                df = frame_of(hit)
+            except Exception:
+                df = None
+            if df is not None and not df.empty:
+                for c in df.columns:
+                    s = df[c]
+                    if pd.api.types.is_numeric_dtype(s):
+                        continue
+                    vals = [str(v).strip() for v in s.dropna().tolist()]
+                    levels = sorted({v for v in vals if v})[:20]
+                    if levels:
+                        text_levels[str(c)] = levels
+        out.append({
+            "name": name,
+            "sheet": sheet,
+            "resolved": hit or "",
+            "method": str(item.get("method") or ""),
+            "kind": str(item.get("kind") or "rad"),
+            "enabled": item.get("enabled") is not False,
+            "n_cols": len(cols),
+            "columns": cols[:40],
+            "text_levels": text_levels,
+        })
+    return out
+
 
 def _resolve_ext_xlsx(file: str, data_path: Path) -> Path:
     src = Path(str(file or "").strip())
@@ -686,7 +734,7 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
         "EXCLUDE_COL", "EXCLUDE_ROW",
         "ICC_THRESHOLD", "ICC_INTRA_COL", "ICC_INTER_COL",
         "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
-        "EXTERNAL_TESTS",
+        "EXTERNAL_TESTS", "MODALITY_BLOCKS",
     )
     blob = []
     for key in keep:

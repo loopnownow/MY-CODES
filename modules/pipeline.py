@@ -136,6 +136,13 @@ from modules.stats.curves_dca import plot_dca
 from modules.stats.nri_cir import nri, cir_plot, nri_from_probs, idi_from_probs, plot_idi
 from modules.stats.curves_survival import plot_survival_bundle
 from modules.stats import advanced as advanced_stats
+from modules.stats import selectors
+from modules.config.blocks import (
+    active_blocks,
+    combined_block_names,
+    combined_mode,
+    skipped_blocks,
+)
 from modules.stats.false_class import (
     compute_false_class,
     print_false_classification,
@@ -397,28 +404,45 @@ def run_analysis(dat: data_io.DataLayer, label_str: str,
     )
 
     if rad_override is None:
-        skip_lasso = not bool(getattr(cfg, "DO_LASSO", True))
-        do_rad_log = bool(getattr(cfg, "DO_RAD_LOGISTIC", False))
-        no_rad = dat.rad is None or dat.rad.empty or dat.rad.shape[1] == 0
-        if no_rad:
-            rad_res = empty_radiomics_result()
-        elif do_rad_log:
-            if not skip_lasso:
-                print("  DO_RAD_LOGISTIC=True — skip LASSO.")
-            rad_res = radiomics.run_radiomics_logistic(
-                dat.rad.drop(columns=["Name"], errors="ignore"),
-                dat.label, dataset_label=label_str, group=dat.group,
+        block_specs = active_blocks()
+        if block_specs:
+            for b in skipped_blocks():
+                print(f"  块 {b.name!r} 未选方法 → 跳过（MODALITY_BLOCKS.method 留空）")
+            missing = [b.name for b in block_specs if b.name not in (dat.blocks or {})]
+            if missing:
+                raise ValueError(
+                    f"配置了块 {missing}，但数据层没有这些块（现有: {list((dat.blocks or {}))}）"
+                )
+            rad_res = selectors.run_blocks(
+                {b.name: dat.blocks[b.name] for b in block_specs},
+                dat.label, block_specs, dataset_label=label_str, group=dat.group,
             )
-        elif skip_lasso:
-            print("  DO_LASSO=False — skip LASSO.")
-            rad_res = empty_radiomics_result()
+            skip_lasso = False
+            do_rad_log = True
+            no_rad = False
         else:
-            rad_frame = dat.rad.drop(columns=["Name"], errors="ignore")
-            if radiomics.prefix_group_plan(list(rad_frame.columns)):
-                print("  Prefix categories apply to logistic — this LASSO run stays one model.")
-            rad_res = radiomics.run_radiomics(
-                rad_frame, dat.label, dataset_label=label_str, group=dat.group,
-            )
+            skip_lasso = not bool(getattr(cfg, "DO_LASSO", True))
+            do_rad_log = bool(getattr(cfg, "DO_RAD_LOGISTIC", False))
+            no_rad = dat.rad is None or dat.rad.empty or dat.rad.shape[1] == 0
+            if no_rad:
+                rad_res = empty_radiomics_result()
+            elif do_rad_log:
+                if not skip_lasso:
+                    print("  DO_RAD_LOGISTIC=True — skip LASSO.")
+                rad_res = radiomics.run_radiomics_logistic(
+                    dat.rad.drop(columns=["Name"], errors="ignore"),
+                    dat.label, dataset_label=label_str, group=dat.group,
+                )
+            elif skip_lasso:
+                print("  DO_LASSO=False — skip LASSO.")
+                rad_res = empty_radiomics_result()
+            else:
+                rad_frame = dat.rad.drop(columns=["Name"], errors="ignore")
+                if radiomics.prefix_group_plan(list(rad_frame.columns)):
+                    print("  Prefix categories apply to logistic — this LASSO run stays one model.")
+                rad_res = radiomics.run_radiomics(
+                    rad_frame, dat.label, dataset_label=label_str, group=dat.group,
+                )
     else:
         rad_res = rad_override
 
@@ -692,6 +716,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             ext_layer = data_io.load_external_layer(
                 ext_file, clin_sheet=cs, rad_sheet=rs, name=name,
                 rad_id_col=str(spec.get("rad_id_col") or "").strip(),
+                block_sheets=(spec.get("sheets") or None),
             )
             external_layers.append({"name": name, "data": ext_layer})
         except Exception as e:
@@ -838,6 +863,53 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         )
         _te_clin = data.test.clin if (data.test is not None and len(getattr(data.test, "label", [])) > 0) else None
         _te_y = data.test.label if _te_clin is not None else None
+
+        # ── Combined：每块分别（临床 + 该块分数）+ 联合（临床 + 全部纳入块分数） ──
+        _cmode = combined_mode()
+        _joint_names = combined_block_names(list(_tr_scores)) if _tr_scores else []
+        comb_specs: Dict[str, Dict[str, np.ndarray]] = {}
+        if _joint_names:
+            if len(_joint_names) > 1:
+                for _n in _joint_names:
+                    _blk = _n[len("RadScore_"):] if _n.startswith("RadScore_") else _n
+                    comb_specs[f"Combined_{_blk}"] = {_n: _tr_scores[_n]}
+                comb_specs["Combined"] = {n: _tr_scores[n] for n in _joint_names}
+            else:
+                comb_specs["Combined"] = {_joint_names[0]: _tr_scores[_joint_names[0]]}
+        _primary_comb = (
+            "Combined"
+            if (_cmode == "joint" or len(comb_specs) <= 1)
+            else next(iter(comb_specs))
+        )
+        if comb_specs:
+            print(
+                f"  Combined 口径: {_cmode} → 主模型 {_primary_comb}"
+                + (f"；同时输出: {', '.join(k for k in comb_specs if k != _primary_comb)}"
+                   if len(comb_specs) > 1 else "")
+            )
+        p_comb_map: Dict[str, np.ndarray] = {}
+        for _cname, _cmap in comb_specs.items():
+            _p = refit_combined_prob(data.train.clin, data.train.label, clin_feat_combined, _cmap)
+            if _p is None:
+                print(f"  ⚠ {_cname} 训练集拟合失败 — 跳过该组")
+                continue
+            p_comb_map[_cname] = _p
+
+        def _combined_extra(layer, scores_map) -> Dict[str, np.ndarray]:
+            """验证层：其余 Combined_* 组的概率（锁定临床变量与该组分数，重估系数）。"""
+            out: Dict[str, np.ndarray] = {}
+            scores_map = scores_map or {}
+            for _cname, _cmap in comb_specs.items():
+                if _cname == _primary_comb:
+                    continue
+                part = {k: scores_map[k] for k in _cmap if scores_map.get(k) is not None}
+                if not part:
+                    continue
+                _p = refit_combined_prob(layer.clin, layer.label, clin_feat_combined, part)
+                if _p is not None:
+                    out[_cname] = _p
+            return out
+
         nomo = None
         if do_nomo and (has_rs or clin_feat_combined):
             nomo = build_nomogram(
@@ -848,7 +920,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 radscore_test=None,
                 test_clin=_te_clin,
                 test_label=_te_y,
-                score_train=_tr_scores or None,
+                score_train=comb_specs.get(_primary_comb) or (_tr_scores or None),
                 score_test=_te_scores or None,
             )
 
@@ -903,7 +975,11 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         p_nomo_tr = None
         if nomo is not None:
             p_nomo_tr = _expand_to_full(nomo.train_prob, nomo.df_train, len(data.train.label))
-        p_comb_tr = p_nomo_tr if has_rs else None
+        p_comb_tr = None
+        if has_rs and p_nomo_tr is not None:
+            p_comb_tr = p_nomo_tr
+        if p_comb_tr is None:
+            p_comb_tr = p_comb_map.get(_primary_comb)
         p_clin_tr, _ = _score_to_prob(clin_score_tr, data.train.label, None)
         if not has_rs and p_nomo_tr is not None:
             p_clin_tr = p_nomo_tr
@@ -951,6 +1027,13 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 _, p_te = _score_to_prob(tr_vec, data.train.label, te_map.get(name))
                 if p_te is not None:
                     p_map[str(name)] = p_te
+            if rad_res_layer is not None and p_map:
+                rad_res_layer.score_probs = p_map
+            _pm = (
+                payload if isinstance(payload, dict)
+                else ({"RadScore": payload} if payload is not None else {})
+            )
+            p_map.update(_combined_extra(layer, _pm))
             if rad_res_layer is not None and p_map:
                 rad_res_layer.score_probs = p_map
             p_r_val = p_map.get("RadScore")
@@ -1004,6 +1087,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                         p_map[str(name)] = p_one
                 if rad_res_layer is not None and p_map:
                     rad_res_layer.score_probs = p_map
+                p_map.update(_combined_extra(layer, scores or {}))
+                if rad_res_layer is not None and p_map:
+                    rad_res_layer.score_probs = p_map
                 return p_c, p_map.get("RadScore"), p_comb, scores or None
             rs = _validation_radscore(layer, rad_res_layer)
             p_c = None
@@ -1039,12 +1125,20 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     ).fit()
                     p_r = np.full(len(rs_arr), np.nan)
                     p_r[ok_r] = fit_r.predict(Xr)
+            extra = _combined_extra(layer, {"RadScore": rs} if rs is not None else {})
+            if rad_res_layer is not None and extra:
+                merged = dict(getattr(rad_res_layer, "score_probs", None) or {})
+                merged.update(extra)
+                rad_res_layer.score_probs = merged
             return p_c, p_r, p_comb, rs
 
         # train：合并 ROC（单临床 p<阈值 + RadScore + Clinical + Combined）/ 校准 / DCA
         ml_tr = _merged_roc_models(
             data.train, _score_payload(res_train["rad"]), p_clin=p_clin_tr, p_comb=p_comb_tr,
         )
+        for _cname, _p in p_comb_map.items():
+            if _cname != _primary_comb and _p is not None:
+                ml_tr[_cname] = np.asarray(_p, dtype=float)
         if ml_tr:
             plot_roc(ml_tr, data.train.label, dataset_label="train", val_mode=val_mode)
             _maybe_td_rocs("train", ml_tr, data.train)
@@ -1091,8 +1185,11 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             ml_tr_dca["Clinical"] = p_clin_tr
         for _sname, _p in p_rad_map.items():
             ml_tr_dca[_sname] = _p
+        for _cname, _p in p_comb_map.items():
+            if _p is not None:
+                ml_tr_dca[_cname] = _p
         if p_comb_tr is not None:
-            ml_tr_dca["Combined"] = p_comb_tr
+            ml_tr_dca[_primary_comb] = p_comb_tr
         ml_tr_dca = _add_reader_to_dca(ml_tr_dca, data.train.clin)
         cal_prob = p_comb_tr if has_rs else p_clin_tr
         cal_name = "Combined" if has_rs and p_comb_tr is not None else "Clinical"
@@ -1784,7 +1881,8 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
 
 def _resolve_external_specs(input_file: str) -> list:
     """控制台三格（文件/临床sheet/组学sheet）或旧 EXTERNAL_TESTS 列表。
-    必须有外验文件 + 临床 sheet + 组学 sheet；仅默认 sheet 名、无文件 = 不做外验。
+    必须有外验文件 + 临床 sheet；组学 sheet 或 sheets（块表映射）二者其一。
+    仅默认 sheet 名、无文件 = 不做外验。
     （与 console sync_external_tests 一致；勿把主表 input 冒充外验。）
     """
     specs = list(getattr(cfg, "EXTERNAL_TESTS", []) or [])
@@ -1794,6 +1892,7 @@ def _resolve_external_specs(input_file: str) -> list:
         f = str(getattr(cfg, "EXTERNAL_FILE", "") or "").strip()
         if f and cs and rs:
             specs = [{"name": "ext", "file": f, "clin_sheet": cs, "rad_sheet": rs}]
+    blocks = active_blocks()
     out = []
     for spec in specs:
         if not isinstance(spec, dict):
@@ -1801,14 +1900,32 @@ def _resolve_external_specs(input_file: str) -> list:
         cs = str(spec.get("clin_sheet") or "").strip()
         rs = str(spec.get("rad_sheet") or "").strip()
         f = str(spec.get("file") or "").strip()
-        if not f or not cs or not rs:
+        raw_sheets = spec.get("sheets")
+        sheets: dict = {}
+        if isinstance(raw_sheets, dict):
+            for k, v in raw_sheets.items():
+                kk = str(k).strip()
+                vv = str(v or "").strip()
+                if kk and vv:
+                    sheets[kk] = vv
+        if not f or not cs:
             continue
+        if blocks:
+            block_sheets = {b.name: sheets.get(b.name) or b.resolved_sheet for b in blocks}
+        else:
+            block_sheets = dict(sheets)
+        if not rs and not block_sheets:
+            continue
+        if not rs and block_sheets:
+            rs = next(iter(block_sheets.values()))
         item = {
             "name": str(spec.get("name") or "ext"),
             "file": f,
             "clin_sheet": cs,
             "rad_sheet": rs,
         }
+        if block_sheets:
+            item["sheets"] = block_sheets
         rid = str(spec.get("rad_id_col") or "").strip()
         if rid:
             item["rad_id_col"] = rid
@@ -2232,9 +2349,14 @@ def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
     xlsx = input_file or getattr(cfg, "INPUT", "data_merged.xlsx")
     from modules.config.ini_io import resolve_project_dir
     from modules.utils.u_qc import (
-        relocate_legacy_qc_html, resolve_qc_html_path,
-        write_external_qc_reports, write_project_data_qc,
+        _qc_fingerprint,
+        qc_is_fresh,
+        relocate_legacy_qc_html,
+        resolve_qc_html_path,
+        write_external_qc_reports,
+        write_project_data_qc,
     )
+    from pathlib import Path as _Path
     dest = resolve_project_dir()
     relocate_legacy_qc_html(dest)
     cfg.QC_HTML = "ref/qc.html"
@@ -2252,6 +2374,7 @@ def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
         "ICC_THRESHOLD": getattr(_cfg, "ICC_THRESHOLD", 0.75),
         "ICC_INTRA_COL": getattr(_cfg, "ICC_INTRA_COL", "intra_ICC"),
         "ICC_INTER_COL": getattr(_cfg, "ICC_INTER_COL", "inter_ICC"),
+        "MODALITY_BLOCKS": list(getattr(_cfg, "MODALITY_BLOCKS", None) or []),
     }
     for k in (
         "EXTERNAL_TESTS", "EXTERNAL_FILE",
@@ -2262,9 +2385,11 @@ def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
             settings[k] = getattr(cfg, k)
     print("\n═══ QC REPORT ═══")
     try:
-        if out_path.is_file() and out_path.stat().st_size > 200:
-            print(f"  exists → skip  ({out_path})")
+        fp = _qc_fingerprint(_Path(str(xlsx)), settings)
+        if qc_is_fresh(out_path, fp):
+            print(f"  fresh → skip  ({out_path})")
         else:
+            print(f"  stale/missing → 重算  ({out_path})")
             write_project_data_qc(xlsx, settings=settings, out_html=out_path)
     except Exception as e:
         print(f"  ⚠ QC report failed: {e}")

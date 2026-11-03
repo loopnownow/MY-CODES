@@ -74,6 +74,27 @@ def _as_name_list(value: Any) -> list[str]:
     s = str(value).strip()
     return [s] if s else []
 
+def _as_blocks(value: Any) -> list[dict[str, Any]]:
+    """模态块列表规范化。与 config.blocks.normalize_blocks 同一套规则，非法值 raise。"""
+    from modules.config.blocks import normalize_blocks
+
+    specs = normalize_blocks(value)
+    return [
+        {
+            "name": s.name,
+            "sheet": s.sheet,
+            "id_col": s.id_col,
+            "method": s.method,
+            "enabled": s.enabled,
+            "kind": s.kind,
+            "prep": dict(s.prep),
+            "params": dict(s.params),
+            "score": s.score,
+        }
+        for s in specs
+    ]
+
+
 def _as_prefix_group(value: Any) -> dict[str, Any]:
     """分类名顺序 + 前缀归属。空结构表示仍做一整份 Logistic。"""
     names: list[str] = []
@@ -188,6 +209,15 @@ def hydrate_console_settings(settings: dict[str, Any]) -> dict[str, Any]:
     settings["RAD_FEATURE_PREFIX_GROUP"] = _as_prefix_group(
         settings.get("RAD_FEATURE_PREFIX_GROUP")
     )
+    if "MODALITY_BLOCKS" in settings:
+        settings["MODALITY_BLOCKS"] = _as_blocks(settings.get("MODALITY_BLOCKS"))
+    if "TEXT_ENCODE" in settings:
+        from modules.stats.text_encode import normalize_spec
+
+        settings["TEXT_ENCODE"] = normalize_spec(settings.get("TEXT_ENCODE"))
+    for _k in ("COMBINED_BLOCKS", "COMBINED_EXCLUDE"):
+        if _k in settings:
+            settings[_k] = _as_name_list(settings.get(_k))
     apply_clin_role_priority(settings)
     raw_om = settings.get("ORDINAL_MAX_LEVELS", 5)
     if raw_om in (None, ""):
