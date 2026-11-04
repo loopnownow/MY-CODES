@@ -1983,7 +1983,6 @@ function renderDataPane() {
   if (ex) ex.innerHTML = excludeRowsHtml();
   form.querySelectorAll("[data-key]").forEach(bindField);
   form.querySelectorAll(".grow-rows").forEach(bindGrowRows);
-  bindExcludeRows();
   fillIoModule();
 }
 

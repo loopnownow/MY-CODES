@@ -132,6 +132,15 @@ button.pri:hover,a.pri:hover{background:#0c3d4a;text-decoration:none}
 #scanRange{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 #port{width:6.5em;flex:0 0 6.5em}
 .links{margin-top:auto;padding-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.links .btn{min-height:34px}
+.pv-sheet{margin-top:10px}
+.pv-sheet+.pv-sheet{padding-top:10px;border-top:1px dashed var(--line)}
+.pv-sheet .dim{color:var(--muted);font-size:11px;font-weight:400}
+.pv-scroll{overflow:auto;max-height:240px;border:1px solid var(--line);border-radius:8px}
+table.pv-tbl{border-collapse:collapse;font-size:12px;min-width:100%}
+table.pv-tbl th,table.pv-tbl td{padding:4px 8px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;text-align:left}
+table.pv-tbl th{background:#f4f2ec;color:var(--muted);font-weight:600;position:sticky;top:0}
+table.pv-tbl td.dim{color:var(--muted)}
 #msg{min-height:1.4em}
 #msg.ok{color:var(--ok)} #msg.err{color:var(--err)} #msg.warn{color:var(--warn)}
 .save-row{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
@@ -286,9 +295,19 @@ footer{
         </div>
       </div>
       <a id="protoGo" href="about:blank"></a>
-      <p id="msg" class="hint">关闭/开启停服务或启动控制台。端口旁显示是否本控制台；「探测确认」一次完成探测与确认。</p>
+      <div class="links">
+        <button type="button" class="btn pri" id="btnLoadNow" title="读取本课题主数据文件，列出全部工作表并预览每张表的前 3 行。">载入数据</button>
+        <button type="button" class="btn" id="btnGoPg" title="进入控制台「数据预览」页：给工作表分配角色、设外验与排除名单。">进入数据预览</button>
+      </div>
+      <p id="msg" class="hint">关闭/开启停服务或启动控制台。开启服务后会自动读取主数据并显示预览。</p>
     </section>
   </div>
+  <!-- 起始页预览：每次载入后列出所有工作表前 3 行（最多 12 列）。 -->
+  <section id="pvCard" class="card" hidden aria-labelledby="h-pv">
+    <h2 id="h-pv">数据预览</h2>
+    <p class="hint" id="pvMsg">载入后显示每张工作表的前 3 行。</p>
+    <div id="pvBox"></div>
+  </section>
   <!-- 数据区已移到控制台「数据预览」页；本区只作 pageUrl / protoUrl 的状态来源，页面不显示。 -->
   <section id="dataBlock" class="card" hidden aria-labelledby="h-data">
     <h2 id="h-data"><span class="n">4</span> 加载数据</h2>
@@ -961,27 +980,16 @@ function onServiceReady(p) {
     msg.textContent = "服务已开。本页未登记：点「登记项目」后再进数据预览。";
     return;
   }
-  if (!wantAutoJump) {
-    msg.textContent = "服务已开。点「进入数据预览」继续。";
-    return;
-  }
   wantAutoJump = false;
-  autoOpenPreview(p);
+  autoLoadAndPreview(p);
 }
-async function autoOpenPreview(p) {
-  const url = pageUrl(p);
-  msg.textContent = "服务已开，正在载入数据并进入数据预览…";
-  const q = new URLSearchParams(new URL(url).search);
-  try {
-    const headers = pageToken ? {"X-Console-Token": pageToken} : {};
-    const r = await fetch(host(p) + "/api/settings?" + q.toString(), {headers});
-    const j = await r.json();
-    if (!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
-  } catch (e) {
-    msg.innerHTML = '<span class="err">载入失败：' + esc(e && e.message ? e.message : e) + "</span>";
-    return;
+// 开服务后默认读主数据并就地显示预览（不再自动跳控制台）。
+async function autoLoadAndPreview(p) {
+  msg.textContent = "服务已开，正在读取主数据…";
+  await loadWorkbook();
+  if (DATA_LOADED) {
+    msg.textContent = "数据已读取（见下方「数据预览」）。点「进入数据预览」继续。";
   }
-  location.href = url;
 }
 function keysFromSettingsError(msg) {
   const text = String(msg || "");
@@ -1038,6 +1046,36 @@ async function clearBadKeys() {
   } catch (e) {
     if (loadMsg) loadMsg.textContent = "清空失败：" + (e && e.message ? e.message : e);
   }
+}
+function renderSheetBlocks(prev) {
+  const cardEl = document.getElementById("pvCard");
+  const box = document.getElementById("pvBox");
+  const line = document.getElementById("pvMsg");
+  if (!cardEl || !box) return;
+  const blocks = (prev && prev.sheet_blocks) || {};
+  const names = Object.keys(blocks);
+  cardEl.hidden = false;
+  if (!names.length) {
+    box.innerHTML = '<p class="hint">没有读到工作表。</p>';
+    if (line) line.textContent = "未读到工作表。";
+    return;
+  }
+  box.innerHTML = names.map((name) => {
+    const b = blocks[name] || {};
+    if (b.error) {
+      return `<div class="pv-sheet"><div class="sublab">${esc(name)}</div><p class="hint">读取失败：${esc(b.error)}</p></div>`;
+    }
+    const cols = (b.columns || []).map((c) => String(c));
+    const rows = (b.rows || []).slice(0, 3);
+    const head = `<tr><th>#</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>`;
+    const body = rows.map((r, i) => `<tr><td class="dim">${i + 1}</td>${
+      cols.map((_, j) => `<td>${esc(r && r[j] != null ? String(r[j]) : "")}</td>`).join("")
+    }</tr>`).join("");
+    const dim = `${b.n_rows || 0}×${b.n_cols || 0}${cols.length ? " · 显示前 " + cols.length + " 列" : ""}`;
+    return `<div class="pv-sheet"><div class="sublab">${esc(name)} <span class="dim">${esc(dim)}</span></div>
+      <div class="pv-scroll"><table class="pv-tbl">${head}${body}</table></div></div>`;
+  }).join("");
+  if (line) line.textContent = `已读取 ${names.length} 张工作表：${names.join(" / ")}。每张显示前 3 行。`;
 }
 async function loadWorkbook() {
   if (location.protocol === "file:" && !pageToken) {
@@ -1109,6 +1147,7 @@ async function loadWorkbook() {
     RAD_META_OPTS = uniq((prev.rad_meta_cols || []).concat(RAD_META_PICKED));
     renderRadMeta();
     renderExtRows(lock.EXTERNAL_TESTS && lock.EXTERNAL_TESTS.length ? lock.EXTERNAL_TESTS : [emptyExtRow()]);
+    renderSheetBlocks(prev);
     DATA_LOADED = true;
     if (sheetBlock) sheetBlock.hidden = false;
     setGoEnabled(true);
@@ -1146,6 +1185,10 @@ async function enterConsole(e) {
 if (go) go.addEventListener("click", enterConsole);
 if (goFlow) goFlow.addEventListener("click", () => { holdForConsole = true; });
 document.getElementById("btnLoadData").onclick = () => loadWorkbook();
+const btnLoadNow = document.getElementById("btnLoadNow");
+if (btnLoadNow) btnLoadNow.onclick = () => loadWorkbook();
+const btnGoPg = document.getElementById("btnGoPg");
+if (btnGoPg) btnGoPg.addEventListener("click", enterConsole);
 const btnClearBad = document.getElementById("btnClearBad");
 if (btnClearBad) btnClearBad.onclick = () => clearBadKeys();
 document.getElementById("btnExtAdd").onclick = () => {
