@@ -27,11 +27,15 @@ _LASSO_KEYS: Dict[str, str] = {
     "tol": "LASSO_TOL",
     "prefilter_topk": "LASSO_PREFILTER_TOPK",
     "n_jobs": "LASSO_N_JOBS",
+    # 与 _LOGIT_KEYS 同名：LASSO 分数本来就是 OLS，这里只为块面板统一传参。
+    "linear": "RAD_SCORE_LINEAR",
 }
 _LOGIT_KEYS: Dict[str, str] = {
     "uni_p": "RAD_LOGIT_UNI_P",
     "mv_p": "RAD_LOGIT_MV_P",
     "firth": "DO_RAD_FIRTH",
+    # 筛选后再做一次原始尺度 OLS（块级覆盖；LASSO 本来即 OLS，置位无副作用）。
+    "linear": "RAD_SCORE_LINEAR",
 }
 _PREP_KEYS: Dict[str, str] = {
     "icc": "DO_ICC_FILTER",

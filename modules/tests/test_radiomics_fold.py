@@ -195,9 +195,9 @@ def test_prefix_groups_fit_separate_logistics():
     assert "Radiomics logistic — DTI" in page
     assert "Radiomics logistic — DKI" in page
     assert "Radiomics logistic — ASL" not in page
-    assert "RadScore_DTI" in formula
-    assert "RadScore_DKI" in formula
-    assert "<b>RadScore</b>" not in formula
+    # 未开线性拟合（RAD_SCORE_LINEAR=false）：结果页不出 RadScore Formula；
+    # 分数仍在 score_map 里供 ROC / Combined 下游使用。
+    assert formula == ""
 
 
 def test_auc_prefilter_topk():
