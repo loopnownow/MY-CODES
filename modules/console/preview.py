@@ -427,15 +427,12 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
     eh = _hit(exc_sheet)
     try:
         from modules.stats.data_io import (
-            resolve_exclude_files,
+            _exclude_specs,
             normalize_exclude_rows,
             _keys_from_exclude_frame,
         )
-        paths: list[Path] = []
-        for exclude_file in resolve_exclude_files(settings):
-            paths.append(_exclude_path(exclude_file, data_path))
-        ecol = str(settings.get("EXCLUDE_COL") or "exc")
-        row_vals = normalize_exclude_rows(settings.get("EXCLUDE_ROW"))
+        specs = _exclude_specs(settings)
+        paths: list[Path] = [_exclude_path(s["file"], data_path) for s in specs]
         sheets_u: list[str] = []
         columns_u: list[str] = []
         values_u: list[str] = []
@@ -443,21 +440,25 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         n_raw_total = 0
         id_used = ""
         hit_sheet = exc_sheet or ""
-        used_col = ecol
-        for i, ex_p in enumerate(paths):
-            meta = xlsx_meta(ex_p, exc_sheet or "exc", ecol) if ex_p.is_file() else {}
+        used_col = str(settings.get("EXCLUDE_COL") or "exc")
+        row_vals: list[str] = []
+        for i, (spec, ex_p) in enumerate(zip(specs, paths)):
+            sheet_s = str(spec.get("sheet") or "exc")
+            col_s = str(spec.get("col") or "exc")
+            row_vals = normalize_exclude_rows(spec.get("row"))
+            meta = xlsx_meta(ex_p, sheet_s, col_s) if ex_p.is_file() else {}
             for s in meta.get("sheets") or []:
                 if s not in sheets_u:
                     sheets_u.append(str(s))
             if i == 0:
                 columns_u = [str(c) for c in (meta.get("columns") or [])]
                 values_u = [str(v) for v in (meta.get("values") or [])]
-                hit_sheet = str(meta.get("sheet") or (exc_sheet or ""))
-                used_col = str(meta.get("col") or ecol)
+                hit_sheet = str(meta.get("sheet") or sheet_s)
+                used_col = str(meta.get("col") or col_s)
             if not (ex_p.is_file() and meta.get("sheet")):
                 continue
             edf = pd.ExcelFile(ex_p).parse(meta["sheet"])
-            use = ecol if ecol in edf.columns else (
+            use = col_s if col_s in edf.columns else (
                 edf.columns[0] if len(edf.columns) else None
             )
             if use is None:
@@ -832,7 +833,7 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
         "OUTCOME_COLS", "SUBGROUP_COL", "GROUP_SOURCE_COL",
         "GROUP_FROM_ID", "GROUP_FROM_ID_SEP",
         "DO_EXCLUDE_SAMPLES", "EXCLUDE_FILE", "EXCLUDE_SHEET",
-        "EXCLUDE_COL", "EXCLUDE_ROW",
+        "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_TESTS",
         "ICC_THRESHOLD", "ICC_INTRA_COL", "ICC_INTER_COL",
         "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
         "EXTERNAL_TESTS", "MODALITY_BLOCKS",

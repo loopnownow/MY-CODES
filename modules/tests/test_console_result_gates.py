@@ -631,6 +631,20 @@ def test_clinical_prep_and_filter_are_big_two_column_modules():
     assert compact.count("grid-template-columns:repeat(2,minmax(0,1fr))") >= 2
 
 
+def test_exclude_cards_write_per_file_specs():
+    """排除名单每张卡有自己的 sheet/列/内容，写 EXCLUDE_TESTS；旧 EXCLUDE_* 仍镜像首文件。"""
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    js = (ROOT / "modules" / "console" / "console_schema.js").read_text(encoding="utf-8")
+    defaults = (ROOT / "modules" / "config" / "defaults.py").read_text(encoding="utf-8")
+    ini = (ROOT / "modules" / "config" / "ini_io.py").read_text(encoding="utf-8")
+    assert "function excludeTests" in ui and "function setExcSpec" in ui
+    assert 'data-exc-file="' in ui          # 每个 select 记住自己属于哪份文件
+    assert 'setFieldValue("EXCLUDE_TESTS"' in ui
+    assert '"EXCLUDE_TESTS"' in js.split("const HIDDEN_FORM_KEYS", 1)[1]
+    assert '"EXCLUDE_TESTS": []' in defaults
+    assert '"EXCLUDE_TESTS"' in ini
+
+
 def test_start_page_loads_data_and_previews_every_sheet():
     """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
@@ -650,6 +664,46 @@ def test_start_page_loads_data_and_previews_every_sheet():
     assert proj.index('id="btnLoadNow"') < proj.index('id="msg"')
 
 
+
+
+def test_exclude_tests_gives_each_file_its_own_sheet_and_column(tmp_path):
+    """EXCLUDE_TESTS：每个名单文件用自己那张表的 sheet / 列 / 内容（不再一套套所有文件）。"""
+    from modules.stats.data_io import _EXCLUDE_CACHE, _row_id_is_excluded, load_exclude_id_keys
+
+    a = tmp_path / "a.xlsx"
+    b = tmp_path / "b.xlsx"
+    pd.DataFrame({"exc": ["1001", "1002"]}).to_excel(a, sheet_name="exc", index=False)
+    pd.DataFrame({"编号": ["2001"]}).to_excel(b, sheet_name="名单", index=False)
+
+    _EXCLUDE_CACHE.clear()
+    settings = {
+        "DO_EXCLUDE_SAMPLES": True,
+        "EXCLUDE_FILE": [str(a), str(b)],
+        "EXCLUDE_SHEET": "exc", "EXCLUDE_COL": "exc", "EXCLUDE_ROW": "",
+        "EXCLUDE_TESTS": [
+            {"file": str(a), "sheet": "exc", "col": "exc", "row": ""},
+            {"file": str(b), "sheet": "名单", "col": "编号", "row": ""},
+        ],
+    }
+    keys = load_exclude_id_keys(None, settings)
+    assert _row_id_is_excluded("1001", keys)
+    assert _row_id_is_excluded("2001", keys)   # b 用自己那张表 + 自己的列
+    assert not _row_id_is_excluded("9999", keys)
+
+    # 旧口径（EXCLUDE_TESTS 空）：一套 sheet/列套到所有文件 → b 没有 exc 表，读不到 2001
+    _EXCLUDE_CACHE.clear()
+    legacy = dict(settings)
+    legacy["EXCLUDE_TESTS"] = []
+    keys2 = load_exclude_id_keys(None, legacy)
+    assert _row_id_is_excluded("1001", keys2)
+    assert not _row_id_is_excluded("2001", keys2)
+
+    # EXCLUDE_TESTS 不是对象 → 明确报错，不静默跳过
+    _EXCLUDE_CACHE.clear()
+    bad = dict(settings)
+    bad["EXCLUDE_TESTS"] = ["a.xlsx"]
+    with pytest.raises(ValueError, match="EXCLUDE_TESTS\\[0\\]"):
+        load_exclude_id_keys(None, bad)
 
 
 def test_sync_external_tests_keeps_role_sheets():

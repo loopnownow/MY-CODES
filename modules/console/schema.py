@@ -35,6 +35,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("exclude", "样本排除名单", [
         "DO_EXCLUDE_SAMPLES",
         "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS",
+        "EXCLUDE_TESTS",
     ]),
     ("valmode", "内部验证 / 亚组验证 / 外部验证", [
         "VAL_MODE", "SUBGROUP_VAL_MODE", "EXTERNAL_VAL_MODE",

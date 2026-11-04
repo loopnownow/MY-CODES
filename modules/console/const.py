@@ -145,6 +145,7 @@ CONSOLE_DEFAULTS = {
     "EXCLUDE_SHEET": "",
     "EXCLUDE_COL": "",
     "EXCLUDE_ROW": "",
+    "EXCLUDE_TESTS": [],
     "SUBPROJECT_BY_OUTCOME": {},
     "READER_VALUE_MAP": {},
     "OUTCOME_BINARIZE": {},

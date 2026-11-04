@@ -55,6 +55,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "EXCLUDE_COL": "",
     "EXCLUDE_ROW": "",
     "EXCLUDE_IDS": [],
+    # 每个排除文件自己的 sheet / 列 / 内容：[{file, sheet, col, row}]。
+    # 空 = 旧口径（EXCLUDE_SHEET / COL / ROW 一套套到 EXCLUDE_FILE 的全部文件）。
+    "EXCLUDE_TESTS": [],
     "READER_VALUE_MAP": {},
     "OUTCOME_BINARIZE": {},
     "GROUP_KEEP": [],
