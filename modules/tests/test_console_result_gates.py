@@ -599,9 +599,12 @@ def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
     assert schema.SECTION_OF["COMBINED_EXCLUDE"][0] == "combined"
     assert schema.SECTION_OF["CLIN_BLOCK_METHOD"][0] == "combined"
     radprep = [k for s, _t, ks in schema.SECTION_DEFS if s == "radprep" for k in ks]
-    assert "MODALITY_BLOCKS" in radprep and "COMBINED_MODE" not in radprep
+    assert "MODALITY_BLOCKS" not in radprep
+    radblocks = [k for s, _t, ks in schema.SECTION_DEFS if s == "radblocks" for k in ks]
+    assert radblocks == ["MODALITY_BLOCKS"]
+    assert schema.SECTION_OF["MODALITY_BLOCKS"][0] == "radblocks"
     assert "function modalityBlocksPanel" in ui and "function combinedPanel" in ui
-    assert 'data-sec="combined"' in ui
+    assert 'data-sec="radblocks"' in ui and 'data-sec="combined"' in ui
     assert "blk-stage-k" in ui and "预处理" in ui and "筛选" in ui and "模型" in ui
     assert 'data-blk-param="uni_p"' in ui and 'data-blk-param="mv_p"' in ui
     assert 'data-blk-param-bool="firth"' in ui

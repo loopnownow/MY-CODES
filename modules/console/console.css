@@ -85,7 +85,7 @@ header #loadHint .err{color:#ffc9c9}
 .pv-file-head input[type=text]{width:100%;min-width:0;font-size:12px;padding:4px 6px}
 .pv-role.pv-role-4 .pv-role-head,.pv-role.pv-role-4 .pv-role-row{grid-template-columns:minmax(6em,1.3fr) 4.5em minmax(8em,1fr) minmax(8em,1fr)}
 .pv-role.pv-role-5 .pv-role-head,.pv-role.pv-role-5 .pv-role-row{grid-template-columns:6em minmax(6em,1.2fr) 5.5em 5.5em minmax(5em,1fr)}
-.rad-blocks-wrap,.rad-blocks{display:grid;gap:6px}
+.rad-blocks{display:grid;gap:6px}
 .blk-card{display:grid;gap:5px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r8);background:#fff}
 .blk-card + .blk-card{margin-top:6px}
 .blk-card[data-off="1"]{opacity:.55}

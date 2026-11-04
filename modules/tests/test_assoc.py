@@ -300,7 +300,9 @@ def test_sections_place_new_switches():
     assert SECTION_OF["SUBGROUP_VAL_MODE"][0] == "valmode"
     assert SECTION_OF["EXTERNAL_VAL_MODE"][0] == "valmode"
     assert ids.index("corr") < ids.index("pcorr")
-    assert ids.index("radprep") + 1 == ids.index("rad")
+    # 组学三段：预处理 → 组学模块（每块） → LASSO → Logistic（组学模块独立成段，插在预处理与 LASSO 之间）
+    assert ids.index("radprep") + 1 == ids.index("radblocks")
+    assert ids.index("radblocks") + 1 == ids.index("rad")
     assert ids.index("rad") + 1 == ids.index("radlog")
     assert ids.index("fig") + 1 == ids.index("radmark")
     for _sid, title, _ks in SECTION_DEFS:
