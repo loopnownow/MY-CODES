@@ -1322,3 +1322,35 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 .rad-prefix-tools{
   display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 6px;
 }
+
+/* ===== 临床两大模块（预处理 / 筛选）：整行铺开、块内两列（后写生效） ===== */
+[data-sec="clinprep"] .sec-body.clinprep-body,
+[data-sec="clin"] .sec-body.clin-body{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px 18px;padding:10px 12px;align-items:start;
+  justify-items:stretch;
+}
+[data-sec="clinprep"] .sec-body.clinprep-body .field,
+[data-sec="clin"] .sec-body.clin-body .field{
+  width:auto;max-width:none;min-width:0;
+}
+[data-sec="clinprep"] .sec-body.clinprep-body .field.wide,
+[data-sec="clinprep"] .sec-body.clinprep-body .field.span2,
+[data-sec="clinprep"] .sec-body.clinprep-body .field.pathlist,
+[data-sec="clin"] .sec-body.clin-body .field.wide,
+[data-sec="clin"] .sec-body.clin-body .field.span2,
+[data-sec="clin"] .sec-body.clin-body .field.pathlist{
+  grid-column:1/-1;
+}
+[data-sec="clinprep"] .sec-body.clinprep-body select,
+[data-sec="clinprep"] .sec-body.clinprep-body input[type=text],
+[data-sec="clinprep"] .sec-body.clinprep-body input[type=number],
+[data-sec="clin"] .sec-body.clin-body select,
+[data-sec="clin"] .sec-body.clin-body input[type=text],
+[data-sec="clin"] .sec-body.clin-body input[type=number]{
+  width:100%;max-width:none;min-width:0;
+}
+@media (max-width:1000px){
+  [data-sec="clinprep"] .sec-body.clinprep-body,
+  [data-sec="clin"] .sec-body.clin-body{grid-template-columns:1fr}
+}
