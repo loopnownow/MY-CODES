@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import json
 import threading
 from http.client import HTTPConnection
 
@@ -240,5 +241,36 @@ def test_flow_chart_page_allows_same_origin_frame():
         s2, h2, _b2 = _get(port, "/")
         assert s2 == 200
         assert h2.get("X-Frame-Options") == "DENY"
+    finally:
+        _stop_server(httpd)
+
+
+def test_flow_files_route_reports_errors_instead_of_faking_a_list(reg_file, proj_dir):
+    """路由接线：/flow_files 与 /flow_spec 不需要 console token（同 /files/），
+    缺 project / 项目不可解析 / 缺文件都回 ok:false + 原文，不冒充成功。"""
+    _entry, _token = project_registry.register("proj_alpha", proj_dir)
+    httpd, port = _start_server()
+    try:
+        status, _h, body = _get(port, "/flow_files")
+        payload = json.loads(body.decode("utf-8"))
+        assert status == 200, body.decode("utf-8")
+        assert payload["ok"] is False
+        assert "project" in payload["error"]
+        assert payload["files"] == []
+
+        status2, _h2, body2 = _get(port, "/flow_files?project=proj_alpha")
+        payload2 = json.loads(body2.decode("utf-8"))
+        assert status2 == 200
+        assert payload2["ok"] is False
+        assert payload2["error"]
+
+        status3, _h3, body3 = _get(
+            port, "/flow_spec?project=proj_alpha&file=Manuscript_alpha_V1.docx"
+        )
+        payload3 = json.loads(body3.decode("utf-8"))
+        assert status3 == 200
+        assert payload3["ok"] is False
+        assert "未指定手稿文件" not in payload3["error"]
+        assert payload3["spec"] is None
     finally:
         _stop_server(httpd)
