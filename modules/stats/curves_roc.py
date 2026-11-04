@@ -311,6 +311,7 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
     is_val = _is_val_dataset(dataset_label)
     if is_val and mode == "lock_threshold" and lock_from is None:
         lock_from = ROC_LOCK.get("train") or {}
+    from modules.stats.radiomics import score_display_name
 
     assert len(model_list) >= 1
     color_map = _resolve_color_map(list(model_list.keys()), color_map)
@@ -406,7 +407,7 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
         prob_store[nm] = prob_full
 
         metrics_rows.append({
-            "Model": nm, "Threshold": thr_y, "AUC": auc,
+            "Model": score_display_name(nm), "Threshold": thr_y, "AUC": auc,
             "AUC_CI_low": ci[0], "AUC_CI_high": ci[1],
             "ACC": cm["ACC"], "SEN": sens_y, "SPE": spec_y,
             "NPV": cm["NPV"], "PPV": cm["PPV"],
@@ -416,7 +417,9 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
 
         if plot_skip:
             continue
-        display_name = f"{nm}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
+        display_name = (
+            f"{score_display_name(nm)}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
+        )
         curves.append((display_name, nm, fpr, tpr))
 
     ROC_LOCK[str(dataset_label)] = lock_store
@@ -427,14 +430,17 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
         metrics_df = pd.DataFrame(metrics_rows)
         if len(prob_store) >= 2:
             dmat = _pairwise_delong(y, prob_store)
-            names = [str(x) for x in metrics_df["Model"].tolist()]
-            for other in names:
-                col = f"DeLong vs {other}"
+            raw_names = [str(k) for k in prob_store]
+            disp = {k: score_display_name(k) for k in raw_names}
+            for other_raw in raw_names:
+                col = f"DeLong vs {disp[other_raw]}"
                 metrics_df[col] = [
-                    np.nan if self == other else dmat.loc[self, other]
-                    for self in names
+                    np.nan if self_raw == other_raw else dmat.loc[self_raw, other_raw]
+                    for self_raw in raw_names
                 ]
-            n_pair = sum(1 for i, a in enumerate(names) for b in names[i + 1:])
+            n_pair = sum(
+                1 for i, a in enumerate(raw_names) for b in raw_names[i + 1:]
+            )
             print(f"  DeLong pairwise: {n_pair} tests")
         ROC_METRICS[roc_fn] = metrics_df
         print(f"  metrics stored in ROC_METRICS['{roc_fn}']")

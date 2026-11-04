@@ -450,6 +450,8 @@ def run_analysis(dat: data_io.DataLayer, label_str: str,
         clin_for_roc = (list(roc_clin_features) if roc_clin_features is not None
                         else list(clin_res.features))
         payload_scores = radiomics.score_map(rad_res)
+        # 单特征分数在 ROC 图/表与 DCA 图例里用特征名（如 Eccentricity_index），不用块名。
+        radiomics.register_score_display(rad_res)
         grouped = bool(list(getattr(rad_res, "groups", None) or []))
         if grouped or (payload_scores and set(payload_scores) != {"RadScore"}):
             ml = build_models(dat.clin, None, clin_features=clin_for_roc)
@@ -807,6 +809,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
 
     combined_info = None
     _tr_scores = radiomics.score_map(res_train["rad"])
+    radiomics.register_score_display(res_train["rad"])
     has_rs = bool(_tr_scores)
     do_nomo = bool(getattr(cfg, "DO_NOMOGRAM", True))
     if do_nomo or has_rs or train_clin_feat:

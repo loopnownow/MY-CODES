@@ -74,6 +74,7 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     ]):
         return None  # type: ignore[return-value]
     assert len(model_list) >= 1
+    from modules.stats.radiomics import score_display_name
 
     y = np.asarray(y).astype(int)
     prev = float(np.mean(y == 1))
@@ -110,7 +111,7 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     for nm in names:
         sub = dca_df[dca_df["Model"] == nm]
         ax.plot(sub["threshold"], sub["NB"], color=model_colors[nm], linewidth=2.1,
-                linestyle="solid", label=nm, solid_capstyle="round", zorder=3)
+                linestyle="solid", label=score_display_name(nm), solid_capstyle="round", zorder=3)
     sub = dca_df[dca_df["Model"] == "Treat All"]
     ax.plot(sub["threshold"], sub["NB"], color=model_colors["Treat All"], linewidth=1.4,
             linestyle="--", label="Treat All", zorder=2)
