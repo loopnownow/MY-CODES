@@ -78,6 +78,13 @@ header #loadHint .err{color:#ffc9c9}
 .pv-exc-row{padding:4px 0;border-top:1px dashed var(--line)}
 .pv-exc-row input,.pv-exc-row select{width:100%;min-width:0;font-size:12px;padding:4px 6px}
 .pv-exc-row select:disabled{opacity:.45}
+.pv-file-card{display:grid;gap:6px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r8);background:#fff}
+.pv-file-card + .pv-file-card{margin-top:8px}
+.pv-file-head{display:grid;grid-template-columns:auto minmax(9em,1.4fr) auto auto;gap:6px;align-items:center}
+.pv-file-head .pv-file-tag{font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.pv-file-head input[type=text]{width:100%;min-width:0;font-size:12px;padding:4px 6px}
+.pv-role.pv-role-4 .pv-role-head,.pv-role.pv-role-4 .pv-role-row{grid-template-columns:minmax(6em,1.3fr) 4.5em minmax(8em,1fr) minmax(8em,1fr)}
+.pv-role.pv-role-5 .pv-role-head,.pv-role.pv-role-5 .pv-role-row{grid-template-columns:6em minmax(6em,1.2fr) 5.5em 5.5em minmax(5em,1fr)}
 .pv-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 8px}
 .pv-actions-col{display:grid;grid-template-columns:1fr;gap:8px;margin:0 0 8px}
 .pv-actions-col .btn{width:100%}

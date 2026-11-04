@@ -10,6 +10,10 @@ const S = {
   outcomeTab: "",
   pairTab: "",
   ioTab: false,
+  extMeta: {},
+  pvExcMeta: {},
+  pvExcMetaByFile: {},
+  kvFoldOpen: {},
 };
 
 
@@ -67,6 +71,9 @@ function showPane(name) {
   const flow = name === "flow";
   const preview = name === "preview";
   $("paneConfig").hidden = flow || preview;
+  // 右侧运行台属于统计配置页：进配置就显示，进预览/流程就收起（不再依赖 loadAll 是否成功）。
+  const runCol = $("runCol");
+  if (runCol) runCol.hidden = flow || preview;
   $("paneFlow").hidden = !flow;
   const prevPane = $("panePreview");
   if (prevPane) prevPane.hidden = !preview;
@@ -264,11 +271,13 @@ function applyIoDefaults(obj) {
     }
   });
   if (Array.isArray(dst.EXTERNAL_TESTS)) {
+    // 外验的角色（clin_sheet / rad_sheet / qc_sheet / icc_sheet）只认用户在各卡里选的，
+    // 不填默认值：空 = 该表不参与，空 rad_id_col = 用全局组学 ID 列。
     dst.EXTERNAL_TESTS = dst.EXTERNAL_TESTS.map((r) => {
       const row = r && typeof r === "object" ? Object.assign({}, r) : {};
-      if (!(String(row.clin_sheet || "").trim())) row.clin_sheet = IO_DEFAULTS.CLIN_SHEET;
-      if (!(String(row.rad_sheet || "").trim())) row.rad_sheet = IO_DEFAULTS.RAD_SHEET;
-      if (!(String(row.rad_id_col || "").trim())) row.rad_id_col = IO_DEFAULTS.RAD_ID_COL;
+      ["clin_sheet", "rad_sheet", "rad_id_col", "qc_sheet", "icc_sheet"].forEach((k) => {
+        row[k] = String(row[k] == null ? "" : row[k]).trim();
+      });
       return row;
     });
   }
@@ -1974,7 +1983,6 @@ function renderDataPane() {
   if (ex) ex.innerHTML = excludeRowsHtml();
   form.querySelectorAll("[data-key]").forEach(bindField);
   form.querySelectorAll(".grow-rows").forEach(bindGrowRows);
-  bindExcludeRows();
   fillIoModule();
 }
 
@@ -1989,25 +1997,47 @@ function excludeRowsHtml() {
   const sheet = String(fieldValue("EXCLUDE_SHEET") || "");
   const col = String(fieldValue("EXCLUDE_COL") || "");
   const row = String(fieldValue("EXCLUDE_ROW") || "");
-  const head = `<div class="pv-exc-head"><span>文件</span><span>选择</span><span>sheet</span><span>列</span><span>内容</span><span></span></div>`;
-  const body = rows.map((f, i) => {
+  const cards = rows.map((f, i) => {
     const first = i === 0;
-    const dis = first ? "" : " disabled";
-    const shared = "（共用第一行）";
-    return `<div class="pv-exc-row" data-exc-row="${i}">
-      <input data-exc="file" type="text" list="xlsxList" value="${esc(f)}" placeholder="排除名单 xlsx" autocomplete="off" spellcheck="false"/>
-      <input data-exc-filepick type="file" accept=".xlsx,.xls" hidden/>
-      <button type="button" class="btn sec" data-exc-pick>选择</button>
-      <select data-exc="sheet"${dis}>${optHtml(first ? (meta.sheets || []) : [], sheet, first ? "（默认 exc）" : shared)}</select>
-      <select data-exc="col"${dis}>${optHtml(first ? (meta.columns || []) : [], col, first ? "（默认 exc）" : shared)}</select>
-      <select data-exc="row"${dis}>${optHtml(first ? (meta.values || []) : [], row, first ? "（整列当 ID）" : shared)}</select>
-      <button type="button" class="btn sec" data-exc-del title="删这一行">删</button>
+    const roleArea = first
+      ? `<div class="pv-role pv-role-4">
+      <div class="pv-role-head"><span>名单表</span><span>名单列</span><span>内容</span><span></span></div>
+      <div class="pv-role-row">
+        <select data-exc="sheet">${optHtml(meta.sheets || [], sheet, "（默认 exc）")}</select>
+        <select data-exc="col">${optHtml(meta.columns || [], col, "（默认 exc）")}</select>
+        <select data-exc="row">${optHtml(meta.values || [], row, "（整列当 ID）")}</select>
+        <span class="dim">共用</span>
+      </div>
+    </div>`
+      : "";
+    const note = first
+      ? "名单表 / 列 / 内容 由所有名单共用（后端一张表口径）；空内容＝该列整列当 ID。"
+      : "这份沿用首卡的名单表 / 列 / 内容。";
+    const metaOf = (S.pvExcMetaByFile || {})[f] || null;
+    const fileNote = !f
+      ? ""
+      : (metaOf && metaOf.error)
+        ? `读不到这份文件：${metaOf.error}`
+        : (metaOf && Array.isArray(metaOf.sheets) && metaOf.sheets.length)
+          ? `该文件 ${metaOf.sheets.length} 张表：${metaOf.sheets.join(" / ")}`
+          : "";
+    return `<div class="pv-file-card" data-exc-row="${i}">
+      <div class="pv-file-head">
+        <span class="pv-file-tag">名单 ${i + 1}</span>
+        <input data-exc="file" type="text" list="xlsxList" value="${esc(f)}" placeholder="排除名单 xlsx" autocomplete="off" spellcheck="false"/>
+        <input data-exc-filepick type="file" accept=".xlsx,.xls" hidden/>
+        <button type="button" class="btn sec" data-exc-pick>选择</button>
+        <button type="button" class="btn sec" data-exc-del title="删这份文件">删</button>
+      </div>
+      ${roleArea}
+      <p class="hint">${esc(note)}</p>
+      ${fileNote ? `<p class="hint${metaOf && metaOf.error ? " err" : ""}">${esc(fileNote)}</p>` : ""}
     </div>`;
   }).join("");
-  return `<div class="pv-exc">${head}${body}</div>
+  return `${cards}
     <div class="save-row">
-      <button type="button" id="btnExcAdd">+ 文件</button>
-      <span class="hint">名单非空才排除；空＝不排除。多个文件共用第一行的 sheet / 列 / 内容。</span>
+      <button type="button" id="btnExcAdd">+ 名单文件</button>
+      <span class="hint">名单非空才排除；空＝不排除。</span>
     </div>`;
 }
 
@@ -2031,6 +2061,7 @@ function applyExcFiles(list) {
 
 async function loadExcMeta(file) {
   const name = String(file || "").trim();
+  if (!S.pvExcMetaByFile) S.pvExcMetaByFile = {};
   if (!name) {
     S.pvExcMeta = {};
     return;
@@ -2039,12 +2070,16 @@ async function loadExcMeta(file) {
   const col = String(fieldValue("EXCLUDE_COL") || "");
   try {
     const j = await fetchXlsxMeta(name, sheet, col);
-    S.pvExcMeta = { sheets: j.sheets || [], columns: j.columns || [], values: j.values || [] };
+    S.pvExcMetaByFile[name] = {
+      sheets: j.sheets || [], columns: j.columns || [], values: j.values || [],
+    };
   } catch (e) {
-    S.pvExcMeta = {};
+    S.pvExcMetaByFile[name] = { sheets: [], columns: [], values: [], error: String(e && e.message ? e.message : e) };
     const msg = $("ioMsg");
     if (msg) msg.innerHTML = `<span class="err">排除名单读取失败：${esc(e && e.message ? e.message : e)}</span>`;
   }
+  const first = pvExcFiles()[0] || "";
+  if (first === name) S.pvExcMeta = S.pvExcMetaByFile[name];
 }
 
 function renderProjectInfo() {
@@ -2083,6 +2118,9 @@ async function refreshDataPane() {
   const msg = $("ioMsg");
   if (msg) msg.textContent = "正在更新预览…";
   syncExtRows();
+  for (const f of pvExcFiles()) {
+    await loadExcMeta(f);
+  }
   await loadExcMeta(pvExcFiles()[0] || "");
   await reloadPreview();
   renderDataPane();
@@ -2117,10 +2155,43 @@ function bindDataPane() {
     btn.dataset.bound = "1";
     btn.onclick = () => refreshDataPane().catch((e) => alert(e.message));
   }
+  const mainPick = $("ioDataPick");
+  const mainPickBtn = $("btnDataPick");
+  if (mainPick && mainPickBtn && !mainPickBtn.dataset.bound) {
+    mainPickBtn.dataset.bound = "1";
+    mainPickBtn.onclick = () => mainPick.click();
+    mainPick.onchange = () => {
+      const f = mainPick.files && mainPick.files[0];
+      const inp = $("ioData");
+      if (!f || !inp) return;
+      inp.value = f.name;
+      inp.dataset.dirty = "1";
+      refreshDataPane().catch((e) => {
+        const msg = $("ioMsg");
+        if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
+      });
+    };
+  }
   const toCfg = $("btnToConfig");
   if (toCfg && !toCfg.dataset.bound) {
     toCfg.dataset.bound = "1";
     toCfg.onclick = () => showPane("config");
+  }
+  const pvSave = $("btnPvSave");
+  if (pvSave && !pvSave.dataset.bound) {
+    pvSave.dataset.bound = "1";
+    pvSave.onclick = () => writeback().then(() => {
+      const msg = $("ioMsg");
+      if (msg) msg.innerHTML = '<span class="ok">已写入 settings.ini（旧文件备份为 .bak）。</span>';
+    }).catch((e) => {
+      const msg = $("ioMsg");
+      if (msg) msg.innerHTML = `<span class="err">保存失败：${esc(e && e.message ? e.message : e)}</span>`;
+    });
+  }
+  const pvRestart = $("btnPvRestart");
+  if (pvRestart && !pvRestart.dataset.bound) {
+    pvRestart.dataset.bound = "1";
+    pvRestart.onclick = () => restartServer().catch((e) => alert(e.message));
   }
   const sheets = $("pvSheets");
   if (sheets && !sheets.dataset.bound) {
@@ -2148,7 +2219,11 @@ function bindDataPane() {
       if (t.matches("[data-exc=file]")) {
         const list = readExcFiles();
         applyExcFiles(list);
-        loadExcMeta(list[0] || "").then(() => renderDataPane()).catch(() => {});
+        const self = String(t.value || "").trim();
+        Promise.all([
+          loadExcMeta(list[0] || ""),
+          self && self !== list[0] ? loadExcMeta(self) : Promise.resolve(),
+        ]).then(() => renderDataPane()).catch(() => {});
         return;
       }
       const key = t.getAttribute("data-exc");
@@ -2166,7 +2241,9 @@ function bindDataPane() {
       const f = inp.files && inp.files[0];
       const row = inp.closest("[data-exc-row]");
       const dest = row && row.querySelector("[data-exc=file]");
-      if (f && dest) dest.value = f.name;
+      if (!f || !dest) return;
+      dest.value = f.name;
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
     });
     exc.addEventListener("click", (e) => {
       const t = e.target;
@@ -2208,126 +2285,206 @@ function fillAllIoSelects(keep) {
   setSheet("ioIccSheet", "ICC_SHEET", IO_DEFAULTS.ICC_SHEET);
   fillSelect(document.querySelector('[data-key="RAD_ID_COL"]'), ioRadIdOpts, k.RAD_ID_COL, IO_DEFAULTS.RAD_ID_COL);
   fillSelect(document.querySelector('[data-key="CLIN_ID_COL"]'), ioClinIdOpts.length ? ioClinIdOpts : ioRadIdOpts, k.CLIN_ID_COL, IO_DEFAULTS.CLIN_ID_COL);
-  const box = $("extRows");
-  if (!box) return;
-  box.querySelectorAll("[data-ext-row]").forEach((row) => {
-    fillSelect(row.querySelector("[data-ext=clin]"), ioSheetOpts, null, IO_DEFAULTS.CLIN_SHEET);
-    fillSelect(row.querySelector("[data-ext=rad]"), ioSheetOpts, null, IO_DEFAULTS.RAD_SHEET);
-    fillSelect(row.querySelector("[data-ext=radid]"), ioRadIdOpts, null, IO_DEFAULTS.RAD_ID_COL);
-  });
 }
 function emptyExtRow() {
   return {
     name: "", file: "",
-    clin_sheet: IO_DEFAULTS.CLIN_SHEET,
-    rad_sheet: IO_DEFAULTS.RAD_SHEET,
-    rad_id_col: IO_DEFAULTS.RAD_ID_COL,
-    sheets: {},
+    clin_sheet: "", rad_sheet: "", rad_id_col: "",
+    qc_sheet: "", icc_sheet: "",
   };
 }
-function sheetsTextOf(sheets) {
-  if (!sheets || typeof sheets !== "object") return "";
-  return Object.keys(sheets).map(k => `${k}=${sheets[k]}`).join("; ");
-}
-function parseSheetsText(text) {
-  const out = {};
-  String(text || "").split(/[;,\n]+/).forEach((chunk) => {
-    const s = chunk.trim();
-    if (!s) return;
-    const m = s.split(/[=:]/);
-    if (m.length < 2) return;
-    const k = m[0].trim();
-    const v = m.slice(1).join(":").trim();
-    if (k && v) out[k] = v;
-  });
-  return out;
+function extSheetList(file) {
+  const f = String(file || "").trim();
+  const meta = (S.extMeta || {})[f];
+  return meta && Array.isArray(meta.sheets) ? meta.sheets.map(String) : [];
 }
 function readExtRows() {
   const box = $("extRows");
   const out = [];
   if (!box) return out;
-  box.querySelectorAll("[data-ext-row]").forEach((row) => {
-    const val = (sel) => ((row.querySelector(sel) || {}).value || "").trim();
+  box.querySelectorAll("[data-ext-card]").forEach((card) => {
+    const val = (sel) => ((card.querySelector(sel) || {}).value || "").trim();
     const file = val("[data-ext=file]");
-    const cs = val("[data-ext=clin]");
-    const rs = val("[data-ext=rad]");
-    const rid = val("[data-ext=radid]");
-    const name = val("[data-ext=name]");
-    const sheets = parseSheetsText(val("[data-ext=sheets]"));
     if (!file) return;
     const rec = {
-      name: name, file: file,
-      clin_sheet: cs || IO_DEFAULTS.CLIN_SHEET,
-      rad_sheet: rs || IO_DEFAULTS.RAD_SHEET,
-      rad_id_col: rid || IO_DEFAULTS.RAD_ID_COL,
+      name: val("[data-ext=name]"),
+      file: file,
+      clin_sheet: "", rad_sheet: "", rad_id_col: "", qc_sheet: "", icc_sheet: "",
     };
-    if (Object.keys(sheets).length) rec.sheets = sheets;
+    card.querySelectorAll("[data-ext-role]").forEach((sel) => {
+      const sheet = String(sel.getAttribute("data-ext-role") || "");
+      const role = String(sel.value || "");
+      if (!sheet || !role || role === "rad") return;
+      const key = role + "_sheet";
+      if (!rec[key]) rec[key] = sheet;
+    });
+    card.querySelectorAll("[data-ext-role]").forEach((sel) => {
+      const sheet = String(sel.getAttribute("data-ext-role") || "");
+      if (String(sel.value || "") !== "rad" || !sheet || rec.rad_sheet) return;
+      rec.rad_sheet = sheet;
+      card.querySelectorAll("[data-ext-id]").forEach((el) => {
+        if (String(el.getAttribute("data-ext-id") || "") === sheet) {
+          rec.rad_id_col = String(el.value || "").trim();
+        }
+      });
+    });
     out.push(rec);
   });
-  return out.filter(r => r.clin_sheet && (r.rad_sheet || (r.sheets && Object.keys(r.sheets).length)));
+  return out;
+}
+async function loadExtMeta(file) {
+  const name = String(file || "").trim();
+  if (!S.extMeta) S.extMeta = {};
+  if (!name) return;
+  try {
+    const j = await fetchXlsxMeta(name, "", "");
+    S.extMeta[name] = { sheets: (j.sheets || []).map(String) };
+  } catch (e) {
+    S.extMeta[name] = { sheets: [] };
+    const msg = $("ioMsg");
+    if (msg) msg.innerHTML = `<span class="err">读不到这份外验文件的工作表：${esc(e && e.message ? e.message : e)}</span>`;
+  }
+}
+async function refreshExtMetas(files) {
+  const list = (files || []).map((f) => String(f || "").trim()).filter(Boolean);
+  let changed = false;
+  for (const f of list) {
+    if ((S.extMeta || {})[f]) continue;
+    await loadExtMeta(f);
+    changed = true;
+  }
+  if (!changed) return;
+  const cur = readExtRows();
+  renderExtRows(cur.length ? cur : [emptyExtRow()]);
 }
 function bindExtRowEvents() {
   const box = $("extRows");
   if (!box) return;
-  box.querySelectorAll("input,select").forEach((el) => {
-    el.addEventListener("change", collectIoModule);
-  });
-  box.querySelectorAll("[data-ext-pick]").forEach((btn) => {
-    btn.onclick = () => {
-      const row = btn.closest("[data-ext-row]");
-      const inp = row && row.querySelector("[data-ext-filepick]");
-      if (inp) inp.click();
-    };
-  });
-  box.querySelectorAll("[data-ext-filepick]").forEach((inp) => {
-    inp.onchange = async () => {
-      const f = inp.files && inp.files[0];
-      const row = inp.closest("[data-ext-row]");
-      const dest = row && row.querySelector("[data-ext=file]");
-      if (f && dest) dest.value = f.name;
-      collectIoModule();
-      if (f) await previewIntoExtRow(row, f.name);
-    };
-  });
-  box.querySelectorAll("[data-ext-del]").forEach((btn) => {
-    btn.onclick = () => {
-      const row = btn.closest("[data-ext-row]");
-      if (row) row.remove();
-      const box2 = $("extRows");
-      if (box2 && !box2.querySelector("[data-ext-row]")) renderExtRows([emptyExtRow()]);
-      collectIoModule();
-    };
+  const rerender = () => {
+    const cur = readExtRows();
+    renderExtRows(cur.length ? cur : [emptyExtRow()]);
+  };
+  box.querySelectorAll("[data-ext-card]").forEach((card) => {
+    const inp = card.querySelector("[data-ext=file]");
+    const pick = card.querySelector("[data-ext-filepick]");
+    const browse = card.querySelector("[data-ext-pick]");
+    const name = card.querySelector("[data-ext=name]");
+    const del = card.querySelector("[data-ext-del]");
+    if (name) name.addEventListener("change", collectIoModule);
+    if (browse && pick) browse.onclick = () => pick.click();
+    if (pick) {
+      pick.onchange = async () => {
+        const f = pick.files && pick.files[0];
+        if (!f || !inp) return;
+        inp.value = f.name;
+        await loadExtMeta(f.name);
+        collectIoModule();
+        rerender();
+      };
+    }
+    if (inp) {
+      inp.addEventListener("change", async () => {
+        await loadExtMeta(inp.value);
+        collectIoModule();
+        rerender();
+      });
+    }
+    card.querySelectorAll("[data-ext-role]").forEach((sel) => {
+      sel.addEventListener("change", () => {
+        const role = String(sel.value || "");
+        if (role === "clin" || role === "rad") {
+          const taken = Array.from(card.querySelectorAll("[data-ext-role]"))
+            .some((o) => o !== sel && String(o.value || "") === role);
+          if (taken) {
+            sel.value = "";
+            alert(role === "clin"
+              ? "临床信息只能有一张表。"
+              : "组学模块只能有一张表。要多块组学请用主数据文件的组学模块，或拆成多条外验各一张。");
+            return;
+          }
+        }
+        collectIoModule();
+        rerender();
+      });
+    });
+    card.querySelectorAll("[data-ext-id]").forEach((sel) => {
+      sel.addEventListener("change", collectIoModule);
+    });
+    if (del) {
+      del.onclick = () => {
+        const cur = readExtRows();
+        const idx = Number(card.getAttribute("data-ext-card") || "-1");
+        if (idx >= 0 && cur.length) cur.splice(Math.min(idx, cur.length - 1), 1);
+        renderExtRows(cur.length ? cur : [emptyExtRow()]);
+        collectIoModule();
+      };
+    }
   });
 }
+const EXT_ROLE_LABELS = { "": "不用", clin: "临床信息", rad: "组学模块", qc: "质控", icc: "ICC" };
+
+function extRoleOf(r, sheet) {
+  const keys = [["clin", "clin_sheet"], ["rad", "rad_sheet"], ["qc", "qc_sheet"], ["icc", "icc_sheet"]];
+  for (const [role, key] of keys) {
+    if (String((r || {})[key] || "") === sheet) return role;
+  }
+  return "";
+}
+
+function extRoleRowsHtml(r) {
+  const file = String((r || {}).file || "");
+  const sheets = extSheetList(file);
+  ["clin_sheet", "rad_sheet", "qc_sheet", "icc_sheet"].forEach((k) => {
+    const s = String((r || {})[k] || "");
+    if (s && sheets.indexOf(s) < 0) sheets.push(s);
+  });
+  if (!sheets.length) {
+    return file
+      ? '<p class="hint err">读不到这份文件的工作表：确认文件名、或点「选择」重选一次。</p>'
+      : '<p class="hint">先选文件：自动读出该文件的全部工作表，再给每张表选角色。</p>';
+  }
+  const head = '<div class="pv-role-head"><span>工作表</span><span>尺寸</span><span>角色</span><span>组学 ID 列</span></div>';
+  const body = sheets.map((sheet) => {
+    const role = extRoleOf(r, sheet);
+    const opts = ["", "clin", "rad", "qc", "icc"].map((v) =>
+      `<option value="${v}"${v === role ? " selected" : ""}>${esc(EXT_ROLE_LABELS[v])}</option>`).join("");
+    const idCell = role === "rad"
+      ? `<select data-ext-id="${esc(sheet)}">${optHtml(ioRadIdOpts, String((r || {}).rad_id_col || ""), "（用组学 ID 列）")}</select>`
+      : '<span class="dim">—</span>';
+    return `<div class="pv-role-row${role ? "" : " is-off"}" data-ext-role-row="${esc(sheet)}">
+      <span class="sheet" title="${esc(sheet)}">${esc(sheet)}</span>
+      <span class="dim">—</span>
+      <select data-ext-role="${esc(sheet)}">${opts}</select>
+      ${idCell}
+    </div>`;
+  }).join("");
+  return `<div class="pv-role pv-role-4">${head}${body}</div>`;
+}
+
 function renderExtRows(list) {
   const box = $("extRows");
   if (!box) return;
   const rows = (Array.isArray(list) && list.length) ? list : [emptyExtRow()];
   box.innerHTML = rows.map((r, i) => {
-    const name = (r && r.name) || "";
-    const file = (r && (r.file || r.EXTERNAL_FILE)) || "";
-    const cs = (r && (r.clin_sheet || r.EXTERNAL_CLIN_SHEET)) || IO_DEFAULTS.CLIN_SHEET;
-    const rs = (r && (r.rad_sheet || r.EXTERNAL_RAD_SHEET)) || IO_DEFAULTS.RAD_SHEET;
-    const rid = (r && (r.rad_id_col || r.EXTERNAL_RAD_ID_COL)) || IO_DEFAULTS.RAD_ID_COL;
-    const shTxt = sheetsTextOf(r && r.sheets);
-    return `<div class="ext-row" data-ext-row="${i}">
-      <input data-ext="name" type="text" placeholder="名称，可空" value="${esc(name)}"/>
-      <input data-ext="file" type="text" list="xlsxList" placeholder="文件，可空" autocomplete="off" spellcheck="false" value="${esc(file)}"/>
-      <input data-ext-filepick type="file" accept=".xlsx,.xls" hidden/>
-      <button type="button" class="btn sec" data-ext-pick>选择</button>
-      <select data-ext="clin"></select>
-      <select data-ext="rad"></select>
-      <select data-ext="radid"></select>
-      <input data-ext="sheets" type="text" placeholder="块表 块=表;块=表" spellcheck="false" value="${esc(shTxt)}" title="多模态块：写 块名=工作表；留空=按本工程块的默认工作表名"/>
-      <button type="button" class="btn sec" data-ext-del title="删这一条">删</button>
+    const file = String((r || {}).file || "");
+    const name = String((r || {}).name || "");
+    const ok = !!(file && (r || {}).clin_sheet && (r || {}).rad_sheet);
+    const note = !file
+      ? "选文件 → 自动读工作表 → 每张表选一个角色（临床 / 组学 / 质控 / ICC）。"
+      : (ok ? "" : "缺「临床信息」或「组学模块」→ 这份暂不参与外验（后端按这两张表对齐）。");
+    return `<div class="pv-file-card" data-ext-card="${i}" data-ext-row="${i}">
+      <div class="pv-file-head">
+        <span class="pv-file-tag">外验 ${i + 1}</span>
+        <input data-ext="name" type="text" placeholder="名称，可空" value="${esc(name)}"/>
+        <input data-ext="file" type="text" list="xlsxList" placeholder="选择或填写 xlsx" autocomplete="off" spellcheck="false" value="${esc(file)}"/>
+        <input data-ext-filepick type="file" accept=".xlsx,.xls" hidden/>
+        <button type="button" class="btn sec" data-ext-pick>选择</button>
+        <button type="button" class="btn sec" data-ext-del title="删这份文件">删</button>
+      </div>
+      ${extRoleRowsHtml(r)}
+      <p class="hint${ok || !file ? "" : " err"}">${esc(note)}</p>
     </div>`;
   }).join("");
-  box.querySelectorAll("[data-ext-row]").forEach((row, i) => {
-    const r = rows[i] || emptyExtRow();
-    fillSelect(row.querySelector("[data-ext=clin]"), ioSheetOpts, r.clin_sheet || r.EXTERNAL_CLIN_SHEET, IO_DEFAULTS.CLIN_SHEET);
-    fillSelect(row.querySelector("[data-ext=rad]"), ioSheetOpts, r.rad_sheet || r.EXTERNAL_RAD_SHEET, IO_DEFAULTS.RAD_SHEET);
-    fillSelect(row.querySelector("[data-ext=radid]"), ioRadIdOpts, r.rad_id_col || r.EXTERNAL_RAD_ID_COL, IO_DEFAULTS.RAD_ID_COL);
-  });
   bindExtRowEvents();
 }
 function ioDataName() {
@@ -2350,12 +2507,13 @@ function fillIoModule() {
     tests.push({
       name: v.EXTERNAL_NAME || "ext",
       file: v.EXTERNAL_FILE,
-      clin_sheet: v.EXTERNAL_CLIN_SHEET || IO_DEFAULTS.CLIN_SHEET,
-      rad_sheet: v.EXTERNAL_RAD_SHEET || IO_DEFAULTS.RAD_SHEET,
-      rad_id_col: v.EXTERNAL_RAD_ID_COL || IO_DEFAULTS.RAD_ID_COL,
+      clin_sheet: v.EXTERNAL_CLIN_SHEET || "",
+      rad_sheet: v.EXTERNAL_RAD_SHEET || "",
+      rad_id_col: v.EXTERNAL_RAD_ID_COL || "",
     });
   }
   renderExtRows(tests.length ? tests : [emptyExtRow()]);
+  refreshExtMetas(tests.map((r) => r && r.file)).catch(() => {});
   fillAllIoSelects(v);
   if ($("ioExtSplit") && v.USE_INTERNAL_SPLIT_WHEN_EXTERNAL != null) {
     $("ioExtSplit").checked = !!v.USE_INTERNAL_SPLIT_WHEN_EXTERNAL;
@@ -2375,11 +2533,13 @@ function collectIoModule() {
     if (el) S.values[key] = (el.value || "").trim();
   });
   const tests = readExtRows();
-  const first = tests[0] || emptyExtRow();
+  // 只有「文件 + 临床 + 组学」齐全的才进 EXTERNAL_TESTS（后端按这两张表对齐）；不齐的留在卡上等补。
+  const usable = tests.filter((r) => r.clin_sheet && r.rad_sheet);
+  const first = usable[0] || {};
   S.values.EXTERNAL_FILE = first.file || "";
   S.values.EXTERNAL_CLIN_SHEET = first.clin_sheet || "";
   S.values.EXTERNAL_RAD_SHEET = first.rad_sheet || "";
-  S.values.EXTERNAL_TESTS = tests;
+  S.values.EXTERNAL_TESTS = usable;
   if ($("ioExtSplit")) S.values.USE_INTERNAL_SPLIT_WHEN_EXTERNAL = !!$("ioExtSplit").checked;
   persistIoLock();
   fillLockStamp();
@@ -2391,18 +2551,7 @@ function bindIoModule() {
   if ($("ioExtSplit")) $("ioExtSplit").addEventListener("change", collectIoModule);
   if ($("btnExtAdd")) {
     $("btnExtAdd").onclick = () => {
-      const box = $("extRows");
-      const cur = [];
-      (box ? box.querySelectorAll("[data-ext-row]") : []).forEach((row) => {
-        const val = (sel) => ((row.querySelector(sel) || {}).value || "").trim();
-        cur.push({
-          name: val("[data-ext=name]"),
-          file: val("[data-ext=file]"),
-          clin_sheet: val("[data-ext=clin]"),
-          rad_sheet: val("[data-ext=rad]"),
-          rad_id_col: val("[data-ext=radid]"),
-        });
-      });
+      const cur = readExtRows();
       cur.push(emptyExtRow());
       renderExtRows(cur);
       collectIoModule();
@@ -2617,6 +2766,17 @@ function dropSwitch(id, fields) {
   const key = moduleSwitchKey(id);
   return key ? fields.filter(f => f.key !== key) : fields;
 }
+// 重绘前把各折叠块的开/关状态记到 S.kvFoldOpen，重绘后按它回填（用户开过的不会被"弹回"或"弹开"）。
+function captureFoldState() {
+  if (!S.kvFoldOpen) S.kvFoldOpen = {};
+  const root = $("formRoot");
+  if (!root) return;
+  root.querySelectorAll("details[data-fold]").forEach((d) => {
+    const key = d.getAttribute("data-fold") || "";
+    if (key) S.kvFoldOpen[key] = !!d.open;
+  });
+}
+
 function renderForm() {
   const mid = document.querySelector(".col.mid");
   const y = mid ? mid.scrollTop : 0;
@@ -2682,6 +2842,7 @@ function renderForm() {
     groups.length = 0;
     rest.forEach((g) => groups.push(g));
   }
+  captureFoldState();
   root.innerHTML = stitchSections(groups.map(g => {
     const fields = dropSwitch(g.id, g.fields);
     const used = new Set();
@@ -2703,7 +2864,7 @@ function renderForm() {
       const rest = chunks.filter(c => !DATA_PANE_BUNDLES.has(c.id) && c.id !== "subproj").map(c => c.html).join("");
       const sub = chunks.filter(c => c.id === "subproj").map(c => c.html).join("");
       if (!sub && !rest) return "";
-      const head = sectionHead("io", "结局 / 子工程", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页。");
+      const head = sectionHead("io", "结局 / 子工程", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页；阅片列方向（0/1）在「文本编码」卡里。");
       return `<div class="sec-block${head.dim}" data-sec="io">
       ${head.html}
       <div class="sec-body io-sheets">${sub}<div id="ioGrpSlot"></div>${rest}</div>
@@ -3696,13 +3857,6 @@ function blkRows() {
       score: String(x.score || ""),
     }));
 }
-function blkSheetOptions(cur) {
-  const sheets = (typeof workbookSheets === "function" ? workbookSheets() : []) || [];
-  const out = [""].concat(sheets.map(s => String(s)));
-  const c = String(cur || "");
-  if (c && out.indexOf(c) < 0) out.push(c);
-  return out.map(s => `<option value="${esc(s)}"${s === c ? " selected" : ""}>${esc(s || "（选工作表）")}</option>`).join("");
-}
 function textEncodeSpec() {
   const v = fieldValue("TEXT_ENCODE");
   const out = {};
@@ -3983,24 +4137,6 @@ function applyBlkRow(el) {
     const nameInput = row.querySelector("[data-blk=name]");
     if (nameInput && !nameInput.value.trim() && cur.name) nameInput.value = cur.name;
   }
-}
-function addBlkRow(name) {
-  const rows = blkRows();
-  const nm = String(name || "").trim();
-  if (!nm) return alert("先写块名（通常等于工作表名）");
-  if (rows.some(r => r.name.toLowerCase() === nm.toLowerCase())) {
-    return alert("已有同名块：" + nm);
-  }
-  rows.push({ name: nm, sheet: nm, method: "", enabled: true, prep: {}, params: {}, score: "" });
-  setFieldValue("MODALITY_BLOCKS", rows);
-  renderForm();
-}
-function delBlkRow(i) {
-  const rows = blkRows();
-  if (i < 0 || i >= rows.length) return;
-  rows.splice(i, 1);
-  setFieldValue("MODALITY_BLOCKS", rows);
-  renderForm();
 }
 
 function radPrefixStripCombo(prefixF, stripF, asSection) {
@@ -4585,13 +4721,6 @@ function bindDelegates() {
       setFieldValue(key, vals);
     }
   });
-  document.body.addEventListener("keydown", (e) => {
-    const t = e.target;
-    if (!t || !t.matches || !t.matches("[data-blk-add]")) return;
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    addBlkRow(t.value);
-  });
   document.body.addEventListener("click", (e) => {
     const scan = e.target.closest && e.target.closest("[data-txt-scan]");
     if (scan) {
@@ -4611,11 +4740,6 @@ function bindDelegates() {
       delTxtColumn(dcol.getAttribute("data-txt-del"));
       return;
     }
-    const del = e.target.closest && e.target.closest("[data-blk-del]");
-    if (!del) return;
-    e.preventDefault();
-    e.stopPropagation();
-    delBlkRow(Number(del.getAttribute("data-blk-del")));
   });
   document.body.addEventListener("mousedown", (e) => {
     if (e.target.closest && e.target.closest("[data-marker-ctl]")) e.stopPropagation();
@@ -5007,6 +5131,27 @@ function esc(s) {
 }
 function cssEscape(s){ return s.replace(/"/g,'\\"'); }
 
+function roleSheetsHtml(p) {
+  const rows = Array.isArray(p && p.role_sheets) ? p.role_sheets : [];
+  if (!rows.length) return "";
+  const head = `<div class="pv-role-head"><span>角色</span><span>工作表</span><span>尺寸</span><span>例数(ID)</span><span>分数名</span></div>`;
+  const body = rows.map((r) => `<div class="pv-role-row${r.role === "rad" ? " is-rad" : ""}">
+    <span class="sheet">${esc(ROLE_LABELS[r.role] || r.role || "")}</span>
+    <span class="mono">${esc(r.sheet || "")}</span>
+    <span class="dim">${esc(String(r.n_rows ?? "—"))}×${esc(String(r.n_cols ?? "—"))}</span>
+    <span class="dim">${r.n_id == null ? "—" : esc(String(r.n_id))}</span>
+    <span class="mono">${esc(r.score || "—")}</span>
+  </div>`).join("");
+  const inter = (p && p.role_intersection != null)
+    ? `<div class="hint">全部角色表按 ID 取交集：<b>${esc(String(p.role_intersection))}</b> 例（每张表的例数见上表）。</div>`
+    : '<div class="hint">只有一张角色表（或 ID 列未定），交集不适用。</div>';
+  return `<div class="pv-role pv-role-5" style="margin-top:8px">
+    <div class="pv-h">已选工作表（全部）</div>
+    ${head}${body}
+    ${inter}
+  </div>`;
+}
+
 function previewBlockHtml(p, heading, extraRows) {
   if (p && p.error) {
     const title = heading ? `<div class="pv-h">${esc(heading)}</div>` : "";
@@ -5047,6 +5192,7 @@ function previewBlockHtml(p, heading, extraRows) {
     }
     html += `</div>`;
   }
+  html += roleSheetsHtml(p);
   html += previewTablesHtml(p);
   return html;
 }
