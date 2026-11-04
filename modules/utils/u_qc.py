@@ -146,6 +146,16 @@ def _external_specs_from_settings(settings: Dict[str, Any] | None) -> list[dict]
             v = str(spec.get(k) or "").strip()
             if v:
                 item[k] = v
+        raw_sheets = spec.get("sheets")
+        if isinstance(raw_sheets, dict):
+            mapped = {}
+            for bk, bv in raw_sheets.items():
+                kk = str(bk or "").strip()
+                vv = str(bv or "").strip()
+                if kk and vv:
+                    mapped[kk] = vv
+            if mapped:
+                item["sheets"] = mapped
         out.append(item)
     return out
 
