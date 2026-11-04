@@ -501,3 +501,134 @@ def test_console_preview_tab_and_wider_run_column():
     assert "ICC 与相关过滤阈值" not in schema
     compact = css.replace(" ", "").replace("\n", "")
     assert "#paneConfig[hidden]" in compact and "display:none!important" in compact
+
+
+def test_data_pane_uses_one_file_card_for_all_three_inputs():
+    """数据文件 / 外验 / 排除名单共用一张文件卡：选文件 → 自动读表 → 手动选角色。"""
+    base = ROOT / "modules" / "console"
+    html = (base / "console.html").read_text(encoding="utf-8")
+    ui = (base / "console_ui.js").read_text(encoding="utf-8")
+    css = (base / "console.css").read_text(encoding="utf-8")
+    api = (base / "console_api.js").read_text(encoding="utf-8")
+    assert 'data-file-card="main"' in html
+    assert "pv-file-card" in css and "pv-file-head" in css
+    assert "data-ext-card" in ui and "data-exc-row" in ui
+    assert "data-ext-role" in ui and "EXT_ROLE_LABELS" in ui
+    assert "fetchXlsxMeta" in api and "loadExtMeta" in ui
+    # 旧的「块表 块=表」文本入口已删，不再有第二套外验表单
+    assert "data-ext=sheets" not in ui and "parseSheetsText" not in ui
+    assert "previewIntoExtRow" not in api and "previewIntoExtRow" not in ui
+    # 主数据卡也有「选择」按钮（与另两处同形）
+    assert 'id="btnDataPick"' in html and 'id="ioDataPick"' in html
+    # 操作卡：与配置页同一套「保存 ini / 重启服务」入口
+    assert 'id="btnPvSave"' in html and '>保存 ini</button>' in html
+    assert 'id="btnPvRestart"' in html and '>重启服务</button>' in html
+    assert '$("btnPvSave")' in ui and '$("btnPvRestart")' in ui
+    assert "writeback()" in ui and "restartServer()" in ui
+
+
+def test_reader_direction_lives_only_in_the_encode_card():
+    """阅片列方向（READER_VALUE_MAP）只留在「文本编码」卡；配置页不再重复一份（也不许落进开关段）。"""
+    from modules.config.defaults import merged_settings
+    from modules.console import schema
+    from modules.console.schema_ui import build_schema
+
+    assert "READER_VALUE_MAP" not in schema.SECTION_OF
+    js = (ROOT / "modules" / "console" / "console_schema.js").read_text(encoding="utf-8")
+    hidden = js.split("const HIDDEN_FORM_KEYS = new Set([", 1)[1].split("]);", 1)[0]
+    assert '"READER_VALUE_MAP"' in hidden  # 表单隐藏，避免被 _section_of 兜底塞进「开关」段
+    fields = build_schema(merged_settings(), sheets=["cln"])
+    assert [f for f in fields if f.get("key") == "READER_VALUE_MAP"]  # 键仍在（后端要它）
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    assert "function readerDirPanel" in ui
+    assert "captureFoldState" in ui
+    assert "结局 / 子工程 / 阅片方向" not in ui
+
+
+def test_run_column_shows_whenever_the_config_pane_is_shown():
+    """统计配置页右侧运行台：切到配置就显示，进预览/流程图才收起。"""
+    html = (ROOT / "modules" / "console" / "console.html").read_text(encoding="utf-8")
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    assert 'id="runCol"' in html
+    seg = ui.split("function showPane(name)", 1)[1].split("function loadFlowFrame", 1)[0]
+    assert "runCol" in seg and "hidden = flow || preview" in seg
+
+
+def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypatch):
+    """预览覆盖所有已分配角色的工作表，并给出 ID 交集合计。"""
+    from modules.console import preview as prev_mod
+
+    monkeypatch.setattr(prev_mod, "under_root", lambda p: Path(p))
+    book = tmp_path / "demo.xlsx"
+    clin = pd.DataFrame({
+        "Patient_ID": ["a", "b", "c"],
+        "Stroke": ["y", "n", "y"],
+        "Age": [1, 2, 3],
+    })
+    cta = pd.DataFrame({"Patient_ID": ["a", "b", "c"], "f1": [1.0, 2.0, 3.0], "f2": [4.0, 5.0, 6.0]})
+    us = pd.DataFrame({"Patient_ID": ["a", "b"], "g1": [1.0, 2.0]})
+    with pd.ExcelWriter(book) as xw:
+        clin.to_excel(xw, sheet_name="cln", index=False)
+        cta.to_excel(xw, sheet_name="CTA", index=False)
+        us.to_excel(xw, sheet_name="US", index=False)
+    settings = {
+        "CLIN_SHEET": "cln", "CLIN_ID_COL": "Patient_ID",
+        "RAD_ID_COL": "Patient_ID", "OUTCOME_COLS": ["Stroke"],
+        "MODALITY_BLOCKS": [
+            {"name": "CTA", "sheet": "CTA", "method": "logistic"},
+            {"name": "US", "sheet": "US", "method": "logistic"},
+        ],
+    }
+    pv = prev_mod.preview_workbook(book, dict(settings))
+    roles = {(r["role"], r["sheet"]) for r in pv["role_sheets"]}
+    assert ("clin", "cln") in roles
+    assert ("rad", "CTA") in roles and ("rad", "US") in roles
+    assert pv["role_intersection"] == 2  # US 只有 a, b
+    by_sheet = {r["sheet"]: r for r in pv["role_sheets"]}
+    assert by_sheet["CTA"]["n_id"] == 3 and by_sheet["US"]["n_id"] == 2
+    # 起始页预览：每张表都给前 3 行（最多 12 列）
+    blocks = pv["sheet_blocks"]
+    assert set(blocks) == {"cln", "CTA", "US"}
+    for name, blk in blocks.items():
+        assert blk["rows"], name
+        assert len(blk["rows"]) <= 3, name
+        assert len(blk["columns"]) <= 12, name
+    assert blocks["cln"]["columns"][0] == "Patient_ID"
+    assert [str(x) for x in blocks["CTA"]["rows"][0]][:2] == ["a", "1"]
+
+
+def test_start_page_loads_data_and_previews_every_sheet():
+    """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
+    proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
+    assert 'id="btnLoadNow"' in proj and ">载入数据</button>" in proj
+    assert 'id="pvCard"' in proj and 'id="pvBox"' in proj
+    # 起始页不再提供「进入数据预览」按钮，也不要那句「载入后显示…前 3 行」提示
+    assert "btnGoPg" not in proj and ">进入数据预览</button>" not in proj
+    assert 'id="pvMsg"' not in proj and "载入后显示每张工作表的前 3 行" not in proj
+    assert "function renderSheetBlocks" in proj
+    assert "renderSheetBlocks(prev)" in proj
+    assert "function autoLoadAndPreview" in proj
+    assert "autoOpenPreview" not in proj  # 不再自动跳控制台
+    assert "enterConsole" not in proj  # 删掉后无触发点，已清
+    assert 'getElementById("go")' not in proj
+    seg = proj.split("async function autoLoadAndPreview", 1)[1].split("function keysFromSettingsError", 1)[0]
+    assert "location.href" not in seg
+    assert proj.index('id="btnLoadNow"') < proj.index('id="msg"')
+
+
+
+
+def test_sync_external_tests_keeps_role_sheets():
+    """外验卡上选的质控 / ICC 工作表现在随 EXTERNAL_TESTS 一起保留。"""
+    from modules.console.ops import sync_external_tests
+
+    out = sync_external_tests({
+        "EXTERNAL_TESTS": [{
+            "file": "ext.xlsx", "clin_sheet": "cln", "rad_sheet": "CTA",
+            "rad_id_col": "Patient_ID", "qc_sheet": "qc", "icc_sheet": "icc",
+        }],
+    })
+    spec = out["EXTERNAL_TESTS"][0]
+    assert spec["clin_sheet"] == "cln" and spec["rad_sheet"] == "CTA"
+    assert spec["qc_sheet"] == "qc" and spec["icc_sheet"] == "icc"
+    assert out["EXTERNAL_FILE"] == "ext.xlsx"

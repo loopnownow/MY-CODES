@@ -24,6 +24,11 @@ from modules.console.settings_layer import under_root
 
 _PREVIEW_CACHE = _state.PREVIEW_CACHE  # 与 console 同一份 dict（测试断言 identity）
 
+# 起始页「每张工作表前几行」预览的规模上限
+_SHEET_BLOCKS_ROWS = 3
+_SHEET_BLOCKS_COLS = 12
+_SHEET_BLOCKS_MAX_SHEETS = 20
+
 def project_xlsx_names(proj: Path) -> list[str]:
     return [
         p.name for p in sorted(proj.glob("*.xlsx"))
@@ -580,9 +585,103 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         raw_ids = [str(x).strip() for x in id_src[idc_pick].dropna().tolist() if str(x).strip()]
         id_options = _uniq_keep(raw_ids)[:400]
 
+    # 所有已分配角色的工作表（预览用）：表名、尺寸、ID 例数、分数名。
+    role_sheets: list[dict[str, Any]] = []
+    _role_id_sets: dict[str, set] = {}
+
+    def _ensure_info(hit: str) -> dict:
+        meta = info.get(hit)
+        if meta is None:
+            meta = {"name": hit, "n_rows": 0, "n_cols": 0, "columns": [], "missing": {}, "head": []}
+            info[hit] = meta
+        if not meta.get("columns") and not meta.get("head") and not _wide(hit):
+            try:
+                if len(_header(hit)) <= _PREVIEW_HEAD_MAX_COLS:
+                    info[hit] = _info_from_frame(_frame(hit), hit, max_rows=5)
+                    meta = info[hit]
+            except Exception:
+                pass
+        return meta
+
+    def _role_row(role: str, label: str, sheet: str, id_col: str = "", score: str = "") -> None:
+        hit = _hit(sheet)
+        if not hit:
+            return
+        meta = _ensure_info(hit)
+        n_id = None
+        if id_col:
+            try:
+                got = _cols(hit, [id_col])
+                if id_col in got.columns:
+                    vals = got[id_col].dropna().astype(str).str.strip()
+                    vals = vals[vals != ""]
+                    n_id = int(vals.nunique())
+                    _role_id_sets[f"{role}:{hit}"] = set(vals.tolist())
+            except Exception:
+                n_id = None
+        role_sheets.append({
+            "role": role,
+            "label": label,
+            "sheet": hit,
+            "n_rows": int(meta.get("n_rows") or 0),
+            "n_cols": int(meta.get("n_cols") or 0),
+            "id_col": id_col,
+            "n_id": n_id,
+            "score": score,
+        })
+
+    _role_row("clin", "临床信息", ch, clin_id)
+    _role_row("qc", "质控", qc_sheet, "")
+    _role_row("icc", "ICC", icc_sheet, "")
+    _blocks_raw = settings.get("MODALITY_BLOCKS") or []
+    if isinstance(_blocks_raw, list) and _blocks_raw:
+        for _item in _blocks_raw:
+            if not isinstance(_item, dict):
+                continue
+            _nm = str(_item.get("name") or "").strip()
+            _sh = str(_item.get("sheet") or _nm).strip()
+            if not (_nm or _sh):
+                continue
+            _role_row(
+                "rad", _nm or _sh, _sh,
+                str(_item.get("id_col") or rad_id), str(_item.get("score") or ""),
+            )
+    else:
+        _role_row("rad", "组学模块", rh, rad_id)
+
+    role_intersection = None
+    if len(_role_id_sets) >= 2:
+        _sets = list(_role_id_sets.values())
+        try:
+            role_intersection = len(set.intersection(*_sets))
+        except TypeError:
+            role_intersection = None
+
+    # 每张工作表的前几行（起始页预览用）：前 3 行 × 前 12 列，zip 层直读，不读全表。
+    sheet_blocks: dict[str, Any] = {}
+    if len(sheets) <= _SHEET_BLOCKS_MAX_SHEETS:
+        from modules.utils.xlsx_sheet import read_preview_block
+
+        for _s in sheets:
+            try:
+                _hdr, _blk = read_preview_block(
+                    data_path, _s, n_rows=_SHEET_BLOCKS_ROWS, n_cols=_SHEET_BLOCKS_COLS,
+                )
+                sheet_blocks[_s] = {
+                    "columns": [str(c) for c in (_hdr or [])[:_SHEET_BLOCKS_COLS]],
+                    "rows": _blk,
+                    "n_rows": int((size.get(_s) or {}).get("n_rows") or 0),
+                    "n_cols": int((size.get(_s) or {}).get("n_cols") or 0),
+                }
+            except Exception as exc:
+                sheet_blocks[_s] = {"error": str(exc)}
+
     return {
         "data": str(data_path),
         "sheets": sheets,
+        "sheet_blocks": sheet_blocks,
+        "role_sheets": role_sheets,
+        "role_intersection": role_intersection,
         "sheet_info": info,
         "clin_cols": clin_cols,
         "rad_id_cols": rad_id_cols,
@@ -625,6 +724,8 @@ def _preview_blocks(
     settings: dict[str, Any], sheets: list[str], info: dict, frame_of=None
 ) -> list[dict]:
     """预览用：每块的工作表、列名、文本列等级（供控制台文本编码面板）。"""
+    import pandas as pd
+
     out: list[dict] = []
     raw = settings.get("MODALITY_BLOCKS") or []
     if not isinstance(raw, list):

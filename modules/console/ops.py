@@ -67,6 +67,10 @@ def sync_external_tests(settings: dict[str, Any]) -> dict[str, Any]:
             rid = str(spec.get("rad_id_col") or "").strip()
             if rid:
                 item["rad_id_col"] = rid
+            for extra in ("qc_sheet", "icc_sheet"):
+                got = str(spec.get(extra) or "").strip()
+                if got:
+                    item[extra] = got
             norm.append(item)
     if norm:
         settings["EXTERNAL_TESTS"] = norm

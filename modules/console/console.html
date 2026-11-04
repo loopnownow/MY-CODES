@@ -120,13 +120,15 @@
         <div id="pvDataForm">
           <section class="pv-sec" data-pvsec="file">
             <h3 class="pv-h">数据文件与工作表</h3>
-            <div class="fld">
-              <span class="lab" title="工程根下的 Excel。可空＝默认与课题同名。">数据文件</span>
-              <div class="pick-row">
+            <div class="pv-file-card" data-file-card="main">
+              <div class="pv-file-head">
+                <span class="pv-file-tag">主数据</span>
                 <input id="ioData" type="text" list="xlsxList" placeholder="默认 课题名.xlsx" autocomplete="off" spellcheck="false"/>
+                <input id="ioDataPick" type="file" accept=".xlsx,.xls" hidden/>
+                <button type="button" class="btn sec" id="btnDataPick">选择</button>
               </div>
+              <div id="pvSheets"></div>
             </div>
-            <div id="pvSheets"></div>
           </section>
           <section class="pv-sec" data-pvsec="ids">
             <h3 class="pv-h">ID 列 / 非特征列</h3>
@@ -135,15 +137,9 @@
           <section class="pv-sec" data-pvsec="ext">
             <h3 class="pv-h">外部验证</h3>
             <div id="ioCard">
-              <p class="hint">可多条。填了文件且临床、组学 sheet 都有才启用。多条横拼，一条不拼。</p>
-              <div class="ext-wrap">
-                <div class="ext-head">
-                  <span>名称</span><span>文件</span><span>选择</span><span>临床 sheet</span><span>组学 sheet</span><span>组学 ID</span><span>块表</span><span></span>
-                </div>
-                <div id="extRows"></div>
-              </div>
+              <div id="extRows"></div>
               <div class="save-row">
-                <button type="button" id="btnExtAdd">+ 外验</button>
+                <button type="button" id="btnExtAdd">+ 外验文件</button>
                 <label class="check" title="已有外验时是否仍做内部训练/验证。">
                   <input type="checkbox" id="ioExtSplit" checked/> 有外验仍做内拆
                 </label>
@@ -173,6 +169,8 @@
         <div class="pv-actions pv-actions-col">
           <button type="button" class="btn" id="btnPreviewReload" data-tip="用当前选择重算预览：工作表、例数、结局分布、排除后例数、ICC。不建模。">更新预览</button>
           <button type="button" class="btn sec" id="btnDataQc" data-tip="对整体数据做 QC（临床缺失、组学矩阵、ID 对齐、结局完整、ICC、影像质控）。主表写 ref/qc.html；每条外验写 ref/qc-ext.html 或 ref/qc-ext-{名称}.html。不覆盖主表 qc.html。不建模。">整体 QC</button>
+          <button type="button" class="btn" id="btnPvSave" data-tip="把当前页配置（含这一页选的 sheet / 角色 / 外验 / 排除名单）写入 ref/settings.ini。没有则新建；现有 ini 先备份为 settings.ini.bak（再次保存会覆盖这份备份）。">保存 ini</button>
+          <button type="button" class="btn sec" id="btnPvRestart" data-tip="停掉当前统计（若在跑），重启本控制台服务并刷新页面。改完 console.py / html / css 后用这个。">重启服务</button>
           <button type="button" class="btn warn" id="btnToConfig" data-tip="进入统计配置。这里选的文件、工作表、ID 列、外验与排除名单会带过去。">进入统计配置</button>
         </div>
         <p class="hint" id="qcHint"></p>
