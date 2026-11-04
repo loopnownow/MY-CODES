@@ -92,6 +92,7 @@ from modules.console.run import (
 # 端口 / 服务层：真 import（B4c6 起从 console 搬出，注入表随之清空）
 from modules.console.serve import spawn_successor
 from modules.console import registry as project_registry
+from modules.console import flow_fill as flow_prefill
 
 PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
 _PROBE_SAFE_GET = frozenset({"/api/health", "/api/port"})
@@ -558,6 +559,40 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/session":
             ses = load_session()
             c, b, t = _json_bytes({"ok": True, "session": ses})
+            self._send(c, b, t)
+            return
+
+        # 流程图页取数：与 /files/ 同级，不带 /api 前缀，故不需要 console token
+        if path == "/flow_files":
+            try:
+                info = flow_prefill.list_manuscripts(
+                    _require_project(qs.get("project")), qs.get("dir") or ""
+                )
+            except Exception as e:  # noqa: BLE001 原文错误回页面，不回退空列表当成功
+                c, b, t = _json_bytes(
+                    {"ok": False, "error": str(e), "files": [], "default": ""}
+                )
+                self._send(c, b, t)
+                return
+            c, b, t = _json_bytes({"ok": True, **info})
+            self._send(c, b, t)
+            return
+
+        if path == "/flow_spec":
+            try:
+                name = (qs.get("file") or "").strip()
+                if not name:
+                    raise ValueError("未指定手稿文件")
+                out = flow_prefill.fill_flow_spec(
+                    _require_project(qs.get("project")), name, qs.get("dir") or ""
+                )
+            except Exception as e:  # noqa: BLE001 缺失项原文交页面显示，不补数
+                c, b, t = _json_bytes(
+                    {"ok": False, "error": str(e), "spec": None, "missing": []}
+                )
+                self._send(c, b, t)
+                return
+            c, b, t = _json_bytes({"ok": True, **out})
             self._send(c, b, t)
             return
 

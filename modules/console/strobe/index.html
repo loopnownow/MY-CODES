@@ -159,6 +159,7 @@ try {
       font-weight: 650;
     }
     .hint { font-size: 11px; color: var(--muted); }
+    .hint.err { color: #b3261e; }
     label.field { display: block; font-size: 12px; color: var(--muted); margin: 0 0 4px; }
     input[type="text"], input[type="number"], textarea, select {
       width: 100%;
@@ -389,6 +390,19 @@ try {
 
       <section class="sec">
         <div class="sec-h">
+          <h2>0. 手稿</h2>
+          <span class="hint">默认取根目录 Manuscript 文件</span>
+        </div>
+        <select id="manuscript-file" title="子工程根目录的 .docx 手稿"></select>
+        <div class="row" style="margin-top:6px">
+          <button type="button" class="btn" id="btn-fill-manuscript">按手稿填写</button>
+          <button type="button" class="btn" id="btn-refresh-manuscript">刷新列表</button>
+        </div>
+        <p class="hint" id="manuscript-note">未加载。</p>
+      </section>
+
+      <section class="sec">
+        <div class="sec-h">
           <h2>1. 收集</h2>
           <span class="hint">时段与筛查人数</span>
         </div>
@@ -556,6 +570,7 @@ try {
     metrics: { roc: true, calibration: true, dca: true, nri: true, idi: true },
     explain: { dag: false, mediation: false },
     filename: "Figure1_flow",
+    manuscript: "",
     legendTouched: false,
     manual: false,
     structKey: ""
@@ -581,6 +596,8 @@ try {
     qc: document.getElementById("qc"),
     legend: document.getElementById("legend"),
     file: document.getElementById("file-json"),
+    manuscript: document.getElementById("manuscript-file"),
+    note: document.getElementById("manuscript-note"),
     size: document.getElementById("size-hint")
   };
 
@@ -787,7 +804,10 @@ try {
 
   function cohortLines(title, raw) {
     if (!raw || raw.n == null) return "";
-    return title + "\n(n = " + raw.n + ")\npositive n = " + raw.positive + "\nnegative n = " + raw.negative;
+    const lines = [title, "(n = " + raw.n + ")"];
+    if (raw.positive != null) lines.push("positive n = " + raw.positive);
+    if (raw.negative != null) lines.push("negative n = " + raw.negative);
+    return lines.join("\n");
   }
 
   function layoutStudy(spec) {
@@ -830,9 +850,13 @@ try {
       if (excText) exc = addBox("exclusion", x, y, excWH[0], excWH[1], excText);
       y += Math.max(incWH[1], excWH[1]) + gapY;
     }
-    const anaText = spec.included_n == null ? "" : (
-      "Patients included\n(n = " + spec.included_n + ")\npositive n = " + spec.included_positive + "\nnegative n = " + spec.included_negative
-    );
+    const anaLines = [];
+    if (spec.included_n != null) {
+      anaLines.push("Patients included", "(n = " + spec.included_n + ")");
+      if (spec.included_positive != null) anaLines.push("positive n = " + spec.included_positive);
+      if (spec.included_negative != null) anaLines.push("negative n = " + spec.included_negative);
+    }
+    const anaText = anaLines.join("\n");
     const anaWH = anaText ? boxWH(anaText, FS, 0.36, 0.14, 2.4, 6) : [0, 0];
     const ana = anaText ? addBox("included", 0, y, anaWH[0], anaWH[1], anaText) : null;
     if (ana) y += anaWH[1] + gapY;
@@ -2329,6 +2353,7 @@ try {
     putFlags("metrics", ["roc", "calibration", "dca", "nri", "idi"]);
     putFlags("explain", ["dag", "mediation"]);
     put("filename", ["filename"]);
+    put("manuscript", ["manuscript"]);
     if (typeof d.legend === "string") {
       els.legend.value = d.legend;
       state.legendTouched = has(d, "legendTouched") ? !!d.legendTouched : true;
@@ -2366,6 +2391,7 @@ try {
         balance: state.balance, lasso: state.lasso,
         models: state.models, metrics: state.metrics, explain: state.explain,
         filename: state.filename,
+        manuscript: state.manuscript,
         legend: els.legend.value,
         legendTouched: state.legendTouched,
         manual: state.manual,
@@ -2604,6 +2630,143 @@ try {
     refresh(true);
   }
 
+  function setNote(text, bad) {
+    if (!els.note) return;
+    els.note.textContent = text;
+    els.note.classList.toggle("err", !!bad);
+  }
+
+  function projectName() {
+    return qs.get("project") || "";
+  }
+
+  function fillPlaceholderOption(text) {
+    els.manuscript.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = text;
+    els.manuscript.appendChild(opt);
+  }
+
+  function loadManuscriptList() {
+    const project = projectName();
+    if (!project) {
+      fillPlaceholderOption("（未带 project 参数）");
+      setNote("未带 project 参数，无法读子工程手稿。", true);
+      return Promise.resolve("");
+    }
+    return fetch("/flow_files?project=" + encodeURIComponent(project), { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) {
+          throw new Error("服务端未提供 /flow_files（HTTP " + r.status + "），请重启控制台服务");
+        }
+        return r.json();
+      })
+      .then(function (d) {
+        if (!d || !d.ok) throw new Error((d && d.error) || "手稿清单读取失败");
+        const files = d.files || [];
+        els.manuscript.innerHTML = "";
+        files.forEach(function (f) {
+          const opt = document.createElement("option");
+          opt.value = f.name;
+          opt.textContent = f.name;
+          els.manuscript.appendChild(opt);
+        });
+        const keep = files.some(function (f) { return f.name === state.manuscript; });
+        const want = keep ? state.manuscript : (d.default || "");
+        if (!want) {
+          fillPlaceholderOption("（根目录没有 .docx 手稿）");
+          setNote("子工程根目录没有 .docx 手稿。", true);
+          return "";
+        }
+        els.manuscript.value = want;
+        setNote(
+          files.length > 1
+            ? "候选 " + files.length + " 个；当前 " + want + "。"
+            : "只有 1 个候选：" + want + "（无需切换）。",
+          false
+        );
+        return want;
+      })
+      .catch(function (err) {
+        fillPlaceholderOption("（清单读取失败，点「刷新列表」重试）");
+        setNote(String(err.message || err), true);
+        return "";
+      });
+  }
+
+  function blankFlowFields() {
+    state.period = "";
+    state.screenedN = "";
+    state.inclusion = [""];
+    state.exclusion = [""];
+    state.includedN = "";
+    state.includedPos = "";
+    state.includedNeg = "";
+    state.trN = ""; state.trPos = ""; state.trNeg = "";
+    state.teN = ""; state.tePos = ""; state.teNeg = "";
+    state.extOn = false;
+    state.vaN = ""; state.vaPos = ""; state.vaNeg = "";
+    state.balance = "";
+    state.lasso = false;
+    state.models = { clinical: false, radiomics: false, nomogram: false };
+    state.metrics = { roc: false, calibration: false, dca: false, nri: false, idi: false };
+    state.explain = { dag: false, mediation: false };
+    state.legendTouched = false;
+  }
+
+  function applyManuscriptSpec(d, file) {
+    blankFlowFields();
+    applySaved({ spec: d.spec });
+    state.manuscript = file;
+    state.manual = false;
+    state.structKey = "";
+    if (booted) {
+      renderForm();
+      refresh(true);
+    }
+  }
+
+  function noteFromResult(d, file, auto) {
+    const miss = (d.missing || []).filter(Boolean);
+    const head = (auto ? "已按 " : "按 ") + file + " 填写";
+    if (!miss.length) {
+      setNote(head + "；稿件陈述的字段已全部填上。", false);
+      return;
+    }
+    setNote(head + "；稿件未陈述：" + miss.join("；"), true);
+  }
+
+  function fillFromManuscript(auto) {
+    const project = projectName();
+    const file = els.manuscript ? els.manuscript.value : "";
+    if (!project || !file) {
+      setNote("先在左侧选一份子工程手稿。", true);
+      return Promise.resolve(false);
+    }
+    setNote("读取 " + file + " …", false);
+    return fetch(
+      "/flow_spec?project=" + encodeURIComponent(project) + "&file=" + encodeURIComponent(file),
+      { cache: "no-store" }
+    )
+      .then(function (r) {
+        if (!r.ok) {
+          throw new Error("服务端未提供 /flow_spec（HTTP " + r.status + "），请重启控制台服务");
+        }
+        return r.json();
+      })
+      .then(function (d) {
+        if (!d || !d.ok) throw new Error((d && d.error) || "手稿解析失败");
+        applyManuscriptSpec(d, file);
+        noteFromResult(d, file, auto);
+        return true;
+      })
+      .catch(function (err) {
+        setNote(String(err.message || err), true);
+        return false;
+      });
+  }
+
   function download(name, blob) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -2774,6 +2937,17 @@ try {
   });
   document.getElementById("btn-example").addEventListener("click", function () { loadExample(true); });
   document.getElementById("btn-clear").addEventListener("click", clearAll);
+  document.getElementById("btn-fill-manuscript").addEventListener("click", function () {
+    fillFromManuscript(false);
+  });
+  document.getElementById("btn-refresh-manuscript").addEventListener("click", function () {
+    loadManuscriptList();
+  });
+  els.manuscript.addEventListener("change", function () {
+    state.manuscript = els.manuscript.value || "";
+    persist();
+    setNote("已选 " + (state.manuscript || "（空）") + "；点「按手稿填写」生效。", false);
+  });
   document.getElementById("btn-import").addEventListener("click", function () { els.file.click(); });
   els.file.addEventListener("change", function () {
     const f = els.file.files && els.file.files[0];
@@ -2927,13 +3101,23 @@ try {
   if (qs.get("example") === "1") {
     loadExample(true);
     booted = true;
+    loadManuscriptList();
   } else if (!hadStore && qs.get("project")) {
     fetch("/files/" + encodeURIComponent(qs.get("project")) + "/ref/Figure1_flow.json", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) applySaved(d); })
+      .then(function (d) {
+        if (d) {
+          applySaved(d);
+          return loadManuscriptList().then(function () { return false; });
+        }
+        return loadManuscriptList().then(function (file) {
+          return file ? fillFromManuscript(true) : false;
+        });
+      })
       .catch(function () {})
       .then(paintWhenReady);
   } else {
+    loadManuscriptList();
     paintWhenReady();
   }
 })();

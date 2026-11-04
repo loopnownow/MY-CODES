@@ -24,6 +24,12 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from matplotlib.textpath import TextPath
 
+from modules.stats.flow_spec_text import (  # noqa: F401  docx/methods helpers live in the leaf module
+    AuditError,
+    docx_paragraphs,
+    methods_section,
+)
+
 EDGE = "#000000"
 FACE = "#FFFFFF"
 LW = 1.05
@@ -34,10 +40,6 @@ _N_EQ = re.compile(r"\bn\s*=\s*(\d+)\b", re.I)
 _LEADING_COUNT = re.compile(
     r"^\s*(\d+)\s+(?:patients?|subjects?|cases?|women|men)\b", re.I
 )
-
-
-class AuditError(ValueError):
-    """n-audit failed; CLI exits nonzero."""
 
 
 def _font():
@@ -552,49 +554,6 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
 
     c.render(out_path)
     return out_path
-
-
-def docx_paragraphs(path) -> list[str]:
-    """Paragraph text from a docx. Insertions are kept. Deletions are not."""
-    import zipfile
-    import xml.etree.ElementTree as ET
-
-    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    with zipfile.ZipFile(path) as zf:
-        root = ET.fromstring(zf.read("word/document.xml"))
-    paragraphs = []
-    for para in root.iter(ns + "p"):
-        parts = []
-        for node in para.iter():
-            if node.tag == ns + "delText":
-                continue
-            if node.tag == ns + "t" and node.text:
-                parts.append(node.text)
-        line = "".join(parts).strip()
-        if line:
-            paragraphs.append(line)
-    return paragraphs
-
-
-def methods_section(paragraphs: list[str]) -> str:
-    start = None
-    for i, line in enumerate(paragraphs):
-        if re.fullmatch(r"(Materials and Methods|Methods)", line, flags=re.I):
-            start = i + 1
-            break
-    if start is None:
-        raise AuditError(
-            "Materials and Methods was not found. The figure text is taken only from that section."
-        )
-    end = len(paragraphs)
-    for i in range(start, len(paragraphs)):
-        if re.fullmatch(r"Results", paragraphs[i], flags=re.I):
-            end = i
-            break
-    text = "\n".join(paragraphs[start:end]).strip()
-    if not text:
-        raise AuditError("Materials and Methods is empty.")
-    return text
 
 
 def _numbered_block(text: str, heading: str, stop: str) -> list[str]:
