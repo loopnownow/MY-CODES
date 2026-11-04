@@ -527,11 +527,17 @@ def test_data_pane_uses_one_file_card_for_all_three_inputs():
     assert "writeback()" in ui and "restartServer()" in ui
 
 
-def test_reader_direction_lives_only_in_the_encode_card():
-    """READER_VALUE_MAP 只在文本编码卡渲染；io/分组区不再重复一份。"""
+def test_reader_direction_is_on_the_config_page_and_in_the_encode_card():
+    """阅片列方向（READER_VALUE_MAP）在配置页「数据与路径」段可见，文本编码卡里也有编辑入口。"""
+    from modules.config.defaults import merged_settings
     from modules.console import schema
+    from modules.console.schema_ui import build_schema
 
-    assert "READER_VALUE_MAP" not in schema.SECTION_OF
+    assert "READER_VALUE_MAP" in schema.SECTION_OF
+    assert schema.SECTION_OF["READER_VALUE_MAP"][0] == "io"
+    fields = build_schema(merged_settings(), sheets=["cln"])
+    got = [f for f in fields if f.get("key") == "READER_VALUE_MAP"]
+    assert got and got[0].get("section") == "io"
     ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
     assert "function readerDirPanel" in ui
     assert "captureFoldState" in ui
