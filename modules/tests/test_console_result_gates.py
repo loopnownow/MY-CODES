@@ -601,8 +601,10 @@ def test_start_page_loads_data_and_previews_every_sheet():
     """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
     assert 'id="btnLoadNow"' in proj and ">载入数据</button>" in proj
-    assert 'id="btnGoPg"' in proj and ">进入数据预览</button>" in proj
-    assert 'id="pvCard"' in proj and 'id="pvBox"' in proj and 'id="pvMsg"' in proj
+    assert 'id="pvCard"' in proj and 'id="pvBox"' in proj
+    # 起始页不再提供「进入数据预览」按钮，也不要那句「载入后显示…前 3 行」提示
+    assert "btnGoPg" not in proj and ">进入数据预览</button>" not in proj
+    assert 'id="pvMsg"' not in proj and "载入后显示每张工作表的前 3 行" not in proj
     assert "function renderSheetBlocks" in proj
     assert "renderSheetBlocks(prev)" in proj
     assert "function autoLoadAndPreview" in proj

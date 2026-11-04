@@ -297,7 +297,6 @@ footer{
       <a id="protoGo" href="about:blank"></a>
       <div class="links">
         <button type="button" class="btn pri" id="btnLoadNow" title="读取本课题主数据文件，列出全部工作表并预览每张表的前 3 行。">载入数据</button>
-        <button type="button" class="btn" id="btnGoPg" title="进入控制台「数据预览」页：给工作表分配角色、设外验与排除名单。">进入数据预览</button>
       </div>
       <p id="msg" class="hint">关闭/开启停服务或启动控制台。开启服务后会自动读取主数据并显示预览。</p>
     </section>
@@ -305,7 +304,6 @@ footer{
   <!-- 起始页预览：每次载入后列出所有工作表前 3 行（最多 12 列）。 -->
   <section id="pvCard" class="card" hidden aria-labelledby="h-pv">
     <h2 id="h-pv">数据预览</h2>
-    <p class="hint" id="pvMsg">载入后显示每张工作表的前 3 行。</p>
     <div id="pvBox"></div>
   </section>
   <!-- 数据区已移到控制台「数据预览」页；本区只作 pageUrl / protoUrl 的状态来源，页面不显示。 -->
@@ -988,7 +986,7 @@ async function autoLoadAndPreview(p) {
   msg.textContent = "服务已开，正在读取主数据…";
   await loadWorkbook();
   if (DATA_LOADED) {
-    msg.textContent = "数据已读取（见下方「数据预览」）。点「进入数据预览」继续。";
+    msg.textContent = "数据已读取（见下方「数据预览」）。";
   }
 }
 function keysFromSettingsError(msg) {
@@ -1050,14 +1048,12 @@ async function clearBadKeys() {
 function renderSheetBlocks(prev) {
   const cardEl = document.getElementById("pvCard");
   const box = document.getElementById("pvBox");
-  const line = document.getElementById("pvMsg");
   if (!cardEl || !box) return;
   const blocks = (prev && prev.sheet_blocks) || {};
   const names = Object.keys(blocks);
   cardEl.hidden = false;
   if (!names.length) {
     box.innerHTML = '<p class="hint">没有读到工作表。</p>';
-    if (line) line.textContent = "未读到工作表。";
     return;
   }
   box.innerHTML = names.map((name) => {
@@ -1075,7 +1071,6 @@ function renderSheetBlocks(prev) {
     return `<div class="pv-sheet"><div class="sublab">${esc(name)} <span class="dim">${esc(dim)}</span></div>
       <div class="pv-scroll"><table class="pv-tbl">${head}${body}</table></div></div>`;
   }).join("");
-  if (line) line.textContent = `已读取 ${names.length} 张工作表：${names.join(" / ")}。每张显示前 3 行。`;
 }
 async function loadWorkbook() {
   if (location.protocol === "file:" && !pageToken) {
@@ -1187,8 +1182,6 @@ if (goFlow) goFlow.addEventListener("click", () => { holdForConsole = true; });
 document.getElementById("btnLoadData").onclick = () => loadWorkbook();
 const btnLoadNow = document.getElementById("btnLoadNow");
 if (btnLoadNow) btnLoadNow.onclick = () => loadWorkbook();
-const btnGoPg = document.getElementById("btnGoPg");
-if (btnGoPg) btnGoPg.addEventListener("click", enterConsole);
 const btnClearBad = document.getElementById("btnClearBad");
 if (btnClearBad) btnClearBad.onclick = () => clearBadKeys();
 document.getElementById("btnExtAdd").onclick = () => {
