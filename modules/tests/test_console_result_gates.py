@@ -669,6 +669,10 @@ def test_start_page_loads_data_and_previews_every_sheet():
     assert "autoOpenPreview" not in proj  # 不再自动跳控制台
     assert "enterConsole" not in proj  # 删掉后无触发点，已清
     assert 'getElementById("go")' not in proj
+    # 删了 #go 元素后，任何 `go.` / `if (go)` / setGoEnabled 都会在页面初始化时抛 ReferenceError，
+    # 整个初始化中断 → 页面点不动（2026-11-04 真踩过）。
+    for bad in ("if (!go)", "if (go)", "go.href", "go.classList", "setGoEnabled"):
+        assert bad not in proj, bad
     seg = proj.split("async function autoLoadAndPreview", 1)[1].split("function keysFromSettingsError", 1)[0]
     assert "location.href" not in seg
     assert proj.index('id="btnLoadNow"') < proj.index('id="msg"')

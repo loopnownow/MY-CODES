@@ -657,13 +657,8 @@ function renderExtRows(list) {
   });
   bindExtRowEvents();
 }
-function setGoEnabled(on) {
-  if (!go) return;
-  go.classList.toggle("disabled", !on);
-}
 function markDataStale() {
   DATA_LOADED = false;
-  setGoEnabled(false);
   if (sheetBlock) sheetBlock.hidden = true;
 }
 function pageUrl(p) {
@@ -780,7 +775,6 @@ if (portEl) {
 function syncLinks() {
   const modErr = modulesDirError();
   if (modErr) msg.textContent = modErr;
-  if (go) go.href = pageUrl();
   localStorage.setItem(PORT_KEY, String(port()));
   localStorage.setItem(MOD_KEY, modulesDir());
   if (PROJECT) {
@@ -1144,7 +1138,6 @@ async function loadWorkbook() {
     renderSheetBlocks(prev);
     DATA_LOADED = true;
     if (sheetBlock) sheetBlock.hidden = false;
-    setGoEnabled(true);
     syncLinks();
     const n = prev.n_after_exclude_est != null ? prev.n_after_exclude_est : "—";
     if (loadMsg) loadMsg.textContent = "已加载 · sheet " + SHEET_OPTS.join(" / ") + " · n=" + n + "。请选 sheet 后进入配置。";
