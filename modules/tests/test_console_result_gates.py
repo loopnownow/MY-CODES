@@ -541,6 +541,8 @@ def test_reader_direction_is_on_the_config_page_and_in_the_encode_card():
     ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
     assert "function readerDirPanel" in ui
     assert "captureFoldState" in ui
+    # 配置页那块的标题要能认出「阅片方向」（io 段的 UI 标题不是「数据与路径」）
+    assert "结局 / 子工程 / 阅片方向" in ui
 
 
 def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypatch):
