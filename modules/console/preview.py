@@ -24,6 +24,9 @@ from modules.console.settings_layer import under_root
 
 _PREVIEW_CACHE = _state.PREVIEW_CACHE  # 与 console 同一份 dict（测试断言 identity）
 
+# 每个工作表在预览里只铺这么多行（cln 也一样，只作表头核对）。
+_PREVIEW_HEAD_ROWS = 5
+
 def project_xlsx_names(proj: Path) -> list[str]:
     return [
         p.name for p in sorted(proj.glob("*.xlsx"))
@@ -129,7 +132,7 @@ def exclude_select_options(
         "EXCLUDE_ROW": rows,
     }
 
-def _info_from_frame(df, name: str, max_rows: int = 12) -> dict[str, Any]:
+def _info_from_frame(df, name: str, max_rows: int = _PREVIEW_HEAD_ROWS) -> dict[str, Any]:
     """Preview rows for a sheet already in memory. Every column is included."""
     all_cols = [str(c) for c in df.columns]
     n = len(df)

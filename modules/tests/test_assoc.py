@@ -119,7 +119,7 @@ def test_sections_place_new_switches():
         "ORDINAL_MAX_LEVELS",
     ]
     assert encode_ini == [
-        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS", "ENCODE_BLOCK_TEXT",
     ]
     assert "SKIP_CLIN_FEATURES" not in clin_ini
     assert "ORDINAL_MAX_LEVELS" not in clin_ini
@@ -140,11 +140,13 @@ def test_sections_place_new_switches():
         "ORDINAL_MAX_LEVELS",
     ]
     assert encode_ui == [
-        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS", "ENCODE_BLOCK_TEXT",
     ]
     assert SECTION_OF["TEXT_ENCODE"][0] == "encode"
     assert SECTION_OF["TEXT_ENCODE_AUTO"][0] == "encode"
     assert SECTION_OF["TEXT_ENCODE_MAX_LEVELS"][0] == "encode"
+    assert SECTION_OF["ENCODE_BLOCK_TEXT"][0] == "encode"
+    assert SECTION_OF["RAD_SCORE_LINEAR"][0] == "radlog"
     assert SECTION_OF["SKIP_CLIN_FEATURES"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CONTINUOUS"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CATEGORICAL"][0] == "clinprep"

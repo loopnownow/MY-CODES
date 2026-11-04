@@ -1433,11 +1433,12 @@ def _prepare_blocks(
         id_col = str(getattr(spec, "id_col", "") or "") if spec is not None else ""
         frame = _prepare_rad_frame(raw, id_col=id_col)
         frame = _reindex_frame_to_ids(frame, ids, block_name=name)
-        # 手写映射对所有块生效；自动编码只对 kind="clin" 的块开（组学块仍只吃数值）
+        # 文本列一律先编码：手写映射优先，缺的按 ENCODE_BLOCK_TEXT / TEXT_ENCODE_AUTO 自动补。
         from modules.stats import text_encode
 
+        encode_on = text_encode.auto_on(getattr(cfg, "ENCODE_BLOCK_TEXT", True))
         frame = text_encode.prepare_frame(
-            frame, frame_label=name, auto=(str(getattr(spec, "kind", "rad") or "rad") == "clin")
+            frame, frame_label=name, auto=(None if encode_on else False)
         )
         text_cols = [
             str(c) for c in frame.columns
@@ -1445,8 +1446,9 @@ def _prepare_blocks(
         ]
         if text_cols:
             print(
-                f"  ⚠ 模态块 {name!r}: {len(text_cols)} 个非数值列不进组学建模 "
-                f"（如需使用请先编码为数值，或放进 cln）: {text_cols[:8]}"
+                f"  ⚠ 模态块 {name!r}: {len(text_cols)} 个非数值列仍未编码，不进建模 "
+                f"（等级超过 TEXT_ENCODE_MAX_LEVELS 或未给映射；在控制台「文本编码」手填）: "
+                f"{text_cols[:8]}"
             )
         for col in frame.columns:
             if col == "Name":

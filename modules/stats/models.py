@@ -205,7 +205,11 @@ def build_nomogram(train_label: np.ndarray, radscore_train: Optional[np.ndarray]
 
 
 def _display_name(feat: str) -> str:
-    return FEATURE_DISPLAY.get(feat, feat.replace("_", " ").title())
+    """轴名保留原始大小写（CTA 不能变成 Cta）；只有全小写的词首字母大写。"""
+    if feat in FEATURE_DISPLAY:
+        return FEATURE_DISPLAY[feat]
+    words = str(feat).replace("_", " ").split()
+    return " ".join(w if not w.islower() else w[:1].upper() + w[1:] for w in words)
 
 
 def _level_map(feat: str) -> Dict[float, str]:

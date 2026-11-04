@@ -1030,17 +1030,19 @@ def _block_cat_section(data, pos_label: str, neg_label: str) -> str:
                 "<thead><tr>" + "".join(head) + "</tr></thead>\n"
                 "<tbody>\n" + "\n".join(body_rows) + "\n</tbody>\n</table>"
                 '<p class="table-note"><span class="note-label">Note:</span> '
-                "Categorical column of the modality sheet; it is excluded from radiomics "
-                "selection and from every model, so it carries no RadScore or model term. "
+                "Categorical column of the modality sheet that stayed unencoded "
+                "(levels above TEXT_ENCODE_MAX_LEVELS or no mapping supplied), so it is "
+                "kept out of radiomics selection and out of every model. "
                 "Counts are shown as n (percentage within group); P value uses the same "
                 "categorical test as Table 1, computed per set.</p></div>"
             )
     if not tables:
         return ""
     return (
-        "<section><h2>B3. Block categorical descriptors (not modelled)</h2>\n"
-        '<p class="note">Non-numeric columns of the modality sheets are reported '
-        "separately so they stay visible after being excluded from modelling.</p>\n"
+        "<section><h2>B3. Block categorical descriptors (left out of modelling)</h2>\n"
+        '<p class="note">Non-numeric columns of the modality sheets are encoded via '
+        "TEXT_ENCODE and enter modelling as ordinal codes. Only the columns that could "
+        "not be encoded are reported here, so they stay visible.</p>\n"
         + "".join(tables)
         + "</section>"
     )
@@ -2091,7 +2093,12 @@ def _build_panel(panel_label: str, ds, rad_res, clin_res, panel_title: str,
             )
             parts.append(f'<p class="sel-feat"><b>Selected clinical features '
                           f'({tag}, {len(clin_res.features)}):</b> {feat_str}</p>')
-        if rad_res is not None and str(getattr(rad_res, "method", "") or "") == "logistic":
+        # 单块 logistic 与「模态块」两种结果都要出组学单/多因素表：
+        # _radiomics_logistic_html 会逐块递归，LASSO 块自动返回空。
+        rad_groups = list(getattr(rad_res, "groups", None) or []) if rad_res is not None else []
+        if rad_res is not None and (
+            str(getattr(rad_res, "method", "") or "") == "logistic" or rad_groups
+        ):
             rad_log_html = _radiomics_logistic_html(rad_res, panel_label)
             if rad_log_html:
                 parts.append(rad_log_html)
@@ -2232,6 +2239,56 @@ def _radiomics_feature_names(df: Optional[pd.DataFrame]) -> Optional[pd.DataFram
     return out
 
 
+def _ols_fit_table_html(src) -> str:
+    """RAD_SCORE_LINEAR=开时：入选特征的 OLS 系数表（原始尺度）。"""
+    fit = getattr(src, "ols", None)
+    if fit is None:
+        return ""
+    try:
+        params = fit.params.drop("const")
+        bse = fit.bse.reindex(params.index)
+        tvals = fit.tvalues.reindex(params.index)
+        pvals = fit.pvalues.reindex(params.index)
+    except Exception:
+        return ""
+    from modules.stats.radiomics import display_rad_feature
+
+    rows = []
+    for name in params.index:
+        rows.append(
+            {
+                "Feature": display_rad_feature(str(name)),
+                "Coefficient": float(params[name]),
+                "SE": float(bse[name]),
+                "t": float(tvals[name]),
+                "P": float(pvals[name]),
+            }
+        )
+    df = pd.DataFrame(rows)
+    label = str(getattr(src, "score_name", "") or "RadScore")
+    foot = (
+        "Linear regression (OLS) fitted on the selected features in raw scale "
+        f"after feature screening. R² = {float(fit.rsquared):.3f}; "
+        f"adjusted R² = {float(fit.rsquared_adj):.3f}; n = {int(fit.nobs)}. "
+        f"{label} uses these coefficients."
+    )
+    return (
+        f"<h3>RadScore Linear Fit (OLS) — {html.escape(label)}</h3>"
+        + df_to_html(_format_ols_df(df), f"ols-fit-{label}", footnote=foot)
+    )
+
+
+def _format_ols_df(df: pd.DataFrame) -> pd.DataFrame:
+    """OLS 系数表数字格式（4 位小数，P 用 3 位）。"""
+    out = df.copy()
+    for col in ("Coefficient", "SE", "t"):
+        if col in out.columns:
+            out[col] = [f"{float(v):.4f}" for v in out[col]]
+    if "P" in out.columns:
+        out["P"] = [f"{float(v):.3f}" for v in out["P"]]
+    return out
+
+
 def _radiomics_formula_html(rad_res) -> str:
     """RadScore 公式。分类结果按类各写一条，不合并成一个分数。"""
     if rad_res is None:
@@ -2240,18 +2297,34 @@ def _radiomics_formula_html(rad_res) -> str:
     sources = groups if groups else [rad_res]
     bits: List[str] = []
     logistic = False
+    linear = False
+    ols_tables: List[str] = []
     for src in sources:
         text = getattr(src, "formula_text", None)
         if not text:
             continue
         bits.append(f'<p class="formula">{text}</p>')
-        if str(getattr(src, "method", "") or "") == "logistic":
+        method = str(getattr(src, "method", "") or "")
+        fit_kind = str(getattr(src, "score_fit", "logit") or "logit")
+        if method == "logistic" and fit_kind == "ols":
+            linear = True
+            ols_tables.append(_ols_fit_table_html(src))
+        elif method == "logistic":
             logistic = True
     if not bits:
         return ""
     note = ""
-    if logistic:
+    if linear:
         note = (
+            '<p class="note">Radiomics score after feature screening: selected features '
+            'were re-fitted with linear regression (OLS) in raw scale, so coefficients '
+            'are per original unit, not log-odds. Feature selection is unchanged. '
+            'Each evaluation layer follows its validation mode: refit re-estimates '
+            'these OLS coefficients on that layer; apply-formula and lock-threshold '
+            'reuse the training coefficients.</p>'
+        )
+    if logistic:
+        note += (
             '<p class="note">Radiomics logistic linear predictor. '
             'Coefficients are log-odds per 1 training SD after median imputation '
             'and scaling fit on the training set. Features are not re-selected. '
@@ -2259,14 +2332,16 @@ def _radiomics_formula_html(rad_res) -> str:
             'these coefficients after the training scaling; apply-formula and '
             'lock-threshold reuse the training coefficients.</p>'
         )
-    return "<h3>RadScore Formula</h3>" + "".join(bits) + note
+    return "<h3>RadScore Formula</h3>" + "".join(bits) + note + "".join(ols_tables)
 
 
 def _radiomics_logistic_html(rad_res, panel_label: str) -> str:
-    """训练集组学 Logistic 表。验证层不调用。有分类时每类一块。"""
-    if rad_res is None or str(getattr(rad_res, "method", "") or "") != "logistic":
+    """训练集组学 Logistic 表。验证层不调用。有分类/模态块时每块一块。"""
+    if rad_res is None:
         return ""
     groups = list(getattr(rad_res, "groups", None) or [])
+    if not groups and str(getattr(rad_res, "method", "") or "") != "logistic":
+        return ""
     if groups:
         blocks: List[str] = []
         for i, g in enumerate(groups):

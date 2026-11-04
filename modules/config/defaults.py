@@ -202,6 +202,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "TEXT_ENCODE": {},
     "TEXT_ENCODE_AUTO": True,
     "TEXT_ENCODE_MAX_LEVELS": 5,
+    # 组学块里的文本列也走文本编码（开=参与建模；关=只吃数值列）。
+    "ENCODE_BLOCK_TEXT": True,
+    # 组学 Logistic 选出特征后再做一次原始尺度 OLS，RadScore 用 OLS 系数。
+    # 关（默认）= 仍用 logistic log-odds 系数；LASSO 本来就是 OLS，不受此键影响。
+    "RAD_SCORE_LINEAR": False,
     # Combined：空 = 全部块分数进联合模型；COMBINED_EXCLUDE 手动剔除（只影响联合）。
     "COMBINED_BLOCKS": [],
     "COMBINED_EXCLUDE": [],

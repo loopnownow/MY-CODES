@@ -585,6 +585,8 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             formula_text=rad.formula_text,
             method=str(getattr(rad, "method", "") or "lasso"),
             preprocess=getattr(rad, "preprocess", None),
+            score_name=getattr(rad, "score_name", None),
+            score_fit=str(getattr(rad, "score_fit", "logit") or "logit"),
         )
 
     def _validation_radscore(layer: data_io.DataLayer, applied):
@@ -598,6 +600,13 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         if not feats:
             return rs
         if str(getattr(rad, "method", "") or "") == "logistic":
+            if str(getattr(rad, "score_fit", "logit") or "logit") == "ols":
+                rs_new = refit_radscore_ols(layer.rad, layer.label, feats)
+                if rs_new is None:
+                    print("  ⚠ RadScore OLS refit failed — keep train formula")
+                    return rs
+                print(f"  Refit RadScore OLS ({len(feats)} locked features, raw scale)")
+                return rs_new
             rs_new = radiomics.refit_radscore_logistic(rad, layer.rad, layer.label)
             if rs_new is None:
                 print("  ⚠ RadScore logistic refit failed — keep train formula")
