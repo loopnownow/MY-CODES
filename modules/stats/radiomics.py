@@ -71,6 +71,8 @@ class RadiomicsResult:
     groups: Optional[list] = None
     group_name: Optional[str] = None
     score_name: Optional[str] = None
+    # Logistic 路径的分数口径：logit（默认，标准化尺度 log-odds）或 ols（原始尺度线性回归）。
+    score_fit: str = "logit"
 
 
 _ID_LIKE = ("Name", "patient_id", "Patient_ID", "Group")
@@ -891,8 +893,13 @@ def apply_locked_radscore(result: RadiomicsResult, full_rad: pd.DataFrame) -> np
     if result.intercept is None or result.betas is None or not feats:
         raise ValueError("RadScore formula is empty")
     params = getattr(result, "preprocess", None)
-    # 只有 Logistic 的系数是在标准化尺度上估的；LASSO 的 OLS 系数原本就在原始尺度。
-    use_scaling = bool(params) and str(getattr(result, "method", "") or "") == "logistic"
+    # 只有 Logistic 的 log-odds 系数是在标准化尺度上估的；
+    # LASSO 的 OLS 系数、以及 Logistic + RAD_SCORE_LINEAR 的 OLS 系数都在原始尺度。
+    use_scaling = (
+        bool(params)
+        and str(getattr(result, "method", "") or "") == "logistic"
+        and str(getattr(result, "score_fit", "logit") or "logit") == "logit"
+    )
     if use_scaling:
         X = _apply_preprocess(full_rad, params).reindex(columns=feats).to_numpy(dtype=float)
     else:
@@ -1204,6 +1211,8 @@ def _pack_logistic(
     table2: Optional[pd.DataFrame] = None,
     score_name: str = "RadScore",
     group_name: str = "",
+    ols: Optional[sm.regression.linear_model.RegressionResultsWrapper] = None,
+    score_fit: str = "logit",
 ) -> RadiomicsResult:
     return RadiomicsResult(
         features=list(features),
@@ -1211,7 +1220,7 @@ def _pack_logistic(
         radscore=radscore,
         intercept=intercept,
         betas=betas,
-        ols=None,
+        ols=ols,
         lambda_used=float("nan"),
         formula_df=formula_df,
         formula_text=formula_text,
@@ -1229,6 +1238,7 @@ def _pack_logistic(
         table2=table2,
         score_name=score_name,
         group_name=group_name or None,
+        score_fit=score_fit,
     )
 
 
@@ -1383,14 +1393,22 @@ def apply_locked_result(result: RadiomicsResult, full_rad: pd.DataFrame) -> Radi
 
 def refit_locked_result(result: RadiomicsResult, full_rad: pd.DataFrame,
                         y: np.ndarray) -> RadiomicsResult:
-    """锁定各类入选特征，套训练集标准化，在本层重估系数。失败则退回训练公式。"""
+    """锁定各类入选特征，在本层重估系数。失败则退回训练公式。"""
     from dataclasses import replace
+
+    def _refit_one(res: RadiomicsResult) -> Optional[np.ndarray]:
+        """按分数口径重估：OLS 走原始尺度，logit 走训练集标准化尺度。"""
+        if str(getattr(res, "score_fit", "logit") or "logit") == "ols":
+            from modules.stats.val_mode import refit_radscore_ols
+
+            return refit_radscore_ols(full_rad, y, list(res.features or []))
+        return refit_radscore_logistic(res, full_rad, y)
 
     groups = list(getattr(result, "groups", None) or [])
     if not groups:
         if str(getattr(result, "method", "") or "") != "logistic":
             return result
-        rs = refit_radscore_logistic(result, full_rad, y)
+        rs = _refit_one(result)
         if rs is None:
             return result
         return replace(result, radscore=rs)
@@ -1400,15 +1418,17 @@ def refit_locked_result(result: RadiomicsResult, full_rad: pd.DataFrame,
         if str(getattr(g, "method", "") or "") != "logistic" or not g.features:
             out.append(g)
             continue
-        rs = refit_radscore_logistic(g, full_rad, y)
+        rs = _refit_one(g)
         if rs is None:
-            print(f"  ⚠ {label} logistic refit failed — keep train formula")
+            print(f"  ⚠ {label} refit failed — keep train formula")
             try:
                 rs = apply_locked_radscore(g, full_rad)
             except Exception:
                 rs = g.radscore
         else:
-            print(f"  Refit {label} ({len(g.features)} locked features, train scaling)")
+            fit_kind = "OLS (raw scale)" if str(getattr(g, "score_fit", "logit") or "logit") == "ols" \
+                else "logistic (train scaling)"
+            print(f"  Refit {label} ({len(g.features)} locked features, {fit_kind})")
         out.append(replace(g, radscore=rs))
     return replace(result, groups=out, radscore=None)
 
@@ -1457,6 +1477,43 @@ def _run_grouped_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
         ols=None, lambda_used=float("nan"), formula_df=None, formula_text=None,
         method="logistic", table2=table2, groups=children, select_source="grouped",
     )
+
+
+def _cfg_flag(name: str, default: bool = False) -> bool:
+    """读布尔配置。非布尔字符串按 true/false 解析，认不出就 raise（不回退）。"""
+    raw = getattr(cfg, name, default)
+    if isinstance(raw, bool):
+        return raw
+    tok = str(raw).strip().lower()
+    if tok in ("", "true", "1", "yes", "y", "on"):
+        return True
+    if tok in ("false", "0", "no", "n", "off"):
+        return False
+    raise ValueError(f"{name} 无法识别: {raw!r}")
+
+
+def _fit_linear_score(
+    full_rad: pd.DataFrame,
+    y: np.ndarray,
+    features: List[str],
+    params: Optional[dict] = None,
+):
+    """入选特征在原始尺度做一次 OLS（训练集中位数插补），返回 (betas, intercept, fit)。"""
+    feats = [str(f) for f in features]
+    X = full_rad.reindex(columns=feats).apply(pd.to_numeric, errors="coerce")
+    med = (params or {}).get("medians")
+    if med is not None:
+        X = X.fillna(med)
+    yv = np.asarray(y, dtype=float)
+    ok = X.notna().all(axis=1) & np.isfinite(yv)
+    if int(ok.sum()) < len(feats) + 2:
+        raise ValueError(
+            f"线性拟合样本不足：{int(ok.sum())} 行 / {len(feats)} 特征（RAD_SCORE_LINEAR=开）"
+        )
+    fit = sm.OLS(yv[ok], sm.add_constant(X.loc[ok], has_constant="add")).fit()
+    if "const" not in fit.params.index:
+        raise ValueError("线性拟合缺少截距（特征在训练集全为常数）")
+    return fit.params.drop("const"), float(fit.params["const"]), fit
 
 
 def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
@@ -1618,12 +1675,24 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
             firth_uni, firth_mv,
         )
 
-    betas = model.params.drop("const")
-    features = [str(c) for c in betas.index]
-    intercept = float(model.params["const"])
-    coefs = betas.to_numpy(dtype=float)
-    Xsel = X_scaled.reindex(columns=features)
-    radscore = intercept + Xsel.to_numpy(dtype=float) @ coefs
+    linear_on = _cfg_flag("RAD_SCORE_LINEAR", False)
+    ols_fit = None
+    if linear_on:
+        betas, intercept, ols_fit = _fit_linear_score(full_rad, y_group, final_feat, params)
+        features = [str(c) for c in betas.index]
+        coefs = betas.to_numpy(dtype=float)
+        Xraw = full_rad.reindex(columns=features).apply(pd.to_numeric, errors="coerce")
+        med = (params or {}).get("medians")
+        if med is not None:
+            Xraw = Xraw.fillna(med)
+        radscore = intercept + Xraw.to_numpy(dtype=float) @ coefs
+    else:
+        betas = model.params.drop("const")
+        features = [str(c) for c in betas.index]
+        intercept = float(model.params["const"])
+        coefs = betas.to_numpy(dtype=float)
+        Xsel = X_scaled.reindex(columns=features)
+        radscore = intercept + Xsel.to_numpy(dtype=float) @ coefs
     disp_names = [display_rad_feature(n) for n in features]
     formula_parts = " ".join(
         f"{'+' if b >= 0 else '−'} {abs(b):.6f} · <i>{dn}</i>"
@@ -1639,12 +1708,18 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
     print(
         f"  Selected radiomics (multivariate p < {mv_p_cut:g}): {', '.join(disp_names)}"
     )
+    if linear_on:
+        print(
+            f"  Fit: linear regression (OLS) on selected features, raw scale "
+            f"— R²={float(ols_fit.rsquared):.3f}"
+        )
     print(f"  {score_name} = {intercept:.6f}", end="")
     for dn, b in zip(disp_names, coefs):
         print(f" {'+' if b >= 0 else '−'}{abs(b):.6f}×{dn}", end="")
     print()
+    scale_note = "raw scale, OLS" if linear_on else "log-odds / 1 SD"
     print(
-        f"  {score_name} (log-odds / 1 SD): [{np.nanmin(radscore):.3f}, {np.nanmax(radscore):.3f}]  "
+        f"  {score_name} ({scale_note}): [{np.nanmin(radscore):.3f}, {np.nanmax(radscore):.3f}]  "
         f"mean={np.nanmean(radscore):.3f}"
     )
     packed = _pack_logistic(
@@ -1653,7 +1728,7 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
         uni_res=uni_df, mv_df=mv_df, mv_note=mv_note, mv_selected=mv_selected,
         candidates=list(candidates), stepwise_features=list(stepwise),
         select_source="mv_p", firth_uni=firth_uni, firth_mv=firth_mv,
-        table2=table2,
+        table2=table2, ols=ols_fit, score_fit=("ols" if linear_on else "logit"),
     )
     if score_name != "RadScore" or group_name:
         from dataclasses import replace

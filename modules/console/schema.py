@@ -30,7 +30,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
         "SUBGROUP_COL",
     ]),
     ("encode", "文本编码", [
-        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS",
+        "TEXT_ENCODE", "TEXT_ENCODE_AUTO", "TEXT_ENCODE_MAX_LEVELS", "ENCODE_BLOCK_TEXT",
     ]),
     ("exclude", "样本排除名单", [
         "DO_EXCLUDE_SAMPLES",
@@ -123,6 +123,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("radlog", "组学 / Logistic", [
         "DO_RAD_LOGISTIC",
         "RAD_LOGIT_UNI_P", "RAD_LOGIT_MV_P", "DO_RAD_FIRTH",
+        "RAD_SCORE_LINEAR",
     ]),
     ("combined", "Combined 主模型", [
         "COMBINED_MODE", "COMBINED_BLOCKS", "COMBINED_EXCLUDE", "CLIN_BLOCK_METHOD",
@@ -226,6 +227,7 @@ LABELS = {
     "RAD_LOGIT_UNI_P": "单因素 p",
     "RAD_LOGIT_MV_P": "多因素 p",
     "DO_RAD_FIRTH": "Firth 惩罚 Logistic",
+    "RAD_SCORE_LINEAR": "筛选后线性拟合",
     "ENABLE_CORR_FILTER": "相关过滤",
     "DO_FIGURE_PANELS": "图与显示总闸",
     "DO_QC_REPORT": "QC HTML",
@@ -322,6 +324,7 @@ LABELS = {
     "TEXT_ENCODE": "文本编码（列 → 原文 → 编码）",
     "TEXT_ENCODE_AUTO": "自动识别并编码文本",
     "TEXT_ENCODE_MAX_LEVELS": "自动编码等级上限",
+    "ENCODE_BLOCK_TEXT": "组学块文本列参与建模",
     "FIGURE_PANEL_DPI": "拼板 DPI",
     "FIGURE_PANEL_MEDIATION_NCOLS": "中介拼板列数",
     "FIGURE_PANEL_LABEL_POS": "拼板字母位置",
@@ -423,6 +426,7 @@ HINTS: dict[str, str] = {
     "RAD_LOGIT_UNI_P": "组学单因素进入多因素候选池的 α。未开 FDR/FWER 时用原始 p < α；开了则用对应校正 p < α（两者都开时 AND）。完全分离不进入；VIF 只警告。",
     "RAD_LOGIT_MV_P": "候选池多因素 Logistic p 小于此值才入选，并写入 RadScore。",
     "DO_RAD_FIRTH": "另出组学 Firth 单因素和候选池表。不替换入选规则，也不跟随临床的 Firth 开关。",
+    "RAD_SCORE_LINEAR": "开=组学 Logistic 选出特征后，再用原始尺度做一次线性回归（OLS），RadScore 取 OLS 系数（结果页会注明并附 OLS 系数表）。关（默认）= RadScore 仍是 Logistic log-odds。LASSO 本来就是 OLS，不受本开关影响；组学模块里可逐块覆盖。",
     "ENABLE_CORR_FILTER": "组学高相关特征预过滤，阈值见 RAD_COR_CUTOFF。",
     "DO_FIGURE_PANELS": "图与显示总闸。关=不写任何 PNG/TIFF/PDF，结果 HTML 不嵌图，拼板也不跑。开=按各分析开关出图；拼板仍在本块。",
     "DO_QC_REPORT": "根据 QC_SHEET 写 ref/qc.html。",
@@ -523,6 +527,7 @@ HINTS: dict[str, str] = {
     "TEXT_ENCODE": "文本列的编码表：{列名: {原文: 数字}}。控制台「文本编码」面板里点自动识别会按上限自动填，可逐条改。手写的优先于自动。",
     "TEXT_ENCODE_AUTO": "开=自动识别文本列并把 ≤上限等级的取值自动编码（默认开）。关=只用 TEXT_ENCODE 里手写的映射。",
     "TEXT_ENCODE_MAX_LEVELS": "自动编码的等级上限（控制台可选 3/4/5）。2 等级固定自动 0/1，不需要手填。超过上限的列不自动编码、不进建模，可展开手填。",
+    "ENCODE_BLOCK_TEXT": "开（默认）=组学模块工作表里的文本列也按「文本编码」换成数字后参与筛选与建模（≤上限自动编码，超上限或未给映射的列仍跳过并点名）。关=组学块只吃数值列，文本列只在结果 B3 表里作描述。",
     "RAD_FEATURE_DISPLAY_STRIP": "左=检出的标记，右=要剥掉的字（通常就是该标记）。只剥它所在的那一端，不改名称中间。空=不剥。只改图/表显示，不改内部列名。",
     "FIGURE_PANEL_DPI": "拼板 PNG 分辨率。",
     "FIGURE_PANEL_MEDIATION_NCOLS": "中介拼板每行列数。",

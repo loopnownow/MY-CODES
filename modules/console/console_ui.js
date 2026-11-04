@@ -2073,6 +2073,9 @@ function excludeRowsHtml() {
   return `${cards}
     <div class="save-row">
       <button type="button" id="btnExcAdd">+ 名单文件</button>
+      <input data-exc-ids type="text" class="exc-ids" value="${esc(asList(fieldValue("EXCLUDE_IDS")).join(", "))}"
+        placeholder="额外排除 ID（逗号或空格分隔）" spellcheck="false"
+        title="手写要剔除的 ID，与上面的 Excel 名单合并。留在 ini 的 EXCLUDE_IDS。"/>
       <span class="hint">每份文件用自己那张表的 sheet / 列 / 内容；空内容＝该列整列当 ID。</span>
     </div>`;
 }
@@ -2279,7 +2282,19 @@ function bindDataPane() {
     });
     exc.addEventListener("input", (e) => {
       const inp = e.target;
-      if (!inp || !inp.matches("[data-exc-filepick]")) return;
+      if (!inp) return;
+      if (inp.matches("[data-exc-ids]")) {
+        // 额外排除 ID：逗号 / 分号 / 空格分隔，写回 EXCLUDE_IDS。
+        const ids = String(inp.value || "")
+          .split(/[,;，；\s]+/)
+          .map((x) => x.trim())
+          .filter(Boolean);
+        setFieldValue("EXCLUDE_IDS", ids);
+        setFieldValue("DO_EXCLUDE_SAMPLES", ids.length > 0 || pvExcFiles().filter(Boolean).length > 0);
+        markDirty();
+        return;
+      }
+      if (!inp.matches("[data-exc-filepick]")) return;
       const f = inp.files && inp.files[0];
       const row = inp.closest("[data-exc-row]");
       const dest = row && row.querySelector("[data-exc=file]");
@@ -2880,6 +2895,8 @@ function renderForm() {
   }
   for (const f of S.schema) {
     if (isHiddenField(f)) continue;
+    // 样本排除名单只在「数据预览」页（#pvExclude）设置，统计配置页不再显示。
+    if (f.section === "exclude") continue;
     if (!map.has(f.section)) {
       const g = {id: f.section, title: f.section_title, fields: []};
       map.set(f.section, g);
@@ -4168,12 +4185,16 @@ function modalityBlocksPanel() {
     const mvP = blkParamOf(b, "mv_p");
     const firth = blkParamOf(b, "firth");
     const firthOn = firth !== false;
+    const linearParam = blkParamOf(b, "linear");
+    const linearOn = linearParam === true;
+    const linearBox = `<label class="pexcl" title="开=该块选出特征后再做原始尺度 OLS，RadScore 用 OLS 系数；关=用 logistic log-odds"><input type="checkbox" data-blk-param-bool="linear"${linearOn ? " checked" : ""}/> 线性拟合</label>`;
     const stageFilter = method === "logistic"
       ? `<input data-blk-param="uni_p" value="${esc(uniP)}" placeholder="单因素 p（空=全局）" spellcheck="false"/>
          <input data-blk-param="mv_p" value="${esc(mvP)}" placeholder="多因素 p（空=全局）" spellcheck="false"/>
-         <label class="pexcl" title="开=该块多因素用 Firth"><input type="checkbox" data-blk-param-bool="firth"${firthOn ? " checked" : ""}/> Firth</label>`
+         <label class="pexcl" title="开=该块多因素用 Firth"><input type="checkbox" data-blk-param-bool="firth"${firthOn ? " checked" : ""}/> Firth</label>
+         ${linearBox}`
       : (method === "lasso"
-        ? '<span class="dim">LASSO 参数继承全局（λ 搜索在「组学 / LASSO」模块）</span>'
+        ? '<span class="dim">LASSO 参数继承全局（λ 搜索在「组学 / LASSO」模块）；分数本来就是原始尺度 OLS</span>'
         : '<span class="dim">未选方法 → 该块不建模</span>');
     return `<div class="blk-card" data-blk-row="${i}"${b.enabled === false ? ' data-off="1"' : ""}>
       <div class="blk-head">
