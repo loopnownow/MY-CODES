@@ -513,6 +513,22 @@ def qc_is_fresh(path: str | Path, fingerprint: str) -> bool:
     return f"qc-fingerprint: {fingerprint}" in head
 
 
+def _qc_block_sheets(settings: Dict[str, Any]) -> list[tuple[str, str]]:
+    """启用的模态块 (块名, 工作表)；不回落到 RAD_SHEET。"""
+    out: list[tuple[str, str]] = []
+    raw = settings.get("MODALITY_BLOCKS") or []
+    if not isinstance(raw, list):
+        return out
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name or item.get("enabled") is False:
+            continue
+        out.append((name, str(item.get("sheet") or name).strip()))
+    return out
+
+
 def _block_qc_sections(
     xl: pd.ExcelFile,
     sheets: list[str],
@@ -521,16 +537,7 @@ def _block_qc_sections(
     clin_id: str,
 ) -> list[str]:
     """每个模态块：行数、ID 覆盖、缺失率。空 MODALITY_BLOCKS = 用 RAD_SHEET 单块。"""
-    blocks: list[tuple[str, str]] = []
-    raw = settings.get("MODALITY_BLOCKS") or []
-    if isinstance(raw, list):
-        for item in raw:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name") or "").strip()
-            if not name or item.get("enabled") is False:
-                continue
-            blocks.append((name, str(item.get("sheet") or name).strip()))
+    blocks = _qc_block_sheets(settings)
     if not blocks:
         rad = str(settings.get("RAD_SHEET") or "").strip()
         if rad:
@@ -888,16 +895,56 @@ def write_project_data_qc(
     parts.append(_html_table(["Sheet", "n rows", "n cols"], sheet_rows))
 
     parts.append("<h2>1. ID alignment</h2>")
-    parts.append(_html_table(
-        ["Side", "ID col", "n unique"],
-        [
-            ["clin", clin_id if not cdf.empty else "—", len(cset)],
-            ["rad", rad_id if not rdf.empty else "—", len(rset)],
-            ["overlap", "—", len(overlap)],
-            ["clin only", "—", len(cset - rset)],
-            ["rad only", "—", len(rset - cset)],
-        ],
-    ))
+    block_sheets = _qc_block_sheets(settings)
+    have_sheet = {s.lower(): s for s in sheets}
+    block_info: list[tuple[str, int, int]] = []
+    if block_sheets and rad_sheet is None:
+        rows1: list[list[Any]] = [[
+            "clin",
+            clin_id if not cdf.empty else "—",
+            len(cset),
+            "—",
+            "—",
+        ]]
+        for bname, bsheet in block_sheets:
+            hit = have_sheet.get(bsheet.lower())
+            if hit is None:
+                rows1.append([f"block {bname}", bsheet, "missing", "—", "—"])
+                continue
+            bdf = xl.parse(hit)
+            bid = next(
+                (c for c in ("Patient_ID", "PatientID", "patient_id", "Name", "ID")
+                 if c in bdf.columns),
+                str(bdf.columns[0]) if len(bdf.columns) else "",
+            )
+            bset = (
+                {str(x).strip() for x in bdf[bid].dropna().tolist() if str(x).strip()}
+                if bid in bdf.columns else set()
+            )
+            rows1.append([
+                f"block {bname}",
+                bid or "—",
+                len(bset),
+                len(bset & cset) if cset else 0,
+                len(bset - cset) if cset else 0,
+            ])
+            block_info.append((bname, len(bset & cset) if cset else 0, len(bset)))
+        parts.append(_html_table(
+            ["Side", "ID col", "n unique", "in clin", "only in side"],
+            rows1,
+            caption="块模式（无单一组学表）：按块对齐；同一患者可在多行出现",
+        ))
+    else:
+        parts.append(_html_table(
+            ["Side", "ID col", "n unique"],
+            [
+                ["clin", clin_id if not cdf.empty else "—", len(cset)],
+                ["rad", rad_id if not rdf.empty else "—", len(rset)],
+                ["overlap", "—", len(overlap)],
+                ["clin only", "—", len(cset - rset)],
+                ["rad only", "—", len(rset - cset)],
+            ],
+        ))
 
     if outcomes and not cdf.empty:
         parts.append("<h2>2. Outcome completeness</h2>")
@@ -1008,7 +1055,14 @@ def write_project_data_qc(
     body = _qc_html_shell(title, parts)
     body = f"<!-- qc-fingerprint: {fp} -->\n" + body
     out.write_text(body, encoding="utf-8")
-    print(f"  ✓ Project data QC → {out}  (clin={len(cdf)} rad={len(rdf)} overlap={len(overlap)})")
+    if block_info:
+        blk_txt = ", ".join(f"{n} {i}/{t}" for n, i, t in block_info)
+        print(
+            f"  ✓ Project data QC → {out}  "
+            f"(clin={len(cdf)}; blocks in-clin/ids: {blk_txt})"
+        )
+    else:
+        print(f"  ✓ Project data QC → {out}  (clin={len(cdf)} rad={len(rdf)} overlap={len(overlap)})")
     return {
         "html": str(out),
         "n_clin": int(len(cdf)),
