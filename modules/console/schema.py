@@ -109,8 +109,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("radprep", "组学 / 预处理", [
         "DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE", "RAD_COR_CUTOFF",
         "ICC_THRESHOLD", "ICC_FEATURE_COL", "ICC_INTRA_COL", "ICC_INTER_COL",
-        "MODALITY_BLOCKS", "COMBINED_BLOCKS", "COMBINED_EXCLUDE",
-        "COMBINED_MODE", "CLIN_BLOCK_METHOD",
+        "MODALITY_BLOCKS",
     ]),
     ("rad", "组学 / LASSO", [
         "DO_LASSO",
@@ -121,6 +120,9 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ("radlog", "组学 / Logistic", [
         "DO_RAD_LOGISTIC",
         "RAD_LOGIT_UNI_P", "RAD_LOGIT_MV_P", "DO_RAD_FIRTH",
+    ]),
+    ("combined", "Combined 主模型", [
+        "COMBINED_MODE", "COMBINED_BLOCKS", "COMBINED_EXCLUDE", "CLIN_BLOCK_METHOD",
     ]),
     ("fig", "图与显示", [
         "DO_FIGURE_PANELS",
