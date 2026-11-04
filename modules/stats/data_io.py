@@ -956,6 +956,42 @@ def _keys_from_one_exclude_file(
         return set()
 
 
+def _exclude_specs(settings: Optional[dict] = None) -> list[dict]:
+    """每个排除文件的读取规格。
+
+    ``EXCLUDE_TESTS`` 非空 → 每项自带 sheet / col / row（空 sheet / col = 默认 exc）；
+    否则走旧口径：``EXCLUDE_SHEET`` / ``EXCLUDE_COL`` / ``EXCLUDE_ROW`` 一套套到
+    ``EXCLUDE_FILE`` 的所有文件（一个都没填时是工程根 false_classification.xlsx）。
+    """
+    raw = _cfg_get(settings, "EXCLUDE_TESTS", None)
+    if isinstance(raw, list) and raw:
+        out: list[dict] = []
+        for i, item in enumerate(raw):
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"EXCLUDE_TESTS[{i}] 必须是对象（file / sheet / col / row），收到 {type(item).__name__}"
+                )
+            fname = str(item.get("file") or "").strip()
+            if not fname:
+                continue
+            out.append({
+                "file": fname,
+                "sheet": str(item.get("sheet") or "").strip(),
+                "col": str(item.get("col") or "").strip(),
+                "row": item.get("row", ""),
+            })
+        if out:
+            return out
+    if settings is not None:
+        files = resolve_exclude_files(settings)
+    else:
+        files = resolve_exclude_files()
+    sheet = str(_cfg_get(settings, "EXCLUDE_SHEET", "exc") or "exc")
+    col = str(_cfg_get(settings, "EXCLUDE_COL", "exc") or "exc")
+    row = _cfg_get(settings, "EXCLUDE_ROW", "")
+    return [{"file": f, "sheet": sheet, "col": col, "row": row} for f in files]
+
+
 def load_exclude_id_keys(
     data_file: Optional[str] = None,
     settings: Optional[dict] = None,
@@ -970,20 +1006,16 @@ def load_exclude_id_keys(
     if not bool(_cfg_get(settings, "DO_EXCLUDE_SAMPLES", True)):
         return frozenset()
 
-    if settings is not None:
-        files = resolve_exclude_files(settings)
-    else:
-        files = resolve_exclude_files()
     _ = data_file
-    sheet = str(_cfg_get(settings, "EXCLUDE_SHEET", "exc") or "exc")
-    col = str(_cfg_get(settings, "EXCLUDE_COL", "exc") or "exc")
-    row_vals = normalize_exclude_rows(_cfg_get(settings, "EXCLUDE_ROW", ""))
-    row_key = "|".join(row_vals)
-    cache_key = "||".join(
-        f"{os.path.abspath(xfile) if os.path.isfile(xfile) else xfile}"
-        f"::{sheet}::{col}::{row_key}"
-        for xfile in files
-    )
+    specs = _exclude_specs(settings)
+
+    def _spec_key(spec: dict) -> str:
+        path = str(spec.get("file") or "")
+        ab = os.path.abspath(path) if os.path.isfile(path) else path
+        rows = "|".join(normalize_exclude_rows(spec.get("row", "")))
+        return f"{ab}::{spec.get('sheet') or 'exc'}::{spec.get('col') or 'exc'}::{rows}"
+
+    cache_key = "||".join(_spec_key(s) for s in specs)
 
     hard = list(_cfg_get(settings, "EXCLUDE_IDS", None) or [])
     hard_keys: set = set()
@@ -995,14 +1027,21 @@ def load_exclude_id_keys(
 
     excel_keys: set = set()
     found_any = False
-    for xfile in files:
+    for spec in specs:
+        xfile = str(spec.get("file") or "")
         if os.path.isfile(xfile):
             found_any = True
-        excel_keys |= _keys_from_one_exclude_file(xfile, sheet, col, row_vals, settings)
+        excel_keys |= _keys_from_one_exclude_file(
+            xfile,
+            spec.get("sheet") or "exc",
+            spec.get("col") or "exc",
+            normalize_exclude_rows(spec.get("row", "")),
+            settings,
+        )
     if not found_any and hard:
         print("  Exclude list: using EXCLUDE_IDS only")
-    elif found_any and len(files) > 1:
-        print(f"  Exclude list: {len(files)} files merged → match-keys={len(excel_keys | hard_keys)}")
+    elif found_any and len(specs) > 1:
+        print(f"  Exclude list: {len(specs)} files merged → match-keys={len(excel_keys | hard_keys)}")
 
     merged = frozenset(excel_keys | hard_keys)
     _EXCLUDE_CACHE[cache_key] = frozenset(excel_keys)
