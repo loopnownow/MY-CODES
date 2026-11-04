@@ -71,6 +71,9 @@ function showPane(name) {
   const flow = name === "flow";
   const preview = name === "preview";
   $("paneConfig").hidden = flow || preview;
+  // 右侧运行台属于统计配置页：进配置就显示，进预览/流程就收起（不再依赖 loadAll 是否成功）。
+  const runCol = $("runCol");
+  if (runCol) runCol.hidden = flow || preview;
   $("paneFlow").hidden = !flow;
   const prevPane = $("panePreview");
   if (prevPane) prevPane.hidden = !preview;
@@ -2862,7 +2865,7 @@ function renderForm() {
       const rest = chunks.filter(c => !DATA_PANE_BUNDLES.has(c.id) && c.id !== "subproj").map(c => c.html).join("");
       const sub = chunks.filter(c => c.id === "subproj").map(c => c.html).join("");
       if (!sub && !rest) return "";
-      const head = sectionHead("io", "结局 / 子工程 / 阅片方向", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页；阅片列方向（0/1）在本块末尾。");
+      const head = sectionHead("io", "结局 / 子工程", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页；阅片列方向（0/1）在「文本编码」卡里。");
       return `<div class="sec-block${head.dim}" data-sec="io">
       ${head.html}
       <div class="sec-body io-sheets">${sub}<div id="ioGrpSlot"></div>${rest}</div>

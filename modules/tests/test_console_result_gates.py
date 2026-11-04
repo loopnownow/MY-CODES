@@ -527,22 +527,31 @@ def test_data_pane_uses_one_file_card_for_all_three_inputs():
     assert "writeback()" in ui and "restartServer()" in ui
 
 
-def test_reader_direction_is_on_the_config_page_and_in_the_encode_card():
-    """阅片列方向（READER_VALUE_MAP）在配置页「数据与路径」段可见，文本编码卡里也有编辑入口。"""
+def test_reader_direction_lives_only_in_the_encode_card():
+    """阅片列方向（READER_VALUE_MAP）只留在「文本编码」卡；配置页不再重复一份（也不许落进开关段）。"""
     from modules.config.defaults import merged_settings
     from modules.console import schema
     from modules.console.schema_ui import build_schema
 
-    assert "READER_VALUE_MAP" in schema.SECTION_OF
-    assert schema.SECTION_OF["READER_VALUE_MAP"][0] == "io"
+    assert "READER_VALUE_MAP" not in schema.SECTION_OF
+    js = (ROOT / "modules" / "console" / "console_schema.js").read_text(encoding="utf-8")
+    hidden = js.split("const HIDDEN_FORM_KEYS = new Set([", 1)[1].split("]);", 1)[0]
+    assert '"READER_VALUE_MAP"' in hidden  # 表单隐藏，避免被 _section_of 兜底塞进「开关」段
     fields = build_schema(merged_settings(), sheets=["cln"])
-    got = [f for f in fields if f.get("key") == "READER_VALUE_MAP"]
-    assert got and got[0].get("section") == "io"
+    assert [f for f in fields if f.get("key") == "READER_VALUE_MAP"]  # 键仍在（后端要它）
     ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
     assert "function readerDirPanel" in ui
     assert "captureFoldState" in ui
-    # 配置页那块的标题要能认出「阅片方向」（io 段的 UI 标题不是「数据与路径」）
-    assert "结局 / 子工程 / 阅片方向" in ui
+    assert "结局 / 子工程 / 阅片方向" not in ui
+
+
+def test_run_column_shows_whenever_the_config_pane_is_shown():
+    """统计配置页右侧运行台：切到配置就显示，进预览/流程图才收起。"""
+    html = (ROOT / "modules" / "console" / "console.html").read_text(encoding="utf-8")
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    assert 'id="runCol"' in html
+    seg = ui.split("function showPane(name)", 1)[1].split("function loadFlowFrame", 1)[0]
+    assert "runCol" in seg and "hidden = flow || preview" in seg
 
 
 def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypatch):
