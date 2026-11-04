@@ -1332,6 +1332,41 @@ def score_map(result: Optional[RadiomicsResult]) -> Dict[str, np.ndarray]:
     return {name: np.asarray(rs, dtype=float)}
 
 
+# 分数名 → 展示名（ROC 图例 / ROC 表 / DCA 图例用）。单特征分数显示该特征名，
+# 多特征或 LASSO 多特征仍用分数名。由 pipeline 在训练层算完后注册。
+SCORE_DISPLAY: Dict[str, str] = {}
+
+
+def register_score_display(result: Optional[RadiomicsResult]) -> Dict[str, str]:
+    """登记 `{分数名: 展示名}`：只有「恰好选出 1 个特征」的分数改用该特征名。
+
+    重名时退回分数名（不覆盖已有条目），保证 ROC/DCA 图例与表头唯一。
+    """
+    if result is None:
+        return SCORE_DISPLAY
+    groups = list(getattr(result, "groups", None) or [])
+    sources = groups if groups else [result]
+    taken = {v: k for k, v in SCORE_DISPLAY.items()}
+    for src in sources:
+        name = str(getattr(src, "score_name", "") or "RadScore")
+        feats = [str(f) for f in (getattr(src, "features", None) or [])]
+        if len(feats) != 1:
+            SCORE_DISPLAY.pop(name, None)
+            continue
+        label = display_rad_feature(feats[0]) or feats[0]
+        if label in taken and taken[label] != name:
+            SCORE_DISPLAY.pop(name, None)
+            continue
+        SCORE_DISPLAY[name] = label
+        taken[label] = name
+    return SCORE_DISPLAY
+
+
+def score_display_name(name: str) -> str:
+    """分数名 → 展示名；没登记就原样返回。"""
+    return SCORE_DISPLAY.get(str(name), str(name))
+
+
 def selected_feature_names(result: Optional[RadiomicsResult]) -> List[str]:
     if result is None:
         return []
