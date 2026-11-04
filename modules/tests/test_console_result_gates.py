@@ -609,6 +609,8 @@ def test_start_page_loads_data_and_previews_every_sheet():
     assert "renderSheetBlocks(prev)" in proj
     assert "function autoLoadAndPreview" in proj
     assert "autoOpenPreview" not in proj  # 不再自动跳控制台
+    assert "enterConsole" not in proj  # 删掉后无触发点，已清
+    assert 'getElementById("go")' not in proj
     seg = proj.split("async function autoLoadAndPreview", 1)[1].split("function keysFromSettingsError", 1)[0]
     assert "location.href" not in seg
     assert proj.index('id="btnLoadNow"') < proj.index('id="msg"')
