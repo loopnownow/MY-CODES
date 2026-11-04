@@ -597,6 +597,27 @@ def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypat
     assert [str(x) for x in blocks["CTA"]["rows"][0]][:2] == ["a", "1"]
 
 
+def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
+    """组学模块按块三段式（预处理/筛选/模型，含每块 uni_p/mv_p）；Combined 主模型独立成段。"""
+    from modules.console import schema
+
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    css = (ROOT / "modules" / "console" / "console.css").read_text(encoding="utf-8")
+    assert schema.SECTION_OF["COMBINED_MODE"][0] == "combined"
+    assert schema.SECTION_OF["COMBINED_BLOCKS"][0] == "combined"
+    assert schema.SECTION_OF["COMBINED_EXCLUDE"][0] == "combined"
+    assert schema.SECTION_OF["CLIN_BLOCK_METHOD"][0] == "combined"
+    radprep = [k for s, _t, ks in schema.SECTION_DEFS if s == "radprep" for k in ks]
+    assert "MODALITY_BLOCKS" in radprep and "COMBINED_MODE" not in radprep
+    assert "function modalityBlocksPanel" in ui and "function combinedPanel" in ui
+    assert 'data-sec="combined"' in ui
+    assert "blk-stage-k" in ui and "预处理" in ui and "筛选" in ui and "模型" in ui
+    assert 'data-blk-param="uni_p"' in ui and 'data-blk-param="mv_p"' in ui
+    assert 'data-blk-param-bool="firth"' in ui
+    assert "data-blk-param], [data-blk-param-bool]" in ui
+    assert ".blk-card" in css and ".blk-stage" in css
+
+
 def test_start_page_loads_data_and_previews_every_sheet():
     """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
