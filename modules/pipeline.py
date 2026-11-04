@@ -1173,10 +1173,12 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 for w in wanted
             )
             if want_rad:
+                skip = {"RadScore", "Clinical", "Combined"}
                 for k, v in list(ml_dca.items()):
                     ks = str(k)
-                    if ks == "RadScore" or ks.startswith("RadScore_"):
-                        picked.setdefault(k, v)
+                    if ks in skip or ks.startswith(("RadScore_", "Clinical_", "Combined_")):
+                        continue
+                    picked.setdefault(k, v)
             return picked
 
         # DCA：模型级概率 + Reader 对照（若有）

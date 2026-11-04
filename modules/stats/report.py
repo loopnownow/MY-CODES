@@ -860,7 +860,16 @@ def _rad_table2_method(rad_res) -> str:
     """lasso | logistic — drives Table 2 titles."""
     if rad_res is None:
         return "lasso"
-    return str(getattr(rad_res, "method", "") or "lasso")
+    method = str(getattr(rad_res, "method", "") or "lasso")
+    if method == "blocks":
+        kids = {
+            str(getattr(g, "method", "") or "")
+            for g in (getattr(rad_res, "groups", None) or [])
+        }
+        kids.discard("")
+        if kids == {"logistic"}:
+            return "logistic"
+    return method
 
 
 def _rad_table2_caption(rad_res, *, is_all: bool = False, panel_label: str = "") -> str:
@@ -914,6 +923,125 @@ def _table2_train_test_section(res_train, res_test) -> str:
         f'<section><h2>{h2}</h2>\n'
         f'<p class="note">{note}</p>\n'
         + body
+        + "</section>"
+    )
+
+
+_BLOCK_CAT_SKIP = {"Name", "Group", "Patient_ID", "PatientID", "ID"}
+
+
+def _block_cat_columns(frame) -> List[str]:
+    """块内非数值列名；Name / 组标签 / ID 不算变量。"""
+    if frame is None or len(getattr(frame, "columns", [])) == 0:
+        return []
+    out: List[str] = []
+    for col in frame.columns:
+        if str(col).strip() in _BLOCK_CAT_SKIP:
+            continue
+        if not pd.api.types.is_numeric_dtype(frame[col]):
+            out.append(str(col))
+    return out
+
+
+def _block_cat_stats(frame, groups, column: str):
+    """单层单列：水平顺序、两组计数、分类 P（与 Table 1 同一检验）。"""
+    from modules.stats.clinical import _categorical_p
+
+    raw = pd.Series(list(frame[column]), dtype="object")
+    text = raw.where(raw.notna(), "Missing").astype(str)
+    grp = np.asarray(groups).astype(int)
+    pos = grp == 1
+    levels = sorted(set(text.tolist()))
+    table = np.array(
+        [[int((text[pos] == lv).sum()), int((text[~pos] == lv).sum())] for lv in levels],
+        dtype=int,
+    )
+    counts = {lv: (int(table[i, 0]), int(table[i, 1])) for i, lv in enumerate(levels)}
+    return levels, counts, float(_categorical_p(table))
+
+
+def _cat_cell(n: int, total: int) -> str:
+    """'n (x.x%)'；该组为 0 例时只写 n。"""
+    if total <= 0:
+        return f"{n} (—)"
+    return f"{n} ({100.0 * n / total:.1f}%)"
+
+
+def _block_cat_section(data, pos_label: str, neg_label: str) -> str:
+    """非数值块列（不进任何模型）的计数表：Development / Validation / All。"""
+    layers = [
+        (lab, getattr(data, attr, None))
+        for lab, attr in (("Development", "train"), ("Validation", "test"), ("All", "all"))
+    ]
+    layers = [(lab, lay) for lab, lay in layers if lay is not None]
+    if not layers:
+        return ""
+
+    def frame_of(layer, block):
+        return (getattr(layer, "blocks", None) or {}).get(block)
+
+    tables: List[str] = []
+    for block in [str(b) for b in (getattr(layers[0][1], "blocks", None) or {}) if str(b).strip()]:
+        columns: List[str] = []
+        for _lab, layer in layers:
+            for col in _block_cat_columns(frame_of(layer, block)):
+                if col not in columns:
+                    columns.append(col)
+        for column in columns:
+            per_set = []
+            for lab, layer in layers:
+                frame = frame_of(layer, block)
+                if frame is None or column not in list(frame.columns):
+                    continue
+                n = int(len(frame))
+                n_pos = int(np.asarray(layer.label).astype(int).sum())
+                levels, counts, p = _block_cat_stats(frame, layer.label, column)
+                per_set.append((lab, n, n_pos, levels, counts, p))
+            if not per_set:
+                continue
+            levels_all: List[str] = []
+            for item in per_set:
+                for lv in item[3]:
+                    if lv not in levels_all:
+                        levels_all.append(lv)
+            head = ['<th class="col-first">Level</th>']
+            for lab, n, n_pos, *_rest in per_set:
+                head.append(f"<th>{lab} {pos_label} (n={n_pos})</th>")
+                head.append(f"<th>{lab} {neg_label} (n={n - n_pos})</th>")
+            body_rows = []
+            for lv in levels_all:
+                cells = [f'<td class="col-first indent">{lv}</td>']
+                for _lab, n, n_pos, _levels, counts, _p in per_set:
+                    hit = counts.get(lv)
+                    if hit is None:
+                        cells.extend(["<td></td>", "<td></td>"])
+                        continue
+                    cells.append(f"<td>{_cat_cell(hit[0], n_pos)}</td>")
+                    cells.append(f"<td>{_cat_cell(hit[1], n - n_pos)}</td>")
+                body_rows.append("<tr>" + "".join(cells) + "</tr>")
+            p_cells = ['<td class="col-first">P value</td>']
+            for item in per_set:
+                p_cells.append(f'<td colspan="2">{item[5]:.3f}</td>')
+            body_rows.append("<tr>" + "".join(p_cells) + "</tr>")
+            elem = f"block-cat-{block}-{column}".replace(" ", "_")
+            tables.append(
+                f'<div class="table-wrap"><table class="threeline" id="{elem}">\n'
+                f"<caption>{column} ({block})</caption>\n"
+                "<thead><tr>" + "".join(head) + "</tr></thead>\n"
+                "<tbody>\n" + "\n".join(body_rows) + "\n</tbody>\n</table>"
+                '<p class="table-note"><span class="note-label">Note:</span> '
+                "Categorical column of the modality sheet; it is excluded from radiomics "
+                "selection and from every model, so it carries no RadScore or model term. "
+                "Counts are shown as n (percentage within group); P value uses the same "
+                "categorical test as Table 1, computed per set.</p></div>"
+            )
+    if not tables:
+        return ""
+    return (
+        "<section><h2>B3. Block categorical descriptors (not modelled)</h2>\n"
+        '<p class="note">Non-numeric columns of the modality sheets are reported '
+        "separately so they stay visible after being excluded from modelling.</p>\n"
+        + "".join(tables)
         + "</section>"
     )
 
@@ -2546,6 +2674,10 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
     t2_dual = _table2_train_test_section(res_train, res_test)
     if t2_dual:
         html_parts.append(t2_dual)
+
+    blk_cat = _block_cat_section(data, disp_pos or "Positive", disp_neg or "Negative")
+    if blk_cat:
+        html_parts.append(blk_cat)
 
     if res_train is not None:
         html_parts.append(_build_panel(
