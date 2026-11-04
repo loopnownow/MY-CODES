@@ -586,15 +586,6 @@ def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypat
     assert pv["role_intersection"] == 2  # US 只有 a, b
     by_sheet = {r["sheet"]: r for r in pv["role_sheets"]}
     assert by_sheet["CTA"]["n_id"] == 3 and by_sheet["US"]["n_id"] == 2
-    # 起始页预览：每张表都给前 3 行（最多 12 列）
-    blocks = pv["sheet_blocks"]
-    assert set(blocks) == {"cln", "CTA", "US"}
-    for name, blk in blocks.items():
-        assert blk["rows"], name
-        assert len(blk["rows"]) <= 3, name
-        assert len(blk["columns"]) <= 12, name
-    assert blocks["cln"]["columns"][0] == "Patient_ID"
-    assert [str(x) for x in blocks["CTA"]["rows"][0]][:2] == ["a", "1"]
 
 
 def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
@@ -655,27 +646,23 @@ def test_external_cards_can_map_sheets_to_blocks():
     assert 'item["sheets"] = sheets' in (ROOT / "modules" / "console" / "ops.py").read_text(encoding="utf-8")
 
 
-def test_start_page_loads_data_and_previews_every_sheet():
-    """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
+def test_start_page_goes_straight_to_the_console_after_service_starts():
+    """起始页：没有数据预览卡、没有「载入数据」按钮；开服务后自动进控制台「统计配置」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
-    assert 'id="btnLoadNow"' in proj and ">载入数据</button>" in proj
-    assert 'id="pvCard"' in proj and 'id="pvBox"' in proj
-    # 起始页不再提供「进入数据预览」按钮，也不要那句「载入后显示…前 3 行」提示
+    assert 'id="btnLoadNow"' not in proj and ">载入数据</button>" not in proj
+    assert 'id="pvCard"' not in proj and 'id="pvBox"' not in proj
+    assert "renderSheetBlocks" not in proj and 'id="pvMsg"' not in proj
     assert "btnGoPg" not in proj and ">进入数据预览</button>" not in proj
-    assert 'id="pvMsg"' not in proj and "载入后显示每张工作表的前 3 行" not in proj
-    assert "function renderSheetBlocks" in proj
-    assert "renderSheetBlocks(prev)" in proj
-    assert "function autoLoadAndPreview" in proj
-    assert "autoOpenPreview" not in proj  # 不再自动跳控制台
-    assert "enterConsole" not in proj  # 删掉后无触发点，已清
-    assert 'getElementById("go")' not in proj
+    assert "function autoOpenConsole" in proj and "autoOpenConsole(p)" in proj
+    assert "autoLoadAndPreview" not in proj and "autoOpenPreview" not in proj
+    assert '"tab", "config"' in proj and '"tab", "preview"' not in proj
     # 删了 #go 元素后，任何 `go.` / `if (go)` / setGoEnabled 都会在页面初始化时抛 ReferenceError，
     # 整个初始化中断 → 页面点不动（2026-11-04 真踩过）。
+    assert 'getElementById("go")' not in proj
     for bad in ("if (!go)", "if (go)", "go.href", "go.classList", "setGoEnabled"):
         assert bad not in proj, bad
-    seg = proj.split("async function autoLoadAndPreview", 1)[1].split("function keysFromSettingsError", 1)[0]
-    assert "location.href" not in seg
-    assert proj.index('id="btnLoadNow"') < proj.index('id="msg"')
+    # 空 sheet 参数不带，避免把 ini 里的值覆盖成空串
+    assert "sheetParams.forEach" in proj and 'if (s) q.set(key, s)' in proj
 
 
 
