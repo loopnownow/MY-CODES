@@ -860,7 +860,16 @@ def _rad_table2_method(rad_res) -> str:
     """lasso | logistic — drives Table 2 titles."""
     if rad_res is None:
         return "lasso"
-    return str(getattr(rad_res, "method", "") or "lasso")
+    method = str(getattr(rad_res, "method", "") or "lasso")
+    if method == "blocks":
+        kids = {
+            str(getattr(g, "method", "") or "")
+            for g in (getattr(rad_res, "groups", None) or [])
+        }
+        kids.discard("")
+        if kids == {"logistic"}:
+            return "logistic"
+    return method
 
 
 def _rad_table2_caption(rad_res, *, is_all: bool = False, panel_label: str = "") -> str:

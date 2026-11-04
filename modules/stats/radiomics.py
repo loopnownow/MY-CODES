@@ -1202,6 +1202,8 @@ def _pack_logistic(
     firth_uni: Optional[pd.DataFrame],
     firth_mv: Optional[pd.DataFrame],
     table2: Optional[pd.DataFrame] = None,
+    score_name: str = "RadScore",
+    group_name: str = "",
 ) -> RadiomicsResult:
     return RadiomicsResult(
         features=list(features),
@@ -1225,6 +1227,8 @@ def _pack_logistic(
         firth_uni=firth_uni,
         firth_mv=firth_mv,
         table2=table2,
+        score_name=score_name,
+        group_name=group_name or None,
     )
 
 
@@ -1480,6 +1484,7 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
             features=[], coefs=np.array([]), radscore=None,
             intercept=None, betas=None, ols=None, lambda_used=float("nan"),
             formula_df=None, formula_text=None, method="logistic",
+            score_name=score_name, group_name=group_name,
         )
     if split_groups:
         plan = prefix_group_plan(list(full_rad.columns))
@@ -1507,6 +1512,7 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
             formula_df=None, formula_text=None, preprocess=None, uni_res=None,
             mv_df=None, mv_note=None, mv_selected=None, candidates=[], stepwise_features=[],
             select_source=None, firth_uni=None, firth_mv=None,
+            score_name=score_name, group_name=group_name,
         )
 
     full_rad = _filter_rad_by_source(full_rad)
@@ -1529,6 +1535,7 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
             candidates=list(candidates or []), stepwise_features=list(stepwise or []),
             select_source=select_source, firth_uni=firth_uni, firth_mv=firth_mv,
             table2=table2,
+            score_name=score_name, group_name=group_name,
         )
 
     if X_scaled.shape[1] == 0 or len(np.unique(y_group)) < 2:
