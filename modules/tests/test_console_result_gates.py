@@ -618,6 +618,19 @@ def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
     assert ".blk-card" in css and ".blk-stage" in css
 
 
+def test_clinical_prep_and_filter_are_big_two_column_modules():
+    """临床预处理 / 临床筛选各自整行铺开，块内两列（大模块）。"""
+    css = (ROOT / "modules" / "console" / "console.css").read_text(encoding="utf-8")
+    compact = css.replace(" ", "").replace("\n", "")
+    tail = css.split("临床两大模块", 1)[1]
+    assert '[data-sec="clinprep"].sec-body.clinprep-body,' in tail.replace(" ", "")
+    assert '[data-sec="clin"].sec-body.clin-body{' in tail.replace(" ", "")
+    assert "grid-template-columns:repeat(2,minmax(0,1fr))" in tail
+    assert "grid-column:1/-1" in tail  # wide / span2 / pathlist 占满整行
+    assert "max-width:1000px" in tail  # 窄屏退回单列
+    assert compact.count("grid-template-columns:repeat(2,minmax(0,1fr))") >= 2
+
+
 def test_start_page_loads_data_and_previews_every_sheet():
     """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
