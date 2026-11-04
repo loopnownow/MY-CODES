@@ -4,9 +4,10 @@
 Enrolment, cohorts, training-only processing, and the evaluations named in
 Materials and Methods. Text and counts come from that section. Do not invent n.
 
-    python figure_strobe_flow.py --docx manuscript.docx --out Figure1_flow.pdf
+    python figure_strobe_flow.py --docx manuscript.docx --out Figure1_flow.pdf \
+        --spec-out ref/Figure1_flow.json
 
-White ground, black square boxes, Times New Roman 12 pt.
+White ground, black square boxes, Arial (figure dual-track; body stays Times).
 """
 from __future__ import annotations
 
@@ -40,7 +41,7 @@ class AuditError(ValueError):
 
 
 def _font():
-    for name in ("Times New Roman", "Times", "Arial", "Calibri", "Helvetica", "DejaVu Sans"):
+    for name in ("Arial", "Calibri", "Helvetica", "DejaVu Sans"):
         try:
             path = font_manager.findfont(name, fallback_to_default=False)
             if not path:
@@ -782,6 +783,23 @@ def spec_from_methods(text: str) -> dict:
     return spec
 
 
+def write_spec(spec: dict, out_path) -> Path:
+    """Write the flowchart spec as UTF-8 JSON for the console flowchart tab.
+
+    Output layout is {"spec": {...}}, the form the console flowchart tab loads
+    from /files/<project>/ref/Figure1_flow.json. Writes nothing when the n-audit
+    fails, because main() calls this only after draw_study_flow().
+    """
+    out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        json.dumps({"spec": spec}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return out
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Draw the Figure 1 study flowchart from Materials and Methods"
@@ -789,6 +807,11 @@ def main(argv=None):
     ap.add_argument("--json", help="Path to spec JSON")
     ap.add_argument("--docx", help="Manuscript .docx. Figure text is read from Materials and Methods only.")
     ap.add_argument("--out", required=True, help="Output PDF or PNG")
+    ap.add_argument(
+        "--spec-out",
+        help="Optional JSON path; writes the spec parsed from --docx (or read by "
+        "--json) so the console flowchart tab opens it (ref/Figure1_flow.json).",
+    )
     ap.add_argument("--kind", choices=("auto", "study"), default="auto")
     ap.add_argument(
         "--no-audit",
@@ -811,7 +834,10 @@ def main(argv=None):
                     "Pass --docx so the flowchart is read from Materials and Methods, "
                     "or a study-flow JSON with screened_n."
                 )
-        print(draw_study_flow(spec, args.out, audit=not args.no_audit))
+        drawn = draw_study_flow(spec, args.out, audit=not args.no_audit)
+        if args.spec_out:
+            print(write_spec(spec, args.spec_out))
+        print(drawn)
     except AuditError as err:
         print(err, file=sys.stderr)
         sys.exit(1)

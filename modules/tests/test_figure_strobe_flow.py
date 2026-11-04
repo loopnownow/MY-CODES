@@ -2,9 +2,11 @@
 """Figure 1 study flowchart: Canvas contract and n-audit gate."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from modules.stats.figure_strobe_flow import AuditError, draw_study_flow
+from modules.stats.figure_strobe_flow import AuditError, draw_study_flow, write_spec
 
 
 def _spec(**extra):
@@ -47,6 +49,16 @@ def test_draw_study_flow_three_cohorts_png(tmp_path):
     assert out.is_file()
     assert out.stat().st_size > 3_000
     assert out.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_write_spec_roundtrip(tmp_path):
+    """--spec-out JSON roundtrip; assert the {spec: ...} layout the console reads."""
+    out = write_spec(_spec(), tmp_path / "ref" / "Figure1_flow.json")
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["spec"]["screened_n"] == 120
+    assert payload["spec"]["included_n"] == 100
+    assert payload["spec"]["training"]["n"] == 70
+    assert payload["spec"]["exclusion"][0]["n"] == 20
 
 
 def test_audit_rejects_inconsistent_n(tmp_path):
