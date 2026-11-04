@@ -406,7 +406,6 @@ const radMetaAddEl = document.getElementById("radMetaAdd");
 const dataBlock = document.getElementById("dataBlock");
 const projEl = document.getElementById("projectName");
 const msg = document.getElementById("msg");
-const go = document.getElementById("go");
 const goFlow = document.getElementById("goFlow");
 const loadMsg = document.getElementById("loadMsg");
 const sheetBlock = document.getElementById("sheetBlock");
@@ -1156,28 +1155,6 @@ async function loadWorkbook() {
     showClearBad((e && e.badKeys) || []);
   }
 }
-async function enterConsole(e) {
-  if (e) e.preventDefault();
-  syncLinks();
-  if (!PROJECT) {
-    msg.textContent = "请先填写课题名，或把本页放到课题目录再打开。";
-    return;
-  }
-  const p = await ensureLive();
-  if (!p) {
-    msg.textContent = "请先开启 Python 服务，再进入配置。";
-    return;
-  }
-  if (!DATA_LOADED) {
-    msg.textContent = "请先点「加载数据」，再选 sheet 后进入配置。";
-    return;
-  }
-  persistIoPrefs();
-  holdForConsole = true;
-  msg.textContent = "正在进入控制台…";
-  location.href = pageUrl(p);
-}
-if (go) go.addEventListener("click", enterConsole);
 if (goFlow) goFlow.addEventListener("click", () => { holdForConsole = true; });
 document.getElementById("btnLoadData").onclick = () => loadWorkbook();
 const btnLoadNow = document.getElementById("btnLoadNow");
