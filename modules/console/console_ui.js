@@ -1990,30 +1990,67 @@ function pvExcFiles() {
   return growItems(fieldValue("EXCLUDE_FILE"));
 }
 
+function excludeTests() {
+  const raw = fieldValue("EXCLUDE_TESTS");
+  return Array.isArray(raw) ? raw.filter((x) => x && typeof x === "object") : [];
+}
+
+function excSpecOf(file) {
+  const f = String(file || "").trim();
+  const hit = excludeTests().find((x) => String(x.file || "").trim() === f);
+  if (hit) {
+    return {
+      sheet: String(hit.sheet || ""),
+      col: String(hit.col || ""),
+      row: String(hit.row || ""),
+    };
+  }
+  return {
+    sheet: String(fieldValue("EXCLUDE_SHEET") || ""),
+    col: String(fieldValue("EXCLUDE_COL") || ""),
+    row: String(fieldValue("EXCLUDE_ROW") || ""),
+  };
+}
+
+function setExcSpec(file, key, val) {
+  const f = String(file || "").trim();
+  if (!f) return;
+  const list = excludeTests().map((x) => Object.assign({}, x));
+  let hit = list.find((x) => String(x.file || "").trim() === f);
+  if (!hit) {
+    hit = { file: f, sheet: "", col: "", row: "" };
+    list.push(hit);
+  }
+  hit[key] = String(val || "");
+  if (key === "sheet") { hit.col = ""; hit.row = ""; }
+  if (key === "col") { hit.row = ""; }
+  setFieldValue("EXCLUDE_TESTS", list);
+  // 首文件的值继续镜像到 EXCLUDE_SHEET/COL/ROW（旧口径与预览仍读这三个键）。
+  if (f === (pvExcFiles()[0] || "")) {
+    setFieldValue("EXCLUDE_SHEET", hit.sheet || "");
+    setFieldValue("EXCLUDE_COL", hit.col || "");
+    setFieldValue("EXCLUDE_ROW", hit.row || "");
+  }
+}
+
 function excludeRowsHtml() {
   const files = pvExcFiles();
   const rows = files.length ? files : [""];
-  const meta = S.pvExcMeta || {};
-  const sheet = String(fieldValue("EXCLUDE_SHEET") || "");
-  const col = String(fieldValue("EXCLUDE_COL") || "");
-  const row = String(fieldValue("EXCLUDE_ROW") || "");
   const cards = rows.map((f, i) => {
-    const first = i === 0;
-    const roleArea = first
+    const spec = excSpecOf(f);
+    const meta = ((S.pvExcMetaByFile || {})[String(f || "").trim()]) || {};
+    const roleArea = f
       ? `<div class="pv-role pv-role-4">
       <div class="pv-role-head"><span>名单表</span><span>名单列</span><span>内容</span><span></span></div>
       <div class="pv-role-row">
-        <select data-exc="sheet">${optHtml(meta.sheets || [], sheet, "（默认 exc）")}</select>
-        <select data-exc="col">${optHtml(meta.columns || [], col, "（默认 exc）")}</select>
-        <select data-exc="row">${optHtml(meta.values || [], row, "（整列当 ID）")}</select>
-        <span class="dim">共用</span>
+        <select data-exc="sheet" data-exc-file="${esc(f)}">${optHtml(meta.sheets || [], spec.sheet, "（默认 exc）")}</select>
+        <select data-exc="col" data-exc-file="${esc(f)}">${optHtml(meta.columns || [], spec.col, "（默认 exc）")}</select>
+        <select data-exc="row" data-exc-file="${esc(f)}">${optHtml(meta.values || [], spec.row, "（整列当 ID）")}</select>
+        <span class="dim">本文件</span>
       </div>
     </div>`
       : "";
-    const note = first
-      ? "名单表 / 列 / 内容 由所有名单共用（后端一张表口径）；空内容＝该列整列当 ID。"
-      : "这份沿用首卡的名单表 / 列 / 内容。";
-    const metaOf = (S.pvExcMetaByFile || {})[f] || null;
+    const metaOf = (S.pvExcMetaByFile || {})[String(f || "").trim()] || null;
     const fileNote = !f
       ? ""
       : (metaOf && metaOf.error)
@@ -2030,14 +2067,13 @@ function excludeRowsHtml() {
         <button type="button" class="btn sec" data-exc-del title="删这份文件">删</button>
       </div>
       ${roleArea}
-      <p class="hint">${esc(note)}</p>
       ${fileNote ? `<p class="hint${metaOf && metaOf.error ? " err" : ""}">${esc(fileNote)}</p>` : ""}
     </div>`;
   }).join("");
   return `${cards}
     <div class="save-row">
       <button type="button" id="btnExcAdd">+ 名单文件</button>
-      <span class="hint">名单非空才排除；空＝不排除。</span>
+      <span class="hint">每份文件用自己那张表的 sheet / 列 / 内容；空内容＝该列整列当 ID。</span>
     </div>`;
 }
 
@@ -2054,8 +2090,17 @@ function readExcFiles() {
 }
 
 function applyExcFiles(list) {
+  const files = (list || []).map((s) => String(s || "").trim());
   setFieldValue("EXCLUDE_FILE", list);
-  setFieldValue("DO_EXCLUDE_SAMPLES", list.length > 0);
+  setFieldValue("DO_EXCLUDE_SAMPLES", files.filter(Boolean).length > 0);
+  const byFile = {};
+  excludeTests().forEach((x) => { byFile[String(x.file || "").trim()] = x; });
+  const next = [];
+  files.forEach((f) => {
+    if (!f) return;
+    next.push(byFile[f] ? Object.assign({}, byFile[f]) : { file: f, sheet: "", col: "", row: "" });
+  });
+  setFieldValue("EXCLUDE_TESTS", next);
   markDirty();
 }
 
@@ -2066,10 +2111,9 @@ async function loadExcMeta(file) {
     S.pvExcMeta = {};
     return;
   }
-  const sheet = String(fieldValue("EXCLUDE_SHEET") || "");
-  const col = String(fieldValue("EXCLUDE_COL") || "");
+  const spec = excSpecOf(name);
   try {
-    const j = await fetchXlsxMeta(name, sheet, col);
+    const j = await fetchXlsxMeta(name, spec.sheet, spec.col);
     S.pvExcMetaByFile[name] = {
       sheets: j.sheets || [], columns: j.columns || [], values: j.values || [],
     };
@@ -2227,13 +2271,11 @@ function bindDataPane() {
         return;
       }
       const key = t.getAttribute("data-exc");
-      const map = { sheet: "EXCLUDE_SHEET", col: "EXCLUDE_COL", row: "EXCLUDE_ROW" };
-      if (!key || !map[key]) return;
-      setFieldValue(map[key], String(t.value || ""));
-      if (key === "sheet") setFieldValue("EXCLUDE_COL", "");
-      if (key === "sheet" || key === "col") setFieldValue("EXCLUDE_ROW", "");
+      if (key !== "sheet" && key !== "col" && key !== "row") return;
+      const file = String(t.getAttribute("data-exc-file") || "").trim();
+      setExcSpec(file, key, String(t.value || ""));
       markDirty();
-      loadExcMeta(pvExcFiles()[0] || "").then(() => renderDataPane()).catch(() => {});
+      loadExcMeta(file || (pvExcFiles()[0] || "")).then(() => renderDataPane()).catch(() => {});
     });
     exc.addEventListener("input", (e) => {
       const inp = e.target;
