@@ -95,6 +95,18 @@ from modules.console import registry as project_registry
 
 PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
 _PROBE_SAFE_GET = frozenset({"/api/health", "/api/port"})
+# HTML 防嵌入头：deny = 任何页面都不得嵌入（默认）；self = 只允许同源页面嵌入
+# （控制台自己的流程图 iframe 走 self）。
+_FRAME_HEADERS: dict[str, dict[str, str]] = {
+    "deny": {
+        "X-Frame-Options": "DENY",
+        "Content-Security-Policy": "frame-ancestors 'none'",
+    },
+    "self": {
+        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "frame-ancestors 'self'",
+    },
+}
 # 需要 run scope 的写请求（会起进程 / 重跑流水线）
 _RUN_SCOPE_PATHS = frozenset({
     "/api/run",
@@ -225,7 +237,16 @@ class Handler(BaseHTTPRequestHandler):
         extra: dict | None = None,
         *,
         cors_null_ok: bool = False,
+        frame: str = "deny",
     ) -> None:
+        """发送响应；HTML 响应按 frame 决定允许谁嵌入。
+
+        frame: "deny"（默认，任何页面都不能嵌入）或 "self"（只允许同源页面嵌入，
+        控制台流程图 iframe 用 self）。非法值抛 ValueError，不回退。extra 在默认
+        头之后覆盖同名头。
+        """
+        if frame not in _FRAME_HEADERS:
+            raise ValueError(f"frame 只能是 {sorted(_FRAME_HEADERS)}，收到 {frame!r}")
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(payload)))
@@ -234,11 +255,8 @@ class Handler(BaseHTTPRequestHandler):
         allow_null = bool(cors_null_ok or getattr(self, "_reg_entry", None) is not None)
         hdrs = dict(self._cors_headers(allow_null=allow_null))
         if ctype.startswith("text/html"):
-            hdrs.update({
-                "X-Frame-Options": "DENY",
-                "Content-Security-Policy": "frame-ancestors 'none'",
-                "X-Content-Type-Options": "nosniff",
-            })
+            hdrs.update(_FRAME_HEADERS[frame])
+            hdrs["X-Content-Type-Options"] = "nosniff"
         if extra:
             hdrs.update(extra)
         for k, v in hdrs.items():
@@ -492,7 +510,9 @@ class Handler(BaseHTTPRequestHandler):
                     f"<title>SCI Figure 1 · {project}</title>",
                     1,
                 )
-            self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+            self._send(
+                200, html.encode("utf-8"), "text/html; charset=utf-8", frame="self"
+            )
             return
 
         if path == "/api/health":
