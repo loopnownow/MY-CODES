@@ -93,3 +93,34 @@ def test_prepare_blocks_encodes_clin_kind():
     us = blocks["US"]
     assert pd.api.types.is_numeric_dtype(us["echo"])
     assert "many" in us.columns or "many" not in us.columns  # 4 等级 ≤5 → 自动编码
+
+
+def test_prepare_blocks_encodes_rad_kind_too():
+    """kind=rad 的组学块也要把文本列编码后入模（不再直接排除）。"""
+    raw = _frame()
+    specs = {"CTA": normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]}
+    ids = ["P1", "P2", "P3", "P4"]
+    blocks = data_io._prepare_blocks({"CTA": raw}, ids, specs)
+    cta = blocks["CTA"]
+    assert pd.api.types.is_numeric_dtype(cta["echo"])
+    assert list(cta["echo"]) == [3.0, 2.0, 1.0, 3.0]  # 字典序：Hyperechoic 1、Isoechoic 2、Mixed 3
+
+
+def test_prepare_blocks_leaves_text_when_switch_off(monkeypatch):
+    monkeypatch.setattr(cfg, "ENCODE_BLOCK_TEXT", False, raising=False)
+    raw = _frame()
+    specs = {"CTA": normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]}
+    blocks = data_io._prepare_blocks({"CTA": raw}, ["P1", "P2", "P3", "P4"], specs)
+    assert not pd.api.types.is_numeric_dtype(blocks["CTA"]["echo"])
+
+
+def test_encoded_block_levels_keep_original_labels():
+    """编码后 Table 1/2 与列线图要显示原始文字（Hyperechoic…），不是 0/1/2。"""
+    data_io.CLIN_LEVEL_MAPS = {}
+    data_io.CLIN_VAR_TYPES = {}
+    specs = {"CTA": normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]}
+    data_io._prepare_blocks({"CTA": _frame()}, ["P1", "P2", "P3", "P4"], specs)
+    rev = data_io.CLIN_LEVEL_MAPS.get("echo") or {}
+    assert rev.get(1.0) == "Hyperechoic"
+    assert rev.get(3.0) == "Mixed"
+    assert data_io.CLIN_VAR_TYPES.get("echo") == "categorical"

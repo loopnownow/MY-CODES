@@ -26,6 +26,9 @@ import pandas as pd
 
 MAX_LEVELS_DEFAULT = 5
 
+# 编码反查表：{列: {编码: 原文}}。表 1 / 表 2 / 列线图按它显示原始文字而不是 0/1/2。
+CODE_LABELS: Dict[str, Dict[float, str]] = {}
+
 _ID_LIKE = {"Name", "Patient_ID", "patient_id", "PatientID", "ID", "Group"}
 
 
@@ -235,6 +238,14 @@ def apply(
         bad = sorted({k for k in key.unique().tolist() if k and k not in mapping})
         out[col] = pd.to_numeric(codes, errors="coerce")
         report["encoded"].append(col)
+        rev: Dict[float, str] = {}
+        for level, code in mapping.items():
+            try:
+                rev[float(code)] = str(level)
+            except (TypeError, ValueError):
+                continue
+        if rev:
+            CODE_LABELS[col] = rev
         if bad:
             report["unmapped"][col] = bad
     if report["encoded"]:
