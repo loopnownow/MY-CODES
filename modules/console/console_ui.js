@@ -2887,7 +2887,7 @@ function renderForm() {
     }
     map.get(f.section).fields.push(f);
   }
-  const moveAfterClin = ["radprep", "combined", "rad", "radlog"];
+  const moveAfterClin = ["radprep", "radblocks", "combined", "rad", "radlog"];
   if (groups.some((g) => moveAfterClin.indexOf(g.id) >= 0)) {
     const moved = [];
     const rest = groups.filter((g) => {
@@ -3048,16 +3048,22 @@ function renderForm() {
       for (const f of vis) {
         if (left.indexOf(f) < 0) left.push(f);
       }
-      const hiddenPanel = new Set(["MODALITY_BLOCKS"]);
-      const shown = left.filter(f => !hiddenPanel.has(f.key));
+      const shown = left;
       if (!shown.length && !titleKeys.length) return "";
-      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。下面是组学模块：工作表与 ID 列在「数据预览」页分配，这里给每块选 LASSO 或 Logistic。标记的筛选、分类、剥离在单独模块。";
+      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。组学模块（每块的方法与预处理）在下一个模块。标记的筛选、分类、剥离在单独模块。";
       const head = sectionHead("radprep", g.title, shown.length, hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="radprep">
       ${head.html}
-      <div class="sec-body radprep-body">${shown.map(renderField).join("")}
-        <div class="rad-blocks-wrap">${modalityBlocksPanel()}</div>
-      </div>
+      <div class="sec-body radprep-body">${shown.map(renderField).join("")}</div>
+    </div>`;
+    }
+    if (g.id === "radblocks") {
+      const rows = blkRows();
+      const hint = "每块一张工作表（工作表与 ID 列在「数据预览」页分配）。每块三段：预处理（ICC / 相关 / 界值）→ 筛选（LASSO / Logistic，含每块 uni_p·mv_p·Firth）→ 模型（分数名）。留空 = 继承上面的全局设置。";
+      const head = sectionHead("radblocks", g.title, rows.length ? rows.length : "未用", hint);
+      return `<div class="sec-block${head.dim}" data-sec="radblocks">
+      ${head.html}
+      <div class="sec-body radblocks-body">${modalityBlocksPanel()}</div>
     </div>`;
     }
     if (g.id === "combined") {
