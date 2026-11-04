@@ -2353,22 +2353,32 @@ function readExtRows() {
       file: file,
       clin_sheet: "", rad_sheet: "", rad_id_col: "", qc_sheet: "", icc_sheet: "",
     };
+    const sheetsMap = {};
     card.querySelectorAll("[data-ext-role]").forEach((sel) => {
       const sheet = String(sel.getAttribute("data-ext-role") || "");
       const role = String(sel.value || "");
-      if (!sheet || !role || role === "rad") return;
+      if (!sheet || !role) return;
+      if (role.indexOf("blk:") === 0) {
+        const blockName = role.slice(4);
+        if (blockName) sheetsMap[blockName] = sheet;
+        return;
+      }
+      if (role === "rad") {
+        if (!rec.rad_sheet) rec.rad_sheet = sheet;
+        return;
+      }
       const key = role + "_sheet";
       if (!rec[key]) rec[key] = sheet;
     });
-    card.querySelectorAll("[data-ext-role]").forEach((sel) => {
-      const sheet = String(sel.getAttribute("data-ext-role") || "");
-      if (String(sel.value || "") !== "rad" || !sheet || rec.rad_sheet) return;
-      rec.rad_sheet = sheet;
-      card.querySelectorAll("[data-ext-id]").forEach((el) => {
-        if (String(el.getAttribute("data-ext-id") || "") === sheet) {
-          rec.rad_id_col = String(el.value || "").trim();
-        }
-      });
+    if (Object.keys(sheetsMap).length) {
+      rec.sheets = sheetsMap;
+      if (!rec.rad_sheet) rec.rad_sheet = Object.values(sheetsMap)[0];
+    }
+    const idSheet = rec.rad_sheet || Object.values(sheetsMap)[0] || "";
+    card.querySelectorAll("[data-ext-id]").forEach((el) => {
+      if (String(el.getAttribute("data-ext-id") || "") === idSheet) {
+        rec.rad_id_col = String(el.value || "").trim();
+      }
     });
     out.push(rec);
   });
@@ -2434,14 +2444,15 @@ function bindExtRowEvents() {
     card.querySelectorAll("[data-ext-role]").forEach((sel) => {
       sel.addEventListener("change", () => {
         const role = String(sel.value || "");
-        if (role === "clin" || role === "rad") {
+        if (role) {
           const taken = Array.from(card.querySelectorAll("[data-ext-role]"))
             .some((o) => o !== sel && String(o.value || "") === role);
           if (taken) {
             sel.value = "";
-            alert(role === "clin"
-              ? "临床信息只能有一张表。"
-              : "组学模块只能有一张表。要多块组学请用主数据文件的组学模块，或拆成多条外验各一张。");
+            const label = role.indexOf("blk:") === 0
+              ? "这个块"
+              : (EXT_ROLE_LABELS[role] || role);
+            alert(label + " 只能对应一张工作表。");
             return;
           }
         }
@@ -2465,10 +2476,28 @@ function bindExtRowEvents() {
 }
 const EXT_ROLE_LABELS = { "": "不用", clin: "临床信息", rad: "组学模块", qc: "质控", icc: "ICC" };
 
+function extBlockNames() {
+  return blkRows().map((b) => String(b.name || b.sheet || "")).filter(Boolean);
+}
+
+function extRoleOptions() {
+  const base = [["", "不用"], ["clin", "临床信息"], ["qc", "质控"], ["icc", "ICC"]];
+  const names = extBlockNames();
+  if (!names.length) return base.concat([["rad", "组学模块"]]);
+  return base.concat(names.map((n) => ["blk:" + n, "块：" + n]));
+}
+
 function extRoleOf(r, sheet) {
-  const keys = [["clin", "clin_sheet"], ["rad", "rad_sheet"], ["qc", "qc_sheet"], ["icc", "icc_sheet"]];
-  for (const [role, key] of keys) {
-    if (String((r || {})[key] || "") === sheet) return role;
+  if (String((r || {}).clin_sheet || "") === sheet) return "clin";
+  if (String((r || {}).qc_sheet || "") === sheet) return "qc";
+  if (String((r || {}).icc_sheet || "") === sheet) return "icc";
+  const map = (r && r.sheets && typeof r.sheets === "object") ? r.sheets : {};
+  const hit = Object.keys(map).find((k) => String(map[k]) === sheet);
+  if (hit) return "blk:" + hit;
+  if (String((r || {}).rad_sheet || "") === sheet) {
+    // 旧配置只有单张组学表：有块就按第 1 块显示，存回时落成 sheets 映射。
+    const names = extBlockNames();
+    return names.length ? "blk:" + names[0] : "rad";
   }
   return "";
 }
@@ -2488,9 +2517,9 @@ function extRoleRowsHtml(r) {
   const head = '<div class="pv-role-head"><span>工作表</span><span>尺寸</span><span>角色</span><span>组学 ID 列</span></div>';
   const body = sheets.map((sheet) => {
     const role = extRoleOf(r, sheet);
-    const opts = ["", "clin", "rad", "qc", "icc"].map((v) =>
-      `<option value="${v}"${v === role ? " selected" : ""}>${esc(EXT_ROLE_LABELS[v])}</option>`).join("");
-    const idCell = role === "rad"
+    const opts = extRoleOptions().map(([v, t]) =>
+      `<option value="${esc(v)}"${v === role ? " selected" : ""}>${esc(t)}</option>`).join("");
+    const idCell = (role === "rad" || role.indexOf("blk:") === 0)
       ? `<select data-ext-id="${esc(sheet)}">${optHtml(ioRadIdOpts, String((r || {}).rad_id_col || ""), "（用组学 ID 列）")}</select>`
       : '<span class="dim">—</span>';
     return `<div class="pv-role-row${role ? "" : " is-off"}" data-ext-role-row="${esc(sheet)}">
