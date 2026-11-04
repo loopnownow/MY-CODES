@@ -2290,27 +2290,30 @@ def _format_ols_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _radiomics_formula_html(rad_res) -> str:
-    """RadScore 公式。分类结果按类各写一条，不合并成一个分数。"""
+    """RadScore 公式。分组/分块各写一条，不合并。
+
+    开关关（不做线性拟合）时**不出这一段**：Logistic 块的分数仍在下游用于 ROC 等，
+    只是不把 log-odds 系数写成公式。LASSO 块本来就是原始尺度 OLS 公式，照旧显示。
+    """
     if rad_res is None:
         return ""
     groups = list(getattr(rad_res, "groups", None) or [])
     sources = groups if groups else [rad_res]
     bits: List[str] = []
-    logistic = False
     linear = False
     ols_tables: List[str] = []
     for src in sources:
+        method = str(getattr(src, "method", "") or "")
+        fit_kind = str(getattr(src, "score_fit", "logit") or "logit")
+        if method == "logistic" and fit_kind != "ols":
+            continue
         text = getattr(src, "formula_text", None)
         if not text:
             continue
         bits.append(f'<p class="formula">{text}</p>')
-        method = str(getattr(src, "method", "") or "")
-        fit_kind = str(getattr(src, "score_fit", "logit") or "logit")
-        if method == "logistic" and fit_kind == "ols":
+        if fit_kind == "ols":
             linear = True
             ols_tables.append(_ols_fit_table_html(src))
-        elif method == "logistic":
-            logistic = True
     if not bits:
         return ""
     note = ""
@@ -2322,15 +2325,6 @@ def _radiomics_formula_html(rad_res) -> str:
             'Each evaluation layer follows its validation mode: refit re-estimates '
             'these OLS coefficients on that layer; apply-formula and lock-threshold '
             'reuse the training coefficients.</p>'
-        )
-    if logistic:
-        note += (
-            '<p class="note">Radiomics logistic linear predictor. '
-            'Coefficients are log-odds per 1 training SD after median imputation '
-            'and scaling fit on the training set. Features are not re-selected. '
-            'Each evaluation layer follows its validation mode: refit re-estimates '
-            'these coefficients after the training scaling; apply-formula and '
-            'lock-threshold reuse the training coefficients.</p>'
         )
     return "<h3>RadScore Formula</h3>" + "".join(bits) + note + "".join(ols_tables)
 

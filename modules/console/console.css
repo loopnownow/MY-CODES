@@ -27,6 +27,8 @@ header #loadHint{color:#d7eee8;margin:2px 0 0}
 header #loadHint .ok{color:#c6ead4}
 header #loadHint .err{color:#ffc9c9}
 .tabs{display:flex;gap:4px;flex:none}
+.hdr-actions{display:flex;gap:6px;align-items:center;flex:none}
+.hdr-actions .btn{padding:5px 10px}
 .tab{
   border:1px solid #1a6678;background:#0a323c;color:#d7eee8;border-radius:var(--r8);
   padding:5px 12px;font-weight:600;
@@ -53,7 +55,7 @@ header #loadHint .err{color:#ffc9c9}
 .pv-sec>.pv-h{margin:0;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);font-weight:600}
 .pv-sec>.hint{margin:0}
 .pv-sec .field-group{border-top:none;padding-top:0}
-#pvDataForm .field-group.ids>.grp-rest{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+#pvDataForm .field-group.ids{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px 8px}
 #pvDataForm .field-group.ids>.grp-lab,
 #pvDataForm .field-group.exclude>.grp-lab,
 #pvDataForm .field-group.sheets>.grp-lab,
@@ -261,8 +263,13 @@ table.mini th{background:#eef3f1;text-align:left}
   gap:4px 8px;padding:6px 8px;align-items:start;
 }
 [data-sec="clinprep"] .sec-body.clinprep-body{
-  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+  display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
   gap:4px 8px;padding:6px 8px;align-items:start;
+  justify-content:stretch;justify-items:stretch;
+}
+/* 临床筛选：一行多列（与临床预处理同一套排布） */
+[data-sec="clin"] .sec-body.clin-body{
+  grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
   justify-content:stretch;justify-items:stretch;
 }
 [data-sec="clinprep"] .field{min-width:0;width:auto;max-width:none}
@@ -375,9 +382,16 @@ table.mini th{background:#eef3f1;text-align:left}
   [data-sec="io"] .field-group.roles{grid-column:1 / -1}
   [data-sec="io"] .field-group.sheets>.grp-rest,
   [data-sec="io"] .field-group.roles>.grp-rest{grid-template-columns:repeat(2,minmax(0,1fr))}
-  #pvDataForm .field-group.ids>.grp-rest{
+  #pvDataForm .field-group.ids{
     grid-auto-flow:row;grid-auto-columns:auto;
     grid-template-columns:repeat(auto-fit,minmax(6.5em,1fr));
+  }
+  [data-sec="clin"] .sec-body.clin-body{
+    grid-auto-flow:row;grid-auto-columns:auto;
+  }
+  [data-sec="clinprep"] .sec-body.clinprep-body{
+    grid-auto-flow:row;grid-auto-columns:auto;
+    grid-template-columns:repeat(2,minmax(0,1fr));
   }
   [data-sec="nomo"] .field.span4,[data-sec="roc"] .field.span4,[data-sec="fig"] .field.span4{grid-column:span 2}
   [data-sec="corr"] .sec-body.corr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -398,7 +412,10 @@ table.mini th{background:#eef3f1;text-align:left}
   [data-sec="io"] .sec-body.io-sheets{grid-template-columns:repeat(2,minmax(0,1fr))}
   [data-sec="nomo"] .field.span4,[data-sec="roc"] .field.span4,[data-sec="fig"] .field.span4{grid-column:1/-1}
   [data-sec="corr"] .sec-body.corr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
-  [data-sec="clinprep"] .sec-body.clinprep-body{grid-template-columns:repeat(2,minmax(0,1fr))}
+  [data-sec="clinprep"] .sec-body.clinprep-body{
+    grid-auto-flow:row;grid-auto-columns:auto;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
   [data-sec="fig"] .fig-body #palCard{grid-template-columns:1fr}
   [data-sec="fig"] .pal-list{grid-template-columns:repeat(2,minmax(0,1fr))}
   #ioCard .io-grid{grid-template-columns:1fr}
@@ -1126,7 +1143,7 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 .surv-cell{min-width:0}
 .surv-line .surv-lm{min-width:0}
 .surv-row .field{min-width:0;width:100%;max-width:100%}
-[data-sec="clinprep"] .sec-body.clinprep-body{grid-template-columns:repeat(4,minmax(0,1fr))}
+[data-sec="clinprep"] .sec-body.clinprep-body{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
 [data-sec="pcorr"] .field,
 [data-sec="switch"] .field:not(.bool),
 [data-sec="radlog"] .field,
@@ -1239,7 +1256,9 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   [data-sec="advanced"] .mod-blocks,
   .roc-row-1,
   .surv-line,
-  [data-sec="clinprep"] .sec-body.clinprep-body{
+  [data-sec="clinprep"] .sec-body.clinprep-body,
+  [data-sec="clin"] .sec-body.clin-body{
+    grid-auto-flow:row;grid-auto-columns:auto;
     grid-template-columns:minmax(0,1fr);
   }
 }
@@ -1331,24 +1350,25 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 6px;
 }
 
-/* ===== 临床两大模块（预处理 / 筛选）：整行铺开、块内两列（后写生效） ===== */
+/* ===== 临床两大模块（预处理 / 筛选）：一行多列（后写生效） ===== */
 [data-sec="clinprep"] .sec-body.clinprep-body,
 [data-sec="clin"] .sec-body.clin-body{
-  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px 18px;padding:10px 12px;align-items:start;
+  display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+  gap:8px 14px;padding:10px 12px;align-items:start;
   justify-items:stretch;
 }
 [data-sec="clinprep"] .sec-body.clinprep-body .field,
 [data-sec="clin"] .sec-body.clin-body .field{
   width:auto;max-width:none;min-width:0;
 }
+/* 一行多列时不整行铺开（整行会让 grid-column:1/-1 撑满整行） */
 [data-sec="clinprep"] .sec-body.clinprep-body .field.wide,
 [data-sec="clinprep"] .sec-body.clinprep-body .field.span2,
 [data-sec="clinprep"] .sec-body.clinprep-body .field.pathlist,
 [data-sec="clin"] .sec-body.clin-body .field.wide,
 [data-sec="clin"] .sec-body.clin-body .field.span2,
 [data-sec="clin"] .sec-body.clin-body .field.pathlist{
-  grid-column:1/-1;
+  grid-column:auto;
 }
 [data-sec="clinprep"] .sec-body.clinprep-body select,
 [data-sec="clinprep"] .sec-body.clinprep-body input[type=text],
@@ -1360,5 +1380,16 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 }
 @media (max-width:1000px){
   [data-sec="clinprep"] .sec-body.clinprep-body,
-  [data-sec="clin"] .sec-body.clin-body{grid-template-columns:1fr}
+  [data-sec="clin"] .sec-body.clin-body{
+    grid-auto-flow:row;grid-auto-columns:auto;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  [data-sec="clinprep"] .sec-body.clinprep-body .field.wide,
+  [data-sec="clinprep"] .sec-body.clinprep-body .field.span2,
+  [data-sec="clinprep"] .sec-body.clinprep-body .field.pathlist,
+  [data-sec="clin"] .sec-body.clin-body .field.wide,
+  [data-sec="clin"] .sec-body.clin-body .field.span2,
+  [data-sec="clin"] .sec-body.clin-body .field.pathlist{
+    grid-column:1/-1;
+  }
 }

@@ -68,3 +68,38 @@ def test_panel_gate_accepts_block_results():
     """_build_panel 的闸门必须放行 method=blocks 的结果，否则整段组学 Logistic 会消失。"""
     assert 'str(getattr(rad_res, "method", "") or "") == "logistic" or rad_groups' in REPORT_SRC
     assert "_radiomics_logistic_html(rad_res, panel_label)" in REPORT_SRC
+
+
+def _logit_child(score_fit: str = "logit"):
+    return SimpleNamespace(
+        method="logistic", group_name="CTA", score_name="RadScore_CTA",
+        features=["f1"], score_fit=score_fit,
+        formula_text="<b>RadScore_CTA</b> = 1.0 + 2.0 · <i>f1</i>",
+        uni_res=None, mv_df=None, mv_selected=None, firth_uni=None, firth_mv=None,
+        ols=None,
+    )
+
+
+def test_formula_hidden_when_no_linear_fit():
+    """关掉线性拟合时结果页不出 RadScore Formula（分数照旧用于下游 ROC）。"""
+    from modules.stats.report import _radiomics_formula_html
+
+    assert _radiomics_formula_html(_blocks_result([_logit_child("logit")])) == ""
+    single = _logit_child("logit")
+    assert _radiomics_formula_html(single) == ""
+
+
+def test_formula_and_ols_table_shown_when_linear_fit_on():
+    import statsmodels.api as sm
+
+    from modules.stats.report import _radiomics_formula_html
+
+    df = pd.DataFrame({"const": 1.0, "f1": [0.0, 1.0, 2.0, 3.0]})
+    y = pd.Series([0.0, 0.2, 0.8, 1.0])
+    fit = sm.OLS(y, df).fit()
+    child = _logit_child("ols")
+    child.ols = fit
+    html = _radiomics_formula_html(_blocks_result([child]))
+    assert "RadScore Formula" in html
+    assert "RadScore Linear Fit (OLS) — RadScore_CTA" in html
+    assert "linear regression (OLS)" in html

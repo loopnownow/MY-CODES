@@ -1,6 +1,7 @@
 """数据预览页布局：cln 只预览 5 行、ID 列一行多列、三段文件卡同款、配置页不再有排除名单。"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -13,6 +14,7 @@ UI = (CONSOLE / "console_ui.js").read_text(encoding="utf-8")
 CSS = (CONSOLE / "console.css").read_text(encoding="utf-8")
 HTML = (CONSOLE / "console.html").read_text(encoding="utf-8")
 PREVIEW = (CONSOLE / "preview.py").read_text(encoding="utf-8")
+CSS_TIGHT = re.sub(r"\s+", "", CSS)
 
 
 def test_preview_head_rows_is_five():
@@ -33,9 +35,33 @@ def test_config_form_skips_exclude_section_but_preview_keeps_it():
 
 
 def test_ids_panel_is_one_row_multi_column():
-    css = CSS.replace(" ", "")
-    assert "#pvDataForm.field-group.ids>.grp-rest{grid-auto-flow:column" in css
-    assert "grid-auto-columns:minmax(0,1fr)}" in css
+    # #pvIds 里没有 .grp-rest 包裹，规则必须直接落在 .field-group.ids 上。
+    assert "#pvDataForm.field-group.ids{display:grid;grid-auto-flow:column" in CSS_TIGHT
+    assert "grid-auto-columns:minmax(0,1fr)" in CSS_TIGHT
+
+
+def test_clinical_prep_and_filter_are_one_row_multi_column():
+    assert (
+        '[data-sec="clinprep"].sec-body.clinprep-body{display:grid;grid-auto-flow:column'
+        in CSS_TIGHT
+    )
+    assert (
+        '[data-sec="clin"].sec-body.clin-body{display:grid;grid-auto-flow:column'
+        in CSS_TIGHT
+    )
+    # 后写的两列/四列旧规则必须已经改掉，否则会盖掉一行多列
+    assert "clinprep-body{grid-template-columns:repeat(4" not in CSS_TIGHT
+    assert "clin-body{grid-template-columns:repeat(2" not in CSS_TIGHT
+
+
+def test_save_and_restart_buttons_sit_in_header_after_tabs():
+    assert HTML.index('id="tabBtnFlow"') < HTML.index('id="btnPvSave"')
+    assert HTML.index('id="btnPvSave"') < HTML.index('id="btnPvRestart"')
+    assert 'class="hdr-actions"' in HTML
+    # 不再留在「操作」卡片里
+    card = HTML[HTML.index('id="pvActionCard"'):HTML.index('id="pvActionCard"') + 2000]
+    assert 'id="btnPvSave"' not in card and 'id="btnPvRestart"' not in card
+    assert ".hdr-actions{" in CSS_TIGHT
 
 
 def test_file_cards_share_one_head_layout():
