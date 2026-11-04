@@ -2175,6 +2175,22 @@ function bindDataPane() {
     toCfg.dataset.bound = "1";
     toCfg.onclick = () => showPane("config");
   }
+  const pvSave = $("btnPvSave");
+  if (pvSave && !pvSave.dataset.bound) {
+    pvSave.dataset.bound = "1";
+    pvSave.onclick = () => writeback().then(() => {
+      const msg = $("ioMsg");
+      if (msg) msg.innerHTML = '<span class="ok">已写入 settings.ini（旧文件备份为 .bak）。</span>';
+    }).catch((e) => {
+      const msg = $("ioMsg");
+      if (msg) msg.innerHTML = `<span class="err">保存失败：${esc(e && e.message ? e.message : e)}</span>`;
+    });
+  }
+  const pvRestart = $("btnPvRestart");
+  if (pvRestart && !pvRestart.dataset.bound) {
+    pvRestart.dataset.bound = "1";
+    pvRestart.onclick = () => restartServer().catch((e) => alert(e.message));
+  }
   const sheets = $("pvSheets");
   if (sheets && !sheets.dataset.bound) {
     sheets.dataset.bound = "1";

@@ -520,6 +520,11 @@ def test_data_pane_uses_one_file_card_for_all_three_inputs():
     assert "previewIntoExtRow" not in api and "previewIntoExtRow" not in ui
     # 主数据卡也有「选择」按钮（与另两处同形）
     assert 'id="btnDataPick"' in html and 'id="ioDataPick"' in html
+    # 操作卡：与配置页同一套「保存 ini / 重启服务」入口
+    assert 'id="btnPvSave"' in html and '>保存 ini</button>' in html
+    assert 'id="btnPvRestart"' in html and '>重启服务</button>' in html
+    assert '$("btnPvSave")' in ui and '$("btnPvRestart")' in ui
+    assert "writeback()" in ui and "restartServer()" in ui
 
 
 def test_reader_direction_lives_only_in_the_encode_card():
