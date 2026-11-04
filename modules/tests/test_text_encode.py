@@ -112,3 +112,15 @@ def test_prepare_blocks_leaves_text_when_switch_off(monkeypatch):
     specs = {"CTA": normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]}
     blocks = data_io._prepare_blocks({"CTA": raw}, ["P1", "P2", "P3", "P4"], specs)
     assert not pd.api.types.is_numeric_dtype(blocks["CTA"]["echo"])
+
+
+def test_encoded_block_levels_keep_original_labels():
+    """编码后 Table 1/2 与列线图要显示原始文字（Hyperechoic…），不是 0/1/2。"""
+    data_io.CLIN_LEVEL_MAPS = {}
+    data_io.CLIN_VAR_TYPES = {}
+    specs = {"CTA": normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]}
+    data_io._prepare_blocks({"CTA": _frame()}, ["P1", "P2", "P3", "P4"], specs)
+    rev = data_io.CLIN_LEVEL_MAPS.get("echo") or {}
+    assert rev.get(1.0) == "Hyperechoic"
+    assert rev.get(3.0) == "Mixed"
+    assert data_io.CLIN_VAR_TYPES.get("echo") == "categorical"

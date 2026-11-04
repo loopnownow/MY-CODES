@@ -1450,6 +1450,14 @@ def _prepare_blocks(
                 f"（等级超过 TEXT_ENCODE_MAX_LEVELS 或未给映射；在控制台「文本编码」手填）: "
                 f"{text_cols[:8]}"
             )
+        # 编码反查表登记进 CLIN_LEVEL_MAPS：Table 1 / Table 2 / 列线图显示原始文字，不是 0/1/2。
+        for col, rev in (text_encode.CODE_LABELS or {}).items():
+            if col not in frame.columns or not rev:
+                continue
+            if not pd.api.types.is_numeric_dtype(frame[col]):
+                continue
+            CLIN_LEVEL_MAPS[str(col)] = dict(rev)
+            CLIN_VAR_TYPES.setdefault(str(col), "categorical")
         for col in frame.columns:
             if col == "Name":
                 continue

@@ -26,6 +26,10 @@
     <button type="button" class="tab" id="tabBtnConfig" data-tip="统计配置：改分析设置。右侧运行统计、日志和结果。">统计配置</button>
     <button type="button" class="tab" id="tabBtnFlow" data-tip="STROBE / 流程图。按当前课题打开，不跑统计。">流程图</button>
   </nav>
+  <div class="hdr-actions">
+    <button type="button" class="btn sec" id="btnPvSave" data-tip="把当前配置（含数据预览页选的 sheet / 角色 / 外验 / 排除名单）写入 ref/settings.ini。没有则新建；现有 ini 先备份为 settings.ini.bak（再次保存会覆盖这份备份）。">保存 ini</button>
+    <button type="button" class="btn sec" id="btnPvRestart" data-tip="停掉当前统计（若在跑），重启本控制台服务并刷新页面。改完 console.py / html / css 后用这个。">重启服务</button>
+  </div>
   <span class="pill" data-tip="本机 console.py 是否连上。绿=空闲，橙=正在跑，红=出错或未启动。"><i id="statusDot"></i><span id="srv">检测服务…</span></span>
 </header>
 <main id="paneConfig">
@@ -169,8 +173,6 @@
         <div class="pv-actions pv-actions-col">
           <button type="button" class="btn" id="btnPreviewReload" data-tip="用当前选择重算预览：工作表、例数、结局分布、排除后例数、ICC。不建模。">更新预览</button>
           <button type="button" class="btn sec" id="btnDataQc" data-tip="对整体数据做 QC（临床缺失、组学矩阵、ID 对齐、结局完整、ICC、影像质控）。主表写 ref/qc.html；每条外验写 ref/qc-ext.html 或 ref/qc-ext-{名称}.html。不覆盖主表 qc.html。不建模。">整体 QC</button>
-          <button type="button" class="btn" id="btnPvSave" data-tip="把当前页配置（含这一页选的 sheet / 角色 / 外验 / 排除名单）写入 ref/settings.ini。没有则新建；现有 ini 先备份为 settings.ini.bak（再次保存会覆盖这份备份）。">保存 ini</button>
-          <button type="button" class="btn sec" id="btnPvRestart" data-tip="停掉当前统计（若在跑），重启本控制台服务并刷新页面。改完 console.py / html / css 后用这个。">重启服务</button>
           <button type="button" class="btn warn" id="btnToConfig" data-tip="进入统计配置。这里选的文件、工作表、ID 列、外验与排除名单会带过去。">进入统计配置</button>
         </div>
         <p class="hint" id="qcHint"></p>
