@@ -226,3 +226,19 @@ def test_api_null_origin_stale_dir_rejected(reg_file, proj_dir):
     finally:
         _stop_server(httpd)
 
+
+def test_flow_chart_page_allows_same_origin_frame():
+    """流程图页回 SAMEORIGIN（控制台流程图 tab 是同源 iframe）；项目起始页仍 DENY。"""
+    httpd, port = _start_server()
+    try:
+        status, hdrs, body = _get(port, "/flow_chart.html?project=lya_CTA")
+        assert status == 200
+        assert "text/html" in hdrs.get("Content-Type", "")
+        assert hdrs.get("X-Frame-Options") == "SAMEORIGIN"
+        assert hdrs.get("Content-Security-Policy") == "frame-ancestors 'self'"
+        assert body.decode("utf-8").strip()
+        s2, h2, _b2 = _get(port, "/")
+        assert s2 == 200
+        assert h2.get("X-Frame-Options") == "DENY"
+    finally:
+        _stop_server(httpd)
