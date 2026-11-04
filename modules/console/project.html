@@ -131,16 +131,6 @@ button.pri:hover,a.pri:hover{background:#0c3d4a;text-decoration:none}
 #portRow{flex-wrap:wrap}
 #scanRange{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 #port{width:6.5em;flex:0 0 6.5em}
-.links{margin-top:auto;padding-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.links .btn{min-height:34px}
-.pv-sheet{margin-top:10px}
-.pv-sheet+.pv-sheet{padding-top:10px;border-top:1px dashed var(--line)}
-.pv-sheet .dim{color:var(--muted);font-size:11px;font-weight:400}
-.pv-scroll{overflow:auto;max-height:240px;border:1px solid var(--line);border-radius:8px}
-table.pv-tbl{border-collapse:collapse;font-size:12px;min-width:100%}
-table.pv-tbl th,table.pv-tbl td{padding:4px 8px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap;text-align:left}
-table.pv-tbl th{background:#f4f2ec;color:var(--muted);font-weight:600;position:sticky;top:0}
-table.pv-tbl td.dim{color:var(--muted)}
 #msg{min-height:1.4em}
 #msg.ok{color:var(--ok)} #msg.err{color:var(--err)} #msg.warn{color:var(--warn)}
 .save-row{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
@@ -295,17 +285,9 @@ footer{
         </div>
       </div>
       <a id="protoGo" href="about:blank"></a>
-      <div class="links">
-        <button type="button" class="btn pri" id="btnLoadNow" title="读取本课题主数据文件，列出全部工作表并预览每张表的前 3 行。">载入数据</button>
-      </div>
-      <p id="msg" class="hint">关闭/开启停服务或启动控制台。开启服务后会自动读取主数据并显示预览。</p>
+      <p id="msg" class="hint">关闭/开启停服务或启动控制台。开启服务后自动进入控制台「统计配置」。</p>
     </section>
   </div>
-  <!-- 起始页预览：每次载入后列出所有工作表前 3 行（最多 12 列）。 -->
-  <section id="pvCard" class="card" hidden aria-labelledby="h-pv">
-    <h2 id="h-pv">数据预览</h2>
-    <div id="pvBox"></div>
-  </section>
   <!-- 数据区已移到控制台「数据预览」页；本区只作 pageUrl / protoUrl 的状态来源，页面不显示。 -->
   <section id="dataBlock" class="card" hidden aria-labelledby="h-data">
     <h2 id="h-data"><span class="n">4</span> 加载数据</h2>
@@ -669,21 +651,27 @@ function pageUrl(p) {
   if (settingsPath()) q.set("settings", settingsPath());
   if (modulesDir()) q.set("modules", modulesDir());
   const io = ioOverlay();
-  q.set("rad_sheet", io.RAD_SHEET);
-  q.set("clin_sheet", io.CLIN_SHEET);
-  q.set("qc_sheet", io.QC_SHEET);
-  q.set("icc_sheet", io.ICC_SHEET);
-  q.set("rad_id", io.RAD_ID_COL);
-  q.set("clin_id", io.CLIN_ID_COL);
-  q.set("label_col", io.LABEL_COL == null ? "" : String(io.LABEL_COL));
-  q.set("rad_id_cols", JSON.stringify(io.RAD_ID_COLS || []));
+  // 只带非空值：空白参数会把 ini 里的 sheet 覆盖成空串。
+  const sheetParams = [
+    ["rad_sheet", io.RAD_SHEET], ["clin_sheet", io.CLIN_SHEET],
+    ["qc_sheet", io.QC_SHEET], ["icc_sheet", io.ICC_SHEET],
+    ["rad_id", io.RAD_ID_COL], ["clin_id", io.CLIN_ID_COL],
+    ["label_col", io.LABEL_COL],
+  ];
+  sheetParams.forEach(([key, val]) => {
+    const s = (val == null ? "" : String(val)).trim();
+    if (s) q.set(key, s);
+  });
+  if (io.RAD_ID_COLS && io.RAD_ID_COLS.length) {
+    q.set("rad_id_cols", JSON.stringify(io.RAD_ID_COLS));
+  }
   q.set("ext_split", io.USE_INTERNAL_SPLIT_WHEN_EXTERNAL ? "1" : "0");
   if (io.EXTERNAL_TESTS && io.EXTERNAL_TESTS.length) {
     q.set("ext_tests", JSON.stringify(io.EXTERNAL_TESTS));
   }
   const dir = fileDir();
   if (dir) q.set("dir", dir);
-  if (PROJECT) q.set("tab", "preview");
+  if (PROJECT) q.set("tab", "config");
   const qs = q.toString();
   return host(p) + "/?" + qs;
 }
@@ -972,15 +960,23 @@ function onServiceReady(p) {
     return;
   }
   wantAutoJump = false;
-  autoLoadAndPreview(p);
+  autoOpenConsole(p);
 }
-// 开服务后默认读主数据并就地显示预览（不再自动跳控制台）。
-async function autoLoadAndPreview(p) {
-  msg.textContent = "服务已开，正在读取主数据…";
-  await loadWorkbook();
-  if (DATA_LOADED) {
-    msg.textContent = "数据已读取（见下方「数据预览」）。";
+// 开服务后自动进控制台「统计配置」页（先探一次 /api/settings，失败就留在本页报原因）。
+async function autoOpenConsole(p) {
+  msg.textContent = "服务已开，正在进入控制台…";
+  const url = pageUrl(p);
+  const q = new URLSearchParams(new URL(url).search);
+  try {
+    const headers = pageToken ? {"X-Console-Token": pageToken} : {};
+    const r = await fetch(host(p) + "/api/settings?" + q.toString(), {headers});
+    const j = await r.json();
+    if (!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
+  } catch (e) {
+    msg.innerHTML = '<span class="err">进入控制台失败：' + esc(e && e.message ? e.message : e) + "</span>";
+    return;
   }
+  location.href = url;
 }
 function keysFromSettingsError(msg) {
   const text = String(msg || "");
@@ -1037,33 +1033,6 @@ async function clearBadKeys() {
   } catch (e) {
     if (loadMsg) loadMsg.textContent = "清空失败：" + (e && e.message ? e.message : e);
   }
-}
-function renderSheetBlocks(prev) {
-  const cardEl = document.getElementById("pvCard");
-  const box = document.getElementById("pvBox");
-  if (!cardEl || !box) return;
-  const blocks = (prev && prev.sheet_blocks) || {};
-  const names = Object.keys(blocks);
-  cardEl.hidden = false;
-  if (!names.length) {
-    box.innerHTML = '<p class="hint">没有读到工作表。</p>';
-    return;
-  }
-  box.innerHTML = names.map((name) => {
-    const b = blocks[name] || {};
-    if (b.error) {
-      return `<div class="pv-sheet"><div class="sublab">${esc(name)}</div><p class="hint">读取失败：${esc(b.error)}</p></div>`;
-    }
-    const cols = (b.columns || []).map((c) => String(c));
-    const rows = (b.rows || []).slice(0, 3);
-    const head = `<tr><th>#</th>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr>`;
-    const body = rows.map((r, i) => `<tr><td class="dim">${i + 1}</td>${
-      cols.map((_, j) => `<td>${esc(r && r[j] != null ? String(r[j]) : "")}</td>`).join("")
-    }</tr>`).join("");
-    const dim = `${b.n_rows || 0}×${b.n_cols || 0}${cols.length ? " · 显示前 " + cols.length + " 列" : ""}`;
-    return `<div class="pv-sheet"><div class="sublab">${esc(name)} <span class="dim">${esc(dim)}</span></div>
-      <div class="pv-scroll"><table class="pv-tbl">${head}${body}</table></div></div>`;
-  }).join("");
 }
 async function loadWorkbook() {
   if (location.protocol === "file:" && !pageToken) {
@@ -1135,7 +1104,6 @@ async function loadWorkbook() {
     RAD_META_OPTS = uniq((prev.rad_meta_cols || []).concat(RAD_META_PICKED));
     renderRadMeta();
     renderExtRows(lock.EXTERNAL_TESTS && lock.EXTERNAL_TESTS.length ? lock.EXTERNAL_TESTS : [emptyExtRow()]);
-    renderSheetBlocks(prev);
     DATA_LOADED = true;
     if (sheetBlock) sheetBlock.hidden = false;
     syncLinks();
@@ -1150,8 +1118,6 @@ async function loadWorkbook() {
 }
 if (goFlow) goFlow.addEventListener("click", () => { holdForConsole = true; });
 document.getElementById("btnLoadData").onclick = () => loadWorkbook();
-const btnLoadNow = document.getElementById("btnLoadNow");
-if (btnLoadNow) btnLoadNow.onclick = () => loadWorkbook();
 const btnClearBad = document.getElementById("btnClearBad");
 if (btnClearBad) btnClearBad.onclick = () => clearBadKeys();
 document.getElementById("btnExtAdd").onclick = () => {
