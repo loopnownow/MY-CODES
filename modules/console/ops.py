@@ -71,6 +71,16 @@ def sync_external_tests(settings: dict[str, Any]) -> dict[str, Any]:
                 got = str(spec.get(extra) or "").strip()
                 if got:
                     item[extra] = got
+            raw_sheets = spec.get("sheets")
+            if isinstance(raw_sheets, dict):
+                sheets = {}
+                for k, v in raw_sheets.items():
+                    kk = str(k or "").strip()
+                    vv = str(v or "").strip()
+                    if kk and vv:
+                        sheets[kk] = vv
+                if sheets:
+                    item["sheets"] = sheets
             norm.append(item)
     if norm:
         settings["EXTERNAL_TESTS"] = norm
