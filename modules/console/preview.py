@@ -24,11 +24,6 @@ from modules.console.settings_layer import under_root
 
 _PREVIEW_CACHE = _state.PREVIEW_CACHE  # 与 console 同一份 dict（测试断言 identity）
 
-# 起始页「每张工作表前几行」预览的规模上限
-_SHEET_BLOCKS_ROWS = 3
-_SHEET_BLOCKS_COLS = 12
-_SHEET_BLOCKS_MAX_SHEETS = 20
-
 def project_xlsx_names(proj: Path) -> list[str]:
     return [
         p.name for p in sorted(proj.glob("*.xlsx"))
@@ -658,29 +653,9 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         except TypeError:
             role_intersection = None
 
-    # 每张工作表的前几行（起始页预览用）：前 3 行 × 前 12 列，zip 层直读，不读全表。
-    sheet_blocks: dict[str, Any] = {}
-    if len(sheets) <= _SHEET_BLOCKS_MAX_SHEETS:
-        from modules.utils.xlsx_sheet import read_preview_block
-
-        for _s in sheets:
-            try:
-                _hdr, _blk = read_preview_block(
-                    data_path, _s, n_rows=_SHEET_BLOCKS_ROWS, n_cols=_SHEET_BLOCKS_COLS,
-                )
-                sheet_blocks[_s] = {
-                    "columns": [str(c) for c in (_hdr or [])[:_SHEET_BLOCKS_COLS]],
-                    "rows": _blk,
-                    "n_rows": int((size.get(_s) or {}).get("n_rows") or 0),
-                    "n_cols": int((size.get(_s) or {}).get("n_cols") or 0),
-                }
-            except Exception as exc:
-                sheet_blocks[_s] = {"error": str(exc)}
-
     return {
         "data": str(data_path),
         "sheets": sheets,
-        "sheet_blocks": sheet_blocks,
         "role_sheets": role_sheets,
         "role_intersection": role_intersection,
         "sheet_info": info,
