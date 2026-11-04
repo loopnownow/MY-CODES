@@ -2816,7 +2816,7 @@ function renderForm() {
     }
     map.get(f.section).fields.push(f);
   }
-  const moveAfterClin = ["radprep", "rad", "radlog"];
+  const moveAfterClin = ["radprep", "combined", "rad", "radlog"];
   if (groups.some((g) => moveAfterClin.indexOf(g.id) >= 0)) {
     const moved = [];
     const rest = groups.filter((g) => {
@@ -2977,10 +2977,7 @@ function renderForm() {
       for (const f of vis) {
         if (left.indexOf(f) < 0) left.push(f);
       }
-      const hiddenPanel = new Set([
-        "MODALITY_BLOCKS", "COMBINED_BLOCKS", "COMBINED_EXCLUDE",
-        "COMBINED_MODE", "CLIN_BLOCK_METHOD",
-      ]);
+      const hiddenPanel = new Set(["MODALITY_BLOCKS"]);
       const shown = left.filter(f => !hiddenPanel.has(f.key));
       if (!shown.length && !titleKeys.length) return "";
       const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。下面是组学模块：工作表与 ID 列在「数据预览」页分配，这里给每块选 LASSO 或 Logistic。标记的筛选、分类、剥离在单独模块。";
@@ -2990,6 +2987,14 @@ function renderForm() {
       <div class="sec-body radprep-body">${shown.map(renderField).join("")}
         <div class="rad-blocks-wrap">${modalityBlocksPanel()}</div>
       </div>
+    </div>`;
+    }
+    if (g.id === "combined") {
+      const hint = "Combined 主模型的口径与纳入/剔除块：per_block=临床+每块分别；joint=临床+全部块一次 GLM。块自身的方法与预处理在「组学 / 预处理」。临床块固定走临床筛选（Logistic）。";
+      const head = sectionHead("combined", g.title, "", hint);
+      return `<div class="sec-block${head.dim}" data-sec="combined">
+      ${head.html}
+      <div class="sec-body combined-body">${combinedPanel()}</div>
     </div>`;
     }
     if (g.id === "radmark") {
@@ -4063,49 +4068,102 @@ function delReaderCol(col) {
   renderForm();
 }
 
+function blkParamOf(b, name) {
+  const m = String((b || {}).method || "").trim().toLowerCase();
+  const p = (b && b.params && b.params[m]) || {};
+  const v = p[name];
+  return (v === undefined || v === null) ? "" : v;
+}
+
 function modalityBlocksPanel() {
   const rows = blkRows();
-  const body = rows.length
-    ? rows.map((b, i) => {
-      const icc = !(b.prep && b.prep.icc === false);
-      const corr = !(b.prep && b.prep.corr === false);
-      const cut = (b.prep && b.prep.corr_cutoff != null) ? b.prep.corr_cutoff : "";
-      return `<div class="kv-row blk-row" data-blk-row="${i}">
-      <span class="grp-chip">${i + 1}</span>
-      <span class="blk-sheet" title="${esc(b.sheet || b.name)}">${esc(b.sheet || b.name)}</span>
-      <select data-blk="method" title="该块的筛选方法；跳过=该块不建模">${[["", "（跳过）"], ["lasso", "LASSO"], ["logistic", "Logistic"]]
-        .map(([v, t]) => `<option value="${v}"${b.method === v ? " selected" : ""}>${t}</option>`).join("")}</select>
-      <label class="pexcl" title="开=该块先做 ICC 稳定性过滤"><input type="checkbox" data-blk-prep="icc"${icc ? " checked" : ""}/> ICC</label>
-      <label class="pexcl" title="开=该块先做相关过滤"><input type="checkbox" data-blk-prep="corr"${corr ? " checked" : ""}/> 相关</label>
-      <input data-blk-prep-val="corr_cutoff" value="${esc(cut)}" placeholder="相关界值 0.95" spellcheck="false"/>
-      <span class="blk-score mono" title="分数列名">${esc(b.score || ("RadScore" + (i === 0 ? "" : "_" + (b.name || ""))))}</span>
+  const head = '<div class="subh">组学模块（每块三段：预处理 → 筛选 → 模型）</div>';
+  if (!rows.length) {
+    return `<div class="rad-blocks" data-key="MODALITY_BLOCKS">${head}
+      <span class="kv-empty">还没有组学模块。到「数据预览」页把工作表设成「组学模块」。</span></div>`;
+  }
+  const cards = rows.map((b, i) => {
+    const icc = !(b.prep && b.prep.icc === false);
+    const corr = !(b.prep && b.prep.corr === false);
+    const cut = (b.prep && b.prep.corr_cutoff != null) ? b.prep.corr_cutoff : "";
+    const method = String(b.method || "").trim().toLowerCase();
+    const uniP = blkParamOf(b, "uni_p");
+    const mvP = blkParamOf(b, "mv_p");
+    const firth = blkParamOf(b, "firth");
+    const firthOn = firth !== false;
+    const stageFilter = method === "logistic"
+      ? `<input data-blk-param="uni_p" value="${esc(uniP)}" placeholder="单因素 p（空=全局）" spellcheck="false"/>
+         <input data-blk-param="mv_p" value="${esc(mvP)}" placeholder="多因素 p（空=全局）" spellcheck="false"/>
+         <label class="pexcl" title="开=该块多因素用 Firth"><input type="checkbox" data-blk-param-bool="firth"${firthOn ? " checked" : ""}/> Firth</label>`
+      : (method === "lasso"
+        ? '<span class="dim">LASSO 参数继承全局（λ 搜索在「组学 / LASSO」模块）</span>'
+        : '<span class="dim">未选方法 → 该块不建模</span>');
+    return `<div class="blk-card" data-blk-row="${i}"${b.enabled === false ? ' data-off="1"' : ""}>
+      <div class="blk-head">
+        <span class="grp-chip">${i + 1}</span>
+        <span class="blk-sheet mono" title="${esc(b.sheet || b.name)}">${esc(b.sheet || b.name)}</span>
+        <label class="pexcl" title="关=该块不参与建模"><input type="checkbox" data-blk="enabled"${b.enabled === false ? "" : " checked"}/> 启用</label>
+        <span class="blk-score mono">${esc(b.score || ("RadScore" + (i === 0 ? "" : "_" + (b.name || ""))))}</span>
+      </div>
+      <div class="blk-stage">
+        <span class="blk-stage-k">预处理</span>
+        <label class="pexcl" title="开=该块先做 ICC 稳定性过滤"><input type="checkbox" data-blk-prep="icc"${icc ? " checked" : ""}/> ICC</label>
+        <label class="pexcl" title="开=该块先做相关过滤"><input type="checkbox" data-blk-prep="corr"${corr ? " checked" : ""}/> 相关</label>
+        <input data-blk-prep-val="corr_cutoff" value="${esc(cut)}" placeholder="相关界值（空=全局）" spellcheck="false"/>
+      </div>
+      <div class="blk-stage">
+        <span class="blk-stage-k">筛选</span>
+        <select data-blk="method" title="该块的筛选方法；跳过=该块不建模">${[["", "（跳过）"], ["lasso", "LASSO"], ["logistic", "Logistic"]]
+          .map(([v, t]) => `<option value="${v}"${method === v ? " selected" : ""}>${t}</option>`).join("")}</select>
+        ${stageFilter}
+      </div>
+      <div class="blk-stage">
+        <span class="blk-stage-k">模型</span>
+        <input data-blk="score" value="${esc(b.score || "")}" placeholder="分数名（空=RadScore / RadScore_块名）" spellcheck="false"/>
+      </div>
     </div>`;
-    }).join("")
-    : `<span class="kv-empty">还没有组学模块。到「数据预览」页把工作表设成「组学模块」。</span>`;
+  }).join("");
+  return `<div class="rad-blocks" data-key="MODALITY_BLOCKS">${head}${cards}</div>`;
+}
+
+function combinedPanel() {
+  const rows = blkRows();
   const mode = String(fieldValue("COMBINED_MODE") || "per_block");
   const inc = asList(fieldValue("COMBINED_BLOCKS")).join(", ");
   const exc = asList(fieldValue("COMBINED_EXCLUDE")).join(", ");
-  const clin = String(fieldValue("CLIN_BLOCK_METHOD") || "logistic");
-  return `<div class="kv-rows rad-blocks" data-key="MODALITY_BLOCKS">
-    <div class="kv-row rad-prefix-head"><span>#</span><span>工作表</span><span>方法</span><span>ICC</span><span>相关</span><span>界值</span><span>分数名</span></div>
-    ${body}
-    <div class="kv-row blk-combined">
-      <label>临床块
-        <select data-blk-clin="1">
-          ${[["logistic", "Logistic（固定）"]]
-            .map(([v, t]) => `<option value="${v}"${clin === v ? " selected" : ""}>${t}</option>`).join("")}
-        </select>
-      </label>
-      <label>Combined 主模型
-        <select data-blk-mode="1">
-          <option value="per_block"${mode !== "joint" ? " selected" : ""}>per_block（临床 + 每块分别）</option>
-          <option value="joint"${mode === "joint" ? " selected" : ""}>joint（临床 + 全部块）</option>
-        </select>
-      </label>
-      <input data-blk-list="COMBINED_BLOCKS" value="${esc(inc)}" placeholder="联合纳入块（空=全部）" spellcheck="false"/>
-      <input data-blk-list="COMBINED_EXCLUDE" value="${esc(exc)}" placeholder="联合剔除块" spellcheck="false"/>
+  const includeSet = asList(fieldValue("COMBINED_BLOCKS")).map((s) => String(s).trim()).filter(Boolean);
+  const excludeSet = asList(fieldValue("COMBINED_EXCLUDE")).map((s) => String(s).trim()).filter(Boolean);
+  const picks = rows.map((b, i) => {
+    const nm = String(b.name || b.sheet || "");
+    const score = String(b.score || ("RadScore" + (i === 0 ? "" : "_" + nm)));
+    const listed = !includeSet.length || includeSet.indexOf(nm) >= 0 || includeSet.indexOf(score) >= 0;
+    const dropped = excludeSet.indexOf(nm) >= 0 || excludeSet.indexOf(score) >= 0;
+    const used = listed && !dropped && b.method && b.enabled !== false;
+    return `${used ? "✓" : "✗"} ${nm}${score !== nm ? "（" + score + "）" : ""}`;
+  });
+  const composition = rows.length
+    ? `<span class="mono">临床（Logistic）+ ${
+      mode === "joint" ? "全部入选块一次 GLM" : "每块分别"
+    }：${esc(picks.join(" · "))}</span>`
+    : '<span class="kv-empty">还没有组学模块：Combined 只含临床。</span>';
+  return `<div class="blk-rows" data-key="COMBINED_MODE">
+    <div class="blk-stage">
+      <span class="blk-stage-k">口径</span>
+      <select data-blk-mode="1">
+        <option value="per_block"${mode !== "joint" ? " selected" : ""}>per_block（临床 + 每块分别）</option>
+        <option value="joint"${mode === "joint" ? " selected" : ""}>joint（临床 + 全部块一次）</option>
+      </select>
+      <span class="dim" title="临床块固定走临床筛选（单因素→多因素 p），不进 LASSO">临床块：Logistic（固定）</span>
     </div>
-    <span class="kv-empty">模块的工作表与 ID 列在「数据预览」页定；这里选方法与预处理。分数名第 1 块默认 RadScore，其余 RadScore_块名。</span>
+    <div class="blk-stage">
+      <span class="blk-stage-k">纳入 / 剔除</span>
+      <input data-blk-list="COMBINED_BLOCKS" value="${esc(inc)}" placeholder="纳入块（空=全部）" spellcheck="false"/>
+      <input data-blk-list="COMBINED_EXCLUDE" value="${esc(exc)}" placeholder="剔除块" spellcheck="false"/>
+    </div>
+    <div class="blk-stage">
+      <span class="blk-stage-k">组成</span>
+      ${composition}
+    </div>
   </div>`;
 }
 function applyBlkRow(el) {
@@ -4130,6 +4188,29 @@ function applyBlkRow(el) {
     const v = Number(el.value);
     if (!String(el.value || "").trim() || !isFinite(v)) delete cur.prep[prepVal];
     else cur.prep[prepVal] = v;
+  }
+  const paramName = el.getAttribute("data-blk-param");
+  if (paramName) {
+    const m = String(cur.method || "").trim().toLowerCase();
+    cur.params = Object.assign({}, cur.params || {});
+    if (m) {
+      const one = Object.assign({}, cur.params[m] || {});
+      const raw = String(el.value || "").trim();
+      const v = Number(raw);
+      if (!raw || !isFinite(v)) delete one[paramName];
+      else one[paramName] = v;
+      cur.params[m] = one;
+    }
+  }
+  const paramBool = el.getAttribute("data-blk-param-bool");
+  if (paramBool) {
+    const m = String(cur.method || "").trim().toLowerCase();
+    cur.params = Object.assign({}, cur.params || {});
+    if (m) {
+      const one = Object.assign({}, cur.params[m] || {});
+      one[paramBool] = !!el.checked;
+      cur.params[m] = one;
+    }
   }
   rows[i] = cur;
   setFieldValue("MODALITY_BLOCKS", rows);
@@ -4709,6 +4790,7 @@ function bindDelegates() {
     }
     if (t.matches("[data-blk]")) { applyBlkRow(t); return; }
     if (t.matches("[data-blk-prep], [data-blk-prep-val]")) { applyBlkRow(t); return; }
+    if (t.matches("[data-blk-param], [data-blk-param-bool]")) { applyBlkRow(t); return; }
     if (t.matches("[data-blk-clin]")) { setFieldValue("CLIN_BLOCK_METHOD", t.value); return; }
     if (t.matches("[data-blk-mode]")) {
       setFieldValue("COMBINED_MODE", t.value);
