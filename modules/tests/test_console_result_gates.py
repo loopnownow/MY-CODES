@@ -645,6 +645,16 @@ def test_exclude_cards_write_per_file_specs():
     assert '"EXCLUDE_TESTS"' in ini
 
 
+def test_external_cards_can_map_sheets_to_blocks():
+    """有组学块时，外验每张表可选「块：NAME」，存成 EXTERNAL_TESTS.sheets 映射。"""
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    assert "function extBlockNames" in ui and "function extRoleOptions" in ui
+    assert '"blk:" + n' in ui
+    assert 'role.indexOf("blk:") === 0' in ui
+    assert "rec.sheets = sheetsMap" in ui
+    assert 'item["sheets"] = sheets' in (ROOT / "modules" / "console" / "ops.py").read_text(encoding="utf-8")
+
+
 def test_start_page_loads_data_and_previews_every_sheet():
     """起始页：开服务后自动读主数据、列出所有工作表前 3 行；右侧操作台有「载入数据」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
@@ -707,16 +717,31 @@ def test_exclude_tests_gives_each_file_its_own_sheet_and_column(tmp_path):
 
 
 def test_sync_external_tests_keeps_role_sheets():
-    """外验卡上选的质控 / ICC 工作表现在随 EXTERNAL_TESTS 一起保留。"""
+    """外验卡上选的质控 / ICC 工作表、以及「块→工作表」映射都随 EXTERNAL_TESTS 保留。"""
     from modules.console.ops import sync_external_tests
 
     out = sync_external_tests({
         "EXTERNAL_TESTS": [{
             "file": "ext.xlsx", "clin_sheet": "cln", "rad_sheet": "CTA",
             "rad_id_col": "Patient_ID", "qc_sheet": "qc", "icc_sheet": "icc",
+            "sheets": {"CTA": "CTA_ext", "US": "US_ext", "": "junk"},
         }],
     })
     spec = out["EXTERNAL_TESTS"][0]
     assert spec["clin_sheet"] == "cln" and spec["rad_sheet"] == "CTA"
     assert spec["qc_sheet"] == "qc" and spec["icc_sheet"] == "icc"
+    assert spec["sheets"] == {"CTA": "CTA_ext", "US": "US_ext"}
     assert out["EXTERNAL_FILE"] == "ext.xlsx"
+
+
+def test_external_specs_for_qc_keep_block_sheets():
+    """u_qc 的外验 spec 归一化不丢 sheets（外验 QC / 预览要用）。"""
+    from modules.utils.u_qc import _external_specs_from_settings
+
+    specs = _external_specs_from_settings({
+        "EXTERNAL_TESTS": [{
+            "file": "ext.xlsx", "clin_sheet": "cln", "rad_sheet": "CTA",
+            "sheets": {"CTA": "CTA_ext"},
+        }],
+    })
+    assert specs and specs[0]["sheets"] == {"CTA": "CTA_ext"}
