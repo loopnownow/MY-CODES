@@ -81,3 +81,17 @@ def test_refit_locked_result_follows_score_fit(base_cfg, monkeypatch):
     res = rad.run_radiomics_logistic(df, y, score_name="RadScore_CTA", group_name="CTA")
     refit = rad.refit_locked_result(res, df, y)
     assert np.allclose(refit.radscore, res.radscore, atol=1e-8)
+
+
+def test_block_param_linear_maps_to_config():
+    """组学模块面板的「线性拟合」勾选写 params.<method>.linear，映射到 RAD_SCORE_LINEAR。"""
+    from modules.config.blocks import normalize_blocks
+    from modules.stats import selectors
+
+    for method in ("logistic", "lasso"):
+        spec = normalize_blocks(
+            [{"name": "CTA", "method": method, "params": {method: {"linear": True}}}]
+        )[0]
+        assert selectors._param_settings(spec)["RAD_SCORE_LINEAR"] is True
+    spec_off = normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]
+    assert "RAD_SCORE_LINEAR" not in selectors._param_settings(spec_off)
