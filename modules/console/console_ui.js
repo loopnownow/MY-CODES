@@ -2862,7 +2862,7 @@ function renderForm() {
       const rest = chunks.filter(c => !DATA_PANE_BUNDLES.has(c.id) && c.id !== "subproj").map(c => c.html).join("");
       const sub = chunks.filter(c => c.id === "subproj").map(c => c.html).join("");
       if (!sub && !rest) return "";
-      const head = sectionHead("io", "结局 / 子工程", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页。");
+      const head = sectionHead("io", "结局 / 子工程 / 阅片方向", "", "数据文件、工作表、ID 列、外验与排除名单在「数据预览」页；阅片列方向（0/1）在本块末尾。");
       return `<div class="sec-block${head.dim}" data-sec="io">
       ${head.html}
       <div class="sec-body io-sheets">${sub}<div id="ioGrpSlot"></div>${rest}</div>
