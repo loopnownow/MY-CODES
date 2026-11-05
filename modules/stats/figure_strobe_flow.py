@@ -5,8 +5,10 @@ Enrolment, cohorts, training-only processing, and the evaluations named in
 Materials and Methods. Text and counts come from that section. Do not invent n.
 
     python figure_strobe_flow.py --docx manuscript.docx --out Figure1_flow.pdf \
-        --spec-out ref/Figure1_flow.json
+        --spec-out ref/Figure1_flow.json [--width-cm 16]
 
+Canvas width is the print width (default 16 cm = 6.3 in); box text stays 12 pt.
+Use --width-cm 0 for the legacy content-driven width.
 White ground, black square boxes, Arial (figure dual-track; body stays Times).
 """
 from __future__ import annotations
@@ -135,6 +137,32 @@ def _numbered(title: str, lines: list[str], width: int = 36) -> str:
     return "\n".join(out)
 
 
+def _natural_w(text: str, fs: float, pad_x: float = 0.0, min_w: float = 0.0) -> float:
+    """文本自然宽度（英寸）：最长一行 + 左右内边距，不设上限。"""
+    lines = (text or " ").split("\n")
+    return max(min_w, max(_line_w(ln, fs) for ln in lines) + pad_x)
+
+
+def _wrap_to_width(text: str, budget: float, fs: float, width_max: int = 84) -> str:
+    """纯文本按预算宽度（英寸，实测）换行；取能放下的最宽换行。"""
+    single = " ".join((text or "").split())
+    for width in range(width_max, 7, -1):
+        cand = textwrap.fill(single, width=width, break_long_words=False)
+        if _natural_w(cand, fs) <= budget:
+            return cand
+    return textwrap.fill(single, width=8, break_long_words=False)
+
+
+def _wrap_numbered_to_width(title: str, lines: list[str], budget: float,
+                            fs: float, width_max: int = 84) -> str:
+    """编号清单按预算宽度换行；取能放下的最宽换行，放不下再用最窄行宽。"""
+    for width in range(width_max, 11, -1):
+        cand = _numbered(title, lines, width=width)
+        if _natural_w(cand, fs) <= budget:
+            return cand
+    return _numbered(title, lines, width=12)
+
+
 
 
 class Canvas:
@@ -216,6 +244,8 @@ class Canvas:
 
 
 FS_STUDY = 12
+TARGET_WIDTH_CM = 16.0   # 画布印刷宽（cm）；框内文字固定 FS_STUDY
+CM_PER_INCH = 2.54
 _MODELS = ("clinical", "radiomics", "plaque", "nomogram")
 _MODEL_LABEL = {
     "clinical": "Clinical model",
@@ -323,8 +353,14 @@ def _pick(spec: dict, key: str, allowed: tuple[str, ...]) -> list[str]:
     return [x for x in allowed if x in (spec.get(key) or [])]
 
 
-def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
-    """Study flowchart: enrolment, cohorts, training-only processing, then evaluation."""
+def draw_study_flow(spec: dict, out_path, audit: bool = True,
+                    width_cm: float = TARGET_WIDTH_CM) -> Path:
+    """Study flowchart: enrolment, cohorts, training-only processing, then evaluation.
+
+    width_cm：画布印刷宽（cm），默认 16；框内文字固定 ``FS_STUDY``(12 pt)，
+    换行与最小框宽随可用宽度收紧。传 0 = 按内容自适应（旧行为）。
+    内容实在放不下目标宽时按内容宽出图并打印 ⚠ 提示。
+    """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     spec = dict(spec or {})
@@ -385,26 +421,72 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
     metrics = _pick(spec, "metrics", _METRICS)
     explain = _pick(spec, "explain", _EXPLAIN)
 
-    gap_x = 0.32
-    gap_y = 0.46
+    target_w = (max(0.0, float(width_cm)) / CM_PER_INCH) if width_cm else 0.0
+    narrow = target_w > 0.0
+    usable = max(0.0, target_w - 0.36) if narrow else 0.0
+    gap_x = 0.20 if narrow else 0.32
+    gap_y = 0.30 if narrow else 0.46
+    pad_side = 0.20 if narrow else 0.28
+    pad_box = 0.18 if narrow else 0.36
+    min_side_w = 0.90 if narrow else 1.45
+    min_box_w = 0.55 if narrow else 1.45
     fs = FS_STUDY
 
-    def fitted(text: str, width: int = 28):
+    def row_budget(n_items: int) -> float:
+        """一行 n 个框时每个框的宽度预算（英寸）；非窄画布返回 0。"""
+        if not narrow or n_items <= 0:
+            return 0.0
+        return (usable - gap_x * (n_items - 1)) / n_items
+
+    def fitted(text: str, width: int = 28, budget: float | None = None):
+        """框尺寸：窄画布按宽度预算（超预算才换行），否则按字符数换行。"""
         if "\n" in (text or ""):
-            w, h = _box_wh(text, fs, max_w=8.8)
+            maxw = budget if (narrow and budget) else 8.8
+            w, h = _box_wh(
+                text, fs,
+                pad_x=pad_box if narrow else 0.36,
+                min_w=min_box_w if narrow else 1.45,
+                max_w=maxw,
+            )
             return text, w, h
+        if narrow:
+            room = max(0.6, (budget or usable) - pad_box)
+            t = text
+            if _natural_w(text, fs) > room:
+                t = _wrap_to_width(text, room, fs)
+            w, h = _box_wh(
+                t, fs, pad_x=pad_box, min_w=min_box_w, max_w=budget or usable,
+            )
+            return t, w, h
         return _fit(text, width, fs=fs)
 
     top_t, top_w, top_h = fitted(top, 42)
-    inc_w, inc_h = _box_wh(inc_txt, fs, pad_x=0.28, max_w=4.6) if inc_txt else (0.0, 0.0)
-    exc_w, exc_h = _box_wh(exc_txt, fs, pad_x=0.28, max_w=4.6) if exc_txt else (0.0, 0.0)
+    side_budget = row_budget(2) if (narrow and inc_txt and exc_txt) else (usable if narrow else 0.0)
+    if inc_txt and narrow:
+        inc_txt = _wrap_numbered_to_width(
+            "Inclusion criteria:", inclusion, max(1.0, side_budget - pad_side), fs,
+        )
+    if exc_txt and narrow:
+        exc_txt = _wrap_numbered_to_width(
+            "Exclusion criteria:", [t for t, _ in exclusions], max(1.0, side_budget - pad_side), fs,
+        )
+    inc_w, inc_h = (
+        _box_wh(inc_txt, fs, pad_x=pad_side, min_w=min_side_w,
+                max_w=side_budget if narrow else 4.6)
+        if inc_txt else (0.0, 0.0)
+    )
+    exc_w, exc_h = (
+        _box_wh(exc_txt, fs, pad_x=pad_side, min_w=min_side_w,
+                max_w=side_budget if narrow else 4.6)
+        if exc_txt else (0.0, 0.0)
+    )
     ana_t, ana_w, ana_h = fitted(included, 28)
-    cohort_fit = [(bid, *fitted(text, 24)) for bid, text in cohorts]
-    bal_fit = fitted(balance_txt, 22) if balance_txt else None
-    las_fit = fitted("LASSO", 16) if lasso else None
-    model_fit = [(mid, *fitted(_MODEL_LABEL[mid], 18)) for mid in models]
-    metric_fit = [(mid, *fitted(_METRIC_LABEL[mid], 16)) for mid in metrics]
-    explain_fit = [(mid, *fitted(_EXPLAIN_LABEL[mid], 16)) for mid in explain]
+    cohort_fit = [(bid, *fitted(text, 24, row_budget(len(cohorts)))) for bid, text in cohorts]
+    bal_fit = fitted(balance_txt, 22, usable) if balance_txt else None
+    las_fit = fitted("LASSO", 16, usable) if lasso else None
+    model_fit = [(mid, *fitted(_MODEL_LABEL[mid], 18, row_budget(len(models)))) for mid in models]
+    metric_fit = [(mid, *fitted(_METRIC_LABEL[mid], 16, row_budget(len(metrics)))) for mid in metrics]
+    explain_fit = [(mid, *fitted(_EXPLAIN_LABEL[mid], 16, row_budget(len(explain)))) for mid in explain]
 
     def row_width(items) -> float:
         if not items:
@@ -414,8 +496,25 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
     cohort_w = row_width([(None, w, h) for _, _, w, h in cohort_fit])
     model_w = row_width([(None, w, h) for _, _, w, h in model_fit])
     metric_w = row_width([(None, w, h) for _, _, w, h in metric_fit])
+    explain_w = row_width([(None, w, h) for _, _, w, h in explain_fit])
     side_w = inc_w + (gap_x if inc_txt and exc_txt else 0) + exc_w
-    canvas_w = max(11.2, top_w, ana_w, cohort_w, model_w, metric_w, side_w) + 0.8
+    content_w = max(top_w, ana_w, cohort_w, model_w, metric_w, explain_w, side_w)
+    if narrow:
+        canvas_w = max(target_w, content_w + 0.36)
+        if content_w + 0.36 > target_w + 1e-6:
+            print(
+                f"  ⚠ Figure 1 content width {content_w + 0.36:.2f} in "
+                f"exceeds target {target_w:.2f} in ({target_w * CM_PER_INCH:.1f} cm) "
+                "— drawn at content width",
+                flush=True,
+            )
+    else:
+        canvas_w = max(11.2, content_w) + 0.8
+    print(
+        f"  Figure 1 canvas: {canvas_w:.2f} × ? in "
+        f"({canvas_w * CM_PER_INCH:.1f} cm target {width_cm:g} cm), font {fs:g} pt",
+        flush=True,
+    )
     c = Canvas(width=canvas_w)
 
     def center_row(items, y, ids=None):
@@ -517,7 +616,7 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
         stem_bottom = stem[1] + stem[3]
 
     if metric_fit:
-        bus_y = max(stem_bottom, cohort_bottom) + 0.55
+        bus_y = max(stem_bottom, cohort_bottom) + (0.42 if narrow else 0.55)
         total = row_width([(None, w, h) for _, _, w, h in metric_fit])
         x = (canvas_w - total) / 2
         h = max(h for _, _, _, h in metric_fit)
@@ -788,6 +887,10 @@ def main(argv=None):
     )
     ap.add_argument("--kind", choices=("auto", "study"), default="auto")
     ap.add_argument(
+        "--width-cm", type=float, default=TARGET_WIDTH_CM,
+        help=f"Canvas print width in cm (default {TARGET_WIDTH_CM:g}); 0 = fit content (legacy).",
+    )
+    ap.add_argument(
         "--no-audit",
         action="store_true",
         help="Skip n-audit. Only for documented historical figures whose printed n do not add up.",
@@ -808,7 +911,9 @@ def main(argv=None):
                     "Pass --docx so the flowchart is read from Materials and Methods, "
                     "or a study-flow JSON with screened_n."
                 )
-        drawn = draw_study_flow(spec, args.out, audit=not args.no_audit)
+        drawn = draw_study_flow(
+            spec, args.out, audit=not args.no_audit, width_cm=args.width_cm,
+        )
         if args.spec_out:
             print(write_spec(spec, args.spec_out))
         print(drawn)
