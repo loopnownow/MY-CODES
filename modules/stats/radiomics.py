@@ -953,11 +953,23 @@ def _attach_univariate_vif(uni_df: pd.DataFrame, frame: pd.DataFrame) -> pd.Data
         return uni_df
     out = uni_df.copy()
     try:
-        from modules.stats.vif_analysis import compute_vif, format_vif
+        from modules.stats.vif_analysis import compute_vif, derived_features, format_vif
         wanted = {str(f) for f in out["Feature"].tolist()}
         # 按数据表列序建独立基（先基础列、后 AFC_total/_mean 这类派生列），
         # 共线标记才落在派生列上，而不是随单因素 p 排名漂移。
         feats = [str(c) for c in frame.columns if str(c) in wanted]
+        if bool(getattr(cfg, "DO_DROP_DERIVED", False)):
+            drop = set(derived_features(frame, feats))
+            if drop:
+                out = out[~out["Feature"].astype(str).isin(drop)].reset_index(drop=True)
+                feats = [f for f in feats if f not in drop]
+                print(
+                    "  DO_DROP_DERIVED: 单因素表剔除派生列 "
+                    + ", ".join(sorted(drop)),
+                    flush=True,
+                )
+        if out.empty:
+            return out
         vif_df = compute_vif(frame, feats) if len(feats) >= 2 else None
         vmap = {}
         if vif_df is not None and len(vif_df):
