@@ -28,9 +28,30 @@ _PREVIEW_CACHE = _state.PREVIEW_CACHE  # 与 console 同一份 dict（测试断�
 _PREVIEW_HEAD_ROWS = 5
 
 def project_xlsx_names(proj: Path) -> list[str]:
+    """工程根的可选 xlsx（相对路径按工程根显示）。"""
     return [
         p.name for p in sorted(proj.glob("*.xlsx"))
         if p.is_file() and not p.name.startswith("~")
+    ]
+
+
+def results_xlsx_names(proj: Path, settings: dict[str, Any]) -> list[str]:
+    """该结局结果夹里的 xlsx 文件名（默认错分表就落在这里）。
+
+    与工程根列表合并成下拉候选；同名的只保留一次（结果夹那份由路径解析优先）。
+    """
+    from modules.stats.data_io import resolve_results_out_dir
+
+    rel = resolve_results_out_dir(settings)
+    if not rel:
+        return []
+    p = Path(rel)
+    base = p if p.is_absolute() else Path(proj) / p
+    if not base.is_dir():
+        return []
+    return [
+        f.name for f in sorted(base.glob("*.xlsx"))
+        if f.is_file() and not f.name.startswith("~")
     ]
 
 def _exclude_cell_text(raw) -> str:
@@ -103,7 +124,11 @@ def exclude_select_options(
     data_path: Path | None,
     preview: dict[str, Any] | None = None,
 ) -> dict[str, list[str]]:
+    # 工程根 + 该结局结果夹里的 xlsx：默认名单落在结果夹，控制台要能选到它
     files = project_xlsx_names(proj)
+    for name in results_xlsx_names(proj, settings):
+        if name not in files:
+            files.append(name)
     meta = (preview or {}).get("exclude") or {}
     sheets = list(meta.get("sheets") or [])
     cols = list(meta.get("columns") or [])
@@ -429,8 +454,11 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
             normalize_exclude_rows,
             _keys_from_exclude_frame,
         )
-        specs = _exclude_specs(settings)
-        paths: list[Path] = [_exclude_path(s["file"], data_path) for s in specs]
+        proj_root = _preview_project_root(data_path)
+        specs = _exclude_specs(settings, proj_root)
+        paths: list[Path] = [
+            _exclude_path(s["file"], data_path, proj_root, settings) for s in specs
+        ]
         sheets_u: list[str] = []
         columns_u: list[str] = []
         values_u: list[str] = []
@@ -808,6 +836,8 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
     keep = (
         "CLIN_SHEET", "RAD_SHEET", "QC_SHEET", "ICC_SHEET",
         "CLIN_ID_COL", "RAD_ID_COL", "LABEL_COL",
+        # OUT_DIR 决定默认排除表落在哪个结果夹，换结局要重读
+        "OUT_DIR", "SUBPROJECT_BY_OUTCOME",
         "OUTCOME_COLS", "SUBGROUP_COL", "GROUP_SOURCE_COL",
         "GROUP_FROM_ID", "GROUP_FROM_ID_SEP",
         "DO_EXCLUDE_SAMPLES", "EXCLUDE_FILE", "EXCLUDE_SHEET",
@@ -835,24 +865,86 @@ def _preview_cache_key(data_path: Path, settings: dict[str, Any]) -> tuple:
         if p.is_file():
             est = p.stat()
             extras.append((str(p), est.st_mtime_ns, est.st_size))
+    for spec in _exclude_specs_for_cache(settings, data_path):
+        p = Path(str(spec.get("file") or ""))
+        if p.is_file():
+            est = p.stat()
+            extras.append((str(p), est.st_mtime_ns, est.st_size))
     return (str(data_path.resolve()), st.st_mtime_ns, st.st_size, tuple(blob), tuple(extras))
 
 
-def _exclude_path(raw: str, data_path: Path) -> Path:
+def _exclude_specs_for_cache(settings: dict[str, Any], data_path: Path) -> list[dict[str, Any]]:
+    """缓存指纹用排除规格（含默认表的实际路径，换结局/改名都要重读）。"""
+    if not settings.get("DO_EXCLUDE_SAMPLES"):
+        return []
+    try:
+        from modules.stats.data_io import _exclude_specs
+        return _exclude_specs(settings, _preview_project_root(data_path))
+    except Exception:
+        return []
+
+
+def _preview_project_root(data_path: Path) -> Path:
+    """预览用的工程根：默认表路径相对它解析（OUT_DIR 相对工程根）。
+
+    数据文件旁边的 ref/settings.ini（或 settings.ini）即工程根；没有则用
+    RAD_PROJECT / cwd，再退回数据文件所在目录。
+    """
+    d = Path(data_path).parent
+    for cand in (d / "ref" / "settings.ini", d / "settings.ini"):
+        if cand.is_file():
+            return d
+    try:
+        from modules.config.ini_io import resolve_project_dir
+        return Path(resolve_project_dir())
+    except Exception:
+        return d
+
+
+def _exclude_path(
+    raw: str,
+    data_path: Path,
+    proj: Path | None = None,
+    settings: dict[str, Any] | None = None,
+) -> Path:
     """已填/默认的排除表路径。
 
-    绝对路径照用。相对路径先按数据文件同目录找，再按工程根（进程 cwd）找 ——
-    默认的 false_classification.xlsx 在工程根，数据表可放在子目录。
+    绝对路径照用。相对路径先按工程根找（OUT_DIR 相对工程根，默认名单已在结果夹里），
+    再按数据文件同目录找 —— 数据表可放在子目录。
     """
     p = Path(str(raw))
     if p.is_absolute():
         return p
+    roots: list[Path] = []
+    if proj is not None:
+        roots.append(Path(proj))
+    try:
+        from modules.config.ini_io import resolve_project_dir
+        roots.append(Path(resolve_project_dir()))
+    except Exception:
+        pass
+    # 裸文件名（控制台下拉给的）在工程根没有时，按同一套规则落到结果夹
+    if settings is not None and p.parent == Path("."):
+        try:
+            from modules.stats.data_io import resolve_exclude_rel_path
+            fixed = Path(resolve_exclude_rel_path(str(raw), roots[0] if roots else None, settings))
+            if fixed.is_absolute():
+                if fixed.is_file():
+                    return fixed
+            else:
+                for root in roots:
+                    if (root / fixed).is_file():
+                        return root / fixed
+        except Exception:
+            pass
+    for root in roots:
+        cand = root / p
+        if cand.is_file():
+            return cand
     beside_data = data_path.parent / p
     if beside_data.is_file():
         return beside_data
-    if p.is_file():
-        return p
-    return beside_data
+    return (roots[0] / p) if roots else beside_data
 
 
 def preview_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str, Any]:

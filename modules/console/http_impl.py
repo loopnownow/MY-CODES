@@ -747,17 +747,17 @@ class Handler(BaseHTTPRequestHandler):
                     dp = proj / data_s
                 dp = under_project(proj, dp)
             try:
+                sp = Path(qs["settings"]) if qs.get("settings") else project_settings(proj)
+                if not sp.is_absolute():
+                    sp = proj / sp
+                try:
+                    st = public_settings(load_settings_module(under_project(proj, sp)))
+                except Exception:
+                    st = {}
                 if file_s:
-                    path_x = resolve_meta_xlsx(proj, file_s, dp)
+                    path_x = resolve_meta_xlsx(proj, file_s, dp, st)
                 else:
                     from modules.stats.data_io import default_exclude_xlsx
-                    sp = Path(qs["settings"]) if qs.get("settings") else project_settings(proj)
-                    if not sp.is_absolute():
-                        sp = proj / sp
-                    try:
-                        st = public_settings(load_settings_module(under_project(proj, sp)))
-                    except Exception:
-                        st = {}
                     rel = default_exclude_xlsx(st)
                     path_x = Path(rel)
                     if not path_x.is_absolute():
