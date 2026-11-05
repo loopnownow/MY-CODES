@@ -117,3 +117,61 @@ def test_roc_extra_names_fall_back_to_rad_sheet():
         label=np.array([0, 1, 0]),
     )
     assert "Left STG_Vgm" not in _vectors_for_roc_names(short, ["Left STG_Vgm"])
+def test_spec_to_prob_resolves_rad_score_display_name(monkeypatch):
+    from modules.pipeline import _spec_to_prob
+    from modules.stats import radiomics as rad
+
+    monkeypatch.setattr(rad, "SCORE_DISPLAY", {"CTA": "Eccentricity_index"}, raising=False)
+    n = 4
+    p_clin = np.full(n, 0.11)
+    p_rad = np.full(n, 0.22)
+    p_comb = np.full(n, 0.33)
+    score_probs = {"CTA": np.full(n, 0.44)}
+    # 组学分数名与展示名都解析到该分数在评估层的概率
+    assert _spec_to_prob(
+        ["Eccentricity_index"], p_clin, p_rad, p_comb, score_probs=score_probs,
+    ).tolist() == [0.44] * n
+    assert _spec_to_prob(
+        ["cta"], p_clin, p_rad, p_comb, score_probs=score_probs,
+    ).tolist() == [0.44] * n
+    # 令牌优先，且多个名字仍是合成模型（交给重拟合）
+    assert _spec_to_prob(
+        ["clinical"], p_clin, p_rad, p_comb, score_probs=score_probs,
+    ) is p_clin
+    assert _spec_to_prob(
+        ["clinical", "Eccentricity_index"], p_clin, p_rad, p_comb,
+        score_probs=score_probs,
+    ) is None
+
+
+def test_nri_old_arms_splits_rad_score_names(monkeypatch):
+    from modules.pipeline import nri_old_arms
+    from modules.stats import radiomics as rad
+
+    monkeypatch.setattr(rad, "SCORE_DISPLAY", {"CTA": "Eccentricity_index"}, raising=False)
+    # 旧模型 = Clinical 与 CTA 分数各一块
+    assert nri_old_arms(
+        ["clinical", "Eccentricity_index"], readers=[], score_names=["CTA"],
+    ) == [["clinical"], ["Eccentricity_index"]]
+    # 未登记的组学名不拆：仍是合成一个旧模型
+    assert nri_old_arms(
+        ["clinical", "Fibrous_ratio"], readers=[], score_names=["CTA"],
+    ) == [["clinical", "Fibrous_ratio"]]
+
+
+def test_resolve_model_frame_accepts_rad_score_name(monkeypatch):
+    import pandas as pd
+
+    from modules.pipeline import resolve_model_frame
+    from modules.stats import radiomics as rad
+
+    monkeypatch.setattr(rad, "SCORE_DISPLAY", {"CTA": "Eccentricity_index"}, raising=False)
+    clin = pd.DataFrame({"LDL": [1.0, 2.0, 3.0]})
+    payload = {"CTA": np.array([0.5, 0.2, 0.9])}
+    frame = resolve_model_frame(
+        ["Eccentricity_index"], clin, ["LDL"], None, side_name="NRI_OLD",
+        score_payload=payload,
+    )
+    assert list(frame.columns) == ["CTA"]
+    assert frame["CTA"].tolist() == [0.5, 0.2, 0.9]
+
