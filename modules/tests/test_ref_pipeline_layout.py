@@ -1,4 +1,4 @@
-"""Layout SSOT: run logs live in ref/pipeline/, false_classification.xlsx at project root."""
+"""Layout SSOT: run logs in ref/pipeline/, false_classification.xlsx in the run's results folder."""
 from __future__ import annotations
 
 import re
@@ -9,6 +9,10 @@ from modules.console.run import run_log_path
 from modules.stats import data_io
 
 MODULES = Path(__file__).resolve().parents[1]
+
+
+def _slash(p: str) -> str:
+    return str(p).replace("\\", "/")
 
 
 def test_project_pipeline_dir_is_ref_pipeline_and_creates_it(tmp_path):
@@ -54,36 +58,52 @@ def test_no_module_writes_run_log_straight_into_ref_root():
     assert offenders == []
 
 
-def test_default_exclude_xlsx_is_project_root_name(tmp_path, monkeypatch):
-    """The default name never carries an OUT_DIR / subproject prefix."""
-    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
-    for settings in (
-        {"OUT_DIR": "Response", "SUBPROJECT_BY_OUTCOME": {"Response": "Response"}},
-        {"OUT_DIR": "out/Group", "OUTCOME_COLS": ["Group"]},
-        {"GROUP_SOURCE_COL": "Response", "OUT_DIR": "Response"},
-        {},
-    ):
-        assert data_io.default_exclude_xlsx(settings) == "false_classification.xlsx"
-        assert data_io.resolve_exclude_xlsx(settings) == str(
-            tmp_path / "false_classification.xlsx"
-        )
-        assert data_io.resolve_exclude_files(settings) == [
-            str(tmp_path / "false_classification.xlsx"),
-        ]
+def test_results_out_dir_prefers_resolved_out_dir():
+    """Results HTML 所在目录：已解析的 OUT_DIR 原样（两两比较的对子夹也认）。"""
+    assert _slash(data_io.resolve_results_out_dir({"OUT_DIR": "Response"})) == "Response"
+    assert _slash(data_io.resolve_results_out_dir({
+        "OUT_DIR": "Response/CCC_vs_ECC",
+    })) == "Response/CCC_vs_ECC"
 
 
-def test_false_classification_path_joins_project_root(tmp_path, monkeypatch):
-    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
-    assert Path(data_io.false_classification_xlsx_path()) == (
-        tmp_path / "false_classification.xlsx"
+def test_results_out_dir_falls_back_to_subproject_mapping():
+    assert _slash(data_io.resolve_results_out_dir({
+        "GROUP_SOURCE_COL": "Response",
+        "SUBPROJECT_BY_OUTCOME": {"Response": "ASL"},
+    })) == "ASL"
+    assert _slash(data_io.resolve_results_out_dir({
+        "OUTCOME_COLS": ["DSI"],
+        "SUBPROJECT_BY_OUTCOME": {"DSI": "Group"},
+    })) == "Group"
+    assert data_io.resolve_results_out_dir({}) == ""
+
+
+def test_default_exclude_xlsx_lives_in_the_run_results_folder():
+    """默认错分表与 Results HTML 同夹：<OUT_DIR>/false_classification.xlsx。"""
+    assert _slash(data_io.default_exclude_xlsx({"OUT_DIR": "Response"})) == (
+        "Response/false_classification.xlsx"
     )
-    assert Path(data_io.false_classification_xlsx_path(tmp_path / "proj")) == (
-        tmp_path / "proj" / "false_classification.xlsx"
-    )
+    assert _slash(data_io.default_exclude_xlsx({
+        "GROUP_SOURCE_COL": "Stroke",
+        "SUBPROJECT_BY_OUTCOME": {"Stroke": "ASL"},
+    })) == "ASL/false_classification.xlsx"
+    # 推不出结局结果夹时退回工程根同名文件，不编造子目录
+    assert data_io.default_exclude_xlsx({}) == "false_classification.xlsx"
 
 
-def test_pipeline_writes_false_classification_via_project_root_helper():
-    """The pipeline must not build the false-classification path from OUT_DIR."""
+def test_false_classification_path_joins_project_dir_with_results_folder(tmp_path, monkeypatch):
+    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
+    assert Path(data_io.false_classification_xlsx_path(
+        settings={"OUT_DIR": "Response"},
+    )) == tmp_path / "Response" / "false_classification.xlsx"
+    assert Path(data_io.false_classification_xlsx_path(
+        tmp_path / "proj",
+        {"OUT_DIR": "out/Group"},
+    )) == tmp_path / "proj" / "out" / "Group" / "false_classification.xlsx"
+
+
+def test_pipeline_writes_false_classification_through_the_shared_helper():
+    """The pipeline must not hard-code its own false-classification path."""
     text = (MODULES / "pipeline.py").read_text(encoding="utf-8")
     assert "data_io.false_classification_xlsx_path()" in text
     assert not re.search(
@@ -92,14 +112,25 @@ def test_pipeline_writes_false_classification_via_project_root_helper():
 
 
 def test_false_classification_write_and_exclude_read_are_one_file(tmp_path, monkeypatch):
-    """DO_FALSE_CLASS writes where the exclude list reads — same project-root file."""
+    """DO_FALSE_CLASS writes where the exclude list reads — same per-outcome file."""
     monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
-    written = data_io.false_classification_xlsx_path()
-    read = data_io.resolve_exclude_files({
-        "OUT_DIR": "Response",
+    settings = {
+        "OUT_DIR": "Response/CCC_vs_ECC",
         "GROUP_SOURCE_COL": "Response",
-    })[0]
+    }
+    written = data_io.false_classification_xlsx_path(settings=settings)
+    read = data_io.resolve_exclude_files(settings)[0]
     assert Path(read) == Path(written)
+    assert Path(written).parent.name == "CCC_vs_ECC"
+
+
+def test_explicit_exclude_file_still_wins_over_the_default(tmp_path, monkeypatch):
+    """EXCLUDE_FILE 非空 → 用户路径，不换到结果夹。"""
+    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
+    user = tmp_path / "ref" / "my_exclude.xlsx"
+    settings = {"OUT_DIR": "Response", "EXCLUDE_FILE": str(user)}
+    assert data_io.resolve_exclude_files(settings) == [str(user)]
+    assert data_io.resolve_exclude_xlsx(settings) == str(user)
 
 
 def test_console_run_opens_run_log_in_pipeline_folder():
@@ -114,8 +145,57 @@ def test_dry_run_plan_names_the_new_paths():
 
     text = dry_run_text(
         "demo_study", Path("/tmp/demo.xlsx"), Path("/tmp/ref/settings.ini"),
-        {"OUTCOME_COLS": ["Response"], "DO_FALSE_CLASS": True},
+        {
+            "OUTCOME_COLS": ["Response"],
+            "SUBPROJECT_BY_OUTCOME": {"Response": "ASL"},
+            "DO_FALSE_CLASS": True,
+        },
         {}, {},
     )
     assert "ref/pipeline/pipeline_run.log" in text
-    assert "false_classification.xlsx   ← 工程根" in text
+    assert "ASL/false_classification.xlsx" in text
+    assert "工程根（不随 OUT_DIR）" not in text
+
+
+def test_pairwise_run_keeps_the_file_in_the_pair_folder():
+    """两两比较：OUT_DIR 已是对子夹，错分表跟着进对子夹，不回结局父层或工程根。"""
+    settings = {
+        "OUT_DIR": "Group/Positive_vs_Negative",
+        "GROUP_SOURCE_COL": "Group",
+        "GROUP_KEEP": ["Positive", "Negative"],
+    }
+    assert _slash(data_io.default_exclude_xlsx(settings)) == (
+        "Group/Positive_vs_Negative/false_classification.xlsx"
+    )
+    assert _slash(data_io.resolve_results_out_dir(settings)) == (
+        "Group/Positive_vs_Negative"
+    )
+
+
+def test_results_folder_is_never_the_project_root():
+    """结果夹与 Results HTML 同一处：都不落工程根。"""
+    for settings in (
+        {"OUT_DIR": "Response"},
+        {"GROUP_SOURCE_COL": "Response", "SUBPROJECT_BY_OUTCOME": {"Response": "ASL"}},
+        {"OUTCOME_COLS": ["Stroke"]},
+    ):
+        got = _slash(data_io.resolve_results_out_dir(settings))
+        assert got and got != "."
+
+
+def test_bare_exclude_name_resolves_inside_the_results_folder(tmp_path, monkeypatch):
+    """控制台下拉里的裸文件名 → 该结局结果夹里的真文件（工程根没有时）。"""
+    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
+    (tmp_path / "ASL").mkdir()
+    target = tmp_path / "ASL" / "false_classification.xlsx"
+    target.write_bytes(b"x")
+    settings = {
+        "OUT_DIR": "ASL",
+        "EXCLUDE_FILE": "false_classification.xlsx",
+    }
+    assert data_io.resolve_exclude_files(settings) == [
+        str(Path("ASL") / "false_classification.xlsx"),
+    ]
+    # 工程根真有同名文件时，仍是工程根那条（用户显式写的路径不猜）
+    (tmp_path / "false_classification.xlsx").write_bytes(b"y")
+    assert data_io.resolve_exclude_files(settings) == ["false_classification.xlsx"]
