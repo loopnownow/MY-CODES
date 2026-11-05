@@ -1,7 +1,8 @@
 """
 false_class.py — 假阳性/假阴性个体分类
 ═══════════════════════════════════════════════════════════════════
-默认：控制台打印宽表 + 写入工程根 false_classification.xlsx（不随 OUT_DIR 走）
+默认：控制台打印宽表 + 写入本次结果夹 false_classification.xlsx
+      （与 Results{子项目}.html 同目录，随 OUT_DIR；不写工程根）
 两张工作单：
   false_classification — ID | Split | Group | Pattern | 各模型 TP/TN/FP/FN
   exc — 排除名单（默认即本文件；重写时保留已填 ID）
@@ -357,6 +358,9 @@ def save_false_classification_xlsx(
     from modules.utils import dry_run as _dry
     if _dry.skip_write(out_path, what="false_classification xlsx"):
         return
+    parent = os.path.dirname(str(out_path).strip())
+    if parent and not os.path.isdir(parent):
+        os.makedirs(parent, exist_ok=True)
     wide = build_false_classification_wide(
         details, split_by_id=split_by_id, group_labels=group_labels,
     )
