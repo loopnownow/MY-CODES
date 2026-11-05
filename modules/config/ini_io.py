@@ -98,7 +98,7 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
     ]),
     ("switch", "模块开关", [
         "DO_FALSE_CLASS", "DO_FDR", "DO_FWER",
-        "VIF_THRESHOLD_WARN", "BOOTSTRAP_N",
+        "VIF_THRESHOLD_WARN", "DO_DROP_DERIVED", "BOOTSTRAP_N",
         "DO_QC_REPORT", "QC_HTML",
         "DO_COMBINED_MODEL",
         "DO_NOMOGRAM", "DO_CALIBRATION",

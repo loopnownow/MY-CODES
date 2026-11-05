@@ -1004,8 +1004,20 @@ def _attach_vif(df: pd.DataFrame, clin: pd.DataFrame, feats: Sequence[str]) -> p
     if key is None:
         return df
     try:
-        from modules.stats.vif_analysis import compute_vif, format_vif
+        from modules.stats.vif_analysis import compute_vif, derived_features, format_vif
         feat_list = [str(f) for f in clin.columns if str(f) in {str(x) for x in feats}]
+        if bool(getattr(cfg, "DO_DROP_DERIVED", False)):
+            drop = set(derived_features(clin, feat_list))
+            if drop:
+                kept = df[~df[key].astype(str).isin(drop)].reset_index(drop=True)
+                if kept.empty:
+                    return kept
+                df = kept
+                feat_list = [f for f in feat_list if f not in drop]
+                print(
+                    "  DO_DROP_DERIVED: 多因素表剔除派生列 " + ", ".join(sorted(drop)),
+                    flush=True,
+                )
         vif_df = compute_vif(clin, feat_list) if len(feat_list) >= 2 else None
         vmap = {}
         if vif_df is not None and len(vif_df):
@@ -1028,8 +1040,13 @@ def _pool_note(candidates: Sequence[str], stepwise: Sequence[str], p_threshold: 
         "Full multivariable model including candidate covariates with univariate logistic "
         f"p < {p_threshold:g} (n = {n}). "
         f"VIF is reported for collinearity warning (warn ≥ {warn:g}) and does not exclude candidates. "
-        "∞ = exactly collinear with another listed feature (VIF not estimable). "
-        "Table 1 group-comparison p and complete-separation terms are not used for entry."
+        + (
+            "Derived columns (exactly collinear with the others) are removed from this table "
+            "(DO_DROP_DERIVED on). "
+            if bool(getattr(cfg, "DO_DROP_DERIVED", False))
+            else "∞ = exactly collinear with another listed feature (VIF not estimable). "
+        )
+        + "Table 1 group-comparison p and complete-separation terms are not used for entry."
     ]
     if removed:
         parts.append(
@@ -1248,11 +1265,23 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
 
     if not uni_df.empty and "Feature" in uni_df.columns:
         try:
-            from modules.stats.vif_analysis import compute_vif
+            from modules.stats.vif_analysis import compute_vif, derived_features, format_vif
             uni_feats = [
                 str(f) for f in uni_df["Feature"].tolist()
                 if str(f) in clin.columns
             ]
+            if bool(getattr(cfg, "DO_DROP_DERIVED", False)):
+                drop = set(derived_features(clin, uni_feats))
+                if drop:
+                    uni_df = uni_df[
+                        ~uni_df["Feature"].astype(str).isin(drop)
+                    ].reset_index(drop=True)
+                    uni_feats = [f for f in uni_feats if f not in drop]
+                    print(
+                        "  DO_DROP_DERIVED: 单因素表剔除派生列 "
+                        + ", ".join(sorted(drop)),
+                        flush=True,
+                    )
             vif_df = compute_vif(clin, uni_feats) if len(uni_feats) >= 2 else None
             vmap = {}
             if vif_df is not None and len(vif_df):
@@ -1262,8 +1291,7 @@ def select_clinical(clin: pd.DataFrame, y_group: np.ndarray, group: pd.Series,
                 }
             uni_df = uni_df.copy()
             uni_df["VIF"] = [
-                f"{vmap[f]:.3f}" if f in vmap and np.isfinite(vmap[f]) else "NA"
-                for f in uni_df["Feature"].astype(str)
+                format_vif(vmap.get(f)) for f in uni_df["Feature"].astype(str)
             ]
             print(f"  VIF attached to Univariate ({len(vmap)} vars)")
         except Exception as e:

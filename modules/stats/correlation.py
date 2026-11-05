@@ -295,6 +295,28 @@ def clear_selected_heatmap() -> None:
             print(f"  removed stale {os.path.basename(path)}")
 
 
+def drop_derived_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """按完全线性表出关系整列剔除派生列（如 AFC_total、*_mean）。
+
+    供 DO_DROP_DERIVED 开关使用：热图与相关表用剔除后的列，并打印被剔除的列名。
+    """
+    from modules.stats.vif_analysis import derived_features
+
+    if df is None or df.shape[1] < 3:
+        return df
+    numeric = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    if len(numeric) < 3:
+        return df
+    drop = derived_features(df, numeric)
+    if not drop:
+        return df
+    print(
+        "  DO_DROP_DERIVED: 剔除派生列 " + ", ".join(drop) + "（与其余列完全线性表出）",
+        flush=True,
+    )
+    return df.drop(columns=drop)
+
+
 def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.DataFrame] = None, dataset_label: str = "all") -> None:
     """
     合并 rad_df + clin_df，计算 Spearman 相关矩阵并绘制带显著性标注的
@@ -334,6 +356,12 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
             df_full.loc[df_full[col] < 0, col] = np.nan
         else:
             df_full[col] = df_full[col].astype(float)
+
+    if bool(getattr(cfg, "DO_DROP_DERIVED", False)):
+        df_full = drop_derived_columns(df_full)
+        if df_full.shape[1] < 2:
+            print("  DO_DROP_DERIVED 后不足 2 列 — skip heatmap.")
+            return
 
     nf = df_full.shape[1]
     print(f"  Features: {nf}")
