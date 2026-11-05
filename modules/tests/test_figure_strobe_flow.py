@@ -65,3 +65,15 @@ def test_audit_rejects_inconsistent_n(tmp_path):
     spec = _spec(included_n=101)
     with pytest.raises(AuditError):
         draw_study_flow(spec, tmp_path / "bad.pdf")
+
+
+def test_width_cm_sets_canvas_print_width(tmp_path):
+    """--width-cm 控制画布印刷宽；0 = 旧的内容自适应宽。"""
+    from PIL import Image
+
+    narrow = draw_study_flow(_spec(), tmp_path / "narrow.png", width_cm=16)
+    im = Image.open(narrow)
+    dpi = float(im.info.get("dpi", (600, 600))[0])
+    assert abs(im.size[0] / dpi - 16 / 2.54) < 0.05
+    wide = draw_study_flow(_spec(), tmp_path / "wide.png", width_cm=0)
+    assert Image.open(wide).size[0] > im.size[0]
