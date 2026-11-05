@@ -218,8 +218,24 @@ def _is_nri_reader_name(name: str, readers: List[str]) -> bool:
     return str(name).strip().lower().startswith("reader")
 
 
-def nri_old_arms(spec, readers: Optional[List[str]] = None) -> List[List[str]]:
-    """一个旧模型返回一项。多个 Reader / 模型名各自成一项，上下各出一份 NRI。
+def _is_nri_model_name(name: str, score_names: Optional[List[str]] = None) -> bool:
+    """令牌、组学分数名或其展示名 → 算一个独立的旧模型。
+
+    score_names 为空时看已登记的 `radiomics.SCORE_DISPLAY`（分数名 → 展示名）。
+    """
+    if _token(name) in _NRI_MODEL_TOKENS:
+        return True
+    pool = list(score_names) if score_names else list(radiomics.SCORE_DISPLAY)
+    for score_name in pool:
+        display = radiomics.score_display_name(score_name)
+        if _token(name) in (_token(score_name), _token(display)):
+            return True
+    return False
+
+
+def nri_old_arms(spec, readers: Optional[List[str]] = None,
+                 score_names: Optional[List[str]] = None) -> List[List[str]]:
+    """一个旧模型返回一项。多个 Reader / 组学分数 / 模型名各自成一项，上下各出一份 NRI。
 
     普通临床列（如体积 + 病灶数）仍合成一个旧模型。
     """
@@ -227,13 +243,21 @@ def nri_old_arms(spec, readers: Optional[List[str]] = None) -> List[List[str]]:
     if len(items) <= 1:
         return [items] if items else [[]]
     pool = list(getattr(cfg, "READER_COLS", None) or []) if readers is None else list(readers)
-    if all(_token(x) in _NRI_MODEL_TOKENS or _is_nri_reader_name(x, pool) for x in items):
+    if all(
+        _is_nri_model_name(x, score_names) or _is_nri_reader_name(x, pool)
+        for x in items
+    ):
         return [[x] for x in items]
     return [items]
 
 
-def _spec_to_prob(spec, p_clin, p_rad, p_comb):
-    """Map NRI_MODEL_* tokens to locked probability vectors. None → caller refits."""
+def _spec_to_prob(spec, p_clin, p_rad, p_comb, score_probs=None):
+    """Map NRI_MODEL_* to locked probability vectors. None → caller refits.
+
+    解析顺序：令牌（clinical / clin / combined / radscore）→ 组学分数名或其展示名
+    （单特征块如 CTA 的分数展示名是 Eccentricity_index）→ 返回 None 交给调用方重拟合。
+    score_probs：{组学分数名: 该分数在评估层的概率}。
+    """
     if spec is None:
         return None
     items = [spec] if isinstance(spec, str) else list(spec)
@@ -246,6 +270,9 @@ def _spec_to_prob(spec, p_clin, p_rad, p_comb):
         return p_comb
     if t in ("radscore", "rad"):
         return p_rad
+    for score_name, prob in dict(score_probs or {}).items():
+        if t in (_token(score_name), _token(radiomics.score_display_name(score_name))):
+            return prob
     return None
 
 
@@ -275,10 +302,13 @@ def resolve_model_frame(
     clin_features: List[str],
     radscore: Optional[np.ndarray],
     side_name: str = "model",
+    score_payload: Optional[Dict[str, np.ndarray]] = None,
 ) -> pd.DataFrame:
     """
     将 NRI/IDI 配置解析为预测矩阵。
-    spec 可为 str 或 list；令牌 clinical / radscore / combined，或 clin 列名。
+    spec 可为 str 或 list；令牌 clinical / radscore / combined，组学分数名或其展示名
+    （如 Eccentricity_index），或 clin 列名。
+    score_payload：{组学分数名: 评估层分数向量}，用于解析组学分数名。
     """
     if spec is None:
         items: List[str] = []
@@ -326,7 +356,23 @@ def resolve_model_frame(
             elif item in clin_df.columns:
                 _add_col(item, pd.to_numeric(clin_df[item], errors="coerce"))
             else:
-                raise ValueError(f"{side_name}: unknown feature/token {item!r}")
+                # 组学分数名或其展示名（单特征块用特征名显示，如 Eccentricity_index）
+                payload = score_payload if isinstance(score_payload, dict) else {}
+                hit = next(
+                    (
+                        str(name) for name, vec in payload.items()
+                        if vec is not None
+                        and t in (_token(name), _token(radiomics.score_display_name(name)))
+                    ),
+                    "",
+                )
+                if hit:
+                    _add_col(hit, payload[hit])
+                else:
+                    raise ValueError(
+                        f"{side_name}: unknown feature/token {item!r} "
+                        "（可接受：clinical / radscore / combined、组学分数名或其展示名、或临床列名）"
+                    )
 
     if not parts:
         raise ValueError(f"{side_name}: empty feature set from spec={spec!r}")
@@ -1335,7 +1381,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             old_spec = getattr(cfg, "NRI_MODEL_OLD", ["clinical"])
             new_spec = getattr(cfg, "NRI_MODEL_NEW", ["combined"])
             cutoff = getattr(cfg, "NRI_CUTOFF", [0.0, 0.3, 0.7, 1.0])
-            arms = nri_old_arms(old_spec)
+            arms = nri_old_arms(old_spec, score_names=list(_tr_scores))
             try:
                 test_pack = val_probs.get("test")
                 use_test = (
@@ -1360,6 +1406,16 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 use_test = False
                 arms = []
             reader = getattr(cfg, "READER_COMPARE_COL", None)
+            # 组学分数在评估层的概率与分数向量：NRI/IDI 旧模型可写成分数名或其展示名。
+            score_probs = (
+                dict(getattr(res_test["rad"], "score_probs", None) or {})
+                if use_test else dict(p_rad_map)
+            )
+            _score_vecs = _score_payload(res_test["rad"] if use_test else res_train["rad"])
+            score_vecs = (
+                _score_vecs if isinstance(_score_vecs, dict)
+                else ({"RadScore": _score_vecs} if _score_vecs is not None else {})
+            )
             for i, arm in enumerate(arms):
                 label = arm[0] if len(arm) == 1 else ", ".join(arm)
                 slug = _nri_slug(label)
@@ -1369,8 +1425,12 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                         f"old={arm} new={new_spec}"
                         + (f"  reader={reader}" if reader else "")
                     )
-                    p_old = _spec_to_prob(arm, p_c_n, p_r_n, p_comb_n)
-                    p_new = _spec_to_prob(new_spec, p_c_n, p_r_n, p_comb_n)
+                    p_old = _spec_to_prob(
+                        arm, p_c_n, p_r_n, p_comb_n, score_probs=score_probs,
+                    )
+                    p_new = _spec_to_prob(
+                        new_spec, p_c_n, p_r_n, p_comb_n, score_probs=score_probs,
+                    )
                     if p_old is not None and p_new is not None:
                         nri_one = nri_from_probs(
                             p_old, p_new, y_nri, cutoff=cutoff, seed=cfg.SEED,
@@ -1384,10 +1444,12 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                         x1 = resolve_model_frame(
                             arm, frame_clin, train_clin_feat,
                             frame_rad, side_name="NRI_OLD",
+                            score_payload=score_vecs,
                         )
                         x2 = resolve_model_frame(
                             new_spec, frame_clin, train_clin_feat,
                             frame_rad, side_name="NRI_NEW",
+                            score_payload=score_vecs,
                         )
                         nri_one = nri(
                             x1, x2, y_nri, cutoff=cutoff, seed=cfg.SEED,
