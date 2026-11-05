@@ -425,7 +425,20 @@ def dry_run_text(project: str, data: Path, settings_path: Path,
         )
     lines.append("  ref/pipeline/pipeline_run.log   ← 工程 ref/pipeline/ 运行日志")
     if merged.get("DO_FALSE_CLASS", True):
-        lines.append("  false_classification.xlsx   ← 工程根（不随 OUT_DIR）")
+        dests: list[str] = []
+        for r in plan:
+            d = str(r.get("dest") or "").strip()
+            if d and d != "<工程根>" and d not in dests:
+                dests.append(d)
+        if dests:
+            for d in dests:
+                lines.append(
+                    f"  {d}/false_classification.xlsx   ← 该次结果夹（与 Results HTML 同目录）"
+                )
+        else:
+            lines.append(
+                "  false_classification.xlsx   ← 该次结果夹（与 Results HTML 同目录）"
+            )
     if not plan:
         lines.append("  （无结局、无对子）")
     else:
