@@ -268,7 +268,6 @@ footer{
       <p id="msg" class="hint">「开启服务」启动控制台，「关闭服务」停止。开启后自动进入「统计配置」。</p>
     </section>
   </div>
-  <!-- 数据区已移到控制台「数据预览」页；本区只作 pageUrl / protoUrl 的状态来源，页面不显示。 -->
   <section id="dataBlock" class="card" hidden aria-labelledby="h-data">
     <h2 id="h-data"><span class="n">4</span> 加载数据</h2>
     <p class="hint">服务已开。选 Excel 和外验后点「加载数据」，再选 sheet。项目 / 数据 / 外验均在本区。</p>
@@ -932,7 +931,6 @@ function onServiceReady(p) {
   wantAutoJump = false;
   autoOpenConsole(p);
 }
-// 开服务后自动进控制台「统计配置」页（先探一次 /api/settings，失败就留在本页报原因）。
 async function autoOpenConsole(p) {
   msg.textContent = "服务已开，正在进入控制台…";
   const url = pageUrl(p);

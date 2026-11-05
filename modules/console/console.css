@@ -43,7 +43,6 @@ header #loadHint .err{color:#ffc9c9}
 .preview-page{max-width:none;width:100%;box-sizing:border-box;margin:0;padding:12px 16px 40px}
 #panePreview #previewBox{max-height:none}
 #panePreview #previewCard{overflow:visible}
-/* 数据预览页：三列（项目信息 / 数据+结果 / 操作） */
 .preview-page{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr) 440px;gap:12px;align-items:start}
 .pv-col{display:grid;gap:12px;min-width:0}
 #pvDataCard,#pvInfoCard,#pvActionCard{overflow:visible;min-width:0}
@@ -63,7 +62,6 @@ header #loadHint .err{color:#ffc9c9}
 #pvDataForm .field-group.exclude>.grp-rest{grid-template-columns:repeat(4,minmax(0,1fr))}
 #pvDataForm .pick-row input[type=text]{flex:1 1 18em;width:100%}
 #pvDataForm #ioCard{padding:0;background:transparent;box-shadow:none;border:0}
-/* 工作表角色表 */
 .pv-role{display:grid;gap:4px}
 .pv-role-head,.pv-role-row{display:grid;grid-template-columns:minmax(6em,1.1fr) 5.5em minmax(7em,1fr) minmax(7em,1fr) minmax(7em,1fr);gap:6px;align-items:center}
 .pv-role-head{color:var(--muted);font-size:11px;letter-spacing:.04em}
@@ -73,7 +71,6 @@ header #loadHint .err{color:#ffc9c9}
 .pv-role-row.is-rad .sheet{font-weight:600;color:var(--accent)}
 .pv-role-row.is-off{opacity:.55}
 .pv-role select,.pv-role input{width:100%;min-width:0;font-size:12px;padding:4px 6px}
-/* 样本排除名单（多文件，共用第一行的 sheet / 列 / 内容） */
 .pv-exc{display:grid;gap:4px}
 .pv-exc-head,.pv-exc-row{display:grid;grid-template-columns:minmax(9em,1.4fr) auto minmax(7em,1fr) minmax(7em,1fr) minmax(8em,1fr) auto;gap:6px;align-items:center}
 .pv-exc-head{color:var(--muted);font-size:11px;letter-spacing:.04em}
@@ -82,7 +79,6 @@ header #loadHint .err{color:#ffc9c9}
 .pv-exc-row select:disabled{opacity:.45}
 .pv-file-card{display:grid;gap:6px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r8);background:#fff}
 .pv-file-card + .pv-file-card{margin-top:8px}
-/* 三个文件卡（主数据 / 外验 / 排除名单）共用同一套头行：标签靠左、输入框铺满、按钮贴右。 */
 .pv-file-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .pv-file-head .pv-file-tag{font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;white-space:nowrap}
 .pv-file-head input[type=text]{flex:1 1 12em;width:auto;min-width:0;font-size:12px;padding:4px 6px}
@@ -267,7 +263,6 @@ table.mini th{background:#eef3f1;text-align:left}
   gap:4px 8px;padding:6px 8px;align-items:start;
   justify-content:stretch;justify-items:stretch;
 }
-/* 临床筛选：一行多列（与临床预处理同一套排布） */
 [data-sec="clin"] .sec-body.clin-body{
   grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
   justify-content:stretch;justify-items:stretch;
@@ -963,7 +958,6 @@ table.mini th{background:#eef3f1;text-align:left}
 .pal-mini.aux i{width:11px;height:11px;flex-basis:11px}
 
 
-/* === RAD console polish (UX + visual design) === */
 button,input,select,textarea,.tab,.btn,.otab,.pal-opt,.res-opt,.grp-chip,.addfind-op,.addfind-item,.unov{
   transition:background-color var(--ease),border-color var(--ease),box-shadow var(--ease),color var(--ease),filter var(--ease),opacity var(--ease);
 }
@@ -979,7 +973,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   *,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
 }
 
-/* Section cards: clearer hierarchy, calmer spacing */
 .sec-block{
   margin:0 0 12px;border:1px solid var(--line);border-radius:var(--r8);
   background:#fff;overflow:visible;
@@ -1011,7 +1004,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   color:var(--muted);font-size:12px;line-height:1.4;
 }
 
-/* Bool switches: multi-column, left-aligned; share zone with dropdowns via display:contents */
 .sec-bools,.grp-bools,.sec-rest,.switch-inputs,.fig-fields,.grp-rest{display:contents}
 .field.bool,
 .sec-bools .field,
@@ -1030,7 +1022,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sec-bools input[type=checkbox],
 .grp-bools input[type=checkbox]{width:auto;margin:0;flex:0 0 auto}
 
-/* Switch / fig / module zones: equal-width fr columns across the row */
 [data-sec="switch"] .sec-body.switch-body,
 [data-sec="fig"] .sec-body.fig-body,
 [data-sec="nomo"] .sec-body.nomo-body,
@@ -1050,7 +1041,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   width:100%;min-width:0;max-width:100%;
 }
 
-/* Selected chips ABOVE add-from-data dropdown (column flex; chip-row first) */
 .checks{
   display:flex;flex-direction:column;align-items:stretch;gap:6px;
 }
@@ -1065,11 +1055,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 }
 .checks .chip-row:empty{display:none}
 
-/* No hot red asterisks / red bold (keep inert) */
 .star{display:none!important}
 .field.hot .lab,.field.hot>label,.k.hot{color:inherit;font-weight:inherit}
 
-/* Cards / controls: calmer hover, visible focus already above */
 .card{border-radius:var(--r8);padding:12px 14px;margin:0 0 12px}
 .btn{border-radius:var(--r4);padding:6px 12px}
 .tab{border-radius:var(--r4)}
@@ -1084,15 +1072,12 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 .res-opt,.pal-opt{border-radius:var(--r8)}
 #statusDot.run{box-shadow:0 0 0 3px #e07a3d33}
 
-/* Soften heavy inset accent bars slightly (still one accent, no glow stack) */
 .col.mid #grpCard,.sec-body #grpCard,
 #ioCard,.field-group.labels{
   box-shadow:inset 4px 0 0 var(--accent);
 }
 
 
-/* ===== 一行多列：等宽均分各列（1fr），不用 max-content 挤压 ===== */
-/* 说明只悬停（data-tip / title），不常驻标题栏正文 */
 .sec-block>h3 .sec-hint{display:none}
 .sec-block>h3 .title-gap{flex:0 0 auto}
 .sec-block>h3 .title-textlist{
@@ -1172,7 +1157,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   justify-self:stretch;
 }
 
-/* Body hints live in title / sub-title bars now */
 .sec-body > .hint,
 .field-group > .hint,
 .radprep-body > .hint,
@@ -1194,7 +1178,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   display:flex;flex-direction:column;gap:8px;min-width:0;
   justify-content:stretch;justify-items:stretch;align-items:stretch;
 }
-/* 正文常驻说明已改为 h3 data-tip 悬停 */
 [data-sec="roc"] .sec-body-hint,
 [data-sec="advanced"] .sec-body-hint{
   display:none;
@@ -1237,7 +1220,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 [data-sec="roc"] .mod-block textarea{
   min-height:6.5em;box-sizing:border-box;
 }
-/* E：checklist / pathlist 占满块宽，不用 8 列碎格 */
 [data-sec="advanced"] .mod-block .field.pathlist,
 [data-sec="advanced"] .mod-block .field.span2,
 [data-sec="advanced"] .mod-block .checks{
@@ -1250,7 +1232,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 [data-sec="roc"] .field .td-time-add input{
   width:auto;min-width:7em;max-width:100%;flex:1 1 8em;
 }
-/* B：中栏常 <640px；仅真正很窄时才叠成一列 */
 @container (max-width: 380px){
   [data-sec="roc"] .mod-blocks,
   [data-sec="advanced"] .mod-blocks,
@@ -1263,7 +1244,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   }
 }
 
-/* 文本编码默认收起，占工作表整行。 */
 [data-sec="io"] details.encode-fold{
   grid-column:1 / -1;min-width:0;
 }
@@ -1272,7 +1252,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   width:100%;max-width:100%;
 }
 
-/* 标记侧和最少列数跟在重新识别旁边。 */
 .rad-marker-ctl{
   display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;
   font-weight:500;color:var(--ink);font-size:12px;
@@ -1298,7 +1277,6 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 .td-pair-head{font-size:11px;font-weight:600;color:var(--muted)}
 .td-pair select{width:100%;min-width:0;max-width:100%}
 
-/* 组学预处理 / LASSO / Logistic / 图与显示：一行四列，卡片内单列堆叠。 */
 .sec-quad{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr));

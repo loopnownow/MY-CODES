@@ -17,7 +17,6 @@ const OUTCOME_OVERRIDE_KEYS = new Set([
   "FIG_PALETTE", "FIG_COLORS_MAIN", "FIG_COLORS_AUX",
 ]);
 
-// 多结局时公共页不画这些，只在各结局页改（空=用 ini 默认）。
 const PUBLIC_HIDE_WHEN_MULTI = new Set([
   "SEED", "TRAIN_RATIO",
   "SKIP_CLIN_FEATURES",
@@ -224,7 +223,6 @@ const FIELD_BUNDLES = [
   },
 ];
 
-// 这三个 bundle 在「数据预览」页渲染，不进配置页的 io 段。
 const DATA_PANE_BUNDLES = new Set(["sheets", "external", "exclude"]);
 
 const PAL_ORDER = [
