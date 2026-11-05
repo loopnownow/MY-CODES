@@ -44,7 +44,7 @@ header #loadHint .err{color:#ffc9c9}
 #panePreview #previewBox{max-height:none}
 #panePreview #previewCard{overflow:visible}
 /* 数据预览页：三列（项目信息 / 数据+结果 / 操作） */
-.preview-page{display:grid;grid-template-columns:minmax(230px,270px) minmax(0,1fr) minmax(210px,280px);gap:12px;align-items:start}
+.preview-page{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr) 440px;gap:12px;align-items:start}
 .pv-col{display:grid;gap:12px;min-width:0}
 #pvDataCard,#pvInfoCard,#pvActionCard{overflow:visible;min-width:0}
 .pv-kv{display:grid;gap:8px;font-size:13px}
@@ -62,7 +62,7 @@ header #loadHint .err{color:#ffc9c9}
 #pvDataForm .field-group.sheets>.hint{display:none}
 #pvDataForm .field-group.exclude>.grp-rest{grid-template-columns:repeat(4,minmax(0,1fr))}
 #pvDataForm .pick-row input[type=text]{flex:1 1 18em;width:100%}
-#pvDataForm #ioCard{padding:0;background:transparent;box-shadow:none}
+#pvDataForm #ioCard{padding:0;background:transparent;box-shadow:none;border:0}
 /* 工作表角色表 */
 .pv-role{display:grid;gap:4px}
 .pv-role-head,.pv-role-row{display:grid;grid-template-columns:minmax(6em,1.1fr) 5.5em minmax(7em,1fr) minmax(7em,1fr) minmax(7em,1fr);gap:6px;align-items:center}
@@ -110,6 +110,13 @@ header #loadHint .err{color:#ffc9c9}
 .enc-sub{margin:10px 0 0}
 .enc-sub>.subh{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
 @media (max-width:1280px){
+  .preview-page{grid-template-columns:minmax(200px,240px) minmax(0,1fr) 400px}
+}
+@media (max-width:1100px){
+  .preview-page{grid-template-columns:minmax(200px,240px) minmax(0,1fr)}
+  .preview-page>.pv-col[data-pvcol="right"]{grid-column:1/-1}
+}
+@media (max-width:900px){
   .preview-page{grid-template-columns:minmax(0,1fr)}
 }
 #flowFrame{width:100%;height:100%;border:0;display:block;background:#e8edf2}
@@ -206,7 +213,7 @@ a.btn{display:inline-block;text-decoration:none;line-height:1.2}
 .subh:first-of-type{margin-top:2px}
 .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .btn-grid .btn{width:100%;text-align:center;box-sizing:border-box}
-.run-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.run-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
 .run-actions .btn{width:100%;min-width:0;padding:6px 2px;text-align:center;font-size:13px}
 .hint{color:var(--muted);font-size:12px}
 .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
@@ -231,13 +238,6 @@ table.mini th{background:#eef3f1;text-align:left}
   border-radius:var(--r8) 8px 0 0;
   display:flex;align-items:center;gap:8px;
 }
-.sec-block>h3 .sec-group{
-  margin-left:auto;display:inline-flex;align-items:center;gap:6px;
-  font-size:12px;font-weight:600;color:var(--ink);cursor:default;
-}
-.sec-block>h3 .sec-group select{
-  width:auto;min-width:7em;font-weight:400;cursor:pointer;
-}
 .mod-sw{display:inline-flex;align-items:center;margin:0;cursor:pointer}
 .mod-sw input{width:auto;margin:0}
 .sec-block.mod-off .sec-body{opacity:.42;pointer-events:none}
@@ -250,7 +250,7 @@ table.mini th{background:#eef3f1;text-align:left}
 [data-sec="clin"] .sec-body.clin-body,
 [data-sec="nomo"] .sec-body.nomo-body,
 [data-sec="roc"] .sec-body.roc-body,
-[data-sec="corr"] .sec-body.corr-body,
+[data-sec="pcorr"] .sec-body.pcorr-body,
 [data-sec="ancova"] .sec-body.ancova-body,
 [data-sec="mlr"] .sec-body.mlr-body,
 [data-sec="pcorr"] .sec-body.pcorr-body,
@@ -282,7 +282,7 @@ table.mini th{background:#eef3f1;text-align:left}
 [data-sec="clin"] .field.span2,
 [data-sec="nomo"] .field.span2,
 [data-sec="roc"] .field.span2,
-[data-sec="corr"] .field.span2,
+[data-sec="pcorr"] .field.span2,
 [data-sec="advanced"] .field.span2{grid-column:span 2}
 [data-sec="advanced"] .field.pathlist{grid-column:1/-1}
 .path-list{display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -296,15 +296,15 @@ table.mini th{background:#eef3f1;text-align:left}
   gap:4px 8px;align-items:start;
 }
 [data-sec="pcorr"] .sec-body.pcorr-body,
-[data-sec="corr"] .sec-body.corr-body{
+[data-sec="pcorr"] .sec-body.pcorr-body{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
   gap:4px 8px;align-items:start;
 }
 [data-sec="ancova"] .field,[data-sec="mlr"] .field,[data-sec="pcorr"] .field,
-[data-sec="corr"] .field{min-width:0}
-[data-sec="corr"] .sec-bools .field{min-width:0;white-space:normal}
+[data-sec="pcorr"] .field{min-width:0}
+[data-sec="pcorr"] .sec-bools .field{min-width:0;white-space:normal}
 [data-sec="ancova"] .field select,[data-sec="mlr"] .field select,[data-sec="pcorr"] .field select,
-[data-sec="corr"] .field select,[data-sec="corr"] .field input[type=text]{
+[data-sec="pcorr"] .field select,[data-sec="pcorr"] .field input[type=text]{
   width:100%;max-width:none;min-width:0;
 }
 [data-sec="nomo"] .field.span4,[data-sec="roc"] .field.span4,[data-sec="fig"] .field.span4{grid-column:span 4}
@@ -322,39 +322,39 @@ table.mini th{background:#eef3f1;text-align:left}
 }
 [data-sec="fig"] .fig-body #palCard h2{grid-column:1/-1}
 [data-sec="clin"] .field,[data-sec="nomo"] .field,[data-sec="roc"] .field,
-[data-sec="corr"] .field,[data-sec="advanced"] .field,[data-sec="fig"] .field{gap:1px}
+[data-sec="pcorr"] .field,[data-sec="advanced"] .field,[data-sec="fig"] .field{gap:1px}
 [data-sec="clin"] .field .lab,[data-sec="nomo"] .field .lab,[data-sec="roc"] .field .lab,
-[data-sec="corr"] .field .lab,[data-sec="advanced"] .field .lab,[data-sec="fig"] .field .lab{font-size:11px}
+[data-sec="pcorr"] .field .lab,[data-sec="advanced"] .field .lab,[data-sec="fig"] .field .lab{font-size:11px}
 [data-sec="rad"] .rad-strip,
-[data-sec="radprep"] .rad-strip{
+[data-sec="radblocks"] .rad-strip{
   grid-column:1/-1;min-width:0;background:#f6f9f8;border:1px solid var(--line);
   border-radius:var(--r8);padding:4px 8px;
 }
 [data-sec="rad"] .rad-skip,
-[data-sec="radprep"] .rad-skip,
+[data-sec="radblocks"] .rad-skip,
 [data-sec="radlog"] .rad-skip{margin:0;grid-column:1/-1}
-[data-sec="radprep"] .hint,
+[data-sec="radblocks"] .hint,
 [data-sec="radlog"] .hint{grid-column:1/-1;margin:0}
 [data-sec="rad"] .rad-strip .field,
-[data-sec="radprep"] .rad-strip .field{gap:2px}
+[data-sec="radblocks"] .rad-strip .field{gap:2px}
 [data-sec="rad"] .rad-inputs .field .lab,
 [data-sec="radlog"] .rad-inputs .field .lab,
 [data-sec="rad"] .rad-strip .field .lab,
-[data-sec="radprep"] .rad-strip .field .lab{font-size:10px;line-height:1.2;color:var(--muted)}
+[data-sec="radblocks"] .rad-strip .field .lab{font-size:10px;line-height:1.2;color:var(--muted)}
 [data-sec="rad"] details.rad-strip > .field > .lab,
-[data-sec="radprep"] details.rad-strip > .field > .lab{display:none}
+[data-sec="radblocks"] details.rad-strip > .field > .lab{display:none}
 [data-sec="rad"] .rad-inputs,
 [data-sec="radlog"] .rad-inputs{display:contents}
 [data-sec="rad"] .rad-inputs input,
 [data-sec="radlog"] .rad-inputs input{padding:4px 6px;font-size:12px;width:100%}
 [data-sec="rad"] .rad-inputs select,
 [data-sec="radlog"] .rad-inputs select{width:100%}
-[data-sec="switch"],[data-sec="rad"],[data-sec="radprep"],[data-sec="radlog"],[data-sec="fig"],
-[data-sec="clin"],[data-sec="clinprep"],[data-sec="nomo"],[data-sec="roc"],[data-sec="corr"],[data-sec="advanced"],[data-sec="surv"]{margin-bottom:8px}
-[data-sec="switch"]>h3,[data-sec="rad"]>h3,[data-sec="radprep"]>h3,[data-sec="radlog"]>h3,[data-sec="fig"]>h3,
-[data-sec="clin"]>h3,[data-sec="clinprep"]>h3,[data-sec="nomo"]>h3,[data-sec="roc"]>h3,[data-sec="corr"]>h3,[data-sec="advanced"]>h3{padding:5px 8px;font-size:12px}
-[data-sec="switch"] .field,[data-sec="rad"] .field,[data-sec="radprep"] .field,[data-sec="radlog"] .field,[data-sec="fig"] .field{gap:1px}
-[data-sec="switch"] .field .lab,[data-sec="rad"] .field .lab,[data-sec="radprep"] .field .lab,[data-sec="radlog"] .field .lab,[data-sec="fig"] .field .lab{font-size:11px}
+[data-sec="switch"],[data-sec="rad"],[data-sec="radblocks"],[data-sec="radlog"],[data-sec="fig"],
+[data-sec="clin"],[data-sec="clinprep"],[data-sec="nomo"],[data-sec="roc"],[data-sec="pcorr"],[data-sec="advanced"],[data-sec="surv"]{margin-bottom:8px}
+[data-sec="switch"]>h3,[data-sec="rad"]>h3,[data-sec="radblocks"]>h3,[data-sec="radlog"]>h3,[data-sec="fig"]>h3,
+[data-sec="clin"]>h3,[data-sec="clinprep"]>h3,[data-sec="nomo"]>h3,[data-sec="roc"]>h3,[data-sec="pcorr"]>h3,[data-sec="advanced"]>h3{padding:5px 8px;font-size:12px}
+[data-sec="switch"] .field,[data-sec="rad"] .field,[data-sec="radblocks"] .field,[data-sec="radlog"] .field,[data-sec="fig"] .field{gap:1px}
+[data-sec="switch"] .field .lab,[data-sec="rad"] .field .lab,[data-sec="radblocks"] .field .lab,[data-sec="radlog"] .field .lab,[data-sec="fig"] .field .lab{font-size:11px}
 
 /* Size by middle pane, not the window. Keep 6 columns until the pane is truly narrow. */
 @container (max-width: 640px){
@@ -362,7 +362,7 @@ table.mini th{background:#eef3f1;text-align:left}
   [data-sec="clin"] .sec-body.clin-body,
   [data-sec="nomo"] .sec-body.nomo-body,
   [data-sec="roc"] .sec-body.roc-body,
-  [data-sec="corr"] .sec-body.corr-body,
+  [data-sec="pcorr"] .sec-body.pcorr-body,
   [data-sec="advanced"] .sec-body.adv-body,
   [data-sec="rad"] .sec-body.rad-body,
   [data-sec="switch"] .sec-body.switch-body,
@@ -394,14 +394,14 @@ table.mini th{background:#eef3f1;text-align:left}
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
   [data-sec="nomo"] .field.span4,[data-sec="roc"] .field.span4,[data-sec="fig"] .field.span4{grid-column:span 2}
-  [data-sec="corr"] .sec-body.corr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
+  [data-sec="pcorr"] .sec-body.pcorr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @container (max-width: 460px){
   .sec-body,
   [data-sec="clin"] .sec-body.clin-body,
   [data-sec="nomo"] .sec-body.nomo-body,
   [data-sec="roc"] .sec-body.roc-body,
-  [data-sec="corr"] .sec-body.corr-body,
+  [data-sec="pcorr"] .sec-body.pcorr-body,
   [data-sec="advanced"] .sec-body.adv-body,
   [data-sec="rad"] .sec-body.rad-body,
   [data-sec="switch"] .sec-body.switch-body,
@@ -411,7 +411,7 @@ table.mini th{background:#eef3f1;text-align:left}
   .field-group.icc>.grp-rest{grid-template-columns:repeat(2,minmax(6em,1fr))}
   [data-sec="io"] .sec-body.io-sheets{grid-template-columns:repeat(2,minmax(0,1fr))}
   [data-sec="nomo"] .field.span4,[data-sec="roc"] .field.span4,[data-sec="fig"] .field.span4{grid-column:1/-1}
-  [data-sec="corr"] .sec-body.corr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
+  [data-sec="pcorr"] .sec-body.pcorr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
   [data-sec="clinprep"] .sec-body.clinprep-body{
     grid-auto-flow:row;grid-auto-columns:auto;
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -712,7 +712,7 @@ table.mini th{background:#eef3f1;text-align:left}
 .field-group.nri{grid-template-columns:repeat(3,minmax(0,1fr))}
 [data-sec="nomo"] .sec-body.nomo-body{grid-template-columns:repeat(2,minmax(0,1fr))}
 /* roc/advanced 布局见文末权威块；此处不再写 3/8 列 */
-[data-sec="corr"] .sec-body.corr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
+[data-sec="pcorr"] .sec-body.pcorr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
 [data-sec="fig"] .sec-body.fig-body{grid-template-columns:repeat(8,minmax(0,1fr))}
 [data-sec="rad"] .sec-body.rad-body{grid-template-columns:repeat(9,minmax(0,1fr))}
 [data-sec="radlog"] .sec-body.radlog-body{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -1002,7 +1002,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .switch-body > .hint,
 .nomo-body > .hint,
 .roc-body > .hint,
-.corr-body > .hint,
+.pcorr-body > .hint,
 .adv-body > .hint,
 .surv-body > .hint{
   grid-column:1/-1;
@@ -1034,7 +1034,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 [data-sec="switch"] .sec-body.switch-body,
 [data-sec="fig"] .sec-body.fig-body,
 [data-sec="nomo"] .sec-body.nomo-body,
-[data-sec="corr"] .sec-body.corr-body,
+[data-sec="pcorr"] .sec-body.pcorr-body,
 [data-sec="surv"] .sec-body.surv-body{
   justify-content:stretch;
   justify-items:stretch;
@@ -1094,7 +1094,7 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 /* ===== 一行多列：等宽均分各列（1fr），不用 max-content 挤压 ===== */
 /* 说明只悬停（data-tip / title），不常驻标题栏正文 */
 .sec-block>h3 .sec-hint{display:none}
-.sec-block>h3 .sec-group{flex:0 0 auto}
+.sec-block>h3 .title-gap{flex:0 0 auto}
 .sec-block>h3 .title-textlist{
   display:inline-flex;align-items:center;gap:4px;margin-left:6px;
   font-size:12px;font-weight:600;color:var(--ink);cursor:default;
@@ -1108,11 +1108,11 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 [data-sec="pcorr"] .sec-body.pcorr-body,
 [data-sec="fig"] .sec-body.fig-body,
 [data-sec="nomo"] .sec-body.nomo-body,
-[data-sec="corr"] .sec-body.corr-body,
+[data-sec="pcorr"] .sec-body.pcorr-body,
 [data-sec="surv"] .sec-body.surv-body,
 [data-sec="radlog"] .sec-body.radlog-body,
 [data-sec="rad"] .sec-body.rad-body,
-[data-sec="radprep"] .sec-body.radprep-body,
+[data-sec="radblocks"] .sec-body.radprep-body,
 [data-sec="clinprep"] .sec-body.clinprep-body{
   display:grid;
   justify-content:stretch;
@@ -1128,7 +1128,7 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 }
 [data-sec="nomo"] .sec-body.nomo-body{grid-template-columns:repeat(2,minmax(0,1fr))}
 /* roc/advanced：见文末权威块 */
-[data-sec="corr"] .sec-body.corr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
+[data-sec="pcorr"] .sec-body.pcorr-body{grid-template-columns:repeat(4,minmax(0,1fr))}
 [data-sec="fig"] .sec-body.fig-body{grid-template-columns:repeat(8,minmax(0,1fr))}
 [data-sec="rad"] .sec-body.rad-body{grid-template-columns:repeat(9,minmax(0,1fr))}
 [data-sec="radlog"] .sec-body.radlog-body{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -1180,7 +1180,7 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 .switch-body > .hint,
 .nomo-body > .hint,
 .roc-body > .hint,
-.corr-body > .hint,
+.pcorr-body > .hint,
 .adv-body > .hint,
 .surv-body > .hint,
 .pcorr-body > .hint{
@@ -1301,12 +1301,12 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
 /* 组学预处理 / LASSO / Logistic / 图与显示：一行四列，卡片内单列堆叠。 */
 .sec-quad{
   display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
   gap:8px 10px;align-items:start;min-width:0;
 }
 .sec-quad > .sec-block{min-width:0;margin:0}
 .sec-quad .sec-block > h3{flex-wrap:wrap}
-.sec-quad [data-sec="radprep"] .radprep-body,
+.sec-quad [data-sec="radblocks"] .radprep-body,
 .sec-quad [data-sec="rad"] .rad-body,
 .sec-quad [data-sec="radlog"] .radlog-body,
 .sec-quad [data-sec="fig"] .fig-body{
@@ -1392,4 +1392,11 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   [data-sec="clin"] .sec-body.clin-body .field.pathlist{
     grid-column:1/-1;
   }
+}
+
+/* 组学模块：预处理并入后整卡单列堆叠，预处理字段自己一行多列（2026-11-05） */
+[data-sec="radblocks"] .sec-body.radblocks-body{grid-template-columns:minmax(0,1fr)}
+[data-sec="radblocks"] .radprep-body{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5em,1fr));
+  gap:4px 10px;margin:0 0 6px;min-width:0;
 }

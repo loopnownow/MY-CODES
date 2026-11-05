@@ -52,6 +52,21 @@ def test_default_manuscript_falls_back_to_first_docx_and_then_empty(tmp_path):
     assert default_manuscript([]) == ""
 
 
+def test_scan_manuscripts_orders_decimal_versions(tmp_path):
+    """V1.10 must sort above V1.9, and V2.1 above both (major.minor, not first digit)."""
+    _docx(tmp_path / "Manuscript_demo_V1.9.docx", ("Title",))
+    _docx(tmp_path / "Manuscript_demo_V1.10.docx", ("Title",))
+    _docx(tmp_path / "Manuscript_demo_V2.1.docx", ("Title",))
+
+    files = scan_manuscripts(tmp_path)
+    assert [entry["name"] for entry in files] == [
+        "Manuscript_demo_V2.1.docx",
+        "Manuscript_demo_V1.10.docx",
+        "Manuscript_demo_V1.9.docx",
+    ]
+    assert default_manuscript(files) == "Manuscript_demo_V2.1.docx"
+
+
 def test_flow_spec_from_docx_reads_materials_and_methods(tmp_path):
     path = _docx(
         tmp_path / "Manuscript_demo_V1.docx",

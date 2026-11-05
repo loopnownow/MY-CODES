@@ -654,12 +654,17 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
             "n_cols": int(meta.get("n_cols") or 0),
             "id_col": id_col,
             "n_id": n_id,
-            "score": score,
+            "score": score or hit,
         })
 
-    _role_row("clin", "临床信息", ch, clin_id)
-    _role_row("qc", "质控", qc_sheet, "")
-    _role_row("icc", "ICC", icc_sheet, "")
+    _role_row(
+        "clin", "临床信息", ch, clin_id,
+        str(settings.get("CLIN_SCORE") or "Clinical"),
+    )
+    _role_row("qc", "质控", qc_sheet, str(settings.get("QC_ID_COL") or ""),
+              str(settings.get("QC_SCORE") or ""))
+    _role_row("icc", "ICC", icc_sheet, str(settings.get("ICC_ID_COL") or ""),
+              str(settings.get("ICC_SCORE") or ""))
     _blocks_raw = settings.get("MODALITY_BLOCKS") or []
     if isinstance(_blocks_raw, list) and _blocks_raw:
         for _item in _blocks_raw:

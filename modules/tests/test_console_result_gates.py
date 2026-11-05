@@ -482,14 +482,17 @@ def test_console_preview_tab_and_wider_run_column():
     assert 'id="palCol"' in html and 'id="palCard"' in html
     assert html.index('id="palCol"') < html.index('class="col mid"')
     assert ">干跑</button>" in html and ">运行</button>" in html and ">重启</button>" in html
-    assert ">保存</button>" in html and ">读取</button>" not in html
+    # 保存按钮已从右侧控制台移走，只留顶部的「保存配置」
+    assert ">保存</button>" not in html and ">读取</button>" not in html
+    assert ">保存配置</button>" in html
     assert 'id="btnLoadBak"' not in html and "btnLoadBak" not in ui and "restoreBackup" not in ui
     assert "读取用 .bak" not in html
-    assert html.index('id="btnWrite"') < html.index('id="btnDry"') < html.index('id="btnRun"')
+    assert 'id="btnWrite"' not in html and "btnWrite" not in ui
+    assert html.index('id="btnDry"') < html.index('id="btnRun"')
     assert "run-actions" in html
     css_compact = css.replace(" ", "").replace("\n", "")
     assert ".pal-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));" in css_compact
-    assert ".run-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));" in css_compact
+    assert ".run-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));" in css_compact
     assert "minmax(220px,280px)" in css
     assert "440px" in css
     assert "palCardPark" not in ui
@@ -518,10 +521,11 @@ def test_data_pane_uses_one_file_card_for_all_three_inputs():
     # 旧的「块表 块=表」文本入口已删，不再有第二套外验表单
     assert "data-ext=sheets" not in ui and "parseSheetsText" not in ui
     assert "previewIntoExtRow" not in api and "previewIntoExtRow" not in ui
-    # 主数据卡也有「选择」按钮（与另两处同形）
-    assert 'id="btnDataPick"' in html and 'id="ioDataPick"' in html
-    # 操作卡：与配置页同一套「保存 ini / 重启服务」入口
-    assert 'id="btnPvSave"' in html and '>保存 ini</button>' in html
+    # 主数据卡也有「选择」按钮（与另两处同形）；一律走服务端原生对话框 /api/pick-file
+    assert 'id="btnDataPick"' in html and 'id="ioDataPick"' not in html
+    assert "pickExcelFromProject" in ui and "/api/pick-file" in ui
+    # 操作卡：与配置页同一套「保存配置 / 重启服务」入口
+    assert 'id="btnPvSave"' in html and '>保存配置</button>' in html
     assert 'id="btnPvRestart"' in html and '>重启服务</button>' in html
     assert '$("btnPvSave")' in ui and '$("btnPvRestart")' in ui
     assert "writeback()" in ui and "restartServer()" in ui

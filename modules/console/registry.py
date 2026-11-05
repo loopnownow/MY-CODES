@@ -204,17 +204,23 @@ def listing() -> list[dict[str, Any]]:
     return sorted(rows, key=lambda r: r["project"])
 
 
+META_TOKEN_RE = r'(<meta\s+name="console-token"\s+content=")[^"]*(")'
+
+
 def inject_token(html_path: str | Path, token: str) -> str:
-    """把 token 写进项目启动页；返回动作名（placeholder / meta / inserted）。"""
+    """把 token 写进项目启动页的 meta 标签；返回动作名（meta / inserted）。
+
+    只改 `<meta name="console-token" content="…">` 这一处。页面 JS 里的
+    `__CONSOLE_TOKEN__` 是「本页未注入」的哨兵，必须原样保留：一旦被写成
+    具体 token，后续 rotate 就再也改不到它，页面会拿旧 token 当有效值。
+    """
     target = Path(html_path)
     if not target.is_file():
         raise FileNotFoundError(f"启动页不存在: {target}")
     text = target.read_text(encoding="utf-8")
-    if "__CONSOLE_TOKEN__" in text:
-        out, action = text.replace("__CONSOLE_TOKEN__", token), "placeholder"
-    elif re.search(r'<meta\s+name="console-token"', text):
+    if re.search(r'<meta\s+name="console-token"', text):
         out = re.sub(
-            r'(<meta\s+name="console-token"\s+content=")[^"]*(")',
+            META_TOKEN_RE,
             lambda m: m.group(1) + token + m.group(2),
             text,
             count=1,
@@ -229,22 +235,23 @@ def inject_token(html_path: str | Path, token: str) -> str:
         action = "inserted"
     else:
         raise ValueError(f"启动页缺 <head>: {target}")
-    target.write_text(out, encoding="utf-8")
+    # newline="\n"：金版与其它课题页都是 LF，别让 Windows 文本模式写成 CRLF
+    target.write_text(out, encoding="utf-8", newline="\n")
     return action
 
 
 def clear_token(html_path: str | Path) -> str:
-    """注销时把启动页里的 token 抹回占位符。"""
+    """注销时把启动页 meta 里的 token 抹回占位符（JS 哨兵本就不动）。"""
     target = Path(html_path)
     if not target.is_file():
         raise FileNotFoundError(f"启动页不存在: {target}")
     text = target.read_text(encoding="utf-8")
     out = re.sub(
-        r'(<meta\s+name="console-token"\s+content=")[^"]*(")',
+        META_TOKEN_RE,
         lambda m: m.group(1) + "__CONSOLE_TOKEN__" + m.group(2),
         text,
         count=1,
     )
-    target.write_text(out, encoding="utf-8")
+    target.write_text(out, encoding="utf-8", newline="\n")
     return "cleared"
 

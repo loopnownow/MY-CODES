@@ -101,17 +101,40 @@ def test_listing_flags_stale_dir(reg_file, proj_dir):
     assert project_registry.listing()[0]["dir_ok"] is False
 
 
+GOLDEN_PAGE = (
+    '<head>\n<meta name="console-token" content="__CONSOLE_TOKEN__"/>\n</head>\n'
+    '<script>\n'
+    'const metaTok = ((document.querySelector(\'meta[name="console-token"]\') || {}).content || "").trim();\n'
+    'const ok = (metaTok && metaTok !== "__CONSOLE_TOKEN__");\n'
+    'if (t && t !== "__CONSOLE_TOKEN__") pageToken = t;\n'
+    '</script>'
+)
+
+
 def test_inject_and_clear_token(tmp_path):
     page = tmp_path / "proj_alpha.html"
-    page.write_text("<head>\n<meta name=\"console-token\" content=\"__CONSOLE_TOKEN__\"/>\n</head>",
-                    encoding="utf-8")
-    assert project_registry.inject_token(page, "abc123") == "placeholder"
+    page.write_text(GOLDEN_PAGE, encoding="utf-8")
+    assert project_registry.inject_token(page, "abc123") == "meta"
     text = page.read_text(encoding="utf-8")
-    assert 'content="abc123"' in text and "__CONSOLE_TOKEN__" not in text
+    assert 'content="abc123"' in text
+    # JS 哨兵必须保留占位符：写死 token 后 rotate 就改不到它了
+    assert text.count("__CONSOLE_TOKEN__") == 2
+    assert "\r\n" not in text
     assert project_registry.inject_token(page, "zzz") == "meta"
-    assert 'content="zzz"' in page.read_text(encoding="utf-8")
+    text = page.read_text(encoding="utf-8")
+    assert 'content="zzz"' in text and 'content="abc123"' not in text
+    assert text.count("__CONSOLE_TOKEN__") == 2
     project_registry.clear_token(page)
-    assert "__CONSOLE_TOKEN__" in page.read_text(encoding="utf-8")
+    text = page.read_text(encoding="utf-8")
+    assert text.count("__CONSOLE_TOKEN__") == 3
+    assert "\r\n" not in text
+
+
+def test_inject_token_inserts_meta_when_absent(tmp_path):
+    page = tmp_path / "no_meta.html"
+    page.write_text("<html><head>\n</head><body></body></html>", encoding="utf-8")
+    assert project_registry.inject_token(page, "abc123") == "inserted"
+    assert '<meta name="console-token" content="abc123"/>' in page.read_text(encoding="utf-8")
 
 
 def test_register_project_writes_token_into_page(reg_file, tmp_path, monkeypatch):
@@ -126,8 +149,10 @@ def test_register_project_writes_token_into_page(reg_file, tmp_path, monkeypatch
     out = cons.register_project("proj_beta", str(proj), rotate=True)
     assert out["ok"] is True
     assert out["token_written"] is True
-    assert out["action"] == "placeholder"
-    assert "__CONSOLE_TOKEN__" not in page.read_text(encoding="utf-8")
+    assert out["action"] == "meta"
+    text = page.read_text(encoding="utf-8")
+    assert "__CONSOLE_TOKEN__" not in text
+    assert "\r\n" not in text
     entry = project_registry.get("proj_beta")
     assert entry is not None
     assert entry.dir_key == project_registry.dir_key(proj)

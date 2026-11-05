@@ -48,7 +48,6 @@ const ID_KEYS = ["RAD_ID_COL", "CLIN_ID_COL"];
 const START_PAGE_KEYS = [
   "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
   "EXTERNAL_TESTS",
-  "USE_INTERNAL_SPLIT_WHEN_EXTERNAL",
 ];
 const START_PAGE_QS = {
   RAD_SHEET: "rad_sheet",
@@ -63,7 +62,6 @@ const START_PAGE_QS = {
   EXTERNAL_CLIN_SHEET: "ext_clin",
   EXTERNAL_RAD_SHEET: "ext_rad",
   EXTERNAL_TESTS: "ext_tests",
-  USE_INTERNAL_SPLIT_WHEN_EXTERNAL: "ext_split",
 };
 const CARD_ONLY_KEYS = new Set([
   "INPUT", "MODULES_DIR",
@@ -121,6 +119,11 @@ const HIDDEN_FORM_KEYS = new Set([
   "ICC_SHEET",
   "RAD_ID_COL",
   "CLIN_ID_COL",
+  "CLIN_SCORE",
+  "QC_ID_COL",
+  "QC_SCORE",
+  "ICC_ID_COL",
+  "ICC_SCORE",
   "LABEL_COL",
   "RAD_ID_COLS",
   "DRY_RUN",
@@ -141,7 +144,7 @@ const FIELD_BUNDLES = [
   },
   {
     id: "external",
-    keys: ["EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET", "USE_INTERNAL_SPLIT_WHEN_EXTERNAL"],
+    keys: ["EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET"],
     title: "外部验证",
     hint: "在「数据预览」页填写。主模型锁死后整队列评估（同亚组：不重筛）。多条横拼，一条不拼。",
     cls: "external",

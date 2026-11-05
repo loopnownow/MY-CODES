@@ -216,10 +216,11 @@ class Canvas:
 
 
 FS_STUDY = 12
-_MODELS = ("clinical", "radiomics", "nomogram")
+_MODELS = ("clinical", "radiomics", "plaque", "nomogram")
 _MODEL_LABEL = {
     "clinical": "Clinical model",
     "radiomics": "Radiomics model",
+    "plaque": "Plaque score",
     "nomogram": "Nomogram",
 }
 _METRICS = ("roc", "calibration", "dca", "nri", "idi")
@@ -246,13 +247,6 @@ def _count(value) -> int | None:
     return n
 
 
-def _need(spec: dict, key: str, problems: list[str]) -> int | None:
-    n = _count(spec.get(key))
-    if n is None:
-        problems.append(f"missing {key}")
-    return n
-
-
 def _cohort(raw, name: str, problems: list[str]) -> dict | None:
     if not raw:
         return None
@@ -262,20 +256,21 @@ def _cohort(raw, name: str, problems: list[str]) -> dict | None:
     n = _count(raw.get("n"))
     pos = _count(raw.get("positive"))
     neg = _count(raw.get("negative"))
-    if n is None or pos is None or neg is None:
-        problems.append(f"{name} needs n, positive, and negative")
+    if n is None:
+        problems.append(f"{name} needs n")
         return None
-    if pos + neg != n:
+    if pos is not None and neg is not None and pos + neg != n:
         problems.append(f"{name}: positive ({pos}) + negative ({neg}) != n ({n})")
     return {"n": n, "positive": pos, "negative": neg}
 
 
 def audit_study(spec: dict) -> None:
+    """只校验已给数字之间的一致性；手稿没写的人数留空（图上画 n = -），不猜数。"""
     problems: list[str] = []
-    screened = _need(spec, "screened_n", problems)
-    included_n = _need(spec, "included_n", problems)
-    included_pos = _need(spec, "included_positive", problems)
-    included_neg = _need(spec, "included_negative", problems)
+    screened = _count(spec.get("screened_n"))
+    included_n = _count(spec.get("included_n"))
+    included_pos = _count(spec.get("included_positive"))
+    included_neg = _count(spec.get("included_negative"))
     if included_n is not None and included_pos is not None and included_neg is not None:
         if included_pos + included_neg != included_n:
             problems.append(
@@ -295,16 +290,21 @@ def audit_study(spec: dict) -> None:
     training = _cohort(spec.get("training"), "training", problems)
     test = _cohort(spec.get("test"), "test", problems)
     validation = _cohort(spec.get("validation"), "validation", problems) if spec.get("validation") else None
-    if training and test and included_n is not None:
-        total = training["n"] + test["n"] + (validation["n"] if validation else 0)
+    given = [c for c in (training, test, validation) if c]
+    if given and included_n is not None:
+        total = sum(c["n"] for c in given)
         if total != included_n:
             problems.append(f"cohort n sum ({total}) != included_n ({included_n})")
-        pos = training["positive"] + test["positive"] + (validation["positive"] if validation else 0)
-        neg = training["negative"] + test["negative"] + (validation["negative"] if validation else 0)
-        if included_pos is not None and pos != included_pos:
-            problems.append(f"cohort positive sum ({pos}) != included_positive ({included_pos})")
-        if included_neg is not None and neg != included_neg:
-            problems.append(f"cohort negative sum ({neg}) != included_negative ({included_neg})")
+        _pos = [c["positive"] for c in given]
+        _neg = [c["negative"] for c in given]
+        if all(v is not None for v in _pos):
+            pos = sum(_pos)
+            if included_pos is not None and pos != included_pos:
+                problems.append(f"cohort positive sum ({pos}) != included_positive ({included_pos})")
+        if all(v is not None for v in _neg):
+            neg = sum(_neg)
+            if included_neg is not None and neg != included_neg:
+                problems.append(f"cohort negative sum ({neg}) != included_negative ({included_neg})")
     balance = spec.get("balance") or None
     if balance not in (None, "", "downsample", "smote"):
         problems.append("balance must be downsample, smote, or omitted")
@@ -332,36 +332,46 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
         audit_study(spec)
 
     period = (spec.get("period") or "").strip()
-    screened_n = int(spec["screened_n"])
-    top = period + f"\n{screened_n} patients screened" if period else f"{screened_n} patients screened"
+    screened_n = _count(spec.get("screened_n"))
+    top_line = (
+        f"{screened_n} patients screened" if screened_n is not None
+        else "Patients screened (n = -)"
+    )
+    top = period + "\n" + top_line if period else top_line
     inclusion = [str(x).strip() for x in (spec.get("inclusion") or []) if str(x).strip()]
     exclusions = _exclusion_items(spec.get("exclusion"))
     inc_txt = _numbered("Inclusion criteria:", inclusion, width=32) if inclusion else ""
     exc_txt = _numbered("Exclusion criteria:", [t for t, _ in exclusions], width=32) if exclusions else ""
     def _arm(raw: dict, side: str, default: str) -> str:
         label = str(raw.get(f"{side}_label") or default).strip() or default
-        return f"{label} n = {int(raw[side])}"
+        n = _count(raw.get(side))
+        return f"{label} n = {'-' if n is None else n}"
 
+    included_n = _count(spec.get("included_n"))
     included = (
-        f"Patients included\n(n = {int(spec['included_n'])})\n"
+        f"Patients included\n(n = {'-' if included_n is None else included_n})\n"
         f"{_arm(spec, 'included_positive', 'positive')}\n"
         f"{_arm(spec, 'included_negative', 'negative')}"
     )
-    training = spec["training"]
-    test = spec["test"]
+    training = spec.get("training") or None
+    test = spec.get("test") or None
     validation = spec.get("validation") or None
 
     def cohort_txt(title: str, raw: dict) -> str:
+        n = _count(raw.get("n"))
         return (
-            f"{title}\n(n = {int(raw['n'])})\n"
+            f"{title}\n(n = {'-' if n is None else n})\n"
             f"{_arm(raw, 'positive', 'positive')}\n"
             f"{_arm(raw, 'negative', 'negative')}"
         )
 
-    cohorts = [("cohort-training", cohort_txt("Training Cohort", training))]
-    cohorts.append(("cohort-test", cohort_txt("Test Cohort", test)))
+    cohorts = []
+    if training:
+        cohorts.append(("cohort-training", cohort_txt("Training set", training)))
+    if test:
+        cohorts.append(("cohort-test", cohort_txt("Test set", test)))
     if validation:
-        cohorts.append(("cohort-validation", cohort_txt("Validation Cohort", validation)))
+        cohorts.append(("cohort-validation", cohort_txt("Validation set", validation)))
 
     balance = spec.get("balance") or None
     balance_txt = ""
@@ -466,7 +476,7 @@ def draw_study_flow(spec: dict, out_path, audit: bool = True) -> Path:
     for _, box in placed_cohorts:
         c.add_arrow(ana[0] + ana_w / 2, ana[1] + ana_h, box[0] + box[2] / 2, box[1])
     cohort_bottom = max(box[1] + box[3] for _, box in placed_cohorts)
-    train = cohort_map["cohort-training"]
+    train = cohort_map.get("cohort-training") or (placed_cohorts[0][1] if placed_cohorts else ana)
     train_cx = train[0] + train[2] / 2
     y = cohort_bottom + gap_y
     stem = train
@@ -591,22 +601,22 @@ def _pair(snippet: str) -> dict | None:
 
 
 def _cohort_snippet(text: str, anchor: str) -> dict | None:
-    match = re.search(anchor + r"(.{0,280})", text, flags=re.I | re.S)
-    if not match:
-        return None
-    snippet = match.group(0)
-    total = re.search(r"\(\s*n\s*=\s*(\d+)", snippet, flags=re.I)
-    pair = _pair(snippet)
-    if not pair:
-        return None
-    summed = pair["positive"] + pair["negative"]
-    if total and int(total.group(1)) != summed and int(total.group(1)) not in (
-        pair["positive"],
-        pair["negative"],
-    ):
-        return None
-    n = int(total.group(1)) if total and int(total.group(1)) == summed else summed
-    return {"n": n, **pair}
+    """First anchor hit that carries both a total and a positive/negative pair."""
+    for match in re.finditer(anchor + r"(.{0,280})", text, flags=re.I | re.S):
+        snippet = match.group(0)
+        total = re.search(r"\(\s*n\s*=\s*(\d+)", snippet, flags=re.I)
+        pair = _pair(snippet)
+        if not pair:
+            continue
+        summed = pair["positive"] + pair["negative"]
+        if total and int(total.group(1)) != summed and int(total.group(1)) not in (
+            pair["positive"],
+            pair["negative"],
+        ):
+            continue
+        n = int(total.group(1)) if total and int(total.group(1)) == summed else summed
+        return {"n": n, **pair}
+    return None
 
 
 def spec_from_methods(text: str) -> dict:
@@ -621,17 +631,20 @@ def spec_from_methods(text: str) -> dict:
     if dates:
         period = f"{dates.group(1).strip()} to {dates.group(2).strip()}"
 
-    screened = re.search(r"(\d+)\s+patients were screened", text, flags=re.I)
+    screened = re.search(r"(\d+)\s+(?:patients|examinations) were screened", text, flags=re.I)
     if not screened:
         screened = re.search(r"\breview of\s+(\d+)\s+patients", text, flags=re.I)
     if not screened:
         missing.append("screened n")
 
-    included_n = re.search(r"(\d+)\s+patients were (?:analyzed|included)", text, flags=re.I)
+    included_n = re.search(r"(\d+)\s+(?:patients|examinations) were (?:analyzed|included)", text, flags=re.I)
     included_pair = None
-    analyzed_at = re.search(r"patients were (?:analyzed|included).{0,180}", text, flags=re.I | re.S)
-    if analyzed_at:
+    for analyzed_at in re.finditer(
+        r"(?:patients|examinations) were (?:analyzed|included).{0,180}", text, flags=re.I | re.S
+    ):
         included_pair = _pair(analyzed_at.group(0))
+        if included_pair:
+            break
     if not included_n:
         missing.append("included n")
     if not included_pair:
@@ -645,7 +658,7 @@ def spec_from_methods(text: str) -> dict:
     exclusion_lines = _numbered_block(
         text,
         r"Exclusion criteria were as follows:\s*",
-        r"\bModel building\b|\bStatistical analysis\b|\bPatients were divided\b",
+        r"\bModel building\b|\bStatistical analysis\b|\bPatients were divided\b|\bOutcomes\b",
     )
     exclusion = []
     for line in exclusion_lines:
@@ -693,10 +706,12 @@ def spec_from_methods(text: str) -> dict:
         models.append("clinical")
     if mentioned(r"radiomics"):
         models.append("radiomics")
+    if mentioned(r"plaque (?:model|score)"):
+        models.append("plaque")
     if mentioned(r"nomogram"):
         models.append("nomogram")
     metrics = []
-    if mentioned(r"\bROC\b"):
+    if mentioned(r"\bROC\b|receiver operating characteristic"):
         metrics.append("roc")
     if mentioned(r"calibration"):
         metrics.append("calibration")
