@@ -646,6 +646,8 @@ def _skip_nonfeature_cols(df: pd.DataFrame) -> List[str]:
 
 _EXCLUDE_CACHE: Dict[str, frozenset] = {}
 
+_LEGACY_WARNED: set[str] = set()
+
 
 def _cfg_get(settings: Optional[dict], key: str, default=""):
     if settings is not None and key in settings:
@@ -667,25 +669,68 @@ def resolve_subproject_root(settings: Optional[dict] = None) -> str:
     return subproject_root(outcome, out_dir, mapping, use_subdir)
 
 
-def default_exclude_xlsx(settings: Optional[dict] = None) -> str:
-    """工程根 false_classification.xlsx（不放子工程目录、不随 OUT_DIR 走）。
+def resolve_results_out_dir(settings: Optional[dict] = None) -> str:
+    """该次运行的结果夹（相对工程根；绝对路径原样），即 Results*.html 所在目录。
 
-    排除名单与 DO_FALSE_CLASS 写出的错分表是同一份文件，都在工程根。
-    settings 参数保留，便于调用方统一传设置。
+    ``OUT_DIR`` 已解析时直接用它（多结局 / 两两比较由 set_outcome / set_pairwise
+    逐次改写）。为空时按 ``GROUP_SOURCE_COL`` / ``OUTCOME_COLS`` 首项 +
+    ``SUBPROJECT_BY_OUTCOME`` 推导，与控制台 dry-run 的 plan 同一套口径。
+    推不出（无结局）返回空串，调用方按工程根处理。
+
+    显式传 settings 时只认这份设置（控制台预览/干跑看的是页面值），
+    不回落进程里已 import 的 config 全局。
     """
-    _ = settings
-    return "false_classification.xlsx"
+    from modules.config.outcome import map_outcome_out_dir, normalize_analysis_out_dir
+
+    def own(key: str, default=""):
+        if settings is not None:
+            return settings.get(key, default)
+        return getattr(cfg, key, default)
+
+    raw = str(own("OUT_DIR") or "").strip()
+    if raw and raw not in (".", "./"):
+        try:
+            return normalize_analysis_out_dir(raw)
+        except ValueError:
+            pass
+    outcome = str(own("GROUP_SOURCE_COL") or "").strip()
+    if not outcome:
+        cols = own("OUTCOME_COLS") or []
+        if isinstance(cols, (list, tuple)) and cols:
+            outcome = str(cols[0] or "").strip()
+    if not outcome:
+        return ""
+    mapping = own("SUBPROJECT_BY_OUTCOME") or {}
+    if not isinstance(mapping, dict):
+        mapping = {}
+    use_subdir = bool(own("OUTCOME_OUT_SUBDIR", True))
+    try:
+        return map_outcome_out_dir(outcome, "", mapping, use_subdir)
+    except ValueError:
+        return ""
 
 
-def false_classification_xlsx_path(proj=None) -> str:
-    """错分表 / 排除名单的绝对路径：<工程根>/false_classification.xlsx。
+def default_exclude_xlsx(settings: Optional[dict] = None) -> str:
+    """默认错分表 / 排除名单：该结局结果夹里的 false_classification.xlsx。
+
+    与 Results*.html 同目录（``<工程根>/<OUT_DIR>/``），不写工程根。
+    ``EXCLUDE_FILE`` 非空时不走这里。推不出结果夹时退回工程根同名文件。
+    返回值相对工程根（绝对 OUT_DIR 时是绝对路径）。
+    """
+    rel = resolve_results_out_dir(settings)
+    name = "false_classification.xlsx"
+    return os.path.join(rel, name) if rel else name
+
+
+def false_classification_xlsx_path(proj=None, settings: Optional[dict] = None) -> str:
+    """错分表 / 排除名单的绝对路径：<工程根>/<结果夹>/false_classification.xlsx。
 
     写入（pipeline DO_FALSE_CLASS）与默认读取（排除名单）共用这一处，
-    免得一边写工程根、一边读子工程目录。
+    所以每一结局（或每一对子）写出的错分表，就是该次运行读的排除名单。
     """
     from modules.config.ini_io import resolve_project_dir
     root = Path(proj) if proj is not None else Path(resolve_project_dir())
-    return str(root / default_exclude_xlsx())
+    return str(root / default_exclude_xlsx(settings))
 
 
 def exclude_file_names(settings: Optional[dict] = None) -> list[str]:
@@ -697,29 +742,61 @@ def exclude_file_names(settings: Optional[dict] = None) -> list[str]:
     return [packed] if packed else []
 
 
-def resolve_exclude_files(settings: Optional[dict] = None) -> list[str]:
-    """排除名单路径。填了就用所填的全部；一个都没填 → 工程根 false_classification.xlsx。
+def resolve_exclude_rel_path(rel: str, proj=None, settings: Optional[dict] = None) -> str:
+    """裸文件名在工程根找不到、但该结局结果夹里有 → 换成结果夹里的相对路径。
+
+    控制台下拉列出的是结果夹里的 ``false_classification.xlsx``（裸名），
+    落到这里才找到真文件；带目录的写法、绝对路径、工程根已有的文件都不动。
+    """
+    from modules.config.ini_io import resolve_project_dir
+    raw = str(rel or "").strip()
+    if not raw:
+        return rel
+    p = Path(raw)
+    if p.is_absolute() or p.parent != Path("."):
+        return rel
+    root = Path(proj) if proj is not None else Path(resolve_project_dir())
+    if (root / p).is_file():
+        return rel
+    rel_dir = resolve_results_out_dir(settings)
+    if not rel_dir:
+        return rel
+    base = Path(rel_dir)
+    if base.is_absolute():
+        cand = base / p.name
+        return str(cand) if cand.is_file() else rel
+    if (root / base / p.name).is_file():
+        return os.path.join(rel_dir, p.name)
+    return rel
+
+
+def resolve_exclude_files(
+    settings: Optional[dict] = None,
+    proj=None,
+) -> list[str]:
+    """排除名单路径。填了就用所填的全部；一个都没填 → 该结局结果夹的默认错分表。
 
     默认那一份给绝对路径：写错分表和读排除名单必须是同一份，
-    且流水线子进程的 cwd 不一定是工程根。
+    且流水线子进程的 cwd 不一定是工程根。``proj`` 显式给工程根
+    （控制台预览另一项目时用）。
     """
     names = exclude_file_names(settings)
     if names:
-        return names
-    return [false_classification_xlsx_path()]
+        return [resolve_exclude_rel_path(n, proj, settings) for n in names]
+    return [false_classification_xlsx_path(proj, settings)]
 
 
-def resolve_exclude_xlsx(settings: Optional[dict] = None) -> str:
+def resolve_exclude_xlsx(settings: Optional[dict] = None, proj=None) -> str:
     """
     排除名单 xlsx（第一个）。
-    EXCLUDE_FILE 非空 → 用该路径；空 → 工程根 false_classification.xlsx。
+    EXCLUDE_FILE 非空 → 用该路径；空 → 该结局结果夹的 false_classification.xlsx。
     多个文件时其余文件由 resolve_exclude_files 读取，这里仍返回第一个。
     """
-    return resolve_exclude_files(settings)[0]
+    return resolve_exclude_files(settings, proj)[0]
 
 
 def _resolve_exclude_file(data_file: Optional[str] = None) -> str:
-    """排除表路径：EXCLUDE_FILE > 工程根 false_classification.xlsx。"""
+    """排除表路径：EXCLUDE_FILE > 该结局结果夹 false_classification.xlsx。"""
     _ = data_file
     return resolve_exclude_xlsx()
 
@@ -956,12 +1033,16 @@ def _keys_from_one_exclude_file(
         return set()
 
 
-def _exclude_specs(settings: Optional[dict] = None) -> list[dict]:
+def _exclude_specs(
+    settings: Optional[dict] = None,
+    proj=None,
+) -> list[dict]:
     """每个排除文件的读取规格。
 
     ``EXCLUDE_TESTS`` 非空 → 每项自带 sheet / col / row（空 sheet / col = 默认 exc）；
     否则走旧口径：``EXCLUDE_SHEET`` / ``EXCLUDE_COL`` / ``EXCLUDE_ROW`` 一套套到
-    ``EXCLUDE_FILE`` 的所有文件（一个都没填时是工程根 false_classification.xlsx）。
+    ``EXCLUDE_FILE`` 的所有文件（一个都没填时是该结局结果夹的 false_classification.xlsx）。
+    ``proj`` 显式给工程根时，默认那一份按它解析（控制台预览别的项目）。
     """
     raw = _cfg_get(settings, "EXCLUDE_TESTS", None)
     if isinstance(raw, list) and raw:
@@ -983,22 +1064,51 @@ def _exclude_specs(settings: Optional[dict] = None) -> list[dict]:
         if out:
             return out
     if settings is not None:
-        files = resolve_exclude_files(settings)
+        files = resolve_exclude_files(settings, proj)
     else:
-        files = resolve_exclude_files()
+        files = resolve_exclude_files(None, proj)
     sheet = str(_cfg_get(settings, "EXCLUDE_SHEET", "exc") or "exc")
     col = str(_cfg_get(settings, "EXCLUDE_COL", "exc") or "exc")
     row = _cfg_get(settings, "EXCLUDE_ROW", "")
     return [{"file": f, "sheet": sheet, "col": col, "row": row} for f in files]
 
 
+def _warn_legacy_root_file(xfile: str, proj=None) -> None:
+    """默认名单不在结果夹、但工程根还留着旧 false_classification.xlsx 时提示一次。
+
+    不自动搬动/复制：旧表是用户数据，可能正是上一次运行（旧版写工程根）的名单。
+    """
+    if not xfile:
+        return
+    from modules.config.ini_io import resolve_project_dir
+    root = Path(proj) if proj is not None else Path(resolve_project_dir())
+    legacy = root / "false_classification.xlsx"
+    if not legacy.is_file():
+        return
+    try:
+        if legacy.resolve() == Path(xfile).resolve():
+            return
+    except OSError:
+        return
+    key = str(legacy.resolve())
+    if key in _LEGACY_WARNED:
+        return
+    _LEGACY_WARNED.add(key)
+    print(
+        f"  ⚠ 工程根还有旧 false_classification.xlsx（{legacy}），"
+        f"本结局用的是 {xfile}。名单现在随结果夹走；需要沿用旧名单就把它挪进结果夹，"
+        f"或在 EXCLUDE_FILE 里指过去。"
+    )
+
+
 def load_exclude_id_keys(
     data_file: Optional[str] = None,
     settings: Optional[dict] = None,
+    proj=None,
 ) -> frozenset:
     """
     读取排除 ID 集合（匹配用 key）。
-    来源：EXCLUDE_IDS + 排除 xlsx（可多个；默认工程根 false_classification.xlsx）
+    来源：EXCLUDE_IDS + 排除 xlsx（可多个；默认该结局结果夹的 false_classification.xlsx）
     的 EXCLUDE_SHEET / EXCLUDE_COL（默认 exc / exc）。同一 sheet、列、内容套到每个文件，名单合并。
     EXCLUDE_ROW 非空：只剔除该列内容等于所选值的行（取其 ID 列）。
     无文件 / 无 sheet / 关闭开关 → 空集。
@@ -1007,7 +1117,7 @@ def load_exclude_id_keys(
         return frozenset()
 
     _ = data_file
-    specs = _exclude_specs(settings)
+    specs = _exclude_specs(settings, proj)
 
     def _spec_key(spec: dict) -> str:
         path = str(spec.get("file") or "")
@@ -1042,6 +1152,8 @@ def load_exclude_id_keys(
         print("  Exclude list: using EXCLUDE_IDS only")
     elif found_any and len(specs) > 1:
         print(f"  Exclude list: {len(specs)} files merged → match-keys={len(excel_keys | hard_keys)}")
+    elif not found_any and specs:
+        _warn_legacy_root_file(specs[0].get("file") or "", proj)
 
     merged = frozenset(excel_keys | hard_keys)
     _EXCLUDE_CACHE[cache_key] = frozenset(excel_keys)
