@@ -99,16 +99,17 @@ def expand_heatmap_columns(
     clin_selected: Sequence[str] | None = None,
     rad_selected: Sequence[str] | None = None,
     score_names: Sequence[str] | None = None,
+    keep_score: bool = True,
 ) -> tuple[list[str], list[str]]:
     """HEATMAP_COLS：Clinical / RadScore = 评分本身 + 入选成分特征。
 
-    与 expand_corr_predictors 相同：保留复合评分名，再追加筛选后的成分列。
-    分类 Logistic 时 RadScore 令牌展开为 score_names。Combined 等其它名字原样保留。
+    keep_score=False（热图）只列 clinical / 组学筛选出来的成分特征，不把复合评分
+    Clinical / US 画进热图；没有成分特征时才退回评分本身。
     第二项恒为空列表（兼容旧调用方）。
     """
     return expand_corr_predictors(
         wanted, rad_selected=rad_selected, clin_selected=clin_selected,
-        score_names=score_names,
+        score_names=score_names, keep_score=keep_score,
     ), []
 
 
@@ -117,13 +118,14 @@ def expand_corr_predictors(
     rad_selected: Sequence[str] | None = None,
     clin_selected: Sequence[str] | None = None,
     score_names: Sequence[str] | None = None,
+    keep_score: bool = True,
 ) -> list[str]:
     """Expand Clinical / RadScore tokens for corr / partial / ANCOVA / MLR / heatmap.
 
     Keep the composite score name and append screened component features so
     RadScore is used together with its LASSO / logistic components (Clinical
-    likewise with selected clinical columns). Combined stays a score token.
-    Other names pass through unchanged.
+    likewise with selected clinical columns). keep_score=False 只留成分特征。
+    Combined stays a score token. Other names pass through unchanged.
     """
     clin_sel = _unique_names(clin_selected)
     rad_sel = _unique_names(rad_selected)
@@ -140,16 +142,18 @@ def expand_corr_predictors(
     for name in heatmap_wanted(wanted):
         tok = _col_token(name)
         if tok == "clinical":
-            _add("Clinical")
+            if keep_score or not clin_sel:
+                _add("Clinical")
             for c in clin_sel:
                 _add(c)
             continue
         if tok == "radscore":
-            if scores:
-                for s in scores:
-                    _add(s)
-            else:
-                _add("RadScore")
+            if keep_score or not rad_sel:
+                if scores:
+                    for s in scores:
+                        _add(s)
+                else:
+                    _add("RadScore")
             for c in rad_sel:
                 _add(c)
             continue
@@ -210,7 +214,11 @@ def resolve_heatmap_columns(
 
 
 def select_heatmap_frames(wanted, clin_df, rad_df, group_labels=None):
-    """按名单取热图用的两张表。Group 不在临床表里时用 group_labels。"""
+    """按名单取热图用的两张表。Group 不在临床表里时用 group_labels。
+
+    取值恒定的列（例如按 DOR 限定行后 Group 只剩一个水平）相关无法计算，
+    从热图去掉并打印原因，避免整行空白。
+    """
     clin_names = [] if clin_df is None else [str(c) for c in clin_df.columns]
     rad_names = [] if rad_df is None else [str(c) for c in rad_df.columns]
     clin_cols, rad_cols, missing = resolve_heatmap_columns(wanted, clin_names, rad_names)
@@ -231,7 +239,28 @@ def select_heatmap_frames(wanted, clin_df, rad_df, group_labels=None):
         rad_sel = rad_df.loc[:, rad_have].copy()
     else:
         rad_sel = pd.DataFrame(index=rad_df.index)
-    return rad_sel, clin_sel, missing
+    return _drop_constant_cols(rad_sel), _drop_constant_cols(clin_sel), missing
+
+
+def _drop_constant_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """去掉取值恒定的列（相关系数无定义），并打印到运行日志。"""
+    if df is None or len(df.columns) == 0:
+        return df
+    keep: list[str] = []
+    for c in df.columns:
+        try:
+            n = int(df[c].dropna().astype(str).nunique())
+        except Exception:
+            keep.append(c)
+            continue
+        if n <= 1:
+            print(
+                f"  ⚠ 热图列 {c!r} 在当前子集里只有 {n} 个取值，相关无法计算，已去掉",
+                flush=True,
+            )
+            continue
+        keep.append(c)
+    return df.loc[:, keep]
 
 
 def _sig_stars(p: float) -> str:

@@ -1004,17 +1004,14 @@ def _attach_vif(df: pd.DataFrame, clin: pd.DataFrame, feats: Sequence[str]) -> p
     if key is None:
         return df
     try:
-        from modules.stats.vif_analysis import compute_vif
-        feat_list = [str(f) for f in feats if str(f) in clin.columns]
+        from modules.stats.vif_analysis import compute_vif, format_vif
+        feat_list = [str(f) for f in clin.columns if str(f) in {str(x) for x in feats}]
         vif_df = compute_vif(clin, feat_list) if len(feat_list) >= 2 else None
         vmap = {}
         if vif_df is not None and len(vif_df):
             vmap = {str(r["Variable"]): r["VIF"] for _, r in vif_df.iterrows()}
         out = df.copy()
-        out["VIF"] = [
-            f"{vmap[f]:.3f}" if f in vmap and np.isfinite(vmap[f]) else "NA"
-            for f in out[key].astype(str)
-        ]
+        out["VIF"] = [format_vif(vmap.get(f)) for f in out[key].astype(str)]
         return out
     except Exception as e:
         print(f"  ⚠ VIF for multivariate pool failed: {e}")
@@ -1031,6 +1028,7 @@ def _pool_note(candidates: Sequence[str], stepwise: Sequence[str], p_threshold: 
         "Full multivariable model including candidate covariates with univariate logistic "
         f"p < {p_threshold:g} (n = {n}). "
         f"VIF is reported for collinearity warning (warn ≥ {warn:g}) and does not exclude candidates. "
+        "∞ = exactly collinear with another listed feature (VIF not estimable). "
         "Table 1 group-comparison p and complete-separation terms are not used for entry."
     ]
     if removed:

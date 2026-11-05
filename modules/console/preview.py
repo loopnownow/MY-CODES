@@ -26,6 +26,7 @@ _PREVIEW_CACHE = _state.PREVIEW_CACHE  # 与 console 同一份 dict（测试断�
 
 # 每个工作表在预览里只铺这么多行（cln 也一样，只作表头核对）。
 _PREVIEW_HEAD_ROWS = 5
+_PREVIEW_WIDE_COLS = 40  # 宽表（>40 列）预览只读前 40 列，避免整张组学矩阵进内存
 
 def project_xlsx_names(proj: Path) -> list[str]:
     """工程根的可选 xlsx（相对路径按工程根显示）。"""
@@ -621,10 +622,19 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         if meta is None:
             meta = {"name": hit, "n_rows": 0, "n_cols": 0, "columns": [], "missing": {}, "head": []}
             info[hit] = meta
-        if not meta.get("columns") and not meta.get("head") and not _wide(hit):
+        if not meta.get("head"):
             try:
-                if len(_header(hit)) <= _PREVIEW_HEAD_MAX_COLS:
-                    info[hit] = _info_from_frame(_frame(hit), hit, max_rows=5)
+                head_cols = _header(hit)
+                if len(head_cols) <= _PREVIEW_HEAD_MAX_COLS:
+                    if _wide(hit):
+                        # 宽表只读前若干列做预览，避免把整张组学矩阵拉进内存。
+                        got = read_columns(data_path, hit, head_cols[:_PREVIEW_WIDE_COLS])
+                        info[hit] = _info_from_frame(got, hit, max_rows=_PREVIEW_HEAD_ROWS)
+                        info[hit]["n_cols"] = int(
+                            (size.get(hit) or {}).get("n_cols") or len(head_cols)
+                        )
+                    else:
+                        info[hit] = _info_from_frame(_frame(hit), hit, max_rows=_PREVIEW_HEAD_ROWS)
                     meta = info[hit]
             except Exception:
                 pass
