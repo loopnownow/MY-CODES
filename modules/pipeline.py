@@ -754,7 +754,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             ml.setdefault(name, vec)
         return ml
 
-    # ── false_classification：仅控制台打印，不写 xlsx/其他表 ──
+    # ── false_classification：打印宽表 + 写本次结果夹（与 Results*.html 同目录）──
     if getattr(cfg, "DO_FALSE_CLASS", True):
         try:
             fc_details: Dict = {}
@@ -795,13 +795,14 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     split_by_id[s] = "test"
                 else:
                     split_by_id[s] = ""
-            # 控制台打印 + 默认写入 xlsx（单 sheet，无其他表）
+            # 控制台打印 + 写入本次结果夹的 xlsx（单 sheet，无其他表）
             gmap = group_label_map(data.all)
             print_false_classification(
                 fc_details, split_by_id=split_by_id, group_labels=gmap,
             )
             save_false_classification_xlsx(
-                fc_details, data_io.false_classification_xlsx_path(),
+                fc_details,
+                data_io.false_classification_xlsx_path(),
                 split_by_id=split_by_id, group_labels=gmap,
             )
         except Exception as e:
