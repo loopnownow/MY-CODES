@@ -109,16 +109,27 @@ def sync_external_tests(settings: dict[str, Any]) -> dict[str, Any]:
     return settings
 
 
-def resolve_meta_xlsx(proj: Path, file_s: str, data_path: Path | None = None) -> Path:
+def resolve_meta_xlsx(
+    proj: Path,
+    file_s: str,
+    data_path: Path | None = None,
+    settings: dict[str, Any] | None = None,
+) -> Path:
+    """排除表路径：填了就用（相对工程根）；空 → 该结局结果夹的默认错分表。
+
+    裸文件名在工程根没有时，按 ``resolve_exclude_rel_path`` 落到结果夹那份。
+    """
     raw = str(file_s or "").strip()
     if raw:
-        p = Path(raw)
+        from modules.stats.data_io import resolve_exclude_rel_path
+        p = Path(resolve_exclude_rel_path(raw, proj, settings))
         if not p.is_absolute():
-            p = proj / raw
+            p = proj / p
         return p
     if data_path is not None:
         return data_path
-    return proj / "false_classification.xlsx"
+    from modules.stats.data_io import default_exclude_xlsx
+    return proj / default_exclude_xlsx(settings)
 
 
 def resolve_run_outcome(body: dict[str, Any], overlay: dict[str, Any]) -> str:
