@@ -71,7 +71,6 @@ function showPane(name) {
   const flow = name === "flow";
   const preview = name === "preview";
   $("paneConfig").hidden = flow || preview;
-  // 右侧运行台属于统计配置页：进配置就显示，进预览/流程就收起（不再依赖 loadAll 是否成功）。
   const runCol = $("runCol");
   if (runCol) runCol.hidden = flow || preview;
   $("paneFlow").hidden = !flow;
@@ -1826,7 +1825,6 @@ function applyPreviewLists(prev) {
   ioClinIdOpts = prev.clin_cols || prev.id_options || [];
 }
 
-// 数据预览页的字段：这些键只在 renderDataPane 里渲染，不进配置页。
 const DATA_PANE_KEYS = new Set([
   "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET",
   "RAD_ID_COL", "CLIN_ID_COL", "LABEL_COL", "RAD_ID_COLS",
@@ -1868,7 +1866,6 @@ function pvBlockOf(sheet) {
 }
 
 function pvDefaultScore(sheet) {
-  // 分数名默认取工作表名（临床行另用 Clinical）；空=不设时仍按此显示。
   return String(sheet || "").trim();
 }
 
@@ -2053,7 +2050,6 @@ function setExcSpec(file, key, val) {
   if (key === "sheet") { hit.col = ""; hit.row = ""; }
   if (key === "col") { hit.row = ""; }
   setFieldValue("EXCLUDE_TESTS", list);
-  // 首文件的值继续镜像到 EXCLUDE_SHEET/COL/ROW（旧口径与预览仍读这三个键）。
   if (f === (pvExcFiles()[0] || "")) {
     setFieldValue("EXCLUDE_SHEET", hit.sheet || "");
     setFieldValue("EXCLUDE_COL", hit.col || "");
@@ -2302,7 +2298,6 @@ function bindDataPane() {
       const inp = e.target;
       if (!inp) return;
       if (inp.matches("[data-exc-ids]")) {
-        // 额外排除 ID：逗号 / 分号 / 空格分隔，写回 EXCLUDE_IDS。
         const ids = String(inp.value || "")
           .split(/[,;，；\s]+/)
           .map((x) => x.trim())
@@ -2446,7 +2441,6 @@ async function refreshExtMetas(files) {
   renderExtRows(cur.length ? cur : [emptyExtRow()]);
 }
 async function pickExcelFromProject(title) {
-  // 服务端原生对话框：默认打开子工程根目录，返回相对路径（rel）。
   const proj = ($("project") && $("project").value) || "";
   const entry = (S.projects || []).find((x) => x.name === proj) || {};
   const j = await api("/api/pick-file", {
@@ -2668,7 +2662,6 @@ function collectIoModule() {
     if (el) S.values[key] = (el.value || "").trim();
   });
   const tests = readExtRows();
-  // 只有「文件 + 临床 + 组学」齐全的才进 EXTERNAL_TESTS（后端按这两张表对齐）；不齐的留在卡上等补。
   const usable = tests.filter((r) => r.clin_sheet && r.rad_sheet);
   const first = usable[0] || {};
   S.values.EXTERNAL_FILE = first.file || "";
@@ -2922,7 +2915,6 @@ function renderForm() {
   }
   for (const f of S.schema) {
     if (isHiddenField(f)) continue;
-    // 样本排除名单只在「数据预览」页（#pvExclude）设置，统计配置页不再显示。
     if (f.section === "exclude") continue;
     if (!map.has(f.section)) {
       const g = {id: f.section, title: f.section_title, fields: []};
@@ -2957,7 +2949,6 @@ function renderForm() {
     groups.length = 0;
     rest.forEach((g) => groups.push(g));
   }
-  // 组学 / 预处理 并进 组学模块；相关热图 并进 相关 / 偏相关分析（ini 分节不变）。
   const mergeGroup = (fromId, toId, title) => {
     const from = groups.find((g) => g.id === fromId);
     const to = groups.find((g) => g.id === toId);
@@ -3015,7 +3006,6 @@ function renderForm() {
     </div>`;
     }
     if (g.id === "repro") {
-      // 「有外验仍做内拆」放标题行；其余（种子 / 训练比例 / 分组列）留在 body。
       const titleKeys = ["USE_INTERNAL_SPLIT_WHEN_EXTERNAL"];
       const titleSet = new Set(titleKeys);
       const vis = fields.filter(f => !isHiddenField(f) && !titleSet.has(f.key));
@@ -3256,7 +3246,6 @@ function renderForm() {
       const vis = fields.filter(f => !isHiddenField(f) && titleKeys.indexOf(f.key) < 0);
       if (!vis.length) return "";
       const byKey = new Map(vis.map(f => [f.key, f]));
-      // 热图列与组别、预测因子与参考变量、偏相关的控制变量与方法都在同一张卡里。
       const order = [
         "HEATMAP_COLS", "CORR_GROUP",
         "CORR_PREDICTORS", "CORR_REFS",
@@ -3352,7 +3341,6 @@ function renderForm() {
     </div>`;
     }
     if (g.id === "advanced") {
-      // C：与 ROC 同构 — 布尔一行 + 分块；pathlist / checklist 全宽（E）
       const vis = fields.filter(f => !isHiddenField(f));
       if (!vis.length) return "";
       const byKey = new Map(vis.map(f => [f.key, f]));
@@ -3765,8 +3753,6 @@ function markerDetectPhrase() {
   return sideLab + "，至少 " + minN + " 列";
 }
 function markerChoicesFromNames(names) {
-  // 识别阈值只在界面。已保存标记仍按原记号匹配，不受最少列数限制。
-  // 未识别的标记侧不改成「二者」，两侧都不自动列出。
   const side = markerSide();
   const minN = markerMinN();
   const wantPre = side === "prefix" || side === "both";
