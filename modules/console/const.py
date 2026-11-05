@@ -48,6 +48,9 @@ _TOKEN_SAFE_GET = {
 SKIP_SETTING_KEYS = {
     "os", "copy", "List", "Optional", "Dict", "Any", "annotations",
     "PNG_DIR", "GROUP_SOURCE_COL", "OUT_DIR_BASE",
+    # 控制台版本台账：写在 ini 的 [console] 段供对照，但不作为可编辑字段进配置卡
+    "CONSOLE_GOLD_COMMIT", "CONSOLE_GOLD_SHA12",
+    "CONSOLE_PAGE_SHA12", "CONSOLE_SYNCED_AT",
 }
 TUPLE_LIST_KEYS = {"DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT"}
 SET_OUTCOME_DERIVED = {
