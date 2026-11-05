@@ -268,6 +268,10 @@ function applyIoDefaults(obj) {
       dst[k] = fb;
     }
   });
+  // 展示姓名列默认跟 ID 列同列（不再在数据预览页单独选）。
+  if (!String(dst.LABEL_COL == null ? "" : dst.LABEL_COL).trim()) {
+    dst.LABEL_COL = String(dst.CLIN_ID_COL || "").trim();
+  }
   if (Array.isArray(dst.EXTERNAL_TESTS)) {
     // 外验的角色（clin_sheet / rad_sheet / qc_sheet / icc_sheet）只认用户在各卡里选的，
     // 不填默认值：空 = 该表不参与，空 rad_id_col = 用全局组学 ID 列。
@@ -1832,10 +1836,6 @@ const DATA_PANE_KEYS = new Set([
   "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
 ]);
 
-function paneField(key) {
-  return (S.schema || []).find(f => f.key === key) || null;
-}
-
 const ROLE_LABELS = { "": "不用", clin: "临床信息", rad: "组学模块", qc: "质控", icc: "ICC" };
 
 function pvSheets() {
@@ -1856,7 +1856,10 @@ function pvRole(sheet) {
   if (String(v.CLIN_SHEET || "") === sheet) return "clin";
   if (String(v.QC_SHEET || "") === sheet) return "qc";
   if (String(v.ICC_SHEET || "") === sheet) return "icc";
-  if (blkRows().some((b) => String(b.sheet || b.name) === sheet)) return "rad";
+  const rows = blkRows();
+  if (rows.some((b) => String(b.sheet || b.name) === sheet)) return "rad";
+  // 旧配置只有 RAD_SHEET、没有块：仍按组学表显示，选角色时自动补块。
+  if (!rows.length && String(v.RAD_SHEET || "") === sheet) return "rad";
   return "";
 }
 
@@ -1959,7 +1962,12 @@ function setSheetIdCol(sheet, col) {
   } else if (role === "rad") {
     const rows = blkRows();
     const i = rows.findIndex((b) => String(b.sheet || b.name) === sheet);
-    if (i < 0) return;
+    if (i < 0) {
+      // 没有块（旧配置）：组学 ID 列写全局 RAD_ID_COL。
+      setFieldValue("RAD_ID_COL", col);
+      markDirty();
+      return;
+    }
     rows[i].id_col = col;
     setFieldValue("MODALITY_BLOCKS", rows);
   }
@@ -1998,12 +2006,7 @@ function renderDataPane() {
   const sheets = $("pvSheets");
   if (sheets) sheets.innerHTML = renderRoleTable();
   const ids = $("pvIds");
-  if (ids) {
-    const fields = ["RAD_ID_COL", "LABEL_COL", "RAD_ID_COLS"].map(paneField).filter(Boolean);
-    ids.innerHTML = fields.length
-      ? `<div class="field-group ids">${fields.map(renderField).join("")}</div>`
-      : '<p class="hint">载入数据文件后显示 ID 列与非特征列。</p>';
-  }
+  if (ids) ids.innerHTML = "";
   const ex = $("pvExclude");
   if (ex) ex.innerHTML = excludeRowsHtml();
   form.querySelectorAll("[data-key]").forEach(bindField);
@@ -2395,6 +2398,9 @@ function readExtRows() {
       }
       if (role === "rad") {
         if (!rec.rad_sheet) rec.rad_sheet = sheet;
+        // 单块时把这张表的角色同时记成块表映射，后端按块取表时才用得上。
+        const names = extBlockNames();
+        if (names.length === 1 && !sheetsMap[names[0]]) sheetsMap[names[0]] = sheet;
         return;
       }
       const key = role + "_sheet";
@@ -2542,7 +2548,8 @@ function extBlockNames() {
 function extRoleOptions() {
   const base = [["", "不用"], ["clin", "临床信息"], ["qc", "质控"], ["icc", "ICC"]];
   const names = extBlockNames();
-  if (!names.length) return base.concat([["rad", "组学模块"]]);
+  // 单块：角色就叫「组学模块」（内部仍映射到该块的工作表）。
+  if (names.length <= 1) return base.concat([["rad", "组学模块"]]);
   return base.concat(names.map((n) => ["blk:" + n, "块：" + n]));
 }
 
@@ -2550,13 +2557,14 @@ function extRoleOf(r, sheet) {
   if (String((r || {}).clin_sheet || "") === sheet) return "clin";
   if (String((r || {}).qc_sheet || "") === sheet) return "qc";
   if (String((r || {}).icc_sheet || "") === sheet) return "icc";
+  const names = extBlockNames();
+  const single = names.length <= 1;
   const map = (r && r.sheets && typeof r.sheets === "object") ? r.sheets : {};
   const hit = Object.keys(map).find((k) => String(map[k]) === sheet);
-  if (hit) return "blk:" + hit;
+  if (hit) return single ? "rad" : "blk:" + hit;
   if (String((r || {}).rad_sheet || "") === sheet) {
     // 旧配置只有单张组学表：有块就按第 1 块显示，存回时落成 sheets 映射。
-    const names = extBlockNames();
-    return names.length ? "blk:" + names[0] : "rad";
+    return single ? "rad" : "blk:" + names[0];
   }
   return "";
 }
@@ -2573,13 +2581,14 @@ function extRoleRowsHtml(r) {
       ? '<p class="hint err">读不到这份文件的工作表：确认文件名、或点「选择」重选一次。</p>'
       : '<p class="hint">先选文件：自动读出该文件的全部工作表，再给每张表选角色。</p>';
   }
-  const head = '<div class="pv-role-head"><span>工作表</span><span>尺寸</span><span>角色</span><span>组学 ID 列</span></div>';
+  const head = '<div class="pv-role-head"><span>工作表</span><span>尺寸</span><span>角色</span><span>ID 列</span></div>';
+  const baseId = String(fieldValue("RAD_ID_COL") || "");
   const body = sheets.map((sheet) => {
     const role = extRoleOf(r, sheet);
     const opts = extRoleOptions().map(([v, t]) =>
       `<option value="${esc(v)}"${v === role ? " selected" : ""}>${esc(t)}</option>`).join("");
     const idCell = (role === "rad" || role.indexOf("blk:") === 0)
-      ? `<select data-ext-id="${esc(sheet)}">${optHtml(ioRadIdOpts, String((r || {}).rad_id_col || ""), "（用组学 ID 列）")}</select>`
+      ? `<select data-ext-id="${esc(sheet)}">${optHtml(ioRadIdOpts, String((r || {}).rad_id_col || baseId), "（用组学 ID 列）")}</select>`
       : '<span class="dim">—</span>';
     return `<div class="pv-role-row${role ? "" : " is-off"}" data-ext-role-row="${esc(sheet)}">
       <span class="sheet" title="${esc(sheet)}">${esc(sheet)}</span>
@@ -3965,6 +3974,7 @@ function blkRows() {
       prep: (x.prep && typeof x.prep === "object") ? x.prep : {},
       params: (x.params && typeof x.params === "object") ? x.params : {},
       score: String(x.score || ""),
+      id_col: String(x.id_col || ""),
     }));
 }
 function textEncodeSpec() {
@@ -4075,7 +4085,7 @@ function textEncodePanel() {
     <div class="kv-row txt-tools">
       <input data-txt-q="1" type="text" placeholder="搜索列名 / 来源" value="${esc(S.txtQ || "")}" spellcheck="false"/>
       <label class="pexcl" title="≤上限等级的文本列自动按默认顺序编码；手写码优先"><input type="checkbox" data-txt-auto-on="1"${auto ? " checked" : ""}/> 自动识别并编码</label>
-      <label class="txt-cap" title="自动编码的等级上限；2 等级固定自动 0/1，不用手填。超过上限的列不自动编码，可展开手填">等级上限 <select data-txt-cap="1">${(() => {
+      <label class="txt-cap" title="自动编码的等级上限（含）：≤ 该等级的列自动编码；等级数超过该值（如上限 5 时的 6 级及以上）不编码、不进建模，可展开手填。2 等级固定自动 0/1，不用手填">等级上限 <select data-txt-cap="1">${(() => {
         const opts = [3, 4, 5];
         const cur = Number(cap) || 5;
         if (opts.indexOf(cur) < 0) opts.push(cur);
@@ -5386,6 +5396,14 @@ function previewTablesHtml(p) {
   const info = (p && p.sheet_info) || {};
   const resolved = (p && p.resolved_sheets) || {};
   const order = [];
+  const roleSet = new Set();
+  // 先按角色表顺序：凡分配过角色的工作表都预览。
+  (((p && p.role_sheets) || [])).forEach((r) => {
+    const name = String((r && r.sheet) || "");
+    if (!name) return;
+    roleSet.add(name);
+    if (info[name] && order.indexOf(name) < 0) order.push(name);
+  });
   ["CLIN_SHEET", "QC_SHEET", "ICC_SHEET", "RAD_SHEET"].forEach((key) => {
     const name = resolved[key];
     if (name && info[name] && order.indexOf(name) < 0) order.push(name);
@@ -5408,6 +5426,10 @@ function previewTablesHtml(p) {
     }
     if (Number(show.n_cols) > 400) {
       html += `<div class="hint">${esc(show.name || name)} ${show.n_rows}×${show.n_cols}。列数过多，预览不展开这一张表。</div>`;
+      return;
+    }
+    if (roleSet.has(String(show.name || name))) {
+      html += `<div class="hint">${esc(show.name || name)} ${show.n_rows}×${show.n_cols}。这张表已分配角色，但表头没读到，未展开。</div>`;
     }
   });
   return html;

@@ -1465,33 +1465,25 @@ def _table1_train_test_section(res_train, res_test, data=None) -> str:
 
 
 def _nomogram_calibration_html(out_dir: str) -> str:
-    """列线图关则不写 Nomogram；校准关则不写校准。遗留 panel 不覆盖开关。"""
+    """列线图与校准图各出一张：DO_NOMOGRAM 管 panel_nomogram，DO_CALIBRATION 管 panel_calibration。
+
+    两图不再拼成一张，也不带 A/B 角标；遗留 panel 不覆盖开关。
+    """
     do_nomo = bool(getattr(cfg, "DO_NOMOGRAM", False))
     do_cal = bool(getattr(cfg, "DO_CALIBRATION", False))
-    if not do_nomo and not do_cal:
-        return ""
-    if not _f_exists("panel_nomogram_calibration.png", out_dir):
-        return ""
-    if do_nomo and do_cal:
-        title = "Nomogram &amp; Calibration"
-        note = (
-            "Top: nomogram; bottom: calibration train | test. "
-            "Hosmer-Lemeshow results are tabulated below (not drawn on the figure)."
-        )
-        alt = "Nomogram calibration panel"
-    elif do_nomo:
-        title = "Nomogram"
-        note = ""
-        alt = "Nomogram panel"
-    else:
-        title = "Calibration"
-        note = "Hosmer-Lemeshow results are tabulated below (not drawn on the figure)."
-        alt = "Calibration panel"
-    bits = [f"<h3>{title}</h3>"]
-    if note:
-        bits.append(f'<p class="note">{note}</p>')
-    bits.append(_img_tag("panel_nomogram_calibration.png", alt, out_dir))
-    if do_cal:
+    bits: List[str] = []
+    if do_nomo and _f_exists("panel_nomogram.png", out_dir):
+        bits += [
+            "<h3>Nomogram</h3>",
+            _img_tag("panel_nomogram.png", "Nomogram", out_dir),
+        ]
+    if do_cal and _f_exists("panel_calibration.png", out_dir):
+        bits += [
+            "<h3>Calibration</h3>",
+            '<p class="note">Calibration curves (train | test). '
+            "Hosmer-Lemeshow results are tabulated below (not drawn on the figure).</p>",
+            _img_tag("panel_calibration.png", "Calibration", out_dir),
+        ]
         hl_tbl = _hl_metrics_html(("train", "test"), "hosmer-lemeshow-internal")
         if hl_tbl:
             bits.append(hl_tbl)
@@ -2376,6 +2368,7 @@ def _radiomics_logistic_html(rad_res, panel_label: str) -> str:
             f"Candidate-pool entry uses {gate} and no complete separation.{adj_note} "
             f"VIF is reported for collinearity warning "
             f"(warn ≥ {getattr(cfg, 'VIF_THRESHOLD_WARN', 5):g}) and does not exclude candidates. "
+            "∞ = exactly collinear with another listed feature (VIF not estimable). "
             "Selected features are candidate-pool multivariate p "
             f"< {mv_p:g}."
         )

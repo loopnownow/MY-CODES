@@ -1,64 +1,51 @@
-"""Nomogram A ends align with calibration B/C. Report title follows the switches."""
+"""Nomogram and calibration are two separate panels without A/B labels; report titles follow switches."""
 from __future__ import annotations
 
 import os
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 
-def _ink_x_range(arr: np.ndarray, threshold: int = 250) -> tuple[int, int]:
-    ink = (arr < threshold).any(axis=2)
-    cols = ink.any(axis=0)
-    if not cols.any():
-        return 0, arr.shape[1] - 1
-    return int(cols.argmax()), int(len(cols) - 1 - cols[::-1].argmax())
-
-
-def test_nomogram_cal_panel_ends_align(tmp_path, monkeypatch):
+def test_nomogram_and_calibration_are_separate_panels(tmp_path, monkeypatch):
     from modules.stats import figure_panels as fp
 
-    monkeypatch.setattr(fp.cfg, "FIGURE_PANEL_LABELS", False)
-    monkeypatch.setattr(fp.cfg, "FIGURE_PANEL_GAP_PX", 12)
     monkeypatch.setattr(fp.cfg, "DO_PLOT_TIFF", False)
     monkeypatch.setattr(fp.cfg, "DO_PLOT_PDF", False)
     monkeypatch.setattr(fp.cfg, "FIGURE_PANEL_DPI", 72)
+    monkeypatch.setattr(fp.cfg, "DO_FIGURE_PANELS", True, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_ROC", False, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_DCA", False, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_SHAP", False, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_LANDMARK_ROC", False, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_TIME_DEPENDENT_ROC", False, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_NOMOGRAM", True, raising=False)
+    monkeypatch.setattr(fp.cfg, "DO_CALIBRATION", True, raising=False)
+    monkeypatch.setattr(fp.cfg, "SPLIT_COL", "", raising=False)
+    monkeypatch.setattr(fp.cfg, "TRAIN_RATIO", 1, raising=False)
 
-    nom = Image.new("RGB", (900, 220), "white")
-    ImageDraw.Draw(nom).rectangle([80, 30, 520, 190], fill=(20, 20, 20))
-    cal_b = Image.new("RGB", (320, 300), "white")
-    ImageDraw.Draw(cal_b).rectangle([8, 8, 312, 292], outline=(20, 20, 20), width=6)
-    cal_c = Image.new("RGB", (320, 300), "white")
-    ImageDraw.Draw(cal_c).rectangle([8, 8, 312, 292], outline=(20, 20, 20), width=6)
+    png = tmp_path / "PNG"
+    png.mkdir()
+    Image.new("RGB", (300, 200), "white").save(png / "nomogram.png")
+    Image.new("RGB", (240, 240), "white").save(png / "calibration_train.png")
 
-    nom_p = tmp_path / "nomogram.png"
-    b_p = tmp_path / "calibration_train.png"
-    c_p = tmp_path / "calibration_test.png"
-    nom.save(nom_p)
-    cal_b.save(b_p)
-    cal_c.save(c_p)
-    (tmp_path / "PNG").mkdir()
+    fp.build_outcome_panels(str(tmp_path))
 
-    assert fp.stitch_nomogram_cal(str(nom_p), str(b_p), str(c_p), str(tmp_path))
-    panel = Image.open(tmp_path / "PNG" / "panel_nomogram_calibration.png").convert("RGB")
-    a = np.array(panel)
-    h = a.shape[0]
-    top = a[: h // 3]
-    bot = a[2 * h // 3 :]
-    t0, t1 = _ink_x_range(top)
-    b0, b1 = _ink_x_range(bot)
-    assert abs(t0 - b0) <= 12
-    assert abs(t1 - b1) <= 12
-    assert panel.width == b1 + max(0, a.shape[1] - 1 - b1) or True
-    assert abs((t1 - t0) - (b1 - b0)) <= 16
+    assert (png / "panel_nomogram.png").is_file()
+    assert (png / "panel_calibration.png").is_file()
+    assert not (png / "panel_nomogram_calibration.png").exists()
+    for name in ("panel_nomogram.png", "panel_calibration.png"):
+        gray = np.array(Image.open(png / name).convert("L"))
+        assert int(gray.min()) > 250  # 全白源图：出现任何字（A/B 角标）就会变暗
 
 
-def test_report_nomogram_heading_follows_switches(tmp_path, monkeypatch):
+def test_report_nomogram_calibration_headings(tmp_path, monkeypatch):
     from modules.stats import report as rp
 
     png = tmp_path / "PNG"
     png.mkdir()
-    (png / "panel_nomogram_calibration.png").write_bytes(b"png")
+    (png / "panel_nomogram.png").write_bytes(b"png")
+    (png / "panel_calibration.png").write_bytes(b"png")
     monkeypatch.setattr(rp.cfg, "DO_NOMOGRAM", False)
     monkeypatch.setattr(rp.cfg, "DO_CALIBRATION", False)
     assert rp._nomogram_calibration_html(str(tmp_path)) == ""
@@ -66,11 +53,12 @@ def test_report_nomogram_heading_follows_switches(tmp_path, monkeypatch):
     monkeypatch.setattr(rp.cfg, "DO_CALIBRATION", True)
     cal = rp._nomogram_calibration_html(str(tmp_path))
     assert "<h3>Calibration</h3>" in cal
-    assert "Nomogram" not in cal
+    assert "<h3>Nomogram</h3>" not in cal
 
     monkeypatch.setattr(rp.cfg, "DO_NOMOGRAM", True)
     both = rp._nomogram_calibration_html(str(tmp_path))
-    assert "<h3>Nomogram &amp; Calibration</h3>" in both
+    assert both.index("<h3>Nomogram</h3>") < both.index("<h3>Calibration</h3>")
+    assert "panel_nomogram_calibration.png" not in both
 
 
 def test_partial_pairs_cross_two_lists():
@@ -187,7 +175,6 @@ def test_td_roc_panels_place_train_left_of_test(tmp_path, monkeypatch):
         (png / name).write_bytes(b"png")
     monkeypatch.setattr(fp, "Image", object())
     monkeypatch.setattr(fp, "stitch_row", _cap)
-    monkeypatch.setattr(fp, "stitch_nomogram_cal", lambda *a, **k: False)
     monkeypatch.setattr(fp, "stitch_subgroup_train_test", lambda *a, **k: None)
     monkeypatch.setattr(fp, "stitch_external_panels", lambda *a, **k: None)
     monkeypatch.setattr(fp, "_mediation_paths", lambda png_dir: [])
@@ -259,7 +246,6 @@ def test_panels_skip_dca_shap_when_off(tmp_path, monkeypatch):
     (tmp_path / "PNG").mkdir()
     monkeypatch.setattr(fp, "Image", object())
     monkeypatch.setattr(fp, "stitch_row", _cap)
-    monkeypatch.setattr(fp, "stitch_nomogram_cal", lambda *a, **k: False)
     monkeypatch.setattr(fp, "stitch_subgroup_train_test", lambda *a, **k: None)
     monkeypatch.setattr(fp, "stitch_external_panels", lambda *a, **k: None)
     monkeypatch.setattr(fp, "_mediation_paths", lambda png: [])

@@ -4,7 +4,8 @@ figure_panels.py — 将结局目录下单图自动拼接为多面板图
 输出（图总闸 DO_FIGURE_PANELS 开时写 PNG；DO_PLOT_TIFF / DO_PLOT_PDF 时另写投稿格式）：
   panel_roc.png
   panel_dca.png
-  panel_nomogram_calibration.png
+  panel_nomogram.png      （列线图单独一张，不与校准拼）
+  panel_calibration.png   （校准 train | test，不带 A/B 角标）
   panel_shap.png
   panel_survival.png
   panel_mediation.png
@@ -50,32 +51,6 @@ def _resize_to_height(im: "Image.Image", target_h: int) -> "Image.Image":
         return im
     w = max(1, int(round(im.width * (target_h / im.height))))
     return im.resize((w, target_h), _resample())
-
-
-def _resize_to_width(im: "Image.Image", target_w: int) -> "Image.Image":
-    if im.width == target_w or target_w <= 0:
-        return im
-    h = max(1, int(round(im.height * (target_w / im.width))))
-    return im.resize((target_w, h), _resample())
-
-
-def _trim_whitespace(im: "Image.Image", threshold: int = 250, pad: int = 8) -> "Image.Image":
-    """裁掉近白边，保留 pad 像素，便于 A 与下方 BC 按内容两端对齐。"""
-    if im is None:
-        return im
-    gray = im.convert("L")
-    mask = gray.point(lambda p: 255 if p < int(threshold) else 0)
-    bbox = mask.getbbox()
-    if bbox is None:
-        return im
-    l, t, r, b = bbox
-    l = max(0, l - pad)
-    t = max(0, t - pad)
-    r = min(im.width, r + pad)
-    b = min(im.height, b + pad)
-    if r <= l or b <= t:
-        return im
-    return im.crop((l, t, r, b))
 
 
 def _font(size: int = 28):
@@ -214,74 +189,14 @@ def stitch_row(
     return True
 
 
-def stitch_nomogram_cal(
-    nomo_path: str,
-    cal_tr_path: str,
-    cal_te_path: str,
+def stitch_plain(
+    paths: Sequence[str],
+    out_stem: str,
     out_dir: str,
-    out_stem: str = "panel_nomogram_calibration",
 ) -> bool:
-    """上行 nomogram A；下行 cal_train B | cal_test C。A 左右两端与 BC 外沿对齐。"""
-    if Image is None:
-        print("  ⚠ Pillow 不可用，跳过拼板", flush=True)
-        return False
-    if not any(_exists(p) for p in (nomo_path, cal_tr_path, cal_te_path)):
-        print(f"  ⚠ {out_stem}: no source images — skip", flush=True)
-        return False
-    gap = int(getattr(cfg, "FIGURE_PANEL_GAP_PX", 12) or 12)
-    labs = _labels_for(3)
-    pos = _label_pos()
-
-    nom = _trim_whitespace(_load(nomo_path)) if _exists(nomo_path) else None
-    cals: List[Image.Image] = []
-    if _exists(cal_tr_path):
-        cals.append(_trim_whitespace(_load(cal_tr_path)))
-    if _exists(cal_te_path):
-        cals.append(_trim_whitespace(_load(cal_te_path)))
-    if nom is None and not cals:
-        return False
-
-    if cals:
-        th = max(im.height for im in cals)
-        cals = [_resize_to_height(im, th) for im in cals]
-        cal_w = sum(im.width for im in cals) + gap * max(len(cals) - 1, 0)
-        cal_h = cals[0].height
-    else:
-        cal_w, cal_h = 0, 0
-
-    if nom is not None and cal_w > 0:
-        nom = _resize_to_width(nom, cal_w)
-        if nom.width != cal_w:
-            nom = nom.resize((cal_w, max(1, nom.height)), _resample())
-        total_w = cal_w
-    elif nom is not None:
-        total_w = nom.width
-    else:
-        total_w = cal_w
-
-    if nom is not None:
-        nom = _draw_label(nom, labs[0], pos)
-    cals = [
-        _draw_label(im, labs[i + 1] if i + 1 < len(labs) else "")
-        for i, im in enumerate(cals)
-    ]
-
-    row1_h = nom.height if nom is not None else 0
-    cal_h = cals[0].height if cals else 0
-    total_h = row1_h + (gap if row1_h and cal_h else 0) + cal_h
-    canvas = Image.new("RGBA", (max(total_w, 1), max(total_h, 1)), (255, 255, 255, 255))
-    y = 0
-    if nom is not None:
-        x0 = max(0, (total_w - nom.width) // 2) if nom.width != total_w else 0
-        canvas.paste(nom, (x0, y), nom)
-        y += nom.height + (gap if cal_h else 0)
-    if cals:
-        x = 0
-        for im in cals:
-            canvas.paste(im, (x, y), im)
-            x += im.width + gap
-    _save_panel(canvas, out_stem, out_dir)
-    return True
+    """不带 A/B 角标的横排拼接：列线图、校准图各自单独成图。"""
+    items = [p for p in (paths or []) if p]
+    return stitch_row(items, out_stem, out_dir, labels=[""] * len(items))
 
 
 def stitch_grid(
@@ -509,15 +424,17 @@ def build_outcome_panels(out_dir: str | None = None) -> None:
         print("  ⚠ panel_dca: DO_DCA off — skip", flush=True)
     do_nomo = bool(getattr(cfg, "DO_NOMOGRAM", False))
     do_cal = bool(getattr(cfg, "DO_CALIBRATION", False))
-    if do_nomo or do_cal:
-        stitch_nomogram_cal(
-            p("nomogram.png") if do_nomo else "",
-            p("calibration_train.png") if do_cal else "",
-            p("calibration_test.png") if do_cal else "",
-            out_dir,
-        )
+    if do_nomo:
+        stitch_plain([p("nomogram.png")], "panel_nomogram", out_dir)
     else:
-        print("  ⚠ panel_nomogram_calibration: DO_NOMOGRAM and DO_CALIBRATION off — skip", flush=True)
+        print("  ⚠ panel_nomogram: DO_NOMOGRAM off — skip", flush=True)
+    if do_cal:
+        cal_paths = [p("calibration_train.png")]
+        if _expect_internal_test():
+            cal_paths.append(p("calibration_test.png"))
+        stitch_plain(cal_paths, "panel_calibration", out_dir)
+    else:
+        print("  ⚠ panel_calibration: DO_CALIBRATION off — skip", flush=True)
     if bool(getattr(cfg, "DO_SHAP", False)):
         stitch_row(
             [p("shap_bar.png"), p("shap_summary.png")],

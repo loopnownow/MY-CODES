@@ -155,7 +155,10 @@ def run_blocks(
         if t2 is None or len(t2) == 0:
             continue
         t = t2.copy()
-        t.insert(0, "Block", child.group_name or "")
+        # Block 列写分数名（如 US），没有分数名才退回块名；方法列仍写方法。
+        _score = str(getattr(child, "score_name", "") or "")
+        _label = radiomics.score_display_name(_score) if _score else ""
+        t.insert(0, "Block", _label or (child.group_name or ""))
         t.insert(1, "Method", getattr(child, "method", ""))
         frames.append(t)
     table2 = pd.concat(frames, ignore_index=True) if frames else None
