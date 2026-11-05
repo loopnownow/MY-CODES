@@ -811,7 +811,6 @@ try {
   }
 
   function layoutStudy(spec) {
-    if (spec.screened_n == null && spec.included_n == null) return null;
     const boxes = [];
     const arrows = [];
     const lines = [];
@@ -823,7 +822,8 @@ try {
     const gapX = 0.32;
     const gapY = 0.46;
     let y = 0.2;
-    const topText = (spec.period ? spec.period + "\n" : "") + (spec.screened_n != null ? spec.screened_n + " patients screened" : "");
+    const topText = (spec.period ? spec.period + "\n" : "")
+      + (spec.screened_n != null ? spec.screened_n + " patients screened" : "Patients screened (n = -)");
     const topWH = boxWH(topText, FS, 0.36, 0.14, 2.2, 8.8);
     let top = null;
     if (topText.trim()) {
@@ -850,14 +850,12 @@ try {
       if (excText) exc = addBox("exclusion", x, y, excWH[0], excWH[1], excText);
       y += Math.max(incWH[1], excWH[1]) + gapY;
     }
-    const anaLines = [];
-    if (spec.included_n != null) {
-      anaLines.push("Patients included", "(n = " + spec.included_n + ")");
-      if (spec.included_positive != null) anaLines.push("positive n = " + spec.included_positive);
-      if (spec.included_negative != null) anaLines.push("negative n = " + spec.included_negative);
-    }
+    const anaLines = ["Patients included",
+      "(n = " + (spec.included_n != null ? spec.included_n : "-") + ")"];
+    if (spec.included_positive != null) anaLines.push("positive n = " + spec.included_positive);
+    if (spec.included_negative != null) anaLines.push("negative n = " + spec.included_negative);
     const anaText = anaLines.join("\n");
-    const anaWH = anaText ? boxWH(anaText, FS, 0.36, 0.14, 2.4, 6) : [0, 0];
+    const anaWH = boxWH(anaText, FS, 0.36, 0.14, 2.4, 6);
     const ana = anaText ? addBox("included", 0, y, anaWH[0], anaWH[1], anaText) : null;
     if (ana) y += anaWH[1] + gapY;
     const cohortSrc = [];
@@ -2221,11 +2219,10 @@ try {
     const msgs = [];
     let level = "ok";
     if (spec.kind === "study") {
-      if (spec.screened_n == null && spec.included_n == null) {
-        return { level: "empty", msgs: ["填写筛查人数或最终纳入人数后即可出图。"] };
+      if (spec.screened_n == null || spec.included_n == null) {
+        if (level !== "err") level = "warn";
+        msgs.push("手稿未注明的人数在图上留空为 n = -（不猜数）。");
       }
-      const msgs = [];
-      let level = "ok";
       if (spec.included_positive != null && spec.included_negative != null && spec.included_n != null && spec.included_positive + spec.included_negative !== spec.included_n) {
         level = "err";
         msgs.push("最终纳入的阳性与阴性之和不等于总人数。");

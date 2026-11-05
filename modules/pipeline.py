@@ -811,6 +811,11 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
     combined_info = None
     _tr_scores = radiomics.score_map(res_train["rad"])
     radiomics.register_score_display(res_train["rad"])
+    # 临床分数名（数据预览角色表里设）：只改图例/表头显示，内部键仍是 Clinical。
+    _clin_disp = str(getattr(cfg, "CLIN_SCORE", "") or "").strip()
+    if _clin_disp and _clin_disp != "Clinical":
+        radiomics.SCORE_DISPLAY["Clinical"] = _clin_disp
+        print(f"  Clinical score display name: {_clin_disp}", flush=True)
     has_rs = bool(_tr_scores)
     do_nomo = bool(getattr(cfg, "DO_NOMOGRAM", True))
     if do_nomo or has_rs or train_clin_feat:
@@ -959,9 +964,42 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     p_te[ok2] = fit.predict(X2)
             return p_tr, p_te
 
+        # 临床分数口径：开 CLIN_SCORE_LINEAR（默认）= 入选变量原始尺度 OLS；关 = Logistic log-odds。
+        _clin_linear = bool(getattr(cfg, "CLIN_SCORE_LINEAR", True))
+        _clin_ols = None
+        if _clin_linear and res_train["clin"].model is not None and len(train_clin_feat):
+            try:
+                _Xo = data.train.clin[train_clin_feat].apply(pd.to_numeric, errors="coerce")
+                _yo = np.asarray(data.train.label, dtype=float)
+                _oko = _Xo.notna().all(axis=1) & np.isfinite(_yo)
+                if int(_oko.sum()) >= len(train_clin_feat) + 2:
+                    _clin_ols = sm.OLS(
+                        _yo[_oko], sm.add_constant(_Xo.loc[_oko], has_constant="add")
+                    ).fit()
+                    print(
+                        f"  Clinical score: linear regression (OLS) on "
+                        f"{len(train_clin_feat)} features, raw scale — R²="
+                        f"{float(_clin_ols.rsquared):.3f}",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"  ⚠ Clinical OLS skipped: {int(_oko.sum())} rows / "
+                        f"{len(train_clin_feat)} features",
+                        flush=True,
+                    )
+            except Exception as e:
+                print(f"  ⚠ Clinical OLS failed: {e}", flush=True)
+
         def _apply_clin_model(clin_df):
             if res_train["clin"].model is None or len(train_clin_feat) == 0:
                 return None
+            if _clin_ols is not None:
+                feats = [c for c in _clin_ols.params.index if c != "const"]
+                Xo = clin_df.reindex(columns=feats).apply(pd.to_numeric, errors="coerce")
+                return _clin_ols.predict(
+                    sm.add_constant(Xo, has_constant="add")
+                ).to_numpy()
             X = sm.add_constant(
                 clin_df[train_clin_feat].apply(pd.to_numeric, errors="coerce")
             )

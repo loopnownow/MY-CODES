@@ -17,12 +17,15 @@ from pathlib import Path
 
 MANUSCRIPT_KEYWORD = "manuscript"
 SUFFIXES = (".docx",)
-_VERSION = re.compile(r"[_\-\s][vV](\d+)(?=[_\-\s.]|$)")
+_VERSION = re.compile(r"[_\-\s][vV](\d+(?:\.\d+)?)(?=[_\-\s.]|$)")
 
 
-def _version(name: str) -> int:
+def _version(name: str) -> tuple[int, ...]:
+    """Version sort key: major.minor, so V1.10 sorts after V1.9."""
     match = _VERSION.search(name)
-    return int(match.group(1)) if match else 0
+    if not match:
+        return (0,)
+    return tuple(int(part) for part in match.group(1).split("."))
 
 
 def scan_manuscripts(proj: Path) -> list[dict]:
@@ -43,7 +46,7 @@ def scan_manuscripts(proj: Path) -> list[dict]:
     files.sort(
         key=lambda f: (
             not f["is_manuscript"],
-            -_version(f["name"]),
+            tuple(-part for part in _version(f["name"])),
             -f["mtime"],
             f["name"].lower(),
         )

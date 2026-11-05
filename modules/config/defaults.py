@@ -25,6 +25,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "ICC_SHEET": "icc",
     "RAD_ID_COL": "Patient_ID",
     "CLIN_ID_COL": "Patient_ID",
+    # 数据预览角色表的分数名 / ID 列；空串=按下面的默认口径（Clinical / 工作表名）显示。
+    "CLIN_SCORE": "",
+    "QC_ID_COL": "",
+    "QC_SCORE": "",
+    "ICC_ID_COL": "",
+    "ICC_SCORE": "",
     "CLIN_PATH": "",
     "RAD_PATH": "",
     "LABEL_COL": "Name",
@@ -207,6 +213,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # 组学 Logistic 选出特征后再做一次原始尺度 OLS，RadScore 用 OLS 系数。
     # 关（默认）= 仍用 logistic log-odds 系数；LASSO 本来就是 OLS，不受此键影响。
     "RAD_SCORE_LINEAR": False,
+    # 临床块入选变量后用原始尺度 OLS 拟合 Clinical 分数（开=默认）。
+    "CLIN_SCORE_LINEAR": True,
     # Combined：空 = 全部块分数进联合模型；COMBINED_EXCLUDE 手动剔除（只影响联合）。
     "COMBINED_BLOCKS": [],
     "COMBINED_EXCLUDE": [],

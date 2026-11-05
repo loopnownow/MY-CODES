@@ -151,8 +151,9 @@ def test_hover_hints_not_resident_body():
         "#grpCard > p.hint#grpHint" in CSS and "display:none" in CSS
     )
     assert 'titleKeys = ["DO_ROC"' in UI or 'titleKeys = ["DO_ROC", "DO_LANDMARK_ROC"' in UI
-    assert '["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH"]' in UI
-    assert 'titleKeys = ["DO_CORR", "DO_PARTIAL"]' in UI
+    assert '["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH", "CLIN_SCORE_LINEAR"]' in UI
+    # 热图并进相关 / 偏相关后，标题行三个开关一起
+    assert 'titleKeys = ["DO_HEATMAP", "DO_CORR", "DO_PARTIAL"]' in UI
     assert 'titleKeys = ["DO_DAG", "DO_SHAP", "DO_MEDIATION"]' in UI
     assert 'titleKeys = ["DO_FALSE_CLASS", "DO_FDR", "DO_FWER"]' in UI
     assert 'titleKeys = ["DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"]' in UI

@@ -171,9 +171,7 @@ function applyUrlLock() {
   for (const [key, q] of Object.entries(START_PAGE_QS)) {
     if (qs.has(q)) {
       const raw = qs.get(q);
-      if (key === "USE_INTERNAL_SPLIT_WHEN_EXTERNAL") {
-        S.ioLock[key] = (raw === "1" || raw === "true");
-      } else if (key === "EXTERNAL_TESTS" || key === "RAD_ID_COLS") {
+      if (key === "EXTERNAL_TESTS" || key === "RAD_ID_COLS") {
         try {
           const parsed = raw ? JSON.parse(raw) : [];
           S.ioLock[key] = Array.isArray(parsed) ? parsed : [];
@@ -1679,7 +1677,7 @@ function fillDatalist(id, items) {
   el.innerHTML = uniqOpts(items).map(s => "<option value=\"" + esc(s) + "\"></option>").join("");
 }
 const EXCLUDE_EMPTY_LABELS = {
-  EXCLUDE_FILE: "（空＝默认用该结局结果夹 false_classification.xlsx）",
+  EXCLUDE_FILE: "（空＝默认工程根 false_classification.xlsx）",
   EXCLUDE_SHEET: "（空＝默认 exc）",
   EXCLUDE_COL: "（空＝默认 exc）",
   EXCLUDE_ROW: "（空＝整列当 ID）",
@@ -1828,10 +1826,10 @@ function applyPreviewLists(prev) {
 const DATA_PANE_KEYS = new Set([
   "RAD_SHEET", "CLIN_SHEET", "QC_SHEET", "ICC_SHEET",
   "RAD_ID_COL", "CLIN_ID_COL", "LABEL_COL", "RAD_ID_COLS",
+  "CLIN_SCORE", "QC_ID_COL", "QC_SCORE", "ICC_ID_COL", "ICC_SCORE",
   "DO_EXCLUDE_SAMPLES", "EXCLUDE_FILE", "EXCLUDE_SHEET",
   "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS",
   "EXTERNAL_FILE", "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
-  "USE_INTERNAL_SPLIT_WHEN_EXTERNAL",
 ]);
 
 function paneField(key) {
@@ -1867,8 +1865,8 @@ function pvBlockOf(sheet) {
 }
 
 function pvDefaultScore(sheet) {
-  const idx = blkRows().findIndex((b) => String(b.sheet || b.name) === sheet);
-  return idx <= 0 ? "RadScore" : "RadScore_" + sheet;
+  // 分数名默认取工作表名（临床行另用 Clinical）；空=不设时仍按此显示。
+  return String(sheet || "").trim();
 }
 
 function optHtml(items, cur, blank) {
@@ -1899,14 +1897,21 @@ function renderRoleTable() {
     const dim = (info && info.n_rows != null) ? `${info.n_rows}×${info.n_cols}` : "—";
     const cls = "pv-role-row" + (role === "rad" ? " is-rad" : "") + (role ? "" : " is-off");
     const cols = pvCols(name);
+    const val = (k) => String(((S.values || {})[k]) || "");
     let idCell = '<span class="dim">—</span>';
     let scoreCell = '<span class="dim">—</span>';
     if (role === "clin") {
-      idCell = `<select data-role-id="${esc(name)}">${optHtml(cols, String((S.values || {}).CLIN_ID_COL || ""), "（不设）")}</select>`;
+      idCell = `<select data-role-id="${esc(name)}">${optHtml(cols, val("CLIN_ID_COL"), "（不设）")}</select>`;
+      scoreCell = `<input data-role-score="${esc(name)}" value="${esc(val("CLIN_SCORE"))}" placeholder="Clinical" spellcheck="false"/>`;
     } else if (role === "rad") {
       const b = pvBlockOf(name) || {};
       idCell = `<select data-role-id="${esc(name)}">${optHtml(cols, String(b.id_col || ""), "（用组学 ID 列）")}</select>`;
       scoreCell = `<input data-role-score="${esc(name)}" value="${esc(b.score || "")}" placeholder="${esc(pvDefaultScore(name))}" spellcheck="false"/>`;
+    } else if (role === "qc" || role === "icc") {
+      const idKey = role === "qc" ? "QC_ID_COL" : "ICC_ID_COL";
+      const scKey = role === "qc" ? "QC_SCORE" : "ICC_SCORE";
+      idCell = `<select data-role-id="${esc(name)}">${optHtml(cols, val(idKey), "（不设）")}</select>`;
+      scoreCell = `<input data-role-score="${esc(name)}" value="${esc(val(scKey))}" placeholder="${esc(pvDefaultScore(name))}" spellcheck="false"/>`;
     }
     return `<div class="${cls}" data-role-row="${esc(name)}">
       <span class="sheet" title="${esc(name)}">${esc(name)}</span>
@@ -1931,8 +1936,8 @@ function setSheetRole(sheet, role) {
   else if (role === "rad") {
     next.push({ name: sheet, sheet: sheet, method: "logistic", enabled: true, kind: "rad", prep: {}, params: {}, score: "", id_col: "" });
   }
-  next.forEach((b, i) => {
-    if (!String(b.score || "").trim()) b.score = i === 0 ? "RadScore" : "RadScore_" + b.name;
+  next.forEach((b) => {
+    if (!String(b.score || "").trim()) b.score = String(b.sheet || b.name || "");
   });
   setFieldValue("MODALITY_BLOCKS", next);
   setFieldValue("RAD_SHEET", next.length ? String(next[0].sheet || next[0].name) : "");
@@ -1947,6 +1952,10 @@ function setSheetIdCol(sheet, col) {
   const role = pvRole(sheet);
   if (role === "clin") {
     setFieldValue("CLIN_ID_COL", col);
+  } else if (role === "qc") {
+    setFieldValue("QC_ID_COL", col);
+  } else if (role === "icc") {
+    setFieldValue("ICC_ID_COL", col);
   } else if (role === "rad") {
     const rows = blkRows();
     const i = rows.findIndex((b) => String(b.sheet || b.name) === sheet);
@@ -1958,6 +1967,22 @@ function setSheetIdCol(sheet, col) {
 }
 
 function setSheetScore(sheet, val) {
+  const role = pvRole(sheet);
+  if (role === "clin") {
+    setFieldValue("CLIN_SCORE", String(val || "").trim());
+    markDirty();
+    return;
+  }
+  if (role === "qc") {
+    setFieldValue("QC_SCORE", String(val || "").trim());
+    markDirty();
+    return;
+  }
+  if (role === "icc") {
+    setFieldValue("ICC_SCORE", String(val || "").trim());
+    markDirty();
+    return;
+  }
   const rows = blkRows();
   const i = rows.findIndex((b) => String(b.sheet || b.name) === sheet);
   if (i < 0) return;
@@ -2182,7 +2207,6 @@ function syncExtRows() {
   S.values.EXTERNAL_CLIN_SHEET = first.clin_sheet || "";
   S.values.EXTERNAL_RAD_SHEET = first.rad_sheet || "";
   S.values.EXTERNAL_TESTS = tests;
-  if ($("ioExtSplit")) S.values.USE_INTERNAL_SPLIT_WHEN_EXTERNAL = !!$("ioExtSplit").checked;
   persistIoLock();
 }
 
@@ -2202,22 +2226,13 @@ function bindDataPane() {
     btn.dataset.bound = "1";
     btn.onclick = () => refreshDataPane().catch((e) => alert(e.message));
   }
-  const mainPick = $("ioDataPick");
   const mainPickBtn = $("btnDataPick");
-  if (mainPick && mainPickBtn && !mainPickBtn.dataset.bound) {
+  if (mainPickBtn && !mainPickBtn.dataset.bound) {
     mainPickBtn.dataset.bound = "1";
-    mainPickBtn.onclick = () => mainPick.click();
-    mainPick.onchange = () => {
-      const f = mainPick.files && mainPick.files[0];
-      const inp = $("ioData");
-      if (!f || !inp) return;
-      inp.value = f.name;
-      inp.dataset.dirty = "1";
-      refreshDataPane().catch((e) => {
-        const msg = $("ioMsg");
-        if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
-      });
-    };
+    mainPickBtn.onclick = () => pickMainDataFile().catch((e) => {
+      const msg = $("ioMsg");
+      if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
+    });
   }
   const toCfg = $("btnToConfig");
   if (toCfg && !toCfg.dataset.bound) {
@@ -2424,6 +2439,41 @@ async function refreshExtMetas(files) {
   const cur = readExtRows();
   renderExtRows(cur.length ? cur : [emptyExtRow()]);
 }
+async function pickExcelFromProject(title) {
+  // 服务端原生对话框：默认打开子工程根目录，返回相对路径（rel）。
+  const proj = ($("project") && $("project").value) || "";
+  const entry = (S.projects || []).find((x) => x.name === proj) || {};
+  const j = await api("/api/pick-file", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({dir: String(entry.dir || ""), title: title || "选择 Excel"}),
+  });
+  if (!j || !j.path) return "";
+  return String(j.rel || j.path);
+}
+
+async function pickExtFile(card) {
+  const rel = await pickExcelFromProject("选择外验 Excel");
+  if (!rel || !card) return;
+  const inp = card.querySelector("[data-ext=file]");
+  if (inp) inp.value = rel;
+  await loadExtMeta(rel);
+  collectIoModule();
+  const cur = readExtRows();
+  renderExtRows(cur.length ? cur : [emptyExtRow()]);
+  await refreshDataPane();
+}
+
+async function pickMainDataFile() {
+  const rel = await pickExcelFromProject("选择数据 Excel");
+  if (!rel) return;
+  const inp = $("ioData");
+  if (!inp) return;
+  inp.value = rel;
+  inp.dataset.dirty = "1";
+  await refreshDataPane();
+}
+
 function bindExtRowEvents() {
   const box = $("extRows");
   if (!box) return;
@@ -2433,21 +2483,15 @@ function bindExtRowEvents() {
   };
   box.querySelectorAll("[data-ext-card]").forEach((card) => {
     const inp = card.querySelector("[data-ext=file]");
-    const pick = card.querySelector("[data-ext-filepick]");
     const browse = card.querySelector("[data-ext-pick]");
     const name = card.querySelector("[data-ext=name]");
     const del = card.querySelector("[data-ext-del]");
     if (name) name.addEventListener("change", collectIoModule);
-    if (browse && pick) browse.onclick = () => pick.click();
-    if (pick) {
-      pick.onchange = async () => {
-        const f = pick.files && pick.files[0];
-        if (!f || !inp) return;
-        inp.value = f.name;
-        await loadExtMeta(f.name);
-        collectIoModule();
-        rerender();
-      };
+    if (browse) {
+      browse.onclick = () => pickExtFile(card).catch((e) => {
+        const msg = $("ioMsg");
+        if (msg) msg.innerHTML = `<span class="err">${esc(e && e.message ? e.message : e)}</span>`;
+      });
     }
     if (inp) {
       inp.addEventListener("change", async () => {
@@ -2562,8 +2606,7 @@ function renderExtRows(list) {
       <div class="pv-file-head">
         <span class="pv-file-tag">外验 ${i + 1}</span>
         <input data-ext="name" type="text" placeholder="名称，可空" value="${esc(name)}"/>
-        <input data-ext="file" type="text" list="xlsxList" placeholder="选择或填写 xlsx" autocomplete="off" spellcheck="false" value="${esc(file)}"/>
-        <input data-ext-filepick type="file" accept=".xlsx,.xls" hidden/>
+        <input data-ext="file" type="text" readonly placeholder="点「选择」挑 xlsx" title="只能用「选择」在子工程根目录挑 Excel。" value="${esc(file)}"/>
         <button type="button" class="btn sec" data-ext-pick>选择</button>
         <button type="button" class="btn sec" data-ext-del title="删这份文件">删</button>
       </div>
@@ -2601,9 +2644,6 @@ function fillIoModule() {
   renderExtRows(tests.length ? tests : [emptyExtRow()]);
   refreshExtMetas(tests.map((r) => r && r.file)).catch(() => {});
   fillAllIoSelects(v);
-  if ($("ioExtSplit") && v.USE_INTERNAL_SPLIT_WHEN_EXTERNAL != null) {
-    $("ioExtSplit").checked = !!v.USE_INTERNAL_SPLIT_WHEN_EXTERNAL;
-  }
   const p = S.projects.find(x => x.name === ($("project") && $("project").value));
   fillDatalist("xlsxList", (p && p.xlsx) || []);
 }
@@ -2626,7 +2666,6 @@ function collectIoModule() {
   S.values.EXTERNAL_CLIN_SHEET = first.clin_sheet || "";
   S.values.EXTERNAL_RAD_SHEET = first.rad_sheet || "";
   S.values.EXTERNAL_TESTS = usable;
-  if ($("ioExtSplit")) S.values.USE_INTERNAL_SPLIT_WHEN_EXTERNAL = !!$("ioExtSplit").checked;
   persistIoLock();
   fillLockStamp();
 }
@@ -2634,7 +2673,6 @@ let ioReloadBusy = false;
 function bindIoModule() {
   if ($("ioCard") && $("ioCard").dataset.bound) return;
   if ($("ioCard")) $("ioCard").dataset.bound = "1";
-  if ($("ioExtSplit")) $("ioExtSplit").addEventListener("change", collectIoModule);
   if ($("btnExtAdd")) {
     $("btnExtAdd").onclick = () => {
       const cur = readExtRows();
@@ -2667,7 +2705,7 @@ function postFlowSteps(frame) {
 function stitchSections(parts) {
   const out = [];
   const buf = [];
-  const want = new Set(["radprep", "rad", "radlog", "fig"]);
+  const want = new Set(["rad", "radlog", "fig"]);
   const idOf = (html) => {
     const m = String(html || "").match(/data-sec="([^"]+)"/);
     return m ? m[1] : "";
@@ -2798,24 +2836,6 @@ function switchOn(key) {
   if (S.values && Object.prototype.hasOwnProperty.call(S.values, key)) return !!S.values[key];
   return !!fieldValue(key);
 }
-function groupSelectHtml(key) {
-  if (!key || !S.schema) return "";
-  const f = S.schema.find(x => x.key === key);
-  if (!f) return "";
-  const v = fieldValue(key);
-  const labels = f.option_labels || {};
-  const opts = (f.options || []).map(o => {
-    let lab = (o === "" || o == null) ? "全部" : o;
-    if (labels && labels[o] != null) lab = labels[o];
-    else if (labels && labels[String(o)] != null) lab = labels[String(o)];
-    return `<option value="${esc(o)}" ${String(o) === String(v ?? "") ? "selected" : ""}>${esc(lab)}</option>`;
-  }).join("");
-  const tipBits = [];
-  if (f.help) tipBits.push(String(f.help));
-  if (f.key) tipBits.push(String(f.key));
-  const tip = tipBits.length ? ` title="${esc(tipBits.join("\n"))}"` : "";
-  return `<label class="sec-group"${tip} onclick="event.stopPropagation()"><span>${esc(f.label || "分析组别")}</span><select data-key="${esc(key)}">${opts}</select></label>`;
-}
 function titleSwitchHtml(keys) {
   if (!keys || !keys.length || !S.schema) return "";
   return keys.map((key) => {
@@ -2838,14 +2858,12 @@ function sectionHead(id, title, extra, hint, titleKeys) {
     : "";
   const count = typeof extra === "number" || (typeof extra === "string" && /^\d+$/.test(extra));
   const n = extra == null || extra === "" || count ? "" : ` · ${esc(String(extra))}`;
-  const groupKey = id === "corr" ? "CORR_GROUP" : (id === "pcorr" ? "PARTIAL_GROUP" : "");
-  const group = groupSelectHtml(groupKey);
   const headTip = hint ? ` data-tip="${esc(String(hint))}"` : "";
   const peers = titleSwitchHtml(titleKeys);
-  const peerGap = peers || group ? `<span class="title-gap" aria-hidden="true"></span>` : "";
+  const peerGap = peers ? `<span class="title-gap" aria-hidden="true"></span>` : "";
   return {
     dim,
-    html: `<h3${headTip} onclick="this.parentNode.classList.toggle('off')">${sw}<span class="sec-title">${esc(title)}</span>${n}${peerGap}${peers}${group}</h3>`,
+    html: `<h3${headTip} onclick="this.parentNode.classList.toggle('off')">${sw}<span class="sec-title">${esc(title)}</span>${n}${peerGap}${peers}</h3>`,
   };
 }
 function dropSwitch(id, fields) {
@@ -2904,7 +2922,7 @@ function renderForm() {
     }
     map.get(f.section).fields.push(f);
   }
-  const moveAfterClin = ["radprep", "radblocks", "combined", "rad", "radlog"];
+  const moveAfterClin = ["radblocks", "combined", "rad", "radlog"];
   if (groups.some((g) => moveAfterClin.indexOf(g.id) >= 0)) {
     const moved = [];
     const rest = groups.filter((g) => {
@@ -2930,6 +2948,17 @@ function renderForm() {
     groups.length = 0;
     rest.forEach((g) => groups.push(g));
   }
+  // 组学 / 预处理 并进 组学模块；相关热图 并进 相关 / 偏相关分析（ini 分节不变）。
+  const mergeGroup = (fromId, toId, title) => {
+    const from = groups.find((g) => g.id === fromId);
+    const to = groups.find((g) => g.id === toId);
+    if (!from || !to) return;
+    to.fields = from.fields.concat(to.fields);
+    if (title) to.title = title;
+    groups.splice(groups.indexOf(from), 1);
+  };
+  mergeGroup("radprep", "radblocks");
+  mergeGroup("corr", "pcorr", "相关 / 偏相关");
   captureFoldState();
   root.innerHTML = stitchSections(groups.map(g => {
     const fields = dropSwitch(g.id, g.fields);
@@ -2976,6 +3005,18 @@ function renderForm() {
       </div>
     </div>`;
     }
+    if (g.id === "repro") {
+      // 「有外验仍做内拆」放标题行；其余（种子 / 训练比例 / 分组列）留在 body。
+      const titleKeys = ["USE_INTERNAL_SPLIT_WHEN_EXTERNAL"];
+      const titleSet = new Set(titleKeys);
+      const vis = fields.filter(f => !isHiddenField(f) && !titleSet.has(f.key));
+      const hint = "种子、训练比例、分组列。「有外验仍做内拆」在标题行：开=已有外验时仍做内部训练/验证。";
+      const head = sectionHead("repro", g.title, vis.length + titleKeys.length, hint, titleKeys);
+      return `<div class="sec-block${head.dim}" data-sec="repro">
+      ${head.html}
+      <div class="sec-body repro-body">${vis.map(renderField).join("")}</div>
+    </div>`;
+    }
     if (g.id === "clinprep") {
       const order = [
         "ORDINAL_MAX_LEVELS", "CLIN_FORCE_CONTINUOUS", "CLIN_FORCE_CATEGORICAL", "SKIP_CLIN_FEATURES",
@@ -3016,7 +3057,7 @@ function renderForm() {
     </div>`;
     }
     if (g.id === "clin") {
-      const titleKeys = ["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH"];
+      const titleKeys = ["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH", "CLIN_SCORE_LINEAR"];
       const titleSet = new Set(titleKeys);
       const order = [
         "TABLE1_P_THRESHOLD",
@@ -3035,22 +3076,23 @@ function renderForm() {
       }
       if (!vis.length && !titleKeys.length) return "";
       const html = vis.map(renderField).join("");
-      const hint = "单因素 / 多因素表与 Firth 在标题行。Table1 p 在 body。计数/计量等级与强制计数在临床预处理。";
+      const hint = "单因素 / 多因素表、Firth 与「线性拟合」在标题行。Table1 p 在 body。计数/计量等级与强制计数在临床预处理。";
       const head = sectionHead("clin", g.title, vis.length, hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="clin">
       ${head.html}
       <div class="sec-body clin-body">${html}</div>
     </div>`;
     }
-    if (g.id === "radprep") {
+    if (g.id === "radprep" || g.id === "radblocks") {
       const titleKeys = ["DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"];
       const titleSet = new Set(titleKeys);
+      const rows = blkRows();
       const hasRad = !!pickExistingSheet(
         (S.values && S.values.RAD_SHEET) || "", workbookSheets(), ""
-      ) || blkRows().length > 0;
+      ) || rows.length > 0;
       if (!hasRad) {
-        const head = sectionHead("radprep", g.title, "未用", "未指定组学 sheet，跳过预处理。要做组学请回「数据预览」选择组学表。", titleKeys);
-        return `<div class="sec-block off${head.dim}" data-sec="radprep">
+        const head = sectionHead("radblocks", g.title, "未用", "未指定组学 sheet，跳过预处理与建模。要做组学请回「数据预览」选择组学表。", titleKeys);
+        return `<div class="sec-block off${head.dim}" data-sec="radblocks">
       ${head.html}
       <div class="sec-body radprep-body"></div>
     </div>`;
@@ -3066,25 +3108,18 @@ function renderForm() {
         if (left.indexOf(f) < 0) left.push(f);
       }
       const shown = left;
-      if (!shown.length && !titleKeys.length) return "";
-      const hint = "相关过滤界值，以及 ICC 阈值和三列。LASSO 缓存在标题行，默认开。在训练集拟合，验证层套用同一套插补和标准化。组学模块（每块的方法与预处理）在下一个模块。标记的筛选、分类、剥离在单独模块。";
-      const head = sectionHead("radprep", g.title, shown.length, hint, titleKeys);
-      return `<div class="sec-block${head.dim}" data-sec="radprep">
-      ${head.html}
-      <div class="sec-body radprep-body">${shown.map(renderField).join("")}</div>
-    </div>`;
-    }
-    if (g.id === "radblocks") {
-      const rows = blkRows();
-      const hint = "每块一张工作表（工作表与 ID 列在「数据预览」页分配）。每块三段：预处理（ICC / 相关 / 界值）→ 筛选（LASSO / Logistic，含每块 uni_p·mv_p·Firth）→ 模型（分数名）。留空 = 继承上面的全局设置。";
-      const head = sectionHead("radblocks", g.title, rows.length ? rows.length : "未用", hint);
+      const hint = "每块一张工作表（工作表与 ID 列在「数据预览」页分配）。每块两段：预处理（ICC / 相关 / 界值）→ 筛选（LASSO / Logistic，含每块 uni_p·mv_p·Firth）。留空 = 继承本模块顶部的全局设置。";
+      const head = sectionHead("radblocks", g.title, rows.length ? rows.length : "未用", hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="radblocks">
       ${head.html}
-      <div class="sec-body radblocks-body">${modalityBlocksPanel()}</div>
+      <div class="sec-body radblocks-body">
+        ${shown.length ? `<div class="radprep-body">${shown.map(renderField).join("")}</div>` : ""}
+        ${modalityBlocksPanel()}
+      </div>
     </div>`;
     }
     if (g.id === "combined") {
-      const hint = "Combined 主模型的口径与纳入/剔除块：per_block=临床+每块分别；joint=临床+全部块一次 GLM。块自身的方法与预处理在「组学 / 预处理」。临床块固定走临床筛选（Logistic）。";
+      const hint = "Combined 主模型的口径与纳入/剔除块：per_block=临床+每块分别；joint=临床+全部块一次 GLM。块自身的方法与预处理在「组学模块」。临床块固定走临床筛选（Logistic）。";
       const head = sectionHead("combined", g.title, "", hint);
       return `<div class="sec-block${head.dim}" data-sec="combined">
       ${head.html}
@@ -3207,29 +3242,31 @@ function renderForm() {
       <div class="sec-body ${esc(g.id)}-body">${html}</div>
     </div>`;
     }
-    if (g.id === "pcorr") {
-      const titleKeys = ["DO_CORR", "DO_PARTIAL"];
-      const vis = fields.filter(f => !isHiddenField(f) && f.key !== "PARTIAL_GROUP" && titleKeys.indexOf(f.key) < 0);
+    if (g.id === "pcorr" || g.id === "corr") {
+      const titleKeys = ["DO_HEATMAP", "DO_CORR", "DO_PARTIAL"];
+      const vis = fields.filter(f => !isHiddenField(f) && titleKeys.indexOf(f.key) < 0);
       if (!vis.length) return "";
       const byKey = new Map(vis.map(f => [f.key, f]));
-      // 预测因子和参考变量两个开关共用。控制变量与方法只在偏相关开时生效。
+      // 热图列与组别、预测因子与参考变量、偏相关的控制变量与方法都在同一张卡里。
       const order = [
-        "CORR_PREDICTORS", "CORR_REFS", "PARTIAL_METHOD", "PARTIAL_CONTROLS",
+        "HEATMAP_COLS", "CORR_GROUP",
+        "CORR_PREDICTORS", "CORR_REFS",
+        "PARTIAL_GROUP", "PARTIAL_METHOD", "PARTIAL_CONTROLS",
       ];
       const rest = [];
       for (const k of order) {
         const f = byKey.get(k);
-        if (f) rest.push(f);
+        if (f && rest.indexOf(f) < 0) rest.push(f);
       }
       for (const f of vis) {
         if (rest.indexOf(f) < 0) rest.push(f);
       }
       const html = rest.map(renderPartialField).join("");
-      const hint = "预测因子/参考变量共用相关表与偏相关；控制变量与方法仅偏相关。热图在「相关热图」。";
-      const head = sectionHead(g.id, g.title, vis.length, hint, titleKeys);
-      return `<div class="sec-block${head.dim}" data-sec="${esc(g.id)}">
+      const hint = "热图、相关表与偏相关共用同一组变量：预测因子=偏相关 X，参考变量=偏相关 Y；控制变量与方法只作用于偏相关。";
+      const head = sectionHead("pcorr", g.title, vis.length, hint, titleKeys);
+      return `<div class="sec-block${head.dim}" data-sec="pcorr">
       ${head.html}
-      <div class="sec-body ${esc(g.id)}-body">${html}</div>
+      <div class="sec-body pcorr-body">${html}</div>
     </div>`;
     }
     if (g.id === "roc") {
@@ -3340,32 +3377,6 @@ function renderForm() {
       ${head.html}
       <div class="sec-body adv-body">
         ${blockHtml ? `<div class="mod-blocks">${blockHtml}</div>` : ""}
-      </div>
-    </div>`;
-    }
-    if (g.id === "corr") {
-      const vis = fields.filter(f => !isHiddenField(f) && f.key !== "CORR_GROUP");
-      if (!vis.length) return "";
-      const byKey = new Map(vis.map(f => [f.key, f]));
-      const order = ["HEATMAP_COLS"];
-      const bools = vis.filter(f => f.widget === "bool");
-      const rest = [];
-      for (const k of order) {
-        const f = byKey.get(k);
-        if (f && f.widget !== "bool") rest.push(f);
-      }
-      for (const f of vis) {
-        if (f.widget === "bool") continue;
-        if (rest.indexOf(f) < 0) rest.push(f);
-      }
-      const html = rest.map(renderField).join("");
-      const hint = "只画 Spearman 相关热图。列与组别在本块；相关表在「相关/偏相关分析」。";
-      const head = sectionHead(g.id, g.title, vis.length, hint);
-      return `<div class="sec-block${head.dim}" data-sec="corr">
-      ${head.html}
-      <div class="sec-body corr-body">
-        ${bools.length ? `<div class="sec-bools">${bools.map(renderField).join("")}</div>` : ""}
-        ${html ? `<div class="sec-rest">${html}</div>` : ""}
       </div>
     </div>`;
     }
@@ -4171,9 +4182,8 @@ function blkParamOf(b, name) {
 
 function modalityBlocksPanel() {
   const rows = blkRows();
-  const head = '<div class="subh">组学模块（每块三段：预处理 → 筛选 → 模型）</div>';
   if (!rows.length) {
-    return `<div class="rad-blocks" data-key="MODALITY_BLOCKS">${head}
+    return `<div class="rad-blocks" data-key="MODALITY_BLOCKS">
       <span class="kv-empty">还没有组学模块。到「数据预览」页把工作表设成「组学模块」。</span></div>`;
   }
   const cards = rows.map((b, i) => {
@@ -4201,7 +4211,7 @@ function modalityBlocksPanel() {
         <span class="grp-chip">${i + 1}</span>
         <span class="blk-sheet mono" title="${esc(b.sheet || b.name)}">${esc(b.sheet || b.name)}</span>
         <label class="pexcl" title="关=该块不参与建模"><input type="checkbox" data-blk="enabled"${b.enabled === false ? "" : " checked"}/> 启用</label>
-        <span class="blk-score mono">${esc(b.score || ("RadScore" + (i === 0 ? "" : "_" + (b.name || ""))))}</span>
+        <span class="blk-score mono" title="分数名在「数据预览」页的该工作表行里设">${esc(b.score || (b.sheet || b.name || ""))}</span>
       </div>
       <div class="blk-stage">
         <span class="blk-stage-k">预处理</span>
@@ -4215,13 +4225,9 @@ function modalityBlocksPanel() {
           .map(([v, t]) => `<option value="${v}"${method === v ? " selected" : ""}>${t}</option>`).join("")}</select>
         ${stageFilter}
       </div>
-      <div class="blk-stage">
-        <span class="blk-stage-k">模型</span>
-        <input data-blk="score" value="${esc(b.score || "")}" placeholder="分数名（空=RadScore / RadScore_块名）" spellcheck="false"/>
-      </div>
     </div>`;
   }).join("");
-  return `<div class="rad-blocks" data-key="MODALITY_BLOCKS">${head}${cards}</div>`;
+  return `<div class="rad-blocks" data-key="MODALITY_BLOCKS">${cards}</div>`;
 }
 
 function combinedPanel() {
@@ -4233,7 +4239,7 @@ function combinedPanel() {
   const excludeSet = asList(fieldValue("COMBINED_EXCLUDE")).map((s) => String(s).trim()).filter(Boolean);
   const picks = rows.map((b, i) => {
     const nm = String(b.name || b.sheet || "");
-    const score = String(b.score || ("RadScore" + (i === 0 ? "" : "_" + nm)));
+    const score = String(b.score || b.sheet || nm || "");
     const listed = !includeSet.length || includeSet.indexOf(nm) >= 0 || includeSet.indexOf(score) >= 0;
     const dropped = excludeSet.indexOf(nm) >= 0 || excludeSet.indexOf(score) >= 0;
     const used = listed && !dropped && b.method && b.enabled !== false;
@@ -5476,10 +5482,6 @@ function applyUrlSheetsToValues() {
       continue;
     }
     if (raw == null || raw === "") continue;
-    if (key === "USE_INTERNAL_SPLIT_WHEN_EXTERNAL") {
-      S.values[key] = raw === "1" || raw === "true";
-      continue;
-    }
     S.values[key] = raw;
   }
   const dataQ = (qs.get("data") || "").trim();
@@ -5594,7 +5596,6 @@ async function boot() {
   }
   $("btnRestart").onclick = () => restartServer().catch(e => alert(e.message));
   if ($("btnDataQc")) $("btnDataQc").onclick = () => runDataQc().catch(e => alert(e.message));
-  $("btnWrite").onclick = () => writeback().catch(e => alert(e.message));
   $("btnResults").onclick = () => refreshResults().catch(e => alert(e.message));
   $("btnOpenResult").onclick = () => openSelectedResult();
   if ($("btnCopyLog")) {
