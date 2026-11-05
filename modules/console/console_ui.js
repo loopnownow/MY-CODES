@@ -4048,6 +4048,12 @@ function textEncodeCandidates() {
   Object.keys(spec).forEach((col) => push(col, "", "", Object.keys(spec[col])));
   return out;
 }
+function overTxtCap(nLevels, cap) {
+  // 等级数 ≥ 上限即不自动编码；2 等级固定按 0/1，不受上限限制。
+  const n = Number(nLevels) || 0;
+  const c = Number(cap) || 5;
+  return n > 2 && n >= c;
+}
 function textEncodeRow(cand) {
   const spec = textEncodeSpec();
   const cur = spec[cand.col] || {};
@@ -4077,15 +4083,15 @@ function textEncodePanel() {
   const shown = q
     ? cands.filter((c) => c.col.toLowerCase().indexOf(q) >= 0 || String(c.owner).toLowerCase().indexOf(q) >= 0)
     : cands;
-  const over = shown.filter((c) => c.levels.length > cap);
+  const over = shown.filter((c) => overTxtCap(c.levels.length, cap));
   const body = shown.length
     ? shown.map(textEncodeRow).join("")
     : `<span class="kv-empty">${cands.length ? "没有匹配的列。" : "载入数据后自动识别文本列；也可手写列名。"}</span>`;
   return `<div class="kv-rows txt-encode" data-key="TEXT_ENCODE">
     <div class="kv-row txt-tools">
       <input data-txt-q="1" type="text" placeholder="搜索列名 / 来源" value="${esc(S.txtQ || "")}" spellcheck="false"/>
-      <label class="pexcl" title="≤上限等级的文本列自动按默认顺序编码；手写码优先"><input type="checkbox" data-txt-auto-on="1"${auto ? " checked" : ""}/> 自动识别并编码</label>
-      <label class="txt-cap" title="自动编码的等级上限（含）：≤ 该等级的列自动编码；等级数超过该值（如上限 5 时的 6 级及以上）不编码、不进建模，可展开手填。2 等级固定自动 0/1，不用手填">等级上限 <select data-txt-cap="1">${(() => {
+      <label class="pexcl" title="等级数 < 上限的文本列自动按默认顺序编码；手写码优先。2 等级固定 0/1"><input type="checkbox" data-txt-auto-on="1"${auto ? " checked" : ""}/> 自动识别并编码</label>
+      <label class="txt-cap" title="自动编码的等级上限（不含）：等级数 < 该值（默认 5，即 1–4 级）自动编码；等级数 ≥ 该值（5 级及以上）不编码、不进建模，可展开手填。2 等级固定自动 0/1，不受上限限制">等级上限 <select data-txt-cap="1">${(() => {
         const opts = [3, 4, 5];
         const cur = Number(cap) || 5;
         if (opts.indexOf(cur) < 0) opts.push(cur);
@@ -4124,7 +4130,7 @@ function autoTxtAll() {
   const spec = textEncodeSpec();
   let n = 0;
   textEncodeCandidates().forEach((c) => {
-    if (c.levels.length > cap) return;
+    if (overTxtCap(c.levels.length, cap)) return;
     if (Object.prototype.hasOwnProperty.call(spec, c.col)) return;
     spec[c.col] = defaultTextCodes(c.levels);
     n += 1;

@@ -56,6 +56,32 @@ def _independent_basis(mat: np.ndarray, tol: float = 1e-8) -> Tuple[List[int], L
     return basis, dependent
 
 
+def _prepared_matrix(df: pd.DataFrame, feats: Sequence[str]):
+    """按列取数、去掉含缺失的行、标准化；样本不足返回 None。"""
+    X = df[list(feats)].apply(pd.to_numeric, errors="coerce")
+    X = X.loc[X.notna().all(axis=1)].reset_index(drop=True)
+    if len(X) < len(feats) + 2:
+        return None
+    Xs = X.copy()
+    for c in Xs.columns:
+        s = Xs[c].std()
+        if s > 0:
+            Xs[c] = (Xs[c] - Xs[c].mean()) / s
+    return Xs.to_numpy(dtype=float)
+
+
+def derived_features(df: pd.DataFrame, features: Sequence[str]) -> List[str]:
+    """返回与其余列完全线性表出的列名（派生列，如合计 / 均值列）。"""
+    feats = [str(f) for f in features if str(f) in df.columns]
+    if len(feats) < 3:
+        return []
+    arr = _prepared_matrix(df, feats)
+    if arr is None:
+        return []
+    _basis, dependent = _independent_basis(arr)
+    return [feats[i] for i in dependent]
+
+
 def compute_vif(df: pd.DataFrame, features: Sequence[str],
                 warn: float = None, high: float = None) -> pd.DataFrame:
     """对 features 计算 VIF（含截距列的设计矩阵，报告各预测变量 VIF）。
@@ -69,18 +95,9 @@ def compute_vif(df: pd.DataFrame, features: Sequence[str],
     if len(feats) < 2:
         return pd.DataFrame(columns=["Variable", "VIF", "Flag"])
 
-    X = df[feats].apply(pd.to_numeric, errors="coerce")
-    ok = X.notna().all(axis=1)
-    X = X.loc[ok].reset_index(drop=True)
-    if len(X) < len(feats) + 2:
+    arr = _prepared_matrix(df, feats)
+    if arr is None:
         return pd.DataFrame(columns=["Variable", "VIF", "Flag"])
-
-    Xs = X.copy()
-    for c in Xs.columns:
-        s = Xs[c].std()
-        if s > 0:
-            Xs[c] = (Xs[c] - Xs[c].mean()) / s
-    arr = Xs.to_numpy(dtype=float)
     basis, dependent = _independent_basis(arr)
 
     values = {i: float("nan") for i in range(len(feats))}

@@ -77,7 +77,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
     ]),
     ("switch", "开关", [
         "DO_FALSE_CLASS", "DO_FDR", "DO_FWER",
-        "VIF_THRESHOLD_WARN", "BOOTSTRAP_N",
+        "VIF_THRESHOLD_WARN", "DO_DROP_DERIVED", "BOOTSTRAP_N",
     ]),
     ("nomo", "列线图", [
         "DO_NOMOGRAM", "DO_CALIBRATION",
@@ -304,6 +304,7 @@ LABELS = {
     "GROUP_FROM_ID": "从 ID 前缀推断分组",
     "GROUP_FROM_ID_SEP": "ID 分组分隔符",
     "VIF_THRESHOLD_WARN": "VIF警告阈值",
+    "DO_DROP_DERIVED": "剔除派生列",
     "SHAP_MAX_SAMPLES": "SHAP 最大样本",
     "DAG_NODES": "DAG 节点",
     "DAG_EDGES": "DAG 边",
@@ -514,6 +515,7 @@ HINTS: dict[str, str] = {
     "GROUP_FROM_ID": "已从控制台撤下。旧 ini 若仍为 true，流水线仍可从 ID 前缀分组。",
     "GROUP_FROM_ID_SEP": "已从控制台撤下。仅当旧 ini 打开 GROUP_FROM_ID 时有效。",
     "VIF_THRESHOLD_WARN": "VIF 超过则警告共线性（仅警示，不按高阈值剔除候选），常用 5。",
+    "DO_DROP_DERIVED": "开=把与其余列完全线性表出的派生列（如 AFC_total = R_AFC + L_AFC、*_mean = 两侧均值）从热图和相关表里整列剔除，单因素/多因素表的 VIF 也直接去掉这些行（不再显示 ∞），日志会列出被剔除的列名。关=保留派生列，VIF 用 ∞ 标注完全共线。",
     "SHAP_MAX_SAMPLES": "算 SHAP 的最多人数，太大较慢。",
     "DAG_NODES": "DAG 节点名，须含结局节点（常为 Group 或结局列）。",
     "DAG_EDGES": "有向边列表 [[从, 到], ...]。",
@@ -540,7 +542,7 @@ HINTS: dict[str, str] = {
     "CLIN_BLOCK_METHOD": "临床块固定走临床筛选（单因素→多因素 p），不进 LASSO。",
     "TEXT_ENCODE": "文本列的编码表：{列名: {原文: 数字}}。控制台「文本编码」面板里点自动识别会按上限自动填，可逐条改。手写的优先于自动。",
     "TEXT_ENCODE_AUTO": "开=自动识别文本列并把 ≤上限等级的取值自动编码（默认开）。关=只用 TEXT_ENCODE 里手写的映射。",
-    "TEXT_ENCODE_MAX_LEVELS": "自动编码的等级上限（含）：等级数 ≤ 该值（控制台可选 3/4/5）自动编码；等级数超过该值（上限 5 时即 6 级及以上）不编码、不进建模，可展开手填。2 等级固定自动 0/1，不需要手填。",
+    "TEXT_ENCODE_MAX_LEVELS": "自动编码的等级上限（不含）：等级数 < 该值（控制台可选 3/4/5，默认 5 即 1–4 级）自动编码；等级数 ≥ 该值（上限 5 时即 5 级及以上）不编码、不进建模，可展开手填。2 等级固定自动 0/1，不受上限限制。",
     "ENCODE_BLOCK_TEXT": "开（默认）=组学模块工作表里的文本列也按「文本编码」换成数字后参与筛选与建模（≤上限自动编码，超上限或未给映射的列仍跳过并点名）。关=组学块只吃数值列，文本列只在结果 B3 表里作描述。",
     "RAD_FEATURE_DISPLAY_STRIP": "左=检出的标记，右=要剥掉的字（通常就是该标记）。只剥它所在的那一端，不改名称中间。空=不剥。只改图/表显示，不改内部列名。",
     "FIGURE_PANEL_DPI": "拼板 PNG 分辨率。",

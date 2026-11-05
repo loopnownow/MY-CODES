@@ -1,4 +1,4 @@
-"""文本编码：自动识别、≤5 等级自动编码、手改优先、超限列不静默。"""
+"""文本编码：自动识别、等级数 < 上限自动编码、手改优先、超限列不静默。"""
 from __future__ import annotations
 
 import numpy as np
@@ -29,12 +29,12 @@ def _frame():
 
 
 def test_detect_and_auto_codes():
-    det = text_encode.detect_text_columns({"US": _frame()}, limit=3)
+    det = text_encode.detect_text_columns({"US": _frame()}, limit=4)
     cols = {d["column"]: d for d in det}
     assert "num" not in cols and "Patient_ID" not in cols
-    assert cols["echo"]["n_levels"] == 3 and not cols["echo"]["over_cap"]
+    assert cols["echo"]["n_levels"] == 3 and not cols["echo"]["over_cap"]  # 3 < 4
     assert cols["echo"]["levels"] == ["Hyperechoic", "Isoechoic", "Mixed"]
-    assert cols["many"]["over_cap"] is True
+    assert cols["many"]["over_cap"] is True  # 4 ≥ 4
     assert text_encode.default_codes(["10", "2"]) == {"10": 10.0, "2": 2.0}
     assert text_encode.default_codes(["Negative", "Positive"]) == {"Negative": 0.0, "Positive": 1.0}
     assert text_encode.default_codes(["Yes", "No"]) == {"Yes": 1.0, "No": 0.0}
@@ -42,6 +42,26 @@ def test_detect_and_auto_codes():
     assert text_encode.default_codes(["Hyperechoic", "Hypoechoic", "Isoechoic", "Mixed"]) == {
         "Hyperechoic": 1.0, "Hypoechoic": 2.0, "Isoechoic": 3.0, "Mixed": 4.0,
     }
+
+
+def test_cap_is_exclusive_four_levels_encoded_five_dropped():
+    four = (["a", "b", "c", "d"] * 6)[:24]
+    five = (["a", "b", "c", "d", "e"] * 5)[:24]
+    df = pd.DataFrame({"four": four, "five": five})
+    det = {d["column"]: d for d in text_encode.detect_text_columns({"US": df}, limit=5)}
+    assert det["four"]["over_cap"] is False
+    assert det["five"]["over_cap"] is True
+    out = text_encode.prepare_frame(df, frame_label="US", limit=5)
+    assert list(out.columns) == ["four"]
+    assert list(out["four"].head(4)) == [1.0, 2.0, 3.0, 4.0]
+
+
+def test_two_levels_always_encoded_even_at_cap_two(monkeypatch):
+    monkeypatch.setattr(cfg, "TEXT_ENCODE_MAX_LEVELS", 2, raising=False)
+    df = pd.DataFrame({"bin": (["Yes", "No"] * 6)[:12], "three": (["a", "b", "c"] * 4)[:12]})
+    out = text_encode.prepare_frame(df, frame_label="US")
+    assert list(out.columns) == ["bin"]
+    assert set(out["bin"].tolist()) == {0.0, 1.0}
 
 
 def test_normalize_spec_rejects_non_numeric():
@@ -62,7 +82,7 @@ def test_prepare_frame_drops_over_cap_column():
     cfg.TEXT_ENCODE_MAX_LEVELS = 2
     out = text_encode.prepare_frame(_frame(), frame_label="US")
     assert "many" not in out.columns
-    assert "echo" not in out.columns  # 3 等级 > 上限 2，也不自动编码
+    assert "echo" not in out.columns  # 3 等级 ≥ 上限 2，也不自动编码
 
 
 def test_unmapped_level_becomes_nan():
@@ -92,7 +112,7 @@ def test_prepare_blocks_encodes_clin_kind():
     blocks = data_io._prepare_blocks({"US": raw}, ids, specs)
     us = blocks["US"]
     assert pd.api.types.is_numeric_dtype(us["echo"])
-    assert "many" in us.columns or "many" not in us.columns  # 4 等级 ≤5 → 自动编码
+    assert "many" in us.columns and pd.api.types.is_numeric_dtype(us["many"])  # 4 等级 <5 → 自动编码
 
 
 def test_prepare_blocks_encodes_rad_kind_too():

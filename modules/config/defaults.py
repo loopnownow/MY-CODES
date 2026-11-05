@@ -114,6 +114,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "DO_FWER": False,
     "BOOTSTRAP_N": 1000,
     "VIF_THRESHOLD_WARN": 5.0,
+    "DO_DROP_DERIVED": False,
     "ENABLE_CORR_FILTER": True,
     "DO_FIGURE_PANELS": True,
     "DO_QC_REPORT": True,

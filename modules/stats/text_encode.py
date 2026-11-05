@@ -1,17 +1,18 @@
-"""文本编码：自动识别文本列 → ≤N 等级自动编码 → 可手改 → 套到数据上。
+"""文本编码：自动识别文本列 → 等级数 < 上限自动编码 → 可手改 → 套到数据上。
 
 配置
 ----
 TEXT_ENCODE            {列名: {原文: 编码}}，手改/控制台写入；优先级最高
 TEXT_ENCODE_AUTO       true=没有手写映射时自动编码（默认 true）
-TEXT_ENCODE_MAX_LEVELS 自动编码的等级上限（默认 5）
+TEXT_ENCODE_MAX_LEVELS 自动编码的等级上限（默认 5，不含）
 
 规则
 ----
 - 只处理"非数值"列；全是数字（含可 parse 的文本数字）的列不碰。
-- 等级 ≤ max_levels：自动编码。默认码 = 若所有等级都能当数字则用该数字，
+- 等级数 < 上限：自动编码。默认码 = 若所有等级都能当数字则用该数字，
   否则按字典序 1..k（日志打印，可手改）。
-- 等级 > max_levels：不自动编码，列不进建模；打印明确原因（不静默丢）。
+- 等级数 ≥ 上限（默认 5 即 5 级及以上）：不自动编码，列不进建模；打印明确原因
+  （不静默丢）。2 等级固定按 0/1，不受上限限制。
 - 套用时有未编码的取值：写 NaN 并打印该列未编码的取值（不猜）。
 - 非法编码（非数字）→ ValueError。
 
@@ -33,7 +34,7 @@ _ID_LIKE = {"Name", "Patient_ID", "patient_id", "PatientID", "ID", "Group"}
 
 
 def max_levels(raw: Any = None) -> int:
-    """自动编码的等级上限。非法值 raise。"""
+    """自动编码的等级上限（不含：等级数 ≥ 上限即不编码）。非法值 raise。"""
     if raw is None:
         from modules import config as cfg
 
@@ -45,6 +46,12 @@ def max_levels(raw: Any = None) -> int:
     if n < 2:
         raise ValueError(f"TEXT_ENCODE_MAX_LEVELS 至少为 2，当前={n}")
     return n
+
+
+def over_level_cap(n_levels: int, cap: int) -> bool:
+    """等级数 ≥ 上限即不自动编码；2 等级固定按 0/1，不受上限限制。"""
+    n = int(n_levels)
+    return n > 2 and n >= int(cap)
 
 
 def auto_on(raw: Any = None) -> bool:
@@ -139,7 +146,7 @@ def detect_text_columns(
                 "column": name,
                 "n_levels": len(levels),
                 "levels": levels,
-                "over_cap": len(levels) > cap,
+                "over_cap": over_level_cap(len(levels), cap),
             })
     return out
 
@@ -200,14 +207,14 @@ def auto_spec(
     spec: Optional[Dict[str, Dict[str, float]]] = None,
     limit: Optional[int] = None,
 ) -> Dict[str, Dict[str, float]]:
-    """自动补码：手写的码保留，缺的等级按默认顺序补；等级超上限且无手写映射则不补。"""
+    """自动补码：手写的码保留，缺的等级按默认顺序补；等级数 ≥ 上限且无手写映射则不补。"""
     cap = max_levels() if limit is None else int(limit)
     out: Dict[str, Dict[str, float]] = {k: dict(v) for k, v in (spec or {}).items()}
     for item in detected:
         col = item["column"]
         levels = list(item["levels"])
         have = dict(out.get(col) or {})
-        if item["n_levels"] > cap and not have:
+        if over_level_cap(item["n_levels"], cap) and not have:
             continue
         codes = default_codes(levels)
         for lv in levels:
@@ -280,7 +287,7 @@ def prepare_frame(
     for item in over:
         print(
             f"  ⚠ 文本编码 [{frame_label}] {item['column']!r}: "
-            f"{item['n_levels']} 个等级 > 上限 {cap}，不自动编码，该列不进建模"
+            f"{item['n_levels']} 个等级 ≥ 上限 {cap}，不自动编码，该列不进建模"
             f"（需要时在控制台手写映射）",
             flush=True,
         )
