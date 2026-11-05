@@ -739,3 +739,80 @@ def test_external_specs_for_qc_keep_block_sheets():
         }],
     })
     assert specs and specs[0]["sheets"] == {"CTA": "CTA_ext"}
+
+
+def test_default_exclude_xlsx_follows_each_outcome_folder(tmp_path, monkeypatch):
+    """多结局：默认错分表写进当前结局的结果夹，不再共用一个工程根文件。"""
+    from modules.stats import data_io
+
+    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
+    mapping = {"Response": "ASL", "DSI": "Group"}
+    per_outcome = []
+    for outcome in ("Response", "DSI"):
+        settings = {
+            "DO_EXCLUDE_SAMPLES": True,
+            "GROUP_SOURCE_COL": outcome,
+            "OUT_DIR": mapping[outcome],
+            "SUBPROJECT_BY_OUTCOME": mapping,
+            "EXCLUDE_FILE": "",
+        }
+        per_outcome.append(data_io.false_classification_xlsx_path(settings=settings))
+    assert [Path(p).parent.name for p in per_outcome] == ["ASL", "Group"]
+    assert per_outcome[0] != per_outcome[1]
+    assert all(Path(p).name == "false_classification.xlsx" for p in per_outcome)
+
+
+def test_exclude_read_uses_the_folder_of_the_outcome_being_written(tmp_path, monkeypatch):
+    """写哪个结局就读那个结局结果夹的名单；工程根的旧表不参与。"""
+    from modules.stats.data_io import _EXCLUDE_CACHE, _row_id_is_excluded, load_exclude_id_keys
+
+    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
+    outcome_dir = tmp_path / "ASL"
+    outcome_dir.mkdir(parents=True)
+    pd.DataFrame({"exc": ["resp-1"]}).to_excel(
+        outcome_dir / "false_classification.xlsx", sheet_name="exc", index=False,
+    )
+    pd.DataFrame({"exc": ["root-1"]}).to_excel(
+        tmp_path / "false_classification.xlsx", sheet_name="exc", index=False,
+    )
+    settings = {
+        "DO_EXCLUDE_SAMPLES": True,
+        "GROUP_SOURCE_COL": "Response",
+        "OUT_DIR": "ASL",
+        "EXCLUDE_FILE": "",
+        "EXCLUDE_SHEET": "exc", "EXCLUDE_COL": "exc", "EXCLUDE_ROW": "",
+        "EXCLUDE_IDS": [],
+    }
+    _EXCLUDE_CACHE.clear()
+    keys = load_exclude_id_keys(None, settings)
+    assert _row_id_is_excluded("resp-1", keys)
+    assert not _row_id_is_excluded("root-1", keys)
+
+
+def test_preview_resolves_default_exclude_inside_the_results_folder(tmp_path, monkeypatch):
+    """预览读的是结果夹里的默认名单；数据表在子目录也能找到。"""
+    from modules.console import preview as prev_mod
+
+    monkeypatch.setenv("RAD_PROJECT", str(tmp_path))
+    monkeypatch.setattr(prev_mod, "under_root", lambda p: Path(p))
+    (tmp_path / "ref").mkdir(parents=True)
+    (tmp_path / "ref" / "settings.ini").write_text("", encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    book = tmp_path / "data" / "demo.xlsx"
+    pd.DataFrame({"Patient_ID": ["a", "b"]}).to_excel(book, sheet_name="cln", index=False)
+    (tmp_path / "ASL").mkdir()
+    pd.DataFrame({"exc": ["a"]}).to_excel(
+        tmp_path / "ASL" / "false_classification.xlsx", sheet_name="exc", index=False,
+    )
+    settings = {
+        "CLIN_SHEET": "cln", "CLIN_ID_COL": "Patient_ID",
+        "OUTCOME_COLS": ["Response"], "GROUP_SOURCE_COL": "Response",
+        "OUT_DIR": "ASL", "SUBPROJECT_BY_OUTCOME": {"Response": "ASL"},
+        "DO_EXCLUDE_SAMPLES": True, "EXCLUDE_FILE": "",
+        "EXCLUDE_SHEET": "exc", "EXCLUDE_COL": "exc", "EXCLUDE_ROW": "",
+    }
+    pv = prev_mod.preview_workbook(book, dict(settings))
+    exc = pv.get("exclude") or {}
+    assert Path(str(exc.get("file"))).name == "false_classification.xlsx"
+    assert str(tmp_path / "ASL") in str(exc.get("file"))
+    assert exc.get("n") == 1
