@@ -953,16 +953,16 @@ def _attach_univariate_vif(uni_df: pd.DataFrame, frame: pd.DataFrame) -> pd.Data
         return uni_df
     out = uni_df.copy()
     try:
-        from modules.stats.vif_analysis import compute_vif
-        feats = [str(f) for f in out["Feature"].tolist() if str(f) in frame.columns]
+        from modules.stats.vif_analysis import compute_vif, format_vif
+        wanted = {str(f) for f in out["Feature"].tolist()}
+        # 按数据表列序建独立基（先基础列、后 AFC_total/_mean 这类派生列），
+        # 共线标记才落在派生列上，而不是随单因素 p 排名漂移。
+        feats = [str(c) for c in frame.columns if str(c) in wanted]
         vif_df = compute_vif(frame, feats) if len(feats) >= 2 else None
         vmap = {}
         if vif_df is not None and len(vif_df):
             vmap = {str(r["Variable"]): r["VIF"] for _, r in vif_df.iterrows()}
-        out["VIF"] = [
-            f"{vmap[f]:.3f}" if f in vmap and np.isfinite(vmap[f]) else "NA"
-            for f in out["Feature"].astype(str)
-        ]
+        out["VIF"] = [format_vif(vmap.get(f)) for f in out["Feature"].astype(str)]
     except Exception as e:
         print(f"  ⚠ VIF for radiomics univariate failed: {e}")
         out["VIF"] = "NA"

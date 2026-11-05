@@ -269,7 +269,11 @@ def _spec_to_prob(spec, p_clin, p_rad, p_comb, score_probs=None):
     if t in ("combined", "comb"):
         return p_comb
     if t in ("radscore", "rad"):
-        return p_rad
+        if p_rad is not None:
+            return p_rad
+        # 分数名不是字面 RadScore（如块分数名 US）时，唯一一份组学分数的概率即为它。
+        probs = [v for v in dict(score_probs or {}).values() if v is not None]
+        return probs[0] if len(probs) == 1 else None
     for score_name, prob in dict(score_probs or {}).items():
         if t in (_token(score_name), _token(radiomics.score_display_name(score_name))):
             return prob
@@ -330,6 +334,19 @@ def resolve_model_frame(
         parts.append(pd.Series(a, name=name))
         used.add(name)
 
+    def _rad_vector():
+        """组学分数向量：显式 radscore 优先；否则用 score_payload 里唯一一份。
+
+        块分数名可自定义（如 US），此时 RadScore 令牌仍指那一份分数。
+        """
+        if radscore is not None:
+            return "RadScore", np.asarray(radscore, dtype=float)
+        payload = score_payload if isinstance(score_payload, dict) else {}
+        pairs = [(str(k), v) for k, v in payload.items() if v is not None]
+        if len(pairs) == 1:
+            return pairs[0][0], np.asarray(pairs[0][1], dtype=float)
+        return None
+
     for item in items:
         t = _token(item)
         if t in ("clinical", "clin"):
@@ -337,16 +354,18 @@ def resolve_model_frame(
                 if f in clin_df.columns:
                     _add_col(f, pd.to_numeric(clin_df[f], errors="coerce"))
         elif t in ("radscore", "rad"):
-            if radscore is None:
+            got = _rad_vector()
+            if got is None:
                 raise ValueError(f"{side_name}: RadScore unavailable")
-            _add_col("RadScore", radscore)
+            _add_col(got[0], got[1])
         elif t in ("combined", "combine", "clinrad"):
             for f in clin_features:
                 if f in clin_df.columns:
                     _add_col(f, pd.to_numeric(clin_df[f], errors="coerce"))
-            if radscore is None:
+            got = _rad_vector()
+            if got is None:
                 raise ValueError(f"{side_name}: RadScore unavailable for combined")
-            _add_col("RadScore", radscore)
+            _add_col(got[0], got[1])
         else:
             # clin 列名（大小写不敏感）
             cmap = { _token(c): c for c in clin_df.columns }
@@ -1086,6 +1105,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             if _p_one is not None:
                 p_rad_map[str(_sname)] = _p_one
         p_rad_tr = p_rad_map.get("RadScore")
+        if p_rad_tr is None and len(p_rad_map) == 1:
+            # 单块分数名自定义（如 US）时，RadScore 令牌指向那一份。
+            p_rad_tr = next(iter(p_rad_map.values()))
 
         def _apply_nomo(layer, rs):
             if nomo is None or nomo.model is None:
@@ -1682,6 +1704,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         rad_screened = [c for c in rad_selected_names if c in rad_have]
         heatmap_names, heatmap_empty = expand_heatmap_columns(
             heatmap_raw, clin_screened, rad_screened, score_names=score_names,
+            keep_score=False,
         )
         for name in heatmap_empty:
             print(f"  ⚠ HEATMAP_COLS {name!r} 没有筛选后的列，已跳过")
