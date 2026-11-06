@@ -423,6 +423,23 @@ def _vectors_for_roc_names(layer, names) -> Dict[str, np.ndarray]:
     return out
 
 
+def _prefit_feature_vectors(layer, rad_res) -> Dict[str, np.ndarray]:
+    """线性拟合前的入选特征（临床列 + 组学入选特征），按该层取值。"""
+    feats = radiomics.selected_feature_names(rad_res)
+    return _vectors_for_roc_names(layer, feats)
+
+
+def _roc_model_name_is_score(name: str, score_names) -> bool:
+    """ROC 里算分数曲线（Clinical / RadScore / 各块分数 / 单特征展示名）的名字。"""
+    tok = _token(name)
+    if tok in ("clinical", "clin", "radscore"):
+        return True
+    for score_name in score_names or []:
+        if tok in (_token(score_name), _token(radiomics.score_display_name(score_name))):
+            return True
+    return False
+
+
 def build_models(clin_df: pd.DataFrame, radscore_vec: Optional[np.ndarray],
                   clin_features: Optional[List[str]] = None) -> Dict[str, np.ndarray]:
     models: Dict[str, np.ndarray] = {}
@@ -524,6 +541,12 @@ def run_analysis(dat: data_io.DataLayer, label_str: str,
                 ml[str(_sname)] = _svec
         else:
             ml = build_models(dat.clin, rad_res.radscore, clin_features=clin_for_roc)
+        if bool(getattr(cfg, "ROC_PLOT_FEATURES", True)):
+            for _fname, _fvec in _prefit_feature_vectors(dat, rad_res).items():
+                ml.setdefault(_fname, _fvec)
+        if not bool(getattr(cfg, "ROC_PLOT_SCORE_CURVES", False)):
+            ml = {k: v for k, v in ml.items()
+                  if not _roc_model_name_is_score(str(k), list(payload_scores))}
         if len(ml) > 0:
             plot_roc(ml, dat.label, dataset_label=label_str)
 
@@ -799,8 +822,13 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             print(f"  ⚠ External [{name}] load failed: {e}")
     external_results: list = []
 
-    def _merged_roc_models(layer: data_io.DataLayer, radscore, p_clin=None, p_comb=None):
-        """单临床(mv p 过滤) + RadScore + 可选 Clinical/Combined → 一张 ROC。"""
+    def _merged_roc_models(layer: data_io.DataLayer, radscore, p_clin=None, p_comb=None,
+                           rad_res=None):
+        """入选特征（线性拟合前）+ 可选分数曲线 + 可选 Clinical/Combined → 一张 ROC。
+
+        ROC_PLOT_FEATURES（默认开）把入选的临床 / 组学特征各画一条；
+        ROC_PLOT_SCORE_CURVES（默认关）才画 Clinical / RadScore / 各块分数曲线。
+        """
         if isinstance(radscore, dict):
             ml = build_models(layer.clin, None, clin_features=roc_clin_feats)
             for name, vec in radscore.items():
@@ -813,10 +841,19 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             ml["Clinical"] = np.asarray(p_clin, dtype=float)
         if p_comb is not None:
             ml["Combined"] = np.asarray(p_comb, dtype=float)
+        if rad_res is not None and bool(getattr(cfg, "ROC_PLOT_FEATURES", True)):
+            for name, vec in _prefit_feature_vectors(layer, rad_res).items():
+                ml.setdefault(name, vec)
         for name, vec in _vectors_for_roc_names(
             layer, getattr(cfg, "FORCE_CLIN_FOR_ROC", []) or [],
         ).items():
             ml.setdefault(name, vec)
+        if not bool(getattr(cfg, "ROC_PLOT_SCORE_CURVES", False)):
+            score_names = list(radscore) if isinstance(radscore, dict) else (
+                ["RadScore"] if radscore is not None else []
+            )
+            ml = {k: v for k, v in ml.items()
+                  if not _roc_model_name_is_score(str(k), score_names)}
         return ml
 
     # ── false_classification：打印宽表 + 写本次结果夹（与 Results*.html 同目录）──
@@ -994,17 +1031,62 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             return out
 
         nomo = None
-        if do_nomo and (has_rs or clin_feat_combined):
+        _nomo_src = str(getattr(cfg, "NOMOGRAM_SOURCE", "post") or "post").strip().lower()
+        _nomo_pre = _nomo_src in ("pre", "both")
+        _nomo_post = _nomo_src in ("post", "both")
+        _nomo_rad_feats = radiomics.selected_feature_names(res_train["rad"])
+        if _nomo_pre and not _nomo_rad_feats and not clin_feat_combined:
+            print("  ⚠ NOMOGRAM_SOURCE 要拟合前特征，但组学无入选特征 — 退回分数口径")
+            _nomo_pre, _nomo_post = False, True
+
+        def _nomo_frame(src) -> Optional[pd.DataFrame]:
+            """列线图自变量表：临床变量 +（pre/both）组学入选特征原值。
+
+            src 可以是数据层（有 .clin/.rad），也可以直接是临床表。
+            """
+            if src is None:
+                return None
+            if hasattr(src, "clin"):
+                df = src.clin.copy()
+                rad = getattr(src, "rad", None)
+            else:
+                df = src.copy()
+                rad = None
+            if _nomo_pre and _nomo_rad_feats and rad is not None:
+                for f in _nomo_rad_feats:
+                    if f in rad.columns:
+                        df[f] = pd.to_numeric(
+                            rad[f].reset_index(drop=True), errors="coerce"
+                        ).to_numpy()
+            return df
+
+        _tr_rad_cols = set(getattr(getattr(data.train, "rad", None), "columns", []))
+        _nomo_clin_feat = list(clin_feat_combined) + (
+            [f for f in _nomo_rad_feats if f in _tr_rad_cols] if _nomo_pre else []
+        )
+        if do_nomo and (has_rs or _nomo_clin_feat):
+            print(
+                f"  Nomogram source: {_nomo_src}"
+                f"（{'分数' if _nomo_post else ''}"
+                f"{'+' if _nomo_post and _nomo_pre else ''}"
+                f"{'拟合前入选特征' if _nomo_pre else ''}）",
+                flush=True,
+            )
             nomo = build_nomogram(
                 train_label=data.train.label,
                 radscore_train=None,
-                train_clin=data.train.clin,
-                clin_feat=clin_feat_combined,
+                train_clin=_nomo_frame(data.train),
+                clin_feat=_nomo_clin_feat,
                 radscore_test=None,
-                test_clin=_te_clin,
+                test_clin=_nomo_frame(
+                    data.test if (_te_clin is not None and data.test is not None) else _te_clin
+                ),
                 test_label=_te_y,
-                score_train=comb_specs.get(_primary_comb) or (_tr_scores or None),
-                score_test=_te_scores or None,
+                score_train=(
+                    (comb_specs.get(_primary_comb) or (_tr_scores or None))
+                    if _nomo_post else None
+                ),
+                score_test=(_te_scores or None) if _nomo_post else None,
             )
 
         def _score_to_prob(score_tr, y_tr, score_te=None):
@@ -1029,8 +1111,8 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     p_te[ok2] = fit.predict(X2)
             return p_tr, p_te
 
-        # 临床分数口径：开 CLIN_SCORE_LINEAR（默认）= 入选变量原始尺度 OLS；关 = Logistic log-odds。
-        _clin_linear = bool(getattr(cfg, "CLIN_SCORE_LINEAR", True))
+        # 临床分数口径：入选变量一律原始尺度 OLS（开关已取消）。
+        _clin_linear = True
         _clin_ols = None
         if _clin_linear and res_train["clin"].model is not None and len(train_clin_feat):
             try:
@@ -1113,14 +1195,15 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             if nomo is None or nomo.model is None:
                 return None
             try:
-                df_v = layer.clin.copy()
-                if isinstance(rs, dict):
-                    for name, arr in rs.items():
-                        if arr is None:
-                            continue
-                        df_v[str(name)] = np.asarray(arr, dtype=float)
-                elif rs is not None:
-                    df_v["RadScore"] = np.asarray(rs, dtype=float)
+                df_v = _nomo_frame(layer)
+                if _nomo_post:
+                    if isinstance(rs, dict):
+                        for name, arr in rs.items():
+                            if arr is None:
+                                continue
+                            df_v[str(name)] = np.asarray(arr, dtype=float)
+                    elif rs is not None:
+                        df_v["RadScore"] = np.asarray(rs, dtype=float)
                 missing = [f for f in (nomo.features or []) if f not in df_v.columns]
                 if missing:
                     return None
@@ -1251,9 +1334,10 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 rad_res_layer.score_probs = merged
             return p_c, p_r, p_comb, rs
 
-        # train：合并 ROC（单临床 p<阈值 + RadScore + Clinical + Combined）/ 校准 / DCA
+        # train：合并 ROC（入选特征 + 可选分数曲线 + Combined）/ 校准 / DCA
         ml_tr = _merged_roc_models(
             data.train, _score_payload(res_train["rad"]), p_clin=p_clin_tr, p_comb=p_comb_tr,
+            rad_res=res_train["rad"],
         )
         for _cname, _p in p_comb_map.items():
             if _cname != _primary_comb and _p is not None:
@@ -1340,7 +1424,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 p_c, p_r, p_comb = _val_scores(layer, rad_layer)
                 rs = _score_payload(rad_layer)
             val_probs[ds_label] = (p_c, p_r, p_comb, layer)
-            ml = _merged_roc_models(layer, rs, p_clin=p_c, p_comb=p_comb)
+            ml = _merged_roc_models(layer, rs, p_clin=p_c, p_comb=p_comb, rad_res=rad_layer)
             if ml:
                 plot_roc(ml, layer.label, dataset_label=ds_label, val_mode=val_mode)
                 _maybe_td_rocs(ds_label, ml, layer)
@@ -1567,7 +1651,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         try:
             if nomo is not None and nomo.model is not None:
                 feats = list(nomo.features)
-                Xc = data.all.clin.copy()
+                Xc = _nomo_frame(data.all)
                 smap_all = radiomics.score_map(res_all["rad"])
                 for f in feats:
                     if f in smap_all:
@@ -1582,8 +1666,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             print(f"  ⚠ Combined score on all failed: {e}")
 
     else:
-        # 无联合模型：仅画过滤后的单临床 + RadScore
-        ml_tr = _merged_roc_models(data.train, _score_payload(res_train["rad"]))
+        # 无联合模型：入选特征 + 可选分数曲线
+        ml_tr = _merged_roc_models(data.train, _score_payload(res_train["rad"]),
+                                   rad_res=res_train["rad"])
         if ml_tr:
             plot_roc(ml_tr, data.train.label, dataset_label="train", val_mode=val_mode)
             _maybe_td_rocs("train", ml_tr, data.train)
@@ -1594,7 +1679,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             rs = _score_payload(rad_layer)
             if val_mode == "refit":
                 rs = _validation_radscore(layer, rad_layer)
-            ml_e = _merged_roc_models(layer, rs)
+            ml_e = _merged_roc_models(layer, rs, rad_res=rad_layer)
             if ml_e:
                 plot_roc(ml_e, layer.label, dataset_label=ds_label, val_mode=val_mode)
                 _maybe_td_rocs(ds_label, ml_e, layer)
@@ -2187,7 +2272,7 @@ def _run_subgroup_eval(
             else:
                 p_c, p_r, p_comb = score_layer(sub, rad_sub)
             ds = f"sg_{token}_{split}"
-            ml = merged_roc(sub, rs, p_clin=p_c, p_comb=p_comb)
+            ml = merged_roc(sub, rs, p_clin=p_c, p_comb=p_comb, rad_res=rad_sub)
             if ml:
                 plot_roc(ml, sub.label, dataset_label=ds, val_mode=val_mode)
                 mdf = ROC_METRICS.get(f"roc_{ds}")
@@ -2317,7 +2402,7 @@ def _run_external_eval(
         else:
             p_c, p_r, p_comb = score_layer(layer, rad_sub)
         ds = f"ext_{token}"
-        ml = merged_roc(layer, rs, p_clin=p_c, p_comb=p_comb)
+        ml = merged_roc(layer, rs, p_clin=p_c, p_comb=p_comb, rad_res=rad_sub)
         if ml:
             plot_roc(ml, layer.label, dataset_label=ds, val_mode=val_mode)
             _maybe_td_rocs(ds, ml, layer, ipcw_required=False)
@@ -2480,7 +2565,7 @@ def _apply_console_overlay() -> None:
 
 
 def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
-    """主循环前生成 ref/qc.html（一次，与结局无关）；外验另写 ref/qc-ext-*.html。"""
+    """主循环前生成 ref/qc.html（一次，与结局无关）：主表 + 全部外验合成一份。"""
     if not bool(getattr(cfg, "DO_QC_REPORT", True)):
         return
     sheet = str(getattr(cfg, "QC_SHEET", "") or "").strip()
@@ -2491,8 +2576,7 @@ def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
         qc_is_fresh,
         relocate_legacy_qc_html,
         resolve_qc_html_path,
-        write_external_qc_reports,
-        write_project_data_qc,
+        write_merged_qc,
     )
     from pathlib import Path as _Path
     dest = resolve_project_dir()
@@ -2528,15 +2612,9 @@ def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
             print(f"  fresh → skip  ({out_path})")
         else:
             print(f"  stale/missing → 重算  ({out_path})")
-            write_project_data_qc(xlsx, settings=settings, out_html=out_path)
+            write_merged_qc(xlsx, settings, out_dir=dest, out_html=out_path, input_dir=dest)
     except Exception as e:
         print(f"  ⚠ QC report failed: {e}")
-    try:
-        write_external_qc_reports(
-            settings, dest=dest, skip_existing=True, input_dir=dest,
-        )
-    except Exception as e:
-        print(f"  ⚠ external QC report failed: {e}")
 
 
 def main(argv: list[str] | None = None) -> None:

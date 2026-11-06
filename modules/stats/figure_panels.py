@@ -347,6 +347,52 @@ def stitch_train_test_roc(prefix: str, panel_prefix: str, out_dir: str) -> None:
         )
 
 
+def stitch_train_ext(out_dir: str | None = None,
+                     tokens: Optional[Sequence[str]] = None) -> List[str]:
+    """建模组面板 + 各外验面板左右拼成 A/B/C…（每类一张），返回写出的 stem。
+
+    与 ``stitch_external_panels`` 的分工：那个只拼「多条外验」，本函数拼「建模组 + 外验」。
+    训练面板取 ``panel_<kind>.png``，外验取 ``<kind>_ext_<token>.png``；缺哪边就跳过该类。
+    """
+    out_dir = out_dir or cfg.OUT_DIR
+    png = _png_dir(out_dir)
+    if Image is None or not os.path.isdir(png):
+        return []
+    if tokens:
+        found = [str(t) for t in tokens if t]
+    else:
+        found = []
+        for name in os.listdir(png):
+            m = re.match(r"(?:roc|calibration|dca)_ext_(.+)\.png$", name, re.I)
+            if m and m.group(1) not in found:
+                found.append(m.group(1))
+    if not found:
+        return []
+
+    kinds = [("roc", "panel_roc", "roc_ext", bool(getattr(cfg, "DO_ROC", True))),
+             ("calibration", "panel_calibration", "calibration_ext",
+              bool(getattr(cfg, "DO_CALIBRATION", False))),
+             ("dca", "panel_dca", "dca_ext", bool(getattr(cfg, "DO_DCA", True)))]
+    stems: List[str] = []
+    for kind, train_stem, ext_prefix, enabled in kinds:
+        if not enabled:
+            continue
+        train = os.path.join(png, f"{train_stem}.png")
+        if not _exists(train):
+            continue
+        exts = [os.path.join(png, f"{ext_prefix}_{t}.png") for t in found]
+        exts = [p for p in exts if _exists(p)]
+        if not exts:
+            continue
+        suffix = "train_ext" if len(exts) == 1 else "train_all"
+        stem = f"panel_{kind}_{suffix}"
+        if stitch_row([train] + exts, stem, out_dir):
+            stems.append(stem)
+    if stems:
+        print(f"  ✓ train+ext panels: {', '.join(stems)}", flush=True)
+    return stems
+
+
 def stitch_subgroup_train_test(out_dir: str | None = None) -> None:
     """每个亚组：ROC / 校准 / DCA 的 train | test 横拼，标 A、B。"""
     out_dir = out_dir or cfg.OUT_DIR
@@ -455,4 +501,5 @@ def build_outcome_panels(out_dir: str | None = None) -> None:
         print("  ⚠ panel_mediation: no mediation_M*.png — skip", flush=True)
     stitch_subgroup_train_test(out_dir)
     stitch_external_panels(out_dir)
+    stitch_train_ext(out_dir)
     print("  FIGURE PANELS done", flush=True)

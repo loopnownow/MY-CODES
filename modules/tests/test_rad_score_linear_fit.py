@@ -36,15 +36,16 @@ def base_cfg(monkeypatch):
     monkeypatch.setattr(rad.cfg, "ICC_THRESHOLD", 0.75, raising=False)
 
 
-def test_switch_off_keeps_logit_score(base_cfg, monkeypatch):
+def test_linear_fit_switch_is_gone(base_cfg, monkeypatch):
+    """线性拟合开关已取消：cfg 里写 False 也照样原始尺度 OLS。"""
     monkeypatch.setattr(rad.cfg, "RAD_SCORE_LINEAR", False, raising=False)
     df, y = _frame()
     res = rad.run_radiomics_logistic(df, y, score_name="RadScore_CTA", group_name="CTA")
     assert res.features, "logistic 应选出特征"
-    assert res.score_fit == "logit"
-    assert res.ols is None
-    # log-odds 分数：套回同一层应复现（训练集标准化尺度）。
-    assert np.allclose(rad.apply_locked_radscore(res, df), res.radscore, atol=1e-8)
+    assert res.score_fit == "ols"
+    assert res.ols is not None
+    # 原始尺度 OLS：套回同一层必须逐值复现。
+    assert np.allclose(rad.apply_locked_radscore(res, df), res.radscore, atol=1e-9)
 
 
 def test_switch_on_uses_raw_scale_ols(base_cfg, monkeypatch):
@@ -64,15 +65,16 @@ def test_switch_on_uses_raw_scale_ols(base_cfg, monkeypatch):
     assert float(res.ols.rsquared) > 0.0
 
 
-def test_selection_unchanged_by_fit_choice(base_cfg, monkeypatch):
+def test_selection_unchanged_by_retired_flag(base_cfg, monkeypatch):
+    """旧开关不再影响选择或分数（两次结果完全一致）。"""
     df, y = _frame()
     monkeypatch.setattr(rad.cfg, "RAD_SCORE_LINEAR", False, raising=False)
     off = rad.run_radiomics_logistic(df, y, score_name="RadScore_CTA", group_name="CTA")
     monkeypatch.setattr(rad.cfg, "RAD_SCORE_LINEAR", True, raising=False)
     on = rad.run_radiomics_logistic(df, y, score_name="RadScore_CTA", group_name="CTA")
     assert off.features == on.features
-    # 两种口径的 RadScore 是同一组特征的线性组合，必然完全线性相关。
-    assert abs(float(np.corrcoef(off.radscore, on.radscore)[0, 1])) == pytest.approx(1.0)
+    assert off.score_fit == on.score_fit == "ols"
+    assert np.allclose(off.radscore, on.radscore, atol=1e-9)
 
 
 def test_refit_locked_result_follows_score_fit(base_cfg, monkeypatch):
@@ -83,8 +85,8 @@ def test_refit_locked_result_follows_score_fit(base_cfg, monkeypatch):
     assert np.allclose(refit.radscore, res.radscore, atol=1e-8)
 
 
-def test_block_param_linear_maps_to_config():
-    """组学模块面板的「线性拟合」勾选写 params.<method>.linear，映射到 RAD_SCORE_LINEAR。"""
+def test_block_param_linear_is_retired():
+    """组学模块面板的「线性拟合」勾选已取消：旧 ini 里写着也忽略，不再改配置。"""
     from modules.config.blocks import normalize_blocks
     from modules.stats import selectors
 
@@ -92,6 +94,6 @@ def test_block_param_linear_maps_to_config():
         spec = normalize_blocks(
             [{"name": "CTA", "method": method, "params": {method: {"linear": True}}}]
         )[0]
-        assert selectors._param_settings(spec)["RAD_SCORE_LINEAR"] is True
+        assert "RAD_SCORE_LINEAR" not in selectors._param_settings(spec)
     spec_off = normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]
     assert "RAD_SCORE_LINEAR" not in selectors._param_settings(spec_off)

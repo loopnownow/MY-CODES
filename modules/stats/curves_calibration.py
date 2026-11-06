@@ -154,9 +154,9 @@ def plot_calibration(pred: np.ndarray, y: np.ndarray, n_bins: int = DEFAULT_N_BI
     ax.set_ylabel("Observed Proportion")
     suffix = " (recalibrated)" if recalibrate else " (raw)"
     if dataset_label and dataset_label not in ("all", "demo"):
-        ax.set_title(f"Calibration — {dataset_label}{suffix}")
+        ax.set_title(cfg.panel_title(f"Calibration — {dataset_label}{suffix}"))
     else:
-        ax.set_title(f"Calibration — {model_name}{suffix}")
+        ax.set_title(cfg.panel_title(f"Calibration — {model_name}{suffix}"))
     cfg.apply_clean_theme(ax, grid=True, legend=False)
     fig.tight_layout()
 

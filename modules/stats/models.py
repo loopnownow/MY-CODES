@@ -492,9 +492,10 @@ def _plot_nomogram(
         ax.text(-2.8, y, text, ha="right", va="center", fontsize=fontsize,
                 fontweight="bold", color=C_AXIS, clip_on=False)
 
-    ax.text(canvas / 2, y_title + 0.12,
-            "Nomogram for Individualized Risk Prediction",
-            ha="center", va="center", fontsize=13, fontweight="normal", color=C_AXIS)
+    if cfg.panel_titles_on():
+        ax.text(canvas / 2, y_title + 0.12,
+                "Nomogram for Individualized Risk Prediction",
+                ha="center", va="center", fontsize=13, fontweight="normal", color=C_AXIS)
 
     _left_label(y_points, "Points")
     _draw_axis(y_points, 0, canvas, C_POINTS, lw=1.9)

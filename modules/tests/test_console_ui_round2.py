@@ -25,7 +25,7 @@ INI_IO = (ROOT / "modules" / "config" / "ini_io.py").read_text(encoding="utf-8")
 CSS_TIGHT = re.sub(r"\s+", "", CSS)
 
 DATA_PANE_KEYS = ["CLIN_SCORE", "QC_ID_COL", "QC_SCORE", "ICC_ID_COL", "ICC_SCORE"]
-NEW_KEYS = DATA_PANE_KEYS + ["CLIN_SCORE_LINEAR"]
+NEW_KEYS = DATA_PANE_KEYS + ["NOMOGRAM_SOURCE", "ROC_PLOT_FEATURES", "ROC_PLOT_SCORE_CURVES"]
 
 
 def test_start_page_splits_open_and_close_below_the_port_probe():
@@ -121,13 +121,17 @@ def test_omics_block_score_name_is_readonly_text():
     assert "分数名在「数据预览」页的该工作表行里设" in UI
 
 
-def test_clin_score_linear_defaults_on_and_sits_on_the_clin_title_row():
+def test_linear_fit_switch_is_gone_from_the_console():
+    """线性拟合开关已取消：默认 true，但控制台不再有勾选（分节与标题行都没有）。"""
     assert DEFAULT_SETTINGS["CLIN_SCORE_LINEAR"] is True
+    assert DEFAULT_SETTINGS["RAD_SCORE_LINEAR"] is True
     assert (
-        'titleKeys = ["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH", "CLIN_SCORE_LINEAR"]'
+        'titleKeys = ["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH"]'
         in UI
     )
-    assert '"CLIN_SCORE_LINEAR"' in SCHEMA and '"CLIN_SCORE_LINEAR"' in INI_IO
+    assert '"CLIN_SCORE_LINEAR"' not in SCHEMA
+    assert "data-blk-param-bool=\"linear\"" not in UI
+    assert "筛选后一律原始尺度 OLS" in UI
 
 
 def test_six_new_keys_reach_schema_defaults_and_ini():
@@ -142,6 +146,9 @@ def test_six_new_keys_reach_schema_defaults_and_ini():
     for key in DATA_PANE_KEYS:
         assert DEFAULT_SETTINGS[key] == ""
     assert DEFAULT_SETTINGS["CLIN_SCORE_LINEAR"] is True
+    assert DEFAULT_SETTINGS["NOMOGRAM_SOURCE"] == "post"
+    assert DEFAULT_SETTINGS["ROC_PLOT_FEATURES"] is True
+    assert DEFAULT_SETTINGS["ROC_PLOT_SCORE_CURVES"] is False
 
 
 def test_flowchart_audits_only_the_numbers_it_is_given():

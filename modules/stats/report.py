@@ -27,6 +27,11 @@ from modules.stats.curves_roc import ROC_METRICS, LANDMARK_ROC_METRICS, _boot_au
 from modules.stats.curves_ipcw import IPCW_ROC_METRICS
 from modules.stats.curves_calibration import HL_METRICS
 
+# ── SAVE_TABLES：结果页里每张表各存一个 sheet（默认关，见 config/defaults.py）──
+_TABLE_SINK: List[tuple] = []
+_SAVE_TABLES_ON: bool = False
+_BAD_SHEET_CHARS = re.compile(r"[\[\]:*?/\\]")
+
 
 _HEADER_MAP = {
     "feature": "Variable",
@@ -195,6 +200,8 @@ def df_to_html(df: Optional[pd.DataFrame], elem_id: Optional[str] = None,
             df[c] = [_fmt_delong_p(v) for v in df[c]]
             if str(c).startswith("P vs "):
                 df = df.rename(columns={c: "DeLong vs " + str(c)[5:]})
+    if _SAVE_TABLES_ON:
+        _TABLE_SINK.append((str(elem_id or caption or f"Table{len(_TABLE_SINK) + 1}"), df.copy()))
     id_attr = f' id="{elem_id}"' if elem_id else ""
     headers = [_format_header(c) for c in df.columns]
     thead = "<thead><tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr></thead>"
@@ -228,6 +235,32 @@ def df_to_html(df: Optional[pd.DataFrame], elem_id: Optional[str] = None,
         f'<table class="threeline"{id_attr}>\n{cap}{thead}\n{tbody}\n</table>'
         f'{notes}</div>'
     )
+
+
+def _sheet_name(raw: str, seen: Dict[str, int]) -> str:
+    """Excel sheet 名：去非法字符、限 31 字、同名加序号。"""
+    base = _BAD_SHEET_CHARS.sub("_", str(raw or "table")).strip() or "table"
+    base = base[:28]
+    n = seen.get(base, 0) + 1
+    seen[base] = n
+    return base if n == 1 else f"{base}_{n}"[:31]
+
+
+def _write_tables_xlsx(out_dir: str, page_title: str) -> None:
+    """把本次结果页渲染过的表写成 {out_dir}/Tables*.xlsx（一表一 sheet）。
+
+    SAVE_TABLES 打开时才调用；关闭时不产生任何文件。
+    """
+    if not _TABLE_SINK:
+        print("  SAVE_TABLES: 结果页没有表，未写 Tables*.xlsx")
+        return
+    stem = re.sub(r"^Results", "Tables", str(page_title or "Results"))
+    path = os.path.join(out_dir, f"{stem}.xlsx")
+    seen: Dict[str, int] = {}
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        for name, frame in _TABLE_SINK:
+            frame.to_excel(xw, sheet_name=_sheet_name(name, seen), index=False)
+    print(f"  {os.path.basename(path)} ({len(_TABLE_SINK)} sheets)")
 
 
 def _f_exists(png_name: str, out_dir: Optional[str] = None) -> bool:
@@ -265,7 +298,7 @@ def _cleanup_unreferenced_pngs(html_path: str, out_dir: str) -> int:
     for name in os.listdir(png_dir):
         if not name.lower().endswith(".png"):
             continue
-        if name in refs:
+        if name in refs or name.lower().startswith("panel_"):
             continue
         try:
             os.remove(os.path.join(png_dir, name))
@@ -2677,6 +2710,9 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
     from modules.config.outcome import normalize_analysis_out_dir
 
     out_dir = normalize_analysis_out_dir(out_dir)
+    global _SAVE_TABLES_ON
+    _SAVE_TABLES_ON = bool(getattr(cfg, "SAVE_TABLES", False))
+    _TABLE_SINK.clear()
     src = str(getattr(cfg, "GROUP_SOURCE_COL", None) or "").strip()
     cols = [
         str(x).strip()
@@ -2886,6 +2922,8 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
         f.write(full_html)
     print(f"  {html_name} ({len(full_html.encode('utf-8'))} bytes)")
     _cleanup_unreferenced_pngs(html_path, out_dir)
+    if _SAVE_TABLES_ON:
+        _write_tables_xlsx(out_dir, page_title)
     return full_html
 
 

@@ -150,19 +150,18 @@ def run_project_data_qc(
     settings: dict[str, Any],
     overlay: dict[str, Any],
 ) -> dict[str, Any]:
-    """对整表做 QC，写入 ref/qc.html；有外验则另写 ref/qc-ext-*.html。"""
-    from modules.utils.u_qc import write_project_data_qc, write_external_qc_reports, qc_html_rel
+    """对整表做 QC：主队列 + 全部外验合成一份 ref/qc.html（覆盖原文件）。"""
+    from modules.utils.u_qc import write_merged_qc, qc_html_rel
 
     proj = project_dir(project)
     merged = dict(settings)
     merged.update(overlay)
-    info = write_project_data_qc(data, settings=merged, out_dir=proj, out_html="qc.html")
+    info = write_merged_qc(
+        data, merged, out_dir=proj, out_html="qc.html", input_dir=proj,
+    )
     info["project"] = project
     info["out_dir"] = str(proj)
     info["rel"] = qc_html_rel("qc.html")
-    info["external"] = write_external_qc_reports(
-        merged, dest=proj, skip_existing=False, input_dir=proj,
-    )
     return info
 
 def _popen_background_kwargs() -> dict[str, Any]:

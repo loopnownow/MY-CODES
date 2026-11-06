@@ -35,10 +35,11 @@ def test_monte_carlo_returns_p():
     assert 0.0 < p <= 1.0
 
 
-def test_pool_note_skips_retired_vif_high():
+def test_pool_note_reports_vif_as_exclusion():
     note = _pool_note(["Sex"], [], 0.1, mv_p_cut=0.05)
-    assert "warn" in note
-    assert "high" not in note
+    assert "VIF ≥" in note
+    assert "exclude candidate covariates" in note
+    assert "VIF_THRESHOLD_HIGH" not in note
 
 
 def test_no_silent_top3_fallback():

@@ -700,6 +700,55 @@ function radPoolForAnalysis() {
 function nameToken(s) {
   return String(s == null ? "" : s).trim().toLowerCase().replace(/[\s_]/g, "");
 }
+function scoreLabel(name) {
+  const s = String(name == null ? "" : name).trim();
+  if (!s) return "RadScore";
+  if (/score$/i.test(s)) return s;
+  if (/^radscore/i.test(s)) {
+    const rest = s.replace(/^RadScore_?/i, "").trim();
+    return rest ? `RadScore ${rest}` : "RadScore";
+  }
+  return `${s}Score`;
+}
+function blockScoreNames() {
+  const rows = blkRows().filter(b => b && b.enabled !== false);
+  const one = rows.length === 1;
+  return rows.map((b) => {
+    const own = String(b.score || "").trim();
+    if (own) return own;
+    const nm = String(b.name || b.sheet || "").trim();
+    return one ? "RadScore" : `RadScore_${nm}`;
+  }).filter(Boolean);
+}
+function modelOptionItems() {
+  const clin = scoreLabel(String(fieldValue("CLIN_SCORE") || "Clinical"));
+  const scores = uniqKeep(blockScoreNames());
+  const items = [{ v: "Clinical", t: clin }];
+  if (scores.length === 1) items.push({ v: "RadScore", t: scoreLabel(scores[0]) });
+  else scores.forEach((s) => items.push({ v: s, t: scoreLabel(s) }));
+  items.push({ v: "Combined", t: "Combined" });
+  return items;
+}
+function modelOptionValues() {
+  return modelOptionItems().map(o => o.v);
+}
+function prettyModelName(v) {
+  const t = nameToken(v);
+  const hit = modelOptionItems().find(o => nameToken(o.v) === t);
+  return hit ? hit.t : String(v);
+}
+function prettyChipName(key, x) {
+  const k = String(key || "");
+  const s = String(x);
+  if (k === "HEATMAP_COLS" || k === "CORR_PREDICTORS" || k === "CORR_REFS"
+      || k === "DCA_CURVES" || k === "NRI_MODEL_OLD" || k === "NRI_MODEL_NEW"
+      || k === "ROC_PLOT_EXCLUDE" || k === "FORCE_CLIN_FOR_ROC"
+      || k === "COMBINED_BLOCKS" || k === "COMBINED_EXCLUDE") {
+    return prettyModelName(s);
+  }
+  return s;
+}
+
 function rawPool(f) {
   if (!f) return [];
   const previewOn = !!(S.preview && (clinPool().length || radPool().length));
@@ -708,7 +757,7 @@ function rawPool(f) {
   if (previewOn && f.pool_from === "both") {
     const models = (f.model_options && f.model_options.length)
       ? f.model_options
-      : ["Clinical", "RadScore", "Combined"];
+      : modelOptionValues();
     return uniqKeep([].concat(models, clinPool(), radPoolForAnalysis()));
   }
   const src = (f.option_pool && f.option_pool.length) ? f.option_pool : (f.add_options || []);
@@ -726,7 +775,7 @@ function selectedNames(v) {
 function dropdownOptions(f, have) {
   const haveS = selectedNames(have);
   const haveTok = new Set(haveS.map(nameToken));
-  const modelTok = new Set(["clinical", "radscore", "combined"]);
+  const modelTok = new Set(modelOptionValues().flatMap(v => [nameToken(v), nameToken(prettyModelName(v))]));
   const key = f && f.key;
   let addOpts = rawPool(f).filter(c => {
     const s = String(c);
@@ -753,7 +802,8 @@ function filterAddOptions(opts, query) {
     if (list.length <= 80) return { rows: list.slice(), more: 0 };
     const pinned = list.filter(o => {
       const t = nameToken(o);
-      return t === "clinical" || t === "radscore" || t === "combined";
+      return t === "clinical" || t === "radscore" || t === "combined"
+        || modelOptionValues().some(v => nameToken(v) === t);
     });
     return { rows: pinned, more: list.length - pinned.length };
   }
@@ -889,7 +939,7 @@ function paintAddMenu(input) {
       ).join("")}</div>`
     : "";
   const rows = view.rows.map(o =>
-    `<button type="button" class="addfind-item" data-add-pick="${esc(o)}" data-add-pick-key="${esc(key)}">${esc(o)}</button>`
+    `<button type="button" class="addfind-item" data-add-pick="${esc(o)}" data-add-pick-key="${esc(key)}">${esc(prettyChipName(key, o))}</button>`
   ).join("");
   let note = "";
   if (!view.rows.length && !sheetBtn) {
@@ -1552,6 +1602,7 @@ function syncBaselineToggles() {
   [
     ["doBaselineAll", "DO_BASELINE_ALL"],
     ["doBaselineTt", "DO_BASELINE_TRAIN_TEST"],
+    ["saveTables", "SAVE_TABLES"],
   ].forEach(([id, key]) => {
     const el = $(id);
     if (!el) return;
@@ -1617,12 +1668,12 @@ function ensureConsoleFields() {
     S.schema.push({
       key: "DCA_CURVES",
       label: "DCA 曲线指标",
-      help: "画进 DCA 的曲线。可多选 Clinical / RadScore / Combined 或临床列。",
+      help: "画进 DCA 的曲线（按分数名显示：ClinicalScore / USScore 等），或临床列。",
       widget: "checklist",
       hot: false,
       section: proto.section || "dca",
       section_title: proto.section_title || "DCA",
-      add_options: ["Clinical", "RadScore", "Combined"],
+      add_options: modelOptionValues(),
     });
   }
 }
@@ -2368,6 +2419,14 @@ function extSheetList(file) {
   const meta = (S.extMeta || {})[f];
   return meta && Array.isArray(meta.sheets) ? meta.sheets.map(String) : [];
 }
+function extSheetSize(file, sheet) {
+  const f = String(file || "").trim();
+  const meta = (S.extMeta || {})[f] || {};
+  const hit = (meta.sizes || []).find((s) => String(s.name) === String(sheet));
+  if (!hit) return "";
+  if (hit.n_rows == null || hit.n_cols == null) return "";
+  return `${hit.n_rows}×${hit.n_cols}`;
+}
 function readExtRows() {
   const box = $("extRows");
   const out = [];
@@ -2421,7 +2480,12 @@ async function loadExtMeta(file) {
   if (!name) return;
   try {
     const j = await fetchXlsxMeta(name, "", "");
-    S.extMeta[name] = { sheets: (j.sheets || []).map(String) };
+    S.extMeta[name] = {
+      sheets: (j.sheets || []).map(String),
+      sizes: (j.sizes || []).map((s) => ({
+        name: String(s.name), n_rows: s.n_rows, n_cols: s.n_cols,
+      })),
+    };
   } catch (e) {
     S.extMeta[name] = { sheets: [] };
     const msg = $("ioMsg");
@@ -2586,7 +2650,7 @@ function extRoleRowsHtml(r) {
       : '<span class="dim">—</span>';
     return `<div class="pv-role-row${role ? "" : " is-off"}" data-ext-role-row="${esc(sheet)}">
       <span class="sheet" title="${esc(sheet)}">${esc(sheet)}</span>
-      <span class="dim">—</span>
+      <span class="dim">${esc(extSheetSize(file, sheet) || "—")}</span>
       <select data-ext-role="${esc(sheet)}">${opts}</select>
       ${idCell}
     </div>`;
@@ -3056,7 +3120,7 @@ function renderForm() {
     </div>`;
     }
     if (g.id === "clin") {
-      const titleKeys = ["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH", "CLIN_SCORE_LINEAR"];
+      const titleKeys = ["DO_UNI_LOGISTIC_TABLE", "DO_MV_LOGISTIC_TABLE", "DO_FIRTH"];
       const titleSet = new Set(titleKeys);
       const order = [
         "TABLE1_P_THRESHOLD",
@@ -3075,7 +3139,7 @@ function renderForm() {
       }
       if (!vis.length && !titleKeys.length) return "";
       const html = vis.map(renderField).join("");
-      const hint = "单因素 / 多因素表、Firth 与「线性拟合」在标题行。Table1 p 在 body。计数/计量等级与强制计数在临床预处理。";
+      const hint = "单因素 / 多因素表与 Firth 在标题行。Table1 p 在 body。临床分数一律在入选变量后做原始尺度 OLS（线性拟合开关已取消）。计数/计量等级与强制计数在临床预处理。";
       const head = sectionHead("clin", g.title, vis.length, hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="clin">
       ${head.html}
@@ -3193,7 +3257,7 @@ function renderForm() {
         left.push(f);
       }
       const hint = hasRad
-        ? "单因素 / 多因素 Logistic p 筛组学并生成 RadScore。Firth 在标题行。打开则本趟不跑 LASSO。VIF 仅警告（见「开关」）。不重筛；验证模式跟随三个下拉。"
+        ? "单因素 / 多因素 Logistic p 筛组学并生成 RadScore；VIF ≥ 阈值（「开关」页）直接剔除候选。Firth 在标题行。打开则本趟不跑 LASSO。筛选后一律原始尺度 OLS（线性拟合开关已取消）。不重筛；验证模式跟随三个下拉。"
         : "未指定组学 sheet，跳过。要做组学请回「数据预览」选择组学表。";
       const head = sectionHead("radlog", g.title, hasRad ? left.length : "未用", hint, titleKeys);
       return `<div class="sec-block${hasRad ? "" : " off"}${head.dim}" data-sec="radlog">
@@ -3331,7 +3395,7 @@ function renderForm() {
         if (left.indexOf(f) < 0) left.push(f);
       }
       const hint = g.id === "dca"
-        ? "开=画决策曲线。勾选要画的曲线：Clinical / RadScore / Combined，或从数据加临床列、阅片列。"
+        ? "开=画决策曲线。勾选要画的曲线（按分数名显示：ClinicalScore / USScore 等），或从数据加临床列、阅片列。"
         : "相对旧模型的 NRI/IDI。切点、旧模型、新模型在同一行。";
       const head = sectionHead(g.id, g.title, left.length, hint);
       const bodyCls = g.id === "dca" ? "dca-body" : "nri-body";
@@ -4197,14 +4261,11 @@ function modalityBlocksPanel() {
     const mvP = blkParamOf(b, "mv_p");
     const firth = blkParamOf(b, "firth");
     const firthOn = firth !== false;
-    const linearParam = blkParamOf(b, "linear");
-    const linearOn = linearParam === true;
-    const linearBox = `<label class="pexcl" title="开=该块选出特征后再做原始尺度 OLS，RadScore 用 OLS 系数；关=用 logistic log-odds"><input type="checkbox" data-blk-param-bool="linear"${linearOn ? " checked" : ""}/> 线性拟合</label>`;
     const stageFilter = method === "logistic"
       ? `<input data-blk-param="uni_p" value="${esc(uniP)}" placeholder="单因素 p（空=全局）" spellcheck="false"/>
          <input data-blk-param="mv_p" value="${esc(mvP)}" placeholder="多因素 p（空=全局）" spellcheck="false"/>
          <label class="pexcl" title="开=该块多因素用 Firth"><input type="checkbox" data-blk-param-bool="firth"${firthOn ? " checked" : ""}/> Firth</label>
-         ${linearBox}`
+         <span class="dim">筛选后一律原始尺度 OLS（线性拟合开关已取消）</span>`
       : (method === "lasso"
         ? '<span class="dim">LASSO 参数继承全局（λ 搜索在「组学 / LASSO」模块）；分数本来就是原始尺度 OLS</span>'
         : '<span class="dim">未选方法 → 该块不建模</span>');
@@ -4677,7 +4738,7 @@ function renderField(f) {
   } else if (f.widget === "checklist") {
     const have = selectedNames(v);
     const boxes = have.map(x =>
-      `<label><input type="checkbox" data-list="${esc(f.key)}" value="${esc(x)}" checked/> ${esc(x)}</label>`
+      `<label><input type="checkbox" data-list="${esc(f.key)}" value="${esc(x)}" checked/> ${esc(prettyChipName(f.key, x))}</label>`
     ).join("");
     inner = `<div class="checks" data-key="${esc(f.key)}"><div class="chip-row">${boxes}</div>
       ${renderAdder(f)}</div>`;
@@ -5407,21 +5468,30 @@ function previewTablesHtml(p) {
   order.forEach((name) => {
     const show = info[name] || {};
     const head = Array.isArray(show.head) ? show.head : [];
-    if (head.length) {
-      const cols = Object.keys(head[0]);
+    const headCols = head.length ? Object.keys(head[0] || {}) : [];
+    if (headCols.length) {
       html += `<div class="preview-table-wrap"><table class="mini"><tr>${
-        cols.map((c) => `<th>${esc(c)}</th>`).join("")
+        headCols.map((c) => `<th>${esc(c)}</th>`).join("")
       }</tr>${
-        head.map((r) => `<tr>${cols.map((c) => `<td>${esc(r[c])}</td>`).join("")}</tr>`).join("")
-      }</table><div class="hint">${esc(show.name || name)} 前 ${head.length} 行 · 全部 ${cols.length} 列 · ${show.n_rows}×${show.n_cols}</div></div>`;
+        head.map((r) => `<tr>${headCols.map((c) => `<td>${esc(r[c])}</td>`).join("")}</tr>`).join("")
+      }</table><div class="hint">${esc(show.name || name)} 前 ${head.length} 行 · 全部 ${headCols.length} 列 · ${show.n_rows}×${show.n_cols}</div></div>`;
       return;
     }
     if (Number(show.n_cols) > 400) {
       html += `<div class="hint">${esc(show.name || name)} ${show.n_rows}×${show.n_cols}。列数过多，预览不展开这一张表。</div>`;
       return;
     }
+    const colsOnly = Array.isArray(show.columns) ? show.columns.map(String) : [];
+    if (colsOnly.length) {
+      const why = show.head_error ? `前 ${show.n_rows} 行样本没读到（${esc(show.head_error)}）` : "前几行样本没读到";
+      html += `<div class="preview-table-wrap"><table class="mini"><tr>${
+        colsOnly.map((c) => `<th>${esc(c)}</th>`).join("")
+      }</tr></table><div class="hint">${esc(show.name || name)} ${show.n_rows}×${show.n_cols} · 表头已读（第一行）：${colsOnly.length} 列 · ${why}</div></div>`;
+      return;
+    }
     if (roleSet.has(String(show.name || name))) {
-      html += `<div class="hint">${esc(show.name || name)} ${show.n_rows}×${show.n_cols}。这张表已分配角色，但表头没读到，未展开。</div>`;
+      const why = show.head_error ? `：${esc(show.head_error)}` : "";
+      html += `<div class="hint">${esc(show.name || name)} ${show.n_rows}×${show.n_cols}。这张表已分配角色，但表头没读到${why}。</div>`;
     }
   });
   return html;

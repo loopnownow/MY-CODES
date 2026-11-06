@@ -35,6 +35,9 @@ from modules.console.schema import (
     _MODEL_CHOICES,
 )
 
+# 不出控件的键（仍留在 settings/ini 里以兼容旧配置）：线性拟合开关已取消。
+_HIDDEN_KEYS = frozenset({"CLIN_SCORE_LINEAR", "RAD_SCORE_LINEAR"})
+
 def public_settings(mod) -> dict[str, Any]:
     from modules.config.ini_io import migrate_retired_settings
     out: dict[str, Any] = {}
@@ -169,6 +172,15 @@ def hydrate_console_settings(settings: dict[str, Any]) -> dict[str, Any]:
         settings["DO_COMBINED_MODEL"] = bool(settings.get("DO_NOMOGRAM"))
     elif "DO_COMBINED_MODEL" in settings:
         settings["DO_NOMOGRAM"] = bool(settings.get("DO_COMBINED_MODEL"))
+    # 线性拟合开关已取消：临床 / 组学筛选后一律原始尺度 OLS。
+    for _lk in ("CLIN_SCORE_LINEAR", "RAD_SCORE_LINEAR"):
+        settings[_lk] = True
+    # 列线图自变量来源：post（拟合后分数，默认）| pre（拟合前特征）| both。
+    from modules.config.ini_io import _norm_nomo_source
+
+    settings["NOMOGRAM_SOURCE"] = _norm_nomo_source(
+        str(settings.get("NOMOGRAM_SOURCE") or "post")
+    )
     specs = settings.get("EXTERNAL_TESTS") or []
     if isinstance(specs, list) and specs and isinstance(specs[0], dict):
         s0 = specs[0]
@@ -399,8 +411,37 @@ def _column_names(cols) -> list[str]:
         out.append(s)
     return out
 
-def _column_multi_pool(section: str, clin_cols, rad_cols, picked) -> tuple[list[str], list[str], str]:
-    """临床模块只用 cln；组学模块只用 rad；其余模块两表都要，并带三个模型名。"""
+def _model_choices(settings: dict[str, Any]) -> list[str]:
+    """下拉里的模型名：Clinical / RadScore（单块）或各块分数名 / Combined。
+
+    值仍用后端认识的令牌或分数名（Clinical、RadScore、US、RadScore_rad、Combined），
+    显示名由前端按「分数名 + Score」渲染（ClinicalScore / USScore）。
+    """
+    out = ["Clinical"]
+    blocks = [
+        b for b in (settings.get("MODALITY_BLOCKS") or [])
+        if isinstance(b, dict) and b.get("enabled") is not False
+    ]
+    scores: list[str] = []
+    for b in blocks:
+        s = str(b.get("score") or "").strip()
+        if not s:
+            nm = str(b.get("name") or b.get("sheet") or "").strip()
+            s = "RadScore" if len(blocks) == 1 else f"RadScore_{nm}"
+        if s:
+            scores.append(s)
+    scores = _uniq_keep(scores)
+    if len(scores) <= 1:
+        out.append("RadScore")
+    else:
+        out.extend(scores)
+    out.append("Combined")
+    return _uniq_keep(out)
+
+
+def _column_multi_pool(section: str, clin_cols, rad_cols, picked,
+                       model_choices: list[str] | None = None) -> tuple[list[str], list[str], str]:
+    """临床模块只用 cln；组学模块只用 rad；其余模块两表都要，并带模型名（按分数名）。"""
     if section in ("clinprep", "clin"):
         base = _column_names(clin_cols)
         models: list[str] = []
@@ -411,7 +452,7 @@ def _column_multi_pool(section: str, clin_cols, rad_cols, picked) -> tuple[list[
         source = "rad"
     else:
         base = _column_names(clin_cols) + _column_names(rad_cols)
-        models = list(_MODEL_CHOICES)
+        models = list(model_choices or _MODEL_CHOICES)
         source = "both"
     pool = _uniq_keep(list(models) + base)
     for x in picked or []:
@@ -472,7 +513,8 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
                 extra_select: dict[str, list[str]] | None = None,
                 rad_sheet: str | None = None,
                 measure_cols: list[str] | None = None,
-                rad_cols: list[str] | None = None) -> dict[str, Any]:
+                rad_cols: list[str] | None = None,
+                model_choices: list[str] | None = None) -> dict[str, Any]:
     group_levels = group_levels or []
     rad_meta_cols = rad_meta_cols or []
     id_options = id_options or []
@@ -558,7 +600,9 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
         return field
     if key in _COLUMN_MULTI:
         picked = _as_name_list(value)
-        pool, models, source = _column_multi_pool(sid, clin_cols, rad_cols, picked)
+        pool, models, source = _column_multi_pool(
+            sid, clin_cols, rad_cols, picked, model_choices=model_choices,
+        )
         skip_set = {str(x) for x in (skip_clin or [])}
         if key in ("FORCE_REMOVE_FEATURES", "FORCE_INTER_FEATURES", "FORCE_MODEL_FEATURES"):
             picked = [x for x in picked if x not in skip_set]
@@ -686,6 +730,15 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
             "0.75": "0.75 弹性网",
             "0.5": "0.5 弹性网",
             "0.25": "0.25 弹性网",
+        }
+        return field
+    if key == "NOMOGRAM_SOURCE":
+        field["widget"] = "select"
+        field["options"] = ["post", "pre", "both"]
+        field["option_labels"] = {
+            "post": "线性拟合后分数（推荐）",
+            "pre": "线性拟合前入选特征",
+            "both": "分数 + 拟合前特征（共线，仅探索）",
         }
         return field
     if key in ("VAL_MODE", "SUBGROUP_VAL_MODE", "EXTERNAL_VAL_MODE"):
@@ -874,8 +927,10 @@ def build_schema(settings: dict[str, Any], sheets: list[str] | None = None,
             rad_sheet=str(settings.get("RAD_SHEET") or "").strip() or None,
             measure_cols=measure_cols,
             rad_cols=rad_cols,
+            model_choices=_model_choices(settings),
         )
         for k, v in settings.items()
+        if k not in _HIDDEN_KEYS
     ]
     order = {k: i for i, k in enumerate(
         [x for _s, _t, ks in SECTION_DEFS for x in ks]

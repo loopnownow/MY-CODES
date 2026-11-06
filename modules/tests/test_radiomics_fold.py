@@ -77,6 +77,8 @@ def test_logistic_screen_locks_train_scale():
     assert res.radscore is not None and len(res.radscore) == n
     assert np.isfinite(res.radscore).all()
     assert len(set(res.preprocess["keep_cols"]) & {"signal", "twin"}) == 1
+    # 线性拟合开关已取消：筛选（按训练集标准化尺度）后一律原始尺度 OLS 定分。
+    assert res.score_fit == "ols"
     feat = res.features[0]
     val = X.copy()
     val[feat] = val[feat] + 40
@@ -85,10 +87,10 @@ def test_logistic_screen_locks_train_scale():
         float(res.intercept)
         + val[res.features].to_numpy(dtype=float) @ res.betas.reindex(res.features).to_numpy()
     )
+    assert np.allclose(locked, raw)
     scaled = _apply_preprocess(val, res.preprocess).reindex(columns=res.features).to_numpy(dtype=float)
-    expect = float(res.intercept) + scaled @ res.betas.reindex(res.features).to_numpy(dtype=float)
-    assert np.allclose(locked, expect)
-    assert not np.allclose(locked, raw)
+    logit_scale = float(res.intercept) + scaled @ res.betas.reindex(res.features).to_numpy(dtype=float)
+    assert not np.allclose(locked, logit_scale)
     assert "Radiomics Univariate Logistic" in html
     assert "Radiomics Multivariate Logistic (Train — selected)" in html
     assert "Firth" not in html
@@ -106,10 +108,12 @@ def test_logistic_screen_locks_train_scale():
         flipped = refit_radscore_logistic(res, X, 1 - y)
     finally:
         radmod._fit_preprocess = real_fit
-    assert same is not None and np.allclose(same, res.radscore)
+    assert same is not None and len(same) == n and np.isfinite(same).all()
     assert flipped is not None and len(flipped) == n and np.isfinite(flipped).all()
     assert not np.allclose(flipped, apply_locked_radscore(res, X))
     assert float(res.intercept) == held
+    ols_again = radmod.refit_locked_result(res, X, y)
+    assert np.allclose(ols_again.radscore, res.radscore, atol=1e-8)
     blank = RadiomicsResult(
         features=["signal"], coefs=np.array([1.0]), radscore=None,
         intercept=0.0, betas=None, ols=None, lambda_used=np.nan,
@@ -195,9 +199,9 @@ def test_prefix_groups_fit_separate_logistics():
     assert "Radiomics logistic — DTI" in page
     assert "Radiomics logistic — DKI" in page
     assert "Radiomics logistic — ASL" not in page
-    # 未开线性拟合（RAD_SCORE_LINEAR=false）：结果页不出 RadScore Formula；
-    # 分数仍在 score_map 里供 ROC / Combined 下游使用。
-    assert formula == ""
+    # 线性拟合恒为开：结果页出 RadScore Formula（OLS 系数表）。
+    assert formula != ""
+    assert "RadScore_DTI" in formula or "RadScore" in formula
 
 
 def test_auc_prefilter_topk():

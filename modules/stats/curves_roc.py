@@ -51,14 +51,16 @@ def _resolve_color_map(model_names, color_map: Optional[Dict[str, str]] = None) 
         elif nm in _FALLBACK_COLOR_CACHE:
             out[nm] = _FALLBACK_COLOR_CACHE[nm]
         else:
-            used = set(out.values()) | set(base.values()) | set(_FALLBACK_COLOR_CACHE.values())
+            # 只避开本图已用的颜色：base 里其它角色的颜色不该让本图换色
+            used = set(out.values()) | set(_FALLBACK_COLOR_CACHE.values())
             pick = None
             for c in palette:
                 if c not in used:
                     pick = c
                     break
             if pick is None:
-                pick = palette[len(_FALLBACK_COLOR_CACHE) % len(palette)]
+                seen = list(out.values()) + list(_FALLBACK_COLOR_CACHE.values())
+                pick = min(palette, key=seen.count)
             _FALLBACK_COLOR_CACHE[nm] = pick
             out[nm] = pick
     return out
@@ -276,7 +278,7 @@ def draw_roc_curves(
     ax.set_aspect("equal", adjustable="box")
     ax.set_xlabel("1 − Specificity")
     ax.set_ylabel("Sensitivity")
-    ax.set_title(title)
+    ax.set_title(cfg.panel_title(title))
     fs = cfg.FIG_FONT_SIZE
     ax.legend(loc="lower right", fontsize=fs, framealpha=0.95, borderpad=0.6)
     cfg.apply_clean_theme(ax, grid=True, legend=True)
@@ -311,7 +313,7 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
     is_val = _is_val_dataset(dataset_label)
     if is_val and mode == "lock_threshold" and lock_from is None:
         lock_from = ROC_LOCK.get("train") or {}
-    from modules.stats.radiomics import score_display_name
+    from modules.stats.radiomics import score_display_name, fig_label
 
     assert len(model_list) >= 1
     color_map = _resolve_color_map(list(model_list.keys()), color_map)
@@ -418,7 +420,7 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
         if plot_skip:
             continue
         display_name = (
-            f"{score_display_name(nm)}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
+            f"{fig_label(nm)}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
         )
         curves.append((display_name, nm, fpr, tpr))
 
@@ -514,7 +516,7 @@ def plot_auc_by_time(metrics: pd.DataFrame, fname: str, title: str,
         ax.set_xlabel("Time")
     ax.set_ylabel("AUC")
     ax.set_ylim(0.0, 1.02)
-    ax.set_title(title)
+    ax.set_title(cfg.panel_title(title))
     ax.legend(loc="lower right", fontsize=cfg.FIG_FONT_SIZE, framealpha=0.95)
     cfg.apply_clean_theme(ax, grid=True, legend=True)
     fig.tight_layout()
@@ -577,6 +579,7 @@ def plot_landmark_roc(
 ) -> Optional[plt.Figure]:
     """每一对时间列 / 状态列写一行 AUC，并按二分类 ROC 的画法各出一张曲线。"""
     from modules.utils import dry_run as _dry
+    from modules.stats.radiomics import fig_label
     label = str(dataset_label or "all")
     print(f"\n═══ LANDMARK ROC [{label}] ═══")
     pairs = landmarks.get("pairs") if isinstance(landmarks, dict) else None
@@ -626,7 +629,7 @@ def plot_landmark_roc(
             raw_auc = float(roc_auc_score(lab, score))
             fpr, tpr, _thr = roc_curve(lab, score * roc_score_sign(raw_auc))
             display = (
-                f"{nm}  AUC={float(row['AUC']):.3f} "
+                f"{fig_label(nm)}  AUC={float(row['AUC']):.3f} "
                 f"({float(row['AUC_CI_low']):.3f}-{float(row['AUC_CI_high']):.3f})"
             )
             curves.append((display, str(nm), fpr, tpr))

@@ -966,9 +966,9 @@ def _candidates_from_univariate(
     exclude: set,
     vif_high: Optional[float] = None,
 ) -> List[str]:
-    """单因素 Logistic p < 阈值、无完全分离，才进多因素候选池。
+    """单因素 Logistic p < 阈值、无完全分离，且 VIF < 阈值，才进多因素候选池。
 
-    VIF 只作警示（VIF_THRESHOLD_WARN），不再按高阈值剔除候选。
+    VIF 是硬门（VIF_THRESHOLD_WARN）：候选池内反复剔除 VIF 最大者直到全部低于阈值。
     vif_high 保留参数以兼容旧调用，忽略不用。
     不用 Table1 组间 p（否则 Weight 可因 Table1 p<0.1 入选，Platinum 可因卡方显著但
     logistic 完全分离 p≈1 仍入选）。
@@ -993,7 +993,55 @@ def _candidates_from_univariate(
         seen.add(feat)
     if dropped:
         print("  多因素候选池剔除: " + "; ".join(dropped))
-    return out
+    return _vif_exclude(clin, out)
+
+
+def _vif_exclude(
+    frame: pd.DataFrame,
+    candidates: Sequence[str],
+    warn: Optional[float] = None,
+) -> List[str]:
+    """按 VIF 阈值剔除候选变量（VIF 是入选门，不只是警示）。
+
+    反复剔除 VIF 最大者（完全共线 = inf 先出），直到全部 < 阈值或只剩 1 个。
+    返回保留的候选（保持原顺序）；剔除项打印 VIF 值。阈值 ≤ 1 视为不启用。
+    """
+    keep = [str(c) for c in candidates if str(c) in frame.columns]
+    if len(keep) < 2:
+        return [str(c) for c in candidates]
+    cut = getattr(cfg, "VIF_THRESHOLD_WARN", 5) if warn is None else warn
+    try:
+        cut = float(cut)
+    except (TypeError, ValueError):
+        return [str(c) for c in candidates]
+    if (not np.isfinite(cut)) or cut <= 1:
+        return [str(c) for c in candidates]
+    from modules.stats.vif_analysis import compute_vif
+
+    dropped: List[str] = []
+    dropped_names: set = set()
+    while len(keep) >= 2:
+        vif_df = compute_vif(frame, keep)
+        if vif_df is None or vif_df.empty:
+            break
+        vals = {
+            str(r["Variable"]): (float("inf") if str(r["VIF"]).strip().lower() == "inf"
+                                 else float(r["VIF"]))
+            for _, r in vif_df.iterrows()
+        }
+        worst = max(vals, key=lambda k: vals[k])
+        worst_vif = vals[worst]
+        if np.isfinite(worst_vif) and worst_vif < cut:
+            break
+        dropped.append(f"{worst} (VIF={worst_vif:.2f})")
+        dropped_names.add(worst)
+        keep = [c for c in keep if c != worst]
+    if dropped:
+        print(
+            f"  VIF ≥ {cut:g} 剔除候选（共 {len(dropped)} 项）: " + "; ".join(dropped),
+            flush=True,
+        )
+    return [str(c) for c in candidates if str(c) not in dropped_names]
 
 
 def _attach_vif(df: pd.DataFrame, clin: pd.DataFrame, feats: Sequence[str]) -> pd.DataFrame:
@@ -1038,8 +1086,9 @@ def _pool_note(candidates: Sequence[str], stepwise: Sequence[str], p_threshold: 
     warn = getattr(cfg, "VIF_THRESHOLD_WARN", 5)
     parts = [
         "Full multivariable model including candidate covariates with univariate logistic "
-        f"p < {p_threshold:g} (n = {n}). "
-        f"VIF is reported for collinearity warning (warn ≥ {warn:g}) and does not exclude candidates. "
+        f"p < {p_threshold:g} and VIF < {warn:g} (n = {n}). "
+        f"VIF ≥ {warn:g} was used to exclude candidate covariates (highest VIF removed first, "
+        "iteratively) and is therefore an entry criterion, not only a collinearity flag. "
         + (
             "Derived columns (exactly collinear with the others) are removed from this table "
             "(DO_DROP_DERIVED on). "

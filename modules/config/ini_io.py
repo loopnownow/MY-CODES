@@ -54,7 +54,7 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
         "OUTCOME_COLS", "OUTCOME_OVERRIDES", "PAIRWISE_OVERRIDES",
         "SUBPROJECT_BY_OUTCOME", "GROUP_COL_KEYWORD",
         "POSITIVE_GROUP_LABEL", "GROUP_DISPLAY_POS", "GROUP_DISPLAY_NEG",
-        "DO_BASELINE_ALL", "DO_BASELINE_TRAIN_TEST",
+        "DO_BASELINE_ALL", "DO_BASELINE_TRAIN_TEST", "SAVE_TABLES",
         "EXTERNAL_TESTS",
         "DO_EXCLUDE_SAMPLES",
         "EXCLUDE_FILE", "EXCLUDE_SHEET", "EXCLUDE_COL", "EXCLUDE_ROW", "EXCLUDE_IDS",
@@ -101,8 +101,9 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
         "VIF_THRESHOLD_WARN", "DO_DROP_DERIVED", "BOOTSTRAP_N",
         "DO_QC_REPORT", "QC_HTML",
         "DO_COMBINED_MODEL",
-        "DO_NOMOGRAM", "DO_CALIBRATION",
+        "DO_NOMOGRAM", "NOMOGRAM_SOURCE", "DO_CALIBRATION",
         "DO_ROC", "ROC_MV_P_THRESHOLD", "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE",
+        "ROC_PLOT_FEATURES", "ROC_PLOT_SCORE_CURVES",
         "DO_DCA", "DCA_CURVES",
         "DO_NRI", "NRI_CUTOFF", "NRI_MODEL_OLD", "NRI_MODEL_NEW",
         "OUTCOME_READER_COMPARE", "READER_COMPARE_COL",
@@ -147,7 +148,7 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
         "DO_FIGURE_PANELS",
         "DO_PLOT_TIFF", "DO_PLOT_PDF",
         "FIGURE_PANEL_DPI", "FIGURE_PANEL_MEDIATION_NCOLS",
-        "FIGURE_PANEL_LABEL_POS", "FIGURE_PANEL_LABELS", "FIGURE_PANEL_GAP_PX",
+        "FIGURE_PANEL_LABEL_POS", "FIGURE_PANEL_LABELS", "FIGURE_PANEL_TITLES", "FIGURE_PANEL_GAP_PX",
         "FIG_FONT_SIZE", "FIG_PALETTE", "FIG_COLORS_MAIN", "FIG_COLORS_AUX",
     ]),
 ]
@@ -350,6 +351,24 @@ def _coerce_analysis_endpoint(val: str, *, fallback: str = "") -> str:
         return fb
 
 
+_NOMO_SOURCE_ALIASES = {
+    "post": "post", "after": "post", "postfit": "post", "fit": "post", "score": "post",
+    "pre": "pre", "prefit": "pre", "before": "pre", "raw": "pre", "feature": "pre",
+    "both": "both", "all": "both", "mix": "both",
+}
+
+
+def _norm_nomo_source(raw: str) -> str:
+    """列线图自变量来源归一：post（拟合后分数）| pre（拟合前特征）| both。非法值 raise。"""
+    tok = str(raw or "").strip().lower().replace("_", "").replace("-", "")
+    mode = _NOMO_SOURCE_ALIASES.get(tok)
+    if mode is None:
+        raise ValueError(
+            f"NOMOGRAM_SOURCE={raw!r} 无效；允许: post | pre | both（或 after / before / all）"
+        )
+    return mode
+
+
 def migrate_retired_settings(data: dict[str, Any]) -> dict[str, Any]:
     """旧键迁到现用字段后丢掉退役项。
 
@@ -372,6 +391,13 @@ def migrate_retired_settings(data: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, ValueError):
             out["BOOTSTRAP_N"] = 1000
     _lift_landmark_roc(out)
+    # 线性拟合开关已取消：临床 / 组学筛选后一律做原始尺度 OLS（旧 ini 写 false 也按 true 跑）。
+    for _k in ("CLIN_SCORE_LINEAR", "RAD_SCORE_LINEAR"):
+        if _k in out and out[_k] is not True:
+            out[_k] = True
+    _src = str(out.get("NOMOGRAM_SOURCE") or "").strip().lower()
+    if _src:
+        out["NOMOGRAM_SOURCE"] = _norm_nomo_source(_src)
     for key in ("TD_ROC_TIMES", "TD_ROC_STATUS_COLS"):
         if key in out:
             out[key] = coerce_td_roc_field(key, out[key])

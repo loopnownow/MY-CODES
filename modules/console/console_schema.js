@@ -196,16 +196,16 @@ const FIELD_BUNDLES = [
   },
   {
     id: "roc",
-    keys: ["FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE"],
+    keys: ["ROC_PLOT_FEATURES", "ROC_PLOT_SCORE_CURVES", "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE"],
     title: "ROC 对照与图",
-    hint: "左=额外对照列（阅片等，不进列线图）。右=ROC 图上不画的模型。",
+    hint: "入选特征（线性拟合前）默认画；分数曲线（Clinical / RadScore，线性拟合后）默认不画。左=额外对照列（阅片等，不进列线图）。右=ROC 图上不画的模型。",
     cls: "roc",
   },
   {
     id: "dca",
     keys: ["DO_DCA", "DCA_CURVES"],
     title: "DCA",
-    hint: "开=画决策曲线。勾选要画的曲线：Clinical / RadScore / Combined，或从数据加临床列、阅片列。",
+    hint: "开=画决策曲线。勾选要画的曲线（列表按分数名显示：ClinicalScore / USScore 等），或从数据加临床列、阅片列。",
     cls: "dca",
   },
   {

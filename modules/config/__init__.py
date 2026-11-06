@@ -11,6 +11,8 @@ apply_to_globals(globals(), _data)
 from .style import (  # noqa: E402,F401
     ensure_output_dirs,
     figures_on,
+    panel_titles_on,
+    panel_title,
     landmark_roc_on,
     ipcw_roc_on,
     save_plot,
