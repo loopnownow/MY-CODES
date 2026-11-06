@@ -93,7 +93,7 @@ CONFIG = {
     # Limited vocabulary is "fine once, damning when repeated".
     "TIER2_MAX_PER_TERM": 1,      # the same word may appear this many times
     "TIER2_MAX_TOTAL": 3,         # all limited words together may appear this many times
-    "EMDASH_MAX_PER_SENTENCE": 0,  # any em/en-dash fails; prefer parentheses; ranges use ASCII - (owner 2026-10-30)
+    "EMDASH_MAX_PER_SENTENCE": 0,  # em-dash / spaced "--" fail; U+2013 en dash allowed for ranges/CI (t1684u / MY-SKILLS #303); ASCII - OK
     "TRICOLON_MAX_ALLOWED": 3,    # rule-of-three lists tolerated in the scanned text
 
     # ---- 3. Input guards (fail closed) ----------------------------------------
@@ -144,7 +144,10 @@ CONFIG = {
 GROUPS = ("vocabulary", "constructions", "dash_cadence", "tricolon")
 
 # Not user-tunable: syntax-level building blocks.
-_EMDASH = re.compile(r"\u2014|\u2013|(?<=\s)--(?=\s)")  # em-dash, en-dash, or spaced "--"; ranges use ASCII -
+# Split (t1684u): ban U+2014 em dash and spaced "--"; allow U+2013 en dash (ranges/CI). Aligns MY-SKILLS #303.
+_EM_DASH_CHAR = re.compile("\u2014")
+_SPACED_DOUBLE_HYPHEN = re.compile(r"(?<=\s)--(?=\s)")
+_EMDASH = re.compile(r"\u2014|(?<=\s)--(?=\s)")  # kept name for callers; en dash deliberately omitted
 _TRICOLON = re.compile(r"\b[a-z][a-z-]{2,}, [a-z][a-z-]{2,},? (?:and|or) [a-z][a-z-]{2,}\b")
 _MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s*(.+?)\s*#*\s*$")
 _NUMBERING = re.compile(r"^\(?\d+(?:\.\d+)*[.)]?\s+")
@@ -431,8 +434,10 @@ def lint(text, config=None):
 
     # -- group 3: dash cadence ------------------------------------------------
     for rec in sentences:
-        if len(_EMDASH.findall(rec["text"])) > cfg["EMDASH_MAX_PER_SENTENCE"]:
-            groups["dash_cadence"]["hits"].append(mk("dash_cadence", "em/en-dash", rec))
+        n_bad = (len(_EM_DASH_CHAR.findall(rec["text"]))
+                 + len(_SPACED_DOUBLE_HYPHEN.findall(rec["text"])))
+        if n_bad > cfg["EMDASH_MAX_PER_SENTENCE"]:
+            groups["dash_cadence"]["hits"].append(mk("dash_cadence", "em-dash", rec))
     groups["dash_cadence"]["failed"] = bool(groups["dash_cadence"]["hits"])
 
     # -- group 4: rule-of-three rhythm ---------------------------------------
