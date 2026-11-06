@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delta 生境影像组学 · 可视化指南 v2.0</title>
+<style>
+:root {
+    --bg: #f8fafc;
+    --sidebar: #0f172a;
+    --accent: #0369a1;
+    --accent2: #059669;
+    --accent3: #7c3aed;
+    --warn-bg: #fef3c7;
+    --warn-border: #d97706;
+    --danger-bg: #fee2e2;
+    --danger-border: #dc2626;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --code-bg: #0f172a;
+    --card: #ffffff;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 15px;
+}
+.layout { display: flex; }
+
+/* ── Sidebar ── */
+nav.toc {
+    position: fixed;
+    top: 0; left: 0;
+    width: 290px;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--sidebar);
+    color: #cbd5e1;
+    padding: 24px 0;
+    border-right: 1px solid #1e293b;
+    z-index: 100;
+}
+nav.toc h2 { color: #fff; font-size: 15px; margin: 0 0 2px 22px; letter-spacing: 0.4px; }
+nav.toc .ver { font-size: 11.5px; color: #64748b; margin: 0 0 14px 22px; }
+nav.toc .group {
+    font-size: 10.5px; color: #475569;
+    text-transform: uppercase; letter-spacing: 1.1px;
+    padding: 12px 22px 3px; margin-top: 6px;
+}
+nav.toc a {
+    display: block; color: #94a3b8; text-decoration: none;
+    padding: 5px 22px; font-size: 13.5px;
+    border-left: 3px solid transparent;
+    transition: all 0.13s;
+}
+nav.toc a.sub { padding-left: 36px; font-size: 13px; color: #64748b; }
+nav.toc a:hover { background: #1e293b; color: #fff; border-left-color: var(--accent2); }
+nav.toc a.active { color: #fff; border-left-color: var(--accent); background: #1e293b; }
+
+/* ── Main ── */
+main { margin-left: 290px; flex: 1; padding: 40px 52px; max-width: 1120px; }
+
+/* ── Hero ── */
+header.hero {
+    background: linear-gradient(135deg, #0369a1 0%, #0891b2 50%, #059669 100%);
+    color: #fff; border-radius: 16px;
+    padding: 40px 48px; margin-bottom: 40px;
+    box-shadow: 0 10px 32px rgba(3,105,161,0.22);
+}
+header.hero h1 { margin: 0 0 10px; font-size: 26px; font-weight: 700; line-height: 1.35; }
+header.hero p  { margin: 0; opacity: 0.93; font-size: 15.5px; }
+header.hero .badges { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── Typography ── */
+h2.section {
+    font-size: 21px; border-bottom: 3px solid var(--accent);
+    padding-bottom: 8px; margin: 52px 0 18px; color: #0f172a;
+}
+h3 { font-size: 17px; color: var(--accent); margin: 30px 0 10px; }
+h4 { font-size: 15px; color: #334155; margin: 22px 0 8px; font-weight: 600; }
+p  { margin: 10px 0; }
+
+/* ── Code ── */
+code {
+    background: #e0e7ff; color: #1e40af;
+    padding: 2px 6px; border-radius: 4px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 13px;
+}
+pre {
+    background: var(--code-bg); color: #e0f2fe;
+    padding: 20px 24px; border-radius: 10px;
+    overflow-x: auto;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 13px; line-height: 1.58;
+    margin: 14px 0;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.13);
+}
+pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+.comment { color: #6ee7b7; }
+.kw      { color: #93c5fd; }
+.str     { color: #fde68a; }
+.fn      { color: #c4b5fd; }
+.num     { color: #fb923c; }
+
+/* ── Callouts ── */
+.note, .warn, .tip, .danger, .new {
+    border-radius: 10px; padding: 15px 20px;
+    margin: 18px 0; border-left: 5px solid;
+    font-size: 14.5px; line-height: 1.65;
+}
+.note   { background: #e0f2fe; border-color: var(--accent); }
+.tip    { background: #d1fae5; border-color: var(--accent2); }
+.warn   { background: var(--warn-bg); border-color: var(--warn-border); }
+.danger { background: var(--danger-bg); border-color: var(--danger-border); }
+.new    { background: #f3e8ff; border-color: var(--accent3); }
+.note b, .tip b, .warn b, .danger b, .new b { display: block; margin-bottom: 5px; font-size: 15px; }
+
+/* ── Tables ── */
+table {
+    border-collapse: collapse; width: 100%;
+    margin: 16px 0; background: var(--card);
+    border-radius: 10px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+th {
+    background: var(--accent); color: #fff;
+    text-align: left; padding: 11px 16px;
+    font-weight: 600; font-size: 13.5px;
+}
+td {
+    padding: 10px 16px; border-top: 1px solid var(--border);
+    vertical-align: top; font-size: 13.5px;
+}
+tr:nth-child(even) td { background: #f8fafc; }
+.td-red   { color: #dc2626; font-weight: 600; }
+.td-amber { color: #d97706; font-weight: 600; }
+.td-green { color: #059669; font-weight: 600; }
+
+/* ── Misc ── */
+.flow {
+    background: #0f172a; color: #bae6fd;
+    border-radius: 10px; padding: 18px 24px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 13px; white-space: pre;
+    overflow-x: auto; margin: 16px 0; line-height: 1.52;
+}
+.pill {
+    display: inline-block;
+    padding: 3px 12px; border-radius: 9999px;
+    font-size: 12.5px; font-weight: 600;
+}
+.pill-blue  { background: rgba(255,255,255,0.2); color: #fff; }
+.pill-green { background: rgba(5,150,105,0.15); color: #065f46; }
+.pill-red   { background: rgba(220,38,38,0.12); color: #991b1b; }
+.pill-purple{ background: rgba(124,58,237,0.13); color: #4c1d95; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0; }
+.param-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin: 10px 0;
+}
+.param-card h5 { margin: 0 0 6px; font-size: 14px; color: var(--accent3); }
+.param-card p  { margin: 0; font-size: 13.5px; }
+.fn-sig {
+    background: #1e293b; color: #c4b5fd;
+    border-radius: 8px; padding: 12px 18px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 13px; margin: 12px 0;
+    border-left: 4px solid var(--accent3);
+}
+.badge-new {
+    display: inline-block; background: var(--accent3);
+    color: #fff; font-size: 11px; font-weight: 700;
+    padding: 1px 7px; border-radius: 4px;
+    vertical-align: middle; margin-left: 6px;
+}
+.badge-fix {
+    display: inline-block; background: #dc2626;
+    color: #fff; font-size: 11px; font-weight: 700;
+    padding: 1px 7px; border-radius: 4px;
+    vertical-align: middle; margin-left: 6px;
+}
+footer {
+    margin-top: 64px; padding-top: 22px;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13px; text-align: center;
+}
+@media (max-width: 900px) {
+    nav.toc { display: none; }
+    main { margin-left: 0; padding: 24px 20px; }
+    .two-col { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ════════════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════════ -->
+<nav class="toc">
+    <h2>可视化指南</h2>
+    <p class="ver">Delta 生境影像组学 v2.0 · 2026-06</p>
+
+    <div class="group">概述</div>
+    <a href="#intro">1. 概述与版本变更</a>
+    <a href="#overview">2. 运行顺序总览</a>
+    <a href="#config">3. 配置区说明</a>
+
+    <div class="group">预处理</div>
+    <a href="#preproc">4. 预处理可视化</a>
+    <a href="#preproc-checklist" class="sub">4.1 检查清单</a>
+    <a href="#preproc-fn" class="sub">4.2 plot_preproc_qc</a>
+
+    <div class="group">配准</div>
+    <a href="#registration">5. 配准可视化</a>
+    <a href="#reg-fn" class="sub">5.1 plot_registration_qc</a>
+
+    <div class="group">生境划分</div>
+    <a href="#habitat">6. 生境可视化（核心）</a>
+    <a href="#hab-overlay" class="sub">6.1 彩色 Overlay</a>
+    <a href="#hab-intensity" class="sub">6.2 强度分布图 NEW</a>
+    <a href="#hab-delta" class="sub">6.3 Delta 对比图 NEW</a>
+    <a href="#hab-cohort" class="sub">6.4 队列一致性 NEW</a>
+    <a href="#hab-tsne" class="sub">6.5 t-SNE 特征空间 NEW</a>
+
+    <div class="group">批量运行</div>
+    <a href="#batch">7. run_visualization 批量入口</a>
+    <a href="#usage">8. 使用方式</a>
+    <a href="#roadmap">9. 实施路线图</a>
+    <a href="#appendix">10. 附录</a>
+</nav>
+
+<!-- ════════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════════ -->
+<main>
+
+<!-- Hero -->
+<header class="hero">
+    <h1>Delta 生境影像组学<br>可视化流程完整指南</h1>
+    <p>预处理 / 配准 / 生境划分 — 全 Bug 修复版 + 新增 4 种 Habitat 可视化</p>
+    <div class="badges">
+        <span class="pill pill-blue">v2.0  2026-06</span>
+        <span class="pill pill-blue">BUG-1/2/3 已修复</span>
+        <span class="pill pill-blue">+4 Habitat 图</span>
+        <span class="pill pill-blue">软编码 · 配置置顶</span>
+    </div>
+</header>
+
+<!-- ════════════════════════════════════
+     1. 概述与版本变更
+════════════════════════════════════ -->
+<h2 class="section" id="intro">1. 概述与版本变更（v1.0 → v2.0）</h2>
+
+<div class="danger">
+<b>v1.0 中存在三处需要立即修复的 Bug</b>
+<table style="margin:10px 0 0;">
+<tr><th style="background:#991b1b;">编号</th><th style="background:#991b1b;">位置</th><th style="background:#991b1b;">问题描述</th><th style="background:#991b1b;">影响</th></tr>
+<tr><td class="td-red">BUG-1</td><td><code>plot_preproc_qc</code></td><td>mask contour 切片逻辑错误：<code>slice(None)</code> 传入 <code>ax.contour()</code>，导致三维数组传入而非二维切片</td><td>有 mask 的所有患者运行报错或 contour 静默消失</td></tr>
+<tr><td class="td-red">BUG-2</td><td><code>plot_registration_qc</code></td><td>Row-1 第三列重复显示 Fixed 图（<code>arr_f[z]</code>），title 写的是 "Fixed + Warped Mask" 但 mask 绘制在 Row-2，导致第三列无诊断意义</td><td>QC 价值缺失，差异图缺位</td></tr>
+<tr><td class="td-red">BUG-3</td><td>全部函数</td><td>sagittal / coronal 背景图始终使用 axial 切片 <code>arr[z]</code>，而非对应视角的正交切片</td><td>Sagittal/Coronal 视图显示内容错误</td></tr>
+</table>
+</div>
+
+<div class="new">
+<b>v2.0 新增功能</b>
+<ul style="margin:6px 0 0;">
+    <li><strong>4 种 Habitat 可视化函数</strong>：强度分布（小提琴图）、Delta pre/post 对比、全队列一致性面板、t-SNE 特征空间散点图</li>
+    <li><strong>Habitat Overlay 新增体积标注</strong>：图例自动显示每个 Habitat 的体积（mL）和占比（%）</li>
+    <li><strong>Registration Row-2 缺失提示</strong>：warped mask 不存在时显示友好文字提示而非空白</li>
+    <li><strong>自动患者发现改为 <code>sorted()</code></strong>：保证批量处理顺序可复现</li>
+    <li><strong>新增辅助函数</strong>：<code>_orthogonal_slices()</code>、<code>_cfg()</code>、<code>_save_fig()</code>，消除重复代码</li>
+</ul>
+</div>
+
+<!-- ════════════════════════════════════
+     2. 运行顺序总览
+════════════════════════════════════ -->
+<h2 class="section" id="overview">2. 运行顺序总览</h2>
+
+<div class="flow">阶段 0  数据加载 (data_loader.py)
+          ↓
+阶段 1  预处理 (preprocessing.py)
+          ├── 重采样（1×1×1 mm B-Spline）
+          ├── N4 偏置场校正（可选，MRI）
+          ├── 灰度归一化（minmax / zscore）
+          └── Mask 对齐 + 验证
+          ↓ → plot_preproc_qc("pre") / plot_preproc_qc("post")
+阶段 2  非刚性配准 (registration.py)
+          ├── Translation → Affine → SyN 三阶段级联
+          ├── Mask 引导优化
+          └── QC: Dice + Hausdorff + warped mask 保存
+          ↓ → plot_registration_qc()
+阶段 3  生境划分 (habitat.py)
+          ├── cohort_mode=True：池化基线体素特征 → 全局 Scaler+PCA+KMeans
+          ├── 单患者模式：独立优化 K
+          └── 生成 K 个 Habitat Mask（基线空间）
+          ↓ → plot_habitat_overlay()
+             plot_habitat_intensity_distribution()     ← NEW
+             plot_habitat_delta()                      ← NEW
+          ↓（全队列完成后）
+             plot_cohort_habitat_consistency()         ← NEW
+             plot_habitat_feature_space()              ← NEW（需 feature_matrix）
+后续    特征提取 → Delta 计算 → 筛选 → 统计建模</div>
+
+<!-- ════════════════════════════════════
+     3. 配置区说明
+════════════════════════════════════ -->
+<h2 class="section" id="config">3. 配置区说明（顶层软编码）</h2>
+<p>所有可调参数集中在脚本顶部 <code>VIZ_CONFIG</code> 字典。修改一处即可全局生效；也可通过各函数的 <code>override_config</code> 参数临时覆盖单次调用。</p>
+
+<div class="two-col">
+<div class="param-card">
+    <h5>基础显示</h5>
+    <p><code>dpi</code>：输出分辨率（默认 200；论文图用 300）<br>
+    <code>robust_percentiles</code>：抗 outlier 显示范围（默认 2~98）<br>
+    <code>save_format</code>：<code>"png"</code> 或 <code>"pdf"</code><br>
+    <code>show_colorbar</code> / <code>show_legend</code>：可选元素开关</p>
+</div>
+<div class="param-card">
+    <h5>切片策略</h5>
+    <p><code>slice_strategy</code>：<code>"mid"</code>（中位数）或 <code>"percent"</code>（百分位）<br>
+    <code>slice_percent</code>：仅 <code>"percent"</code> 模式生效（默认 0.5）<br>
+    三个正交切片索引 (z, y, x) 由 <code>get_slice_indices()</code> 统一计算</p>
+</div>
+<div class="param-card">
+    <h5>Mask / Contour</h5>
+    <p><code>mask_contour_color</code>：等高线颜色（默认红色）<br>
+    <code>mask_contour_linewidth</code>：线宽（默认 1.8）<br>
+    <code>mask_contour_alpha</code>：透明度（默认 0.85）</p>
+</div>
+<div class="param-card">
+    <h5>Habitat Overlay</h5>
+    <p><code>colormap_habitat</code>：颜色映射（默认 <code>tab10</code>；色盲友好用 <code>Set2</code>）<br>
+    <code>habitat_overlay_alpha</code>：叠加透明度（默认 0.55）<br>
+    <code>cohort_panel_cell_size</code>：队列面板单格大小（默认 (3,3)）</p>
+</div>
+<div class="param-card">
+    <h5>t-SNE 参数</h5>
+    <p><code>tsne_perplexity</code>：困惑度（默认 30）<br>
+    <code>tsne_random_state</code>：随机种子（默认 42，保证可复现）<br>
+    <code>tsne_max_voxels</code>：最大体素采样数（默认 5000，防内存溢出）</p>
+</div>
+<div class="param-card">
+    <h5>路径与命名</h5>
+    <p><code>output_root</code>：输出根目录（默认 <code>OUTPUT_ROOT/qc_reports/viz</code>）<br>
+    <code>filename_template</code>：文件名模板，支持 <code>{patient_id}</code>、<code>{stage}</code>、<code>{suffix}</code>、<code>{ext}</code></p>
+</div>
+</div>
+
+<pre><code><span class="comment"># 示例：临时覆盖参数（不修改全局配置）</span>
+<span class="fn">plot_habitat_overlay</span>(
+    patient_id=<span class="str">"001"</span>,
+    override_config={
+        <span class="str">"dpi"</span>: <span class="num">300</span>,
+        <span class="str">"habitat_overlay_alpha"</span>: <span class="num">0.7</span>,
+        <span class="str">"colormap_habitat"</span>: <span class="str">"Set2"</span>,   <span class="comment"># 色盲友好</span>
+    }
+)</code></pre>
+
+<!-- ════════════════════════════════════
+     4. 预处理可视化
+════════════════════════════════════ -->
+<h2 class="section" id="preproc">4. 阶段一：预处理可视化</h2>
+
+<h3 id="preproc-checklist">4.1 检查清单</h3>
+<table>
+<tr><th>步骤</th><th>可视化内容</th><th>验证重点</th></tr>
+<tr><td>原始图像加载</td><td>spacing / size / min-max + 3 视图</td><td>DICOM 问题、负值、极端 outlier、运动伪影</td></tr>
+<tr><td>重采样（1mm 各向同性）</td><td>新 spacing 确认；前后边缘锐度对比</td><td>B-Spline 插值是否过度平滑</td></tr>
+<tr><td>N4 偏置场校正</td><td>bias field 伪彩图 + 前后对比</td><td>低频漂移是否有效去除</td></tr>
+<tr><td>灰度归一化</td><td>前后直方图 overlay + mask 内 mean/std</td><td>minmax 后 [0,1]；zscore 后 mean≈0 std≈1</td></tr>
+<tr><td>Mask 对齐</td><td>图像 + 红色 contour overlay（3 视图）</td><td>肿瘤完整覆盖、无偏移或空洞</td></tr>
+</table>
+
+<h3 id="preproc-fn">4.2 <code>plot_preproc_qc</code> <span class="badge-fix">BUG-1/3 修复</span></h3>
+
+<div class="fn-sig">plot_preproc_qc(patient_id: str, timepoint: str = "pre", override_config: dict = None) → Optional[str]</div>
+
+<p><strong>输出</strong>：1 行 × 3 列（Axial / Sagittal / Coronal），mask 红色 contour 叠加。</p>
+
+<div class="danger">
+<b>BUG-1 修复：mask contour 切片对齐</b><br>
+v1.0 代码将 <code>slice(None)</code> 传入 <code>ax.contour()</code>，导致三维数组直接传入报错（或因 matplotlib 内部截断而静默失败，contour 消失）。<br><br>
+<strong>修复方式</strong>：新增 <code>_orthogonal_slices(arr, z, y, x)</code> 辅助函数，图像与 mask 均调用同一函数提取对应视图的二维切片，严格对齐。
+</div>
+
+<div class="danger">
+<b>BUG-3 修复：sagittal / coronal 背景图错误</b><br>
+v1.0 所有视图的背景均使用 <code>arr[z]</code>（axial 切片），Sagittal / Coronal 面板实为 axial 图的重复。<br><br>
+<strong>修复方式</strong>：Sagittal 使用 <code>arr[:, y, :]</code>，Coronal 使用 <code>arr[:, :, x]</code>。mask 切片同步修正。
+</div>
+
+<pre><code><span class="comment"># ── v1.0 错误写法（BUG-1 + BUG-3）──────────────────────</span>
+views = [
+    (arr[z], <span class="str">f"Axial z={z}"</span>),
+    (arr[:, y], <span class="str">f"Sagittal y={y}"</span>),    <span class="comment"># BUG-3：arr[:, y] = axial 不是 sagittal</span>
+    (arr[:, :, x], <span class="str">f"Coronal x={x}"</span>)
+]
+<span class="comment"># BUG-1：mask contour 传入三维数组</span>
+ax.contour(m_arr[z <span class="kw">if</span> title.startswith(<span class="str">"Axial"</span>) <span class="kw">else</span>
+                 (slice(<span class="kw">None</span>) <span class="kw">if</span> <span class="str">"Sagittal"</span> <span class="kw">in</span> title <span class="kw">else</span> slice(<span class="kw">None</span>))], ...)
+
+<span class="comment"># ── v2.0 修复写法 ─────────────────────────────────────</span>
+<span class="kw">def</span> <span class="fn">_orthogonal_slices</span>(arr, z, y, x):
+    <span class="str">"""从 (D, H, W) 数组提取三个正交二维切片"""</span>
+    <span class="kw">return</span> [
+        arr[z, :, :],    <span class="comment"># Axial    → H×W</span>
+        arr[:, y, :],    <span class="comment"># Sagittal → D×W</span>
+        arr[:, :, x],    <span class="comment"># Coronal  → D×H</span>
+    ]
+
+img_slices = <span class="fn">_orthogonal_slices</span>(arr,   z, y, x)
+msk_slices = <span class="fn">_orthogonal_slices</span>(m_arr, z, y, x)  <span class="comment"># 与图像切片严格对齐</span>
+
+<span class="kw">for</span> idx, (ax, img_sl, title) <span class="kw">in</span> enumerate(zip(axes, img_slices, view_titles)):
+    ax.imshow(img_sl, cmap=<span class="str">"gray"</span>, vmin=vmin, vmax=vmax, origin=<span class="str">"lower"</span>)
+    <span class="kw">if</span> msk_slices <span class="kw">is not None</span>:
+        ax.contour(msk_slices[idx], levels=[<span class="num">0.5</span>], ...)  <span class="comment"># 二维切片，正确</span></code></pre>
+
+<!-- ════════════════════════════════════
+     5. 配准可视化
+════════════════════════════════════ -->
+<h2 class="section" id="registration">5. 阶段二：配准可视化</h2>
+
+<h3 id="reg-fn">5.1 <code>plot_registration_qc</code> <span class="badge-fix">BUG-2 修复</span></h3>
+
+<div class="fn-sig">plot_registration_qc(patient_id: str, override_config: dict = None) → Optional[str]</div>
+
+<p><strong>输出</strong>：2 行 × 3 列布局</p>
+<table>
+<tr><th></th><th>Col 1</th><th>Col 2</th><th>Col 3</th></tr>
+<tr><td><strong>Row 1（图像）</strong></td><td>Fixed (t1)</td><td>Registered (t2)</td><td class="td-green">Difference Fixed−Reg ← <span class="badge-fix">BUG-2 修复</span></td></tr>
+<tr><td><strong>Row 2（Mask）</strong></td><td>Fixed + Warped Mask</td><td>Registered + Warped Mask</td><td>Fixed + Warped Mask（备用）</td></tr>
+</table>
+
+<div class="danger">
+<b>BUG-2 修复：Row-1 第三列从重复图改为差异图</b><br>
+v1.0 第三列传入 <code>arr_f[z]</code>，与第一列完全相同，毫无诊断价值。<br><br>
+<strong>修复方式</strong>：改为 <code>diff = arr_f[z] − arr_r[z]</code>，使用 <code>RdBu_r</code> colormap，正负对称显示，配准误差在红/蓝区域一目了然。
+</div>
+
+<pre><code><span class="comment"># ── v1.0 错误写法（BUG-2）──────────────────────────────</span>
+<span class="kw">for</span> ax, arr, title <span class="kw">in</span> zip(axes[<span class="num">0</span>],
+                          [arr_f[z], arr_r[z], arr_f[z]],      <span class="comment"># ← 第三列重复</span>
+                          [<span class="str">"Fixed"</span>, <span class="str">"Registered"</span>, <span class="str">"Fixed + Warped Mask"</span>]):
+
+<span class="comment"># ── v2.0 修复写法 ─────────────────────────────────────</span>
+diff      = arr_f[z, :, :] - arr_r[z, :, :]
+diff_vmax = float(np.percentile(np.abs(diff), <span class="num">98</span>))
+
+row1_data = [
+    (arr_f[z, :, :], <span class="str">"gray"</span>,    vmin,      vmax,      <span class="str">"Fixed (t1)"</span>),
+    (arr_r[z, :, :], <span class="str">"gray"</span>,    vmin,      vmax,      <span class="str">"Registered (t2)"</span>),
+    (diff,            <span class="str">"RdBu_r"</span>, -diff_vmax, diff_vmax, <span class="str">"Difference (Fixed − Reg)"</span>),  <span class="comment"># ← 修复</span>
+]</code></pre>
+
+<p>此外，warped mask 不存在时，Row-2 现在会显示友好提示文字而非空白子图：</p>
+
+<pre><code><span class="kw">else</span>:
+    <span class="kw">for</span> ax <span class="kw">in</span> axes[<span class="num">1</span>]:
+        ax.text(<span class="num">0.5</span>, <span class="num">0.5</span>,
+                <span class="str">"Warped mask not found\n(rerun registration with save_qc=True)"</span>,
+                ha=<span class="str">"center"</span>, va=<span class="str">"center"</span>, transform=ax.transAxes,
+                fontsize=<span class="num">10</span>, color=<span class="str">"gray"</span>, style=<span class="str">"italic"</span>)
+        ax.axis(<span class="str">"off"</span>)</code></pre>
+
+<!-- ════════════════════════════════════
+     6. Habitat 可视化
+════════════════════════════════════ -->
+<h2 class="section" id="habitat">6. 阶段三：生境可视化（核心）</h2>
+
+<div class="note">
+<b>为什么 Habitat 可视化是最关键的 QC 环节</b><br>
+Delta 特征的可比性（跨时间点、跨患者）完全依赖于 Habitat 划分的语义一致性。视觉检查是目前验证聚类质量最直接、最可信的手段，同时也是论文 Figure / Supplementary 的必要内容。v2.0 提供 5 种互补的 Habitat 可视化，覆盖从单患者 QC 到全队列验证的完整需求。
+</div>
+
+<!-- 6.1 Overlay -->
+<h3 id="hab-overlay">6.1 <code>plot_habitat_overlay</code>（基础 Overlay，含体积标注）<span class="badge-fix">BUG-3 修复</span></h3>
+
+<div class="fn-sig">plot_habitat_overlay(patient_id: str, override_config: dict = None) → Optional[str]</div>
+
+<p><strong>输出</strong>：1 行 × 3 列正交视图（Axial / Sagittal / Coronal）+ 图例标注每个 Habitat 的体积（mL）和占比（%）</p>
+
+<pre><code><span class="comment"># 体积标注（v2.0 新增）</span>
+spacing    = img.GetSpacing()                           <span class="comment"># (x, y, z) mm</span>
+vox_vol_ml = spacing[<span class="num">0</span>] * spacing[<span class="num">1</span>] * spacing[<span class="num">2</span>] / <span class="num">1000.0</span>
+
+handles = [
+    plt.Line2D([<span class="num">0</span>], [<span class="num">0</span>], marker=<span class="str">"o"</span>, color=<span class="str">"w"</span>,
+               markerfacecolor=colors[i], markersize=<span class="num">9</span>,
+               label=(
+                   <span class="str">f"H{i+1}  "</span>
+                   <span class="str">f"{vox_counts[i] * vox_vol_ml:.1f} mL  "</span>
+                   <span class="str">f"({vox_counts[i] / total_vox * 100:.1f}%)"</span>
+               ))
+    <span class="kw">for</span> i <span class="kw">in</span> range(k)
+]</code></pre>
+
+<!-- 6.2 Intensity Distribution -->
+<h3 id="hab-intensity">6.2 <code>plot_habitat_intensity_distribution</code> <span class="badge-new">NEW</span></h3>
+
+<div class="fn-sig">plot_habitat_intensity_distribution(patient_id: str, override_config: dict = None) → Optional[str]</div>
+
+<p><strong>目的</strong>：验证 K-Means 聚类是否捕捉了真实的强度异质性，而非随机分区。<br>
+<strong>输出</strong>：逐 Habitat 小提琴图（内嵌中位数线），每个 Habitat 独立着色，Y 轴为归一化体素强度。</p>
+
+<div class="tip">
+<b>判读要点</b><br>
+• 不同 Habitat 的分布应有明显的中位数差异或形状差异（尖峰 vs 双峰 vs 宽尾）<br>
+• 如果所有 Habitat 的分布几乎完全重叠，说明聚类主要基于空间位置而非强度特征，需要检查特征归一化步骤<br>
+• 该图是论文 Supplementary Figure 的标准内容
+</div>
+
+<pre><code>parts = ax.violinplot(
+    intensity_data,
+    positions=range(<span class="num">1</span>, k + <span class="num">1</span>),
+    showmedians=<span class="kw">True</span>,
+    showextrema=<span class="kw">True</span>,
+)
+<span class="comment"># 按 Habitat 颜色着色</span>
+<span class="kw">for</span> patch, color <span class="kw">in</span> zip(parts[<span class="str">"bodies"</span>], colors):
+    patch.set_facecolor(color)
+    patch.set_alpha(<span class="num">0.75</span>)
+parts[<span class="str">"cmedians"</span>].set_color(<span class="str">"black"</span>)
+parts[<span class="str">"cmedians"</span>].set_linewidth(<span class="num">2</span>)</code></pre>
+
+<p><strong>输出目录</strong>：<code>habitat_viz/p{id}_habitat_intensity_dist.png</code></p>
+
+<!-- 6.3 Delta -->
+<h3 id="hab-delta">6.3 <code>plot_habitat_delta</code> <span class="badge-new">NEW</span></h3>
+
+<div class="fn-sig">plot_habitat_delta(patient_id: str, override_config: dict = None) → Optional[str]</div>
+
+<p><strong>目的</strong>：Delta 流程的核心图，展示治疗前后 Habitat 分布变化。<br>
+<strong>输出</strong>：1 行 × 3 列</p>
+<table>
+<tr><th>Col 1</th><th>Col 2</th><th>Col 3</th></tr>
+<tr><td>Pre-treatment Habitat Overlay</td><td>Post-treatment Habitat Overlay</td><td>Habitat Change Map（红色高亮标签变化区域）</td></tr>
+</table>
+
+<div class="tip">
+<b>依赖条件</b><br>
+• Post-treatment habitat masks 文件名须含 <code>_t2_</code> 或 <code>_post_</code>（自动识别）<br>
+• Post 图像 <code>p{id}_post_image.nii.gz</code> 须与 pre 在同一空间（已完成配准）<br>
+• Change map 仅高亮肿瘤区内标签变化的体素（背景设为 NaN，透明显示）
+</div>
+
+<pre><code><span class="comment"># Change map 构建</span>
+change_map = (combined_pre != combined_post).astype(np.float32)
+change_map[combined_pre == <span class="num">0</span>] = np.nan   <span class="comment"># 掩掉背景（仅显示肿瘤区内变化）</span>
+
+<span class="comment"># 三列布局</span>
+panels = [
+    (arr_pre[z],   combined_pre[z],   cmap_h,  <span class="str">"Pre-treatment Habitat"</span>),
+    (arr_post[z],  combined_post[z],  cmap_h,  <span class="str">"Post-treatment Habitat"</span>),
+    (arr_pre[z],   change_map[z],     <span class="str">"Reds"</span>, <span class="str">"Habitat Change Map"</span>),
+]</code></pre>
+
+<p><strong>输出目录</strong>：<code>habitat_viz/p{id}_habitat_delta.png</code></p>
+
+<!-- 6.4 Cohort -->
+<h3 id="hab-cohort">6.4 <code>plot_cohort_habitat_consistency</code> <span class="badge-new">NEW</span></h3>
+
+<div class="fn-sig">plot_cohort_habitat_consistency(all_patient_ids: List[str], k: int, override_config: dict = None) → Optional[str]</div>
+
+<p><strong>目的</strong>：验证 <code>cohort_mode=True</code> 时，相同 Habitat 编号在不同患者中代表相同组织表型（跨患者语义一致性）。<br>
+<strong>输出</strong>：N×K 网格，行=患者，列=Habitat 编号，每格=该患者该 Habitat 的轴位中心切片 overlay。</p>
+
+<div class="warn">
+<b>注意</b><br>
+该函数应在全队列所有患者均处理完毕后调用（<code>run_visualization(run_cohort_panel=True)</code>），而非逐患者调用。患者数量 N 较大时输出图像会较长，建议保存为 PDF 格式（<code>override_config={"save_format": "pdf"}</code>）。
+</div>
+
+<pre><code><span class="comment"># 调用示例</span>
+<span class="fn">plot_cohort_habitat_consistency</span>(
+    all_patient_ids=[<span class="str">"001"</span>, <span class="str">"002"</span>, <span class="str">"003"</span>, ...],
+    k=<span class="num">3</span>,
+    override_config={
+        <span class="str">"cohort_panel_cell_size"</span>: (<span class="num">3</span>, <span class="num">3</span>),
+        <span class="str">"save_format"</span>: <span class="str">"pdf"</span>,          <span class="comment"># 推荐 PDF，患者多时不失真</span>
+    }
+)</code></pre>
+
+<p><strong>输出</strong>：<code>habitat_viz/pcohort_habitat_consistency.png/pdf</code></p>
+
+<!-- 6.5 t-SNE -->
+<h3 id="hab-tsne">6.5 <code>plot_habitat_feature_space</code>（t-SNE）<span class="badge-new">NEW</span></h3>
+
+<div class="fn-sig">plot_habitat_feature_space(patient_id: str, feature_matrix: np.ndarray, labels: np.ndarray, override_config: dict = None) → Optional[str]</div>
+
+<p><strong>目的</strong>：在高维特征空间中验证 Habitat 分离度，是论文 Supplementary 中展示聚类质量的标准图。<br>
+<strong>输出</strong>：2D t-SNE 散点图，按 Habitat 标签着色，支持随机下采样（默认最多 5000 体素）。</p>
+
+<div class="note">
+<b>调用时机</b><br>
+该函数需要 <code>feature_matrix</code>（归一化后的体素级特征矩阵）和 <code>labels</code>（聚类标签），建议直接在 <code>habitat.py</code> 的聚类步骤完成后调用，避免重新计算特征。
+</div>
+
+<pre><code><span class="comment"># 在 habitat.py 中集成</span>
+<span class="kw">from</span> visualize_pipeline <span class="kw">import</span> plot_habitat_feature_space
+
+<span class="comment"># ... 聚类完成后 ...</span>
+<span class="fn">plot_habitat_feature_space</span>(
+    patient_id=<span class="str">"001"</span>,          <span class="comment"># 或 "cohort"（全队列池化特征）</span>
+    feature_matrix=X_scaled,    <span class="comment"># (N_voxels, N_features)，已归一化</span>
+    labels=kmeans.labels_,      <span class="comment"># (N_voxels,)</span>
+    override_config={
+        <span class="str">"tsne_perplexity"</span>: <span class="num">50</span>,   <span class="comment"># 样本多时可适当增大</span>
+        <span class="str">"tsne_max_voxels"</span>: <span class="num">8000</span>,
+    }
+)
+
+<span class="comment"># 依赖：scikit-learn（pip install scikit-learn）</span>
+<span class="comment"># 若未安装，函数会 logger.error 并 return None，不影响其他流程</span></code></pre>
+
+<p><strong>输出</strong>：<code>habitat_viz/p{id}_habitat_tsne.png</code></p>
+
+<!-- ════════════════════════════════════
+     7. 批量运行
+════════════════════════════════════ -->
+<h2 class="section" id="batch">7. <code>run_visualization</code> 批量入口</h2>
+
+<div class="fn-sig">run_visualization(patient_ids=None, stages=None, override_config=None,
+                  run_habitat_intensity=True, run_habitat_delta=True,
+                  run_cohort_panel=False, cohort_k=3)</div>
+
+<table>
+<tr><th>参数</th><th>类型</th><th>默认值</th><th>说明</th></tr>
+<tr><td><code>patient_ids</code></td><td>List[str] | None</td><td>None</td><td>None = 自动发现（sorted 排序）</td></tr>
+<tr><td><code>stages</code></td><td>List[str] | None</td><td>None</td><td>None = 使用全局 STAGES</td></tr>
+<tr><td><code>override_config</code></td><td>dict | None</td><td>None</td><td>临时覆盖 VIZ_CONFIG 参数</td></tr>
+<tr><td><code>run_habitat_intensity</code></td><td>bool</td><td>True</td><td>同时生成强度分布图</td></tr>
+<tr><td><code>run_habitat_delta</code></td><td>bool</td><td>True</td><td>同时生成 Delta 对比图</td></tr>
+<tr><td><code>run_cohort_panel</code></td><td>bool</td><td>False</td><td>生成全队列一致性面板（全部完成后调用）</td></tr>
+<tr><td><code>cohort_k</code></td><td>int</td><td>3</td><td>全队列面板的 K 值</td></tr>
+</table>
+
+<!-- ════════════════════════════════════
+     8. 使用方式
+════════════════════════════════════ -->
+<h2 class="section" id="usage">8. 使用方式</h2>
+
+<h4>方式一：直接运行（最常用）</h4>
+<pre><code><span class="comment"># 修改脚本顶部 VIZ_CONFIG 后直接运行</span>
+python visualize_pipeline.py</code></pre>
+
+<h4>方式二：notebook 或其他脚本中导入（推荐调试）</h4>
+<pre><code><span class="kw">from</span> visualize_pipeline <span class="kw">import</span> run_visualization, plot_habitat_overlay
+
+<span class="comment"># 只跑前 3 个患者的 registration + habitat</span>
+<span class="fn">run_visualization</span>(
+    patient_ids=[<span class="str">"001"</span>, <span class="str">"002"</span>, <span class="str">"003"</span>],
+    stages=[<span class="str">"registration"</span>, <span class="str">"habitat"</span>],
+    run_cohort_panel=<span class="kw">True</span>,
+    cohort_k=<span class="num">3</span>,
+)
+
+<span class="comment"># 单函数调用 + 临时覆盖（论文图 300 dpi）</span>
+<span class="fn">plot_habitat_overlay</span>(
+    patient_id=<span class="str">"001"</span>,
+    override_config={<span class="str">"dpi"</span>: <span class="num">300</span>, <span class="str">"colormap_habitat"</span>: <span class="str">"Set2"</span>}
+)</code></pre>
+
+<h4>方式三：集成到 pipeline.py debug 模式（生产推荐）</h4>
+<pre><code><span class="kw">from</span> visualize_pipeline <span class="kw">import</span> (
+    plot_preproc_qc, plot_registration_qc,
+    plot_habitat_overlay, plot_habitat_intensity_distribution,
+)
+
+<span class="kw">def</span> <span class="fn">process_single_patient</span>(pid, debug=<span class="kw">False</span>):
+    <span class="comment"># ... 预处理 ...</span>
+    <span class="kw">if</span> debug:
+        <span class="fn">plot_preproc_qc</span>(pid, <span class="str">"pre"</span>)
+        <span class="fn">plot_preproc_qc</span>(pid, <span class="str">"post"</span>)
+
+    <span class="comment"># ... 配准 ...</span>
+    <span class="kw">if</span> debug:
+        <span class="fn">plot_registration_qc</span>(pid)
+
+    <span class="comment"># ... Habitat 划分 ...</span>
+    <span class="kw">if</span> debug:
+        <span class="fn">plot_habitat_overlay</span>(pid)
+        <span class="fn">plot_habitat_intensity_distribution</span>(pid)</code></pre>
+
+<!-- ════════════════════════════════════
+     9. 实施路线图
+════════════════════════════════════ -->
+<h2 class="section" id="roadmap">9. 实施路线图</h2>
+
+<table>
+<tr><th>阶段</th><th>内容</th><th>工作量</th><th>价值</th><th>v2.0 状态</th></tr>
+<tr>
+    <td>Phase 1</td>
+    <td>Bug 修复（BUG-1/2/3）+ 预处理/配准/Habitat 基础 QC</td>
+    <td>低</td>
+    <td class="td-red">最高</td>
+    <td class="td-green">✓ 已完成</td>
+</tr>
+<tr>
+    <td>Phase 2</td>
+    <td>Habitat 强度分布图 + Delta pre/post 对比图</td>
+    <td>低</td>
+    <td class="td-red">高</td>
+    <td class="td-green">✓ 已完成</td>
+</tr>
+<tr>
+    <td>Phase 3</td>
+    <td>全队列一致性面板 + t-SNE 特征空间图</td>
+    <td>中</td>
+    <td class="td-amber">中</td>
+    <td class="td-green">✓ 已完成</td>
+</tr>
+<tr>
+    <td>Phase 4</td>
+    <td>Deformation magnitude 场可视化（配准质量进阶）</td>
+    <td>中</td>
+    <td class="td-amber">中</td>
+    <td>待实现</td>
+</tr>
+<tr>
+    <td>Phase 5</td>
+    <td>多页 PDF 报告自动生成（reportlab / fpdf2）</td>
+    <td>中</td>
+    <td class="td-amber">中</td>
+    <td>待实现</td>
+</tr>
+<tr>
+    <td>Phase 6</td>
+    <td>UMAP 替代 t-SNE（更快速，支持大规模队列）</td>
+    <td>低</td>
+    <td>低</td>
+    <td>可选扩展</td>
+</tr>
+</table>
+
+<!-- ════════════════════════════════════
+     10. 附录
+════════════════════════════════════ -->
+<h2 class="section" id="appendix">10. 附录</h2>
+
+<h3>输出目录规范</h3>
+<div class="flow">OUTPUT_ROOT/
+└── qc_reports/
+    └── viz/
+        ├── preproc_viz/
+        │   ├── p001_preproc_pre.png
+        │   └── p001_preproc_post.png
+        ├── registration_viz/
+        │   └── p001_registration_qc.png
+        └── habitat_viz/
+            ├── p001_habitat_overlay.png
+            ├── p001_habitat_intensity_dist.png     ← NEW
+            ├── p001_habitat_delta.png              ← NEW
+            ├── pcohort_habitat_consistency.png     ← NEW（全队列）
+            └── p001_habitat_tsne.png               ← NEW</div>
+
+<h3>函数快速参考</h3>
+<table>
+<tr><th>函数</th><th>用途</th><th>新/修复</th></tr>
+<tr><td><code>plot_preproc_qc</code></td><td>预处理 3 视图 + mask contour</td><td class="td-red">BUG-1/3 修复</td></tr>
+<tr><td><code>plot_registration_qc</code></td><td>Fixed / Registered / Diff + warped mask</td><td class="td-red">BUG-2 修复</td></tr>
+<tr><td><code>plot_habitat_overlay</code></td><td>基线图像 + 彩色 Habitat + 体积标注</td><td class="td-red">BUG-3 修复</td></tr>
+<tr><td><code>plot_habitat_intensity_distribution</code></td><td>逐 Habitat 强度小提琴图</td><td class="td-green">NEW</td></tr>
+<tr><td><code>plot_habitat_delta</code></td><td>Pre/Post 并排对比 + 变化图</td><td class="td-green">NEW</td></tr>
+<tr><td><code>plot_cohort_habitat_consistency</code></td><td>N×K 全队列一致性面板</td><td class="td-green">NEW</td></tr>
+<tr><td><code>plot_habitat_feature_space</code></td><td>t-SNE 特征空间散点图</td><td class="td-green">NEW</td></tr>
+<tr><td><code>run_visualization</code></td><td>批量入口（自动发现患者）</td><td>更新参数</td></tr>
+</table>
+
+<h3>依赖库</h3>
+<table>
+<tr><th>库</th><th>用途</th><th>必选</th></tr>
+<tr><td><code>SimpleITK</code></td><td>NIfTI 读取、spacing 提取</td><td class="td-red">必选</td></tr>
+<tr><td><code>numpy</code></td><td>数组计算</td><td class="td-red">必选</td></tr>
+<tr><td><code>matplotlib</code></td><td>所有可视化输出</td><td class="td-red">必选</td></tr>
+<tr><td><code>scikit-learn</code></td><td>t-SNE（仅 <code>plot_habitat_feature_space</code>）</td><td class="td-amber">可选</td></tr>
+</table>
+
+<h3>颜色方案参考</h3>
+<table>
+<tr><th>场景</th><th>推荐 colormap</th><th>备注</th></tr>
+<tr><td>Habitat overlay（默认）</td><td><code>tab10</code></td><td>10 色清晰区分，适合 K≤8</td></tr>
+<tr><td>Habitat overlay（色盲友好）</td><td><code>Set2</code> / <code>Paired</code></td><td>论文投稿推荐</td></tr>
+<tr><td>差异图（配准 Row-1 第三列）</td><td><code>RdBu_r</code></td><td>正负对称，零值为白色</td></tr>
+<tr><td>变化图（Delta change map）</td><td><code>Reds</code></td><td>仅显示变化区域</td></tr>
+<tr><td>Mask contour</td><td>红色 <code>#ff0000</code></td><td>alpha=0.85，linewidth=1.8</td></tr>
+<tr><td>灰度底图</td><td><code>gray</code>，2~98 percentile</td><td>始终使用 robust percentile</td></tr>
+</table>
+
+<footer>
+    Delta 生境影像组学可视化指南 v2.0 &nbsp;|&nbsp;
+    Jinshan Hospital, Fudan University · Radiology<br>
+    BUG-1/2/3 修复 · 新增 4 种 Habitat 可视化 · 软编码置顶 · 2026-06
+</footer>
+
+</main>
+</div>
+
+<script>
+// 侧边栏高亮当前节
+const links = document.querySelectorAll("nav.toc a");
+const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            links.forEach(l => l.classList.remove("active"));
+            const active = document.querySelector(`nav.toc a[href="#${entry.target.id}"]`);
+            if (active) active.classList.add("active");
+        }
+    });
+}, { rootMargin: "-20% 0px -70% 0px" });
+document.querySelectorAll("h2.section, h3[id]").forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
