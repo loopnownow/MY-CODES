@@ -382,7 +382,12 @@ class Handler(BaseHTTPRequestHandler):
             self._err(403, "origin not allowed")
             return False
         if not entry.dir_ok():
-            self._err(403, f"registration stale: {entry.project}")
+            self._err(
+                403,
+                f"registration stale: {entry.project}"
+                f"（项目夹已移动；运行 console.py register --project {entry.project} 重锚，"
+                f"或用 tools/orchestrator/move_project.py 搬家）",
+            )
             return False
         if not entry.allows("read"):
             self._err(403, f"scope denied: {entry.project}")
