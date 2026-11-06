@@ -1,0 +1,16 @@
+# habitat-pipeline (t1727u)
+
+Imported from `Downloads/Desktop.7z` (2026-11-07). **Not** part of the stats engine under `modules/` — keep here under `tools/habitat-pipeline/`.
+
+## Layout
+- `habitat_pipeline/` — multi-sequence habitat pipeline (config, load, preproc, register, habitat, radiomics, test)
+- `delta_habitat_pipeline/` — delta/timepoint habitat pipeline (paired timepoints)
+- `utility/` — helpers (ROI expand, matching, viz, LASSO helper, ROC line, log reader, validate_delta_habitat, …)
+
+## Dedup note
+Compared against MY-CODES `modules/` and `pre-submit/lxf_PP` by filename + SHA-256.
+- No exact SHA matches.
+- Same *basename* only: `pipeline.py` / `radiomics.py` exist under `modules/` but are a different package (stats console engine) — **do not merge into modules/**.
+
+## lxf_PP
+Related note parked at `D:\0Grok\pre-submit\lxf_PP\ref\code-gates\Desktop7z-habitat-pipeline-t1727u.md`.
