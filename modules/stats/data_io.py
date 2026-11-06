@@ -1644,7 +1644,12 @@ def _map_series_by_dict(s: pd.Series, value_map: dict, col_name: str) -> pd.Seri
 
 
 def _apply_outcome_binarize(clin: pd.DataFrame) -> pd.DataFrame:
-    """按 OUTCOME_BINARIZE 将当前结局列编码为 0/1（在 rename→Group 之前）。"""
+    """按 OUTCOME_BINARIZE 将当前结局列编码为 0/1（在 rename→Group 之前）。
+
+    与 GROUP_KEEP 同用时让路：GROUP_KEEP 先按标签筛行，0/1 由
+    ``_encode_group_column`` 在筛后生成；此时若预二值化遇到未映射水平（如只比
+    两组的课题里多出的 HC），不报错、保持原标签，交由筛行丢弃。
+    """
     out = clin.copy()
     gsrc = str(getattr(cfg, "GROUP_SOURCE_COL", "") or "").strip()
     bmap_all = getattr(cfg, "OUTCOME_BINARIZE", None) or {}
@@ -1658,6 +1663,18 @@ def _apply_outcome_binarize(clin: pd.DataFrame) -> pd.DataFrame:
         bmap.update(rmap)
     bmap.update(extra)
     before = out[gsrc].value_counts(dropna=False)
+    keep = [
+        str(x).strip()
+        for x in (getattr(cfg, "GROUP_KEEP", None) or [])
+        if str(x).strip()
+    ]
+    if keep:
+        print(
+            f"  Outcome binarize [{gsrc}]: 跳过 — GROUP_KEEP={keep} 先按标签筛行，"
+            f"0/1 由 _encode_group_column 生成（raw levels: {dict(before)}）",
+            flush=True,
+        )
+        return out
     try:
         out[gsrc] = _map_series_by_dict(out[gsrc], bmap, gsrc)
     except ValueError:
