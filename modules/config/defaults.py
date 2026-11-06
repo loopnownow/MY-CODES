@@ -52,6 +52,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # 缺键=开。只决定结果 HTML 是否写出这两节，不改队列、拆分和建模。
     "DO_BASELINE_ALL": True,
     "DO_BASELINE_TRAIN_TEST": True,
+    # 缺键=关。开=把结果页里的每一张表另存为 {结果夹}/Tables{子项目}.xlsx（一表一 sheet）。
+    "SAVE_TABLES": False,
     "GROUP_DISPLAY_NEG": "",
     "EXTERNAL_TESTS": [],
     "DO_EXCLUDE_SAMPLES": False,
@@ -128,10 +130,17 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "ICC_REQUIRE_ROW": False,
     "DO_COMBINED_MODEL": True,
     "DO_NOMOGRAM": True,
+    # 列线图自变量来源：post=线性拟合后分数（默认）；pre=线性拟合前入选特征；
+    # both=分数 + 拟合前特征一起（共线，仅探索用）。
+    "NOMOGRAM_SOURCE": "post",
     "DO_CALIBRATION": True,
     "ROC_MV_P_THRESHOLD": 0.05,
     "FORCE_CLIN_FOR_ROC": [],
     "ROC_PLOT_EXCLUDE": [],
+    # ROC 图：画线性拟合前的入选特征（临床 + 组学各一条）；分数曲线另由下一条控制。
+    "ROC_PLOT_FEATURES": True,
+    # ROC 图：画分数曲线（Clinical / RadScore / 各块分数）。默认不画。
+    "ROC_PLOT_SCORE_CURVES": False,
     "DO_DCA": True,
     "DCA_CURVES": ["Clinical", "RadScore", "Combined"],
     "DO_NRI": False,
@@ -211,10 +220,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "TEXT_ENCODE_MAX_LEVELS": 5,
     # 组学块里的文本列也走文本编码（开=参与建模；关=只吃数值列）。
     "ENCODE_BLOCK_TEXT": True,
-    # 组学 Logistic 选出特征后再做一次原始尺度 OLS，RadScore 用 OLS 系数。
-    # 关（默认）= 仍用 logistic log-odds 系数；LASSO 本来就是 OLS，不受此键影响。
-    "RAD_SCORE_LINEAR": False,
-    # 临床块入选变量后用原始尺度 OLS 拟合 Clinical 分数（开=默认）。
+    # 组学 Logistic 选出特征后再做一次原始尺度 OLS，RadScore 用 OLS 系数（站立口径，无开关）。
+    # LASSO 本来就是 OLS，不受此键影响；旧 ini 写 false 会被强制改回 true。
+    "RAD_SCORE_LINEAR": True,
+    # 临床块入选变量后用原始尺度 OLS 拟合 Clinical 分数（站立口径，无开关）。
     "CLIN_SCORE_LINEAR": True,
     # Combined：空 = 全部块分数进联合模型；COMBINED_EXCLUDE 手动剔除（只影响联合）。
     "COMBINED_BLOCKS": [],
@@ -236,6 +245,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "FIGURE_PANEL_MEDIATION_NCOLS": 2,
     "FIGURE_PANEL_LABEL_POS": "lower_left",
     "FIGURE_PANEL_LABELS": None,
+    # 图内标题默认关：队列与令牌（train / ext_Validation）交给图注，不写进图里。
+    "FIGURE_PANEL_TITLES": False,
     "FIGURE_PANEL_GAP_PX": 8,
     "FIG_FONT_SIZE": 11.0,
     "FIG_FONT_FAMILY": "Arial",

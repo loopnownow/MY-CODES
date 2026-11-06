@@ -61,7 +61,7 @@
     <div id="formRoot"></div>
     <div id="grpCardPark" hidden>
     <div class="card" id="grpCard">
-      <h2 data-tip="自动识别当前列的全部组。每一行：组（下拉）→ 展示名 → 阴性 / 阳性 / 不选。表头和图例用展示名。阳性=1，阴性=0。不选的组仍留在总表，不进二分类。">分组 <label class="title-sw" title="关=结果不写总表。不影响队列、拆分和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="doBaselineAll" data-key="DO_BASELINE_ALL"/> 总表</label> <label class="title-sw" title="关=结果不写 Table 1（Train vs Test）。不影响队列、拆分和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="doBaselineTt" data-key="DO_BASELINE_TRAIN_TEST"/> Table 1</label> <span class="inh" id="grpInherit" hidden>用默认</span> <button type="button" class="unov" id="grpUnov" hidden>恢复默认</button></h2>
+      <h2 data-tip="自动识别当前列的全部组。每一行：组（下拉）→ 展示名 → 阴性 / 阳性 / 不选。表头和图例用展示名。阳性=1，阴性=0。不选的组仍留在总表，不进二分类。">分组 <label class="title-sw" title="关=结果不写总表。不影响队列、拆分和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="doBaselineAll" data-key="DO_BASELINE_ALL"/> 总表</label> <label class="title-sw" title="关=结果不写 Table 1（Train vs Test）。不影响队列、拆分和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="doBaselineTt" data-key="DO_BASELINE_TRAIN_TEST"/> Table 1</label> <label class="title-sw" title="关=只出结果页，不落表文件（默认）。开=把结果页里的每张表另存为 Tables{子项目}.xlsx，一表一 sheet。不影响 HTML、队列和建模。" onclick="event.stopPropagation()"><input type="checkbox" id="saveTables" data-key="SAVE_TABLES"/> 保存表格</label> <span class="inh" id="grpInherit" hidden>用默认</span> <button type="button" class="unov" id="grpUnov" hidden>恢复默认</button></h2>
       <div class="grp-grid">
         <div id="grpSubBlock">
           <div class="row"><label class="k" data-tip="亚组列，可空白。空白=不做分层评估。选 histology 等时：主模型仍用全队列结局训练；检出水平只决定评估哪些层。不重训。">亚组</label>

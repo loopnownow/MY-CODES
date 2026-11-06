@@ -1079,7 +1079,9 @@ def _rad_logit_candidates(
         f"  Candidate gate: {rule} < {alpha:g} "
         f"(enabled corrections must all pass; n pass = {len(out)})"
     )
-    return out
+    from modules.stats.clinical import _vif_exclude
+
+    return _vif_exclude(frame, out)
 
 
 def _logistic_pool_note(
@@ -1115,7 +1117,8 @@ def _logistic_pool_note(
         )
     parts = [
         entry
-        + f"VIF is reported for collinearity warning (warn ≥ {warn:g}) and does not exclude candidates. "
+        + f"VIF ≥ {warn:g} was used to exclude radiomics candidates (highest VIF removed first, "
+        "iteratively) and is therefore an entry criterion, not only a collinearity flag. "
         "Complete-separation terms do not enter. "
         "Features were median-imputed and z-scored on the training set before regression; "
         "odds ratios are per 1 training SD."
@@ -1379,6 +1382,16 @@ def score_display_name(name: str) -> str:
     return SCORE_DISPLAY.get(str(name), str(name))
 
 
+# 结果图内的显示名（结果表仍用内部名 Combined）
+FIG_LABEL_OVERRIDES = {"Combined": "Nomogram"}
+
+
+def fig_label(name: str) -> str:
+    """图内显示名：先查 FIG_LABEL_OVERRIDES（按原名或展示名），未命中回落 score_display_name。"""
+    disp = score_display_name(name)
+    return FIG_LABEL_OVERRIDES.get(str(name)) or FIG_LABEL_OVERRIDES.get(disp) or disp
+
+
 def selected_feature_names(result: Optional[RadiomicsResult]) -> List[str]:
     if result is None:
         return []
@@ -1572,11 +1585,11 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
                            group_name: str = "") -> RadiomicsResult:
     """组学 Logistic 筛选。预处理与 LASSO 相同，入选规则与临床筛选相同，界值独立。
 
-    默认：单因素 p < RAD_LOGIT_UNI_P、无完全分离 → 候选池（VIF 仅警告，不剔除）。
-    DO_FDR / DO_FWER 开启时：用校正 p 门控（开启项 AND；α = RAD_LOGIT_UNI_P），
-    并在单因素表写出 FDR P / FWER P 与 Pass 标记。
+    默认：单因素 p < RAD_LOGIT_UNI_P、无完全分离 → 候选池；候选池内 VIF ≥
+    VIF_THRESHOLD_WARN 逐个剔除（硬门）。DO_FDR / DO_FWER 开启时：用校正 p 门控
+    （开启项 AND；α = RAD_LOGIT_UNI_P），并在单因素表写出 FDR P / FWER P 与 Pass 标记。
     入选 = 候选池多因素 p < RAD_LOGIT_MV_P。
-    RadScore = 入选特征的 Logistic 线性预测值（训练集标准化后的 log-odds）。
+    RadScore = 入选特征的 OLS 线性预测值（原始尺度，与临床分数同口径）。
     """
     from modules.utils import dry_run as _dry
     if _dry.exit_after_plan("radiomics_logistic", [
@@ -1722,7 +1735,7 @@ def run_radiomics_logistic(full_rad: pd.DataFrame, y_group: np.ndarray,
             firth_uni, firth_mv,
         )
 
-    linear_on = _cfg_flag("RAD_SCORE_LINEAR", False)
+    linear_on = True  # 线性拟合开关已取消：筛选后一律原始尺度 OLS（LASSO 本来即 OLS）
     ols_fit = None
     if linear_on:
         betas, intercept, ols_fit = _fit_linear_score(full_rad, y_group, final_feat, params)

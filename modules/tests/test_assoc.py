@@ -146,7 +146,9 @@ def test_sections_place_new_switches():
     assert SECTION_OF["TEXT_ENCODE_AUTO"][0] == "encode"
     assert SECTION_OF["TEXT_ENCODE_MAX_LEVELS"][0] == "encode"
     assert SECTION_OF["ENCODE_BLOCK_TEXT"][0] == "encode"
-    assert SECTION_OF["RAD_SCORE_LINEAR"][0] == "radlog"
+    # 线性拟合开关已取消：控制台不再有这两个分节项。
+    assert "RAD_SCORE_LINEAR" not in SECTION_OF
+    assert "CLIN_SCORE_LINEAR" not in SECTION_OF
     assert SECTION_OF["SKIP_CLIN_FEATURES"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CONTINUOUS"][0] == "clinprep"
     assert SECTION_OF["CLIN_FORCE_CATEGORICAL"][0] == "clinprep"

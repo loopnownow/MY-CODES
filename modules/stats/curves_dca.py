@@ -74,7 +74,7 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     ]):
         return None  # type: ignore[return-value]
     assert len(model_list) >= 1
-    from modules.stats.radiomics import score_display_name
+    from modules.stats.radiomics import score_display_name, fig_label
 
     y = np.asarray(y).astype(int)
     prev = float(np.mean(y == 1))
@@ -111,7 +111,7 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     for nm in names:
         sub = dca_df[dca_df["Model"] == nm]
         ax.plot(sub["threshold"], sub["NB"], color=model_colors[nm], linewidth=2.1,
-                linestyle="solid", label=score_display_name(nm), solid_capstyle="round", zorder=3)
+                linestyle="solid", label=fig_label(nm), solid_capstyle="round", zorder=3)
     sub = dca_df[dca_df["Model"] == "Treat All"]
     ax.plot(sub["threshold"], sub["NB"], color=model_colors["Treat All"], linewidth=1.4,
             linestyle="--", label="Treat All", zorder=2)
@@ -124,7 +124,7 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     ax.set_ylim(-0.05, (ymax + 0.06) if np.isfinite(ymax) else 1.0)
     ax.set_xlabel("Threshold Probability")
     ax.set_ylabel("Net Benefit")
-    ax.set_title(f"Decision Curve — {dataset_label}")
+    ax.set_title(cfg.panel_title(f"Decision Curve — {dataset_label}"))
     fs = cfg.FIG_FONT_SIZE
     ax.legend(loc="upper right", fontsize=fs, framealpha=0.95, borderpad=0.6)
     cfg.apply_clean_theme(ax, grid=True, legend=True)

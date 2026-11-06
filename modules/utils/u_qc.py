@@ -483,8 +483,18 @@ def _series_desc(s: pd.Series) -> Dict[str, Any]:
 
 
 def _qc_fingerprint(xlsx: Path, settings: Dict[str, Any]) -> str:
-    """QC 新鲜度指纹：数据文件（名/大小/mtime）+ 影响 QC 的设置。"""
+    """QC 新鲜度指纹：数据文件（名/大小/mtime）+ 外验文件 + 影响 QC 的设置。"""
     st = xlsx.stat()
+    ext_bits = []
+    for spec in _external_specs_from_settings(settings):
+        p = Path(str(spec.get("file") or ""))
+        if not p.is_absolute():
+            p = xlsx.parent / p
+        try:
+            est = p.stat()
+            ext_bits.append((str(p), int(est.st_size), int(est.st_mtime)))
+        except OSError:
+            ext_bits.append((str(p), -1, -1))
     payload = {
         "file": str(xlsx),
         "size": int(st.st_size),
@@ -496,6 +506,7 @@ def _qc_fingerprint(xlsx: Path, settings: Dict[str, Any]) -> str:
         "nin": settings.get("SKIP_CLIN_FEATURES"),
         "oc": settings.get("OUTCOME_COLS"),
         "blocks": settings.get("MODALITY_BLOCKS"),
+        "ext": ext_bits,
     }
     blob = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]
@@ -780,39 +791,20 @@ def _feat_like(name: str) -> bool:
     return s.startswith(("h0_", "h1_", "h2_", "h3_", "original_", "wavelet_", "log-", "log_"))
 
 
-def write_project_data_qc(
+def _project_qc_body(
     input_xlsx: str | Path,
     settings: Dict[str, Any] | None = None,
-    out_dir: str | Path | None = None,
-    out_html: str | Path = "qc.html",
     label: str | None = None,
 ) -> Dict[str, Any]:
-    """整表 QC：临床 / 组学 / 对齐 / ICC / 影像质控。
-    主队列写 ref/qc.html。外验走 write_external_qc_reports（ref/qc-ext-*.html）。
+    """整表 QC 的正文：clinical / radiomics / 对齐 / ICC / 影像质控。
+
+    返回 {"title", "kind", "parts", **info}；不写盘（由 write_project_data_qc /
+    write_merged_qc 负责落 ref/qc.html）。
     """
-    from modules.utils import dry_run as _dry
     settings = settings or {}
     xlsx = Path(input_xlsx)
     if not xlsx.is_absolute():
         xlsx = _project_root() / xlsx
-    proj = Path(out_dir) if out_dir else _project_root()
-    if proj.name.lower() == "ref":
-        proj = proj.parent
-    if not proj.is_absolute():
-        proj = _project_root() / proj
-    if _dry.exit_after_plan("u_qc", [
-        f"xlsx={xlsx}",
-        f"out_dir={proj}",
-        f"out_html={out_html}",
-        "write ref/qc.html (skipped)",
-    ]):
-        return {"ok": True, "dry_run": True, "xlsx": str(xlsx), "out_dir": str(proj)}
-    relocate_legacy_qc_html(proj)
-    out = Path(out_html)
-    if out.is_absolute() and out.parent.name.lower() == "ref":
-        pass
-    else:
-        out = resolve_qc_html_path(out_html, proj)
 
     xl = pd.ExcelFile(xlsx)
     sheets = [str(s) for s in xl.sheet_names]
@@ -1050,28 +1042,95 @@ def write_project_data_qc(
 
     parts.extend(_block_qc_sections(xl, sheets, settings, cdf, clin_id))
 
-    out.parent.mkdir(parents=True, exist_ok=True)
-    fp = _qc_fingerprint(xlsx, settings)
-    body = _qc_html_shell(title, parts)
-    body = f"<!-- qc-fingerprint: {fp} -->\n" + body
-    out.write_text(body, encoding="utf-8")
-    if block_info:
-        blk_txt = ", ".join(f"{n} {i}/{t}" for n, i, t in block_info)
-        print(
-            f"  ✓ Project data QC → {out}  "
-            f"(clin={len(cdf)}; blocks in-clin/ids: {blk_txt})"
-        )
-    else:
-        print(f"  ✓ Project data QC → {out}  (clin={len(cdf)} rad={len(rdf)} overlap={len(overlap)})")
     return {
-        "html": str(out),
+        "title": title,
+        "kind": kind,
+        "parts": parts,
         "n_clin": int(len(cdf)),
         "n_rad": int(len(rdf)),
         "n_overlap": int(len(overlap)),
         "n_qc": int(len(qdf)),
         "sheets": sheets,
         "label": tag,
+        "block_info": block_info,
     }
+
+
+def _qc_out_path(out_html: str | Path, proj: str | Path | None = None) -> Path:
+    """QC HTML 落点：显式绝对 ref/ 路径照用，否则落 <proj>/ref/<文件名>。"""
+    proj_path = Path(proj) if proj else _project_root()
+    if proj_path.name.lower() == "ref":
+        proj_path = proj_path.parent
+    if not proj_path.is_absolute():
+        proj_path = _project_root() / proj_path
+    out = Path(out_html)
+    if out.is_absolute() and out.parent.name.lower() == "ref":
+        return out
+    return resolve_qc_html_path(out_html, proj_path)
+
+
+def _qc_info(body: Dict[str, Any], out: Path) -> Dict[str, Any]:
+    """body → 对外返回的 dict（带 html 路径）。"""
+    return {
+        "html": str(out),
+        "n_clin": body["n_clin"],
+        "n_rad": body["n_rad"],
+        "n_overlap": body["n_overlap"],
+        "n_qc": body["n_qc"],
+        "sheets": body["sheets"],
+        "label": body["label"],
+    }
+
+
+def _print_qc_line(body: Dict[str, Any], out: Path) -> None:
+    block_info = body.get("block_info") or []
+    if block_info:
+        blk_txt = ", ".join(f"{n} {i}/{t}" for n, i, t in block_info)
+        print(
+            f"  ✓ Project data QC → {out}  "
+            f"(clin={body['n_clin']}; blocks in-clin/ids: {blk_txt})"
+        )
+    else:
+        print(
+            f"  ✓ Project data QC → {out}  "
+            f"(clin={body['n_clin']} rad={body['n_rad']} overlap={body['n_overlap']})"
+        )
+
+
+def write_project_data_qc(
+    input_xlsx: str | Path,
+    settings: Dict[str, Any] | None = None,
+    out_dir: str | Path | None = None,
+    out_html: str | Path = "qc.html",
+    label: str | None = None,
+) -> Dict[str, Any]:
+    """整表 QC 单文件：临床 / 组学 / 对齐 / ICC / 影像质控 → ref/<out_html>。"""
+    from modules.utils import dry_run as _dry
+
+    xlsx = Path(input_xlsx)
+    if not xlsx.is_absolute():
+        xlsx = _project_root() / xlsx
+    proj = Path(out_dir) if out_dir else _project_root()
+    if proj.name.lower() == "ref":
+        proj = proj.parent
+    if not proj.is_absolute():
+        proj = _project_root() / proj
+    if _dry.exit_after_plan("u_qc", [
+        f"xlsx={xlsx}",
+        f"out_dir={proj}",
+        f"out_html={out_html}",
+        "write ref/qc.html (skipped)",
+    ]):
+        return {"ok": True, "dry_run": True, "xlsx": str(xlsx), "out_dir": str(proj)}
+    relocate_legacy_qc_html(proj)
+    body = _project_qc_body(xlsx, settings, label=label)
+    out = _qc_out_path(out_html, proj)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fp = _qc_fingerprint(xlsx, settings or {})
+    page = _qc_html_shell(body["title"], body["parts"])
+    out.write_text(f"<!-- qc-fingerprint: {fp} -->\n{page}", encoding="utf-8")
+    _print_qc_line(body, out)
+    return _qc_info(body, out)
 
 
 def _pick_named_sheet(sheets: list[str], *cands: str) -> str:
@@ -1087,6 +1146,122 @@ def _pick_named_sheet(sheets: list[str], *cands: str) -> str:
         if hit:
             return hit
     return ""
+
+
+def write_merged_qc(
+    input_xlsx: str | Path,
+    settings: Dict[str, Any] | None = None,
+    *,
+    out_dir: str | Path | None = None,
+    out_html: str | Path = "qc.html",
+    input_dir: str | Path | None = None,
+) -> Dict[str, Any]:
+    """主表 + 全部 EXTERNAL_TESTS 的 QC 合成一份 ref/qc.html（覆盖原文件）。
+
+    每个外验自成一节（外验节内不再重复 h1），节前给出文件与 cln/rad 例数。
+    """
+    from modules.utils import dry_run as _dry
+
+    settings = dict(settings or {})
+    xlsx = Path(input_xlsx)
+    if not xlsx.is_absolute():
+        xlsx = _project_root() / xlsx
+    proj = Path(out_dir) if out_dir else _project_root()
+    if proj.name.lower() == "ref":
+        proj = proj.parent
+    if not proj.is_absolute():
+        proj = _project_root() / proj
+    specs = _external_specs_from_settings(settings)
+    if _dry.exit_after_plan("u_qc", [
+        f"xlsx={xlsx}",
+        f"out_dir={proj}",
+        f"out_html={out_html}",
+        f"externals={[s['name'] for s in specs]}",
+        "write merged ref/qc.html (skipped)",
+    ]):
+        return {"ok": True, "dry_run": True, "xlsx": str(xlsx), "out_dir": str(proj)}
+    relocate_legacy_qc_html(proj)
+    base = Path(input_dir) if input_dir else proj
+
+    main = _project_qc_body(xlsx, settings, label=None)
+    parts: list[str] = [
+        f"<h1>{main['title']}</h1>",
+        f"<p class='muted'>{main['kind']} · 主队列 · {xlsx}</p>",
+        "<p class='muted'>本页含主队列与全部外部验证集：外验各成一节，小节编号与主队列相同。</p>",
+    ]
+    parts.extend(main["parts"][2:])  # 跳过重复的 h1 / 副标题
+    ext_infos: list[dict] = []
+    for spec in specs:
+        name = str(spec["name"])
+        src = Path(str(spec["file"]))
+        if not src.is_absolute():
+            src = base / src
+        parts.append(f"<hr/><h2>External validation — {html.escape(name)}</h2>")
+        if not src.is_file():
+            print(f"  ⚠ external QC [{name}] missing file: {src}")
+            parts.append(f"<p class='err'>找不到外验文件：{html.escape(str(src))}</p>")
+            ext_infos.append({"name": name, "file": str(src), "error": f"missing file: {src}"})
+            continue
+        try:
+            sheets = [str(s) for s in pd.ExcelFile(src).sheet_names]
+        except Exception as e:
+            print(f"  ⚠ external QC [{name}] open failed: {e}")
+            parts.append(f"<p class='err'>外验文件打不开：{html.escape(str(e))}</p>")
+            ext_infos.append({"name": name, "file": str(src), "error": str(e)})
+            continue
+        ext_settings = dict(settings)
+        ext_settings["CLIN_SHEET"] = spec["clin_sheet"]
+        ext_settings["RAD_SHEET"] = spec["rad_sheet"]
+        if spec.get("rad_id_col"):
+            ext_settings["RAD_ID_COL"] = spec["rad_id_col"]
+        ext_settings["QC_SHEET"] = _pick_named_sheet(
+            sheets, spec.get("qc_sheet", ""), settings.get("QC_SHEET"), "qc",
+        )
+        ext_settings["ICC_SHEET"] = _pick_named_sheet(
+            sheets, spec.get("icc_sheet", ""), settings.get("ICC_SHEET"), "icc",
+        )
+        try:
+            one = _project_qc_body(src, ext_settings, label=name)
+        except Exception as e:
+            print(f"  ⚠ external QC [{name}] failed: {e}")
+            parts.append(f"<p class='err'>外验 QC 失败：{html.escape(str(e))}</p>")
+            ext_infos.append({"name": name, "file": str(src), "error": str(e)})
+            continue
+        parts.append(
+            f"<p class='muted'>{html.escape(str(src))} · "
+            f"cln={html.escape(str(spec['clin_sheet']))} · "
+            f"rad={html.escape(str(spec['rad_sheet']))}</p>"
+        )
+        parts.extend(part for part in one["parts"] if not str(part).startswith("<h1>"))
+        ext_infos.append({
+            "name": name,
+            "file": str(src),
+            "n_clin": one["n_clin"],
+            "n_rad": one["n_rad"],
+            "n_overlap": one["n_overlap"],
+        })
+    out = _qc_out_path(out_html, proj)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fp = _qc_fingerprint(xlsx, settings)
+    title = "Project QC (main + external) — " + Path(xlsx).name
+    page = _qc_html_shell(title, parts)
+    out.write_text(f"<!-- qc-fingerprint: {fp} -->\n{page}", encoding="utf-8")
+    _print_qc_line(main, out)
+    if ext_infos:
+        print(
+            "  ✓ 外验 QC 已并入同一份："
+            + "; ".join(
+                f"{e['name']}({e.get('n_clin', '?')} cln / {e.get('n_rad', '?')} rad)"
+                if "error" not in e else f"{e['name']}(error)"
+                for e in ext_infos
+            )
+        )
+    info = _qc_info(main, out)
+    info["external"] = [
+        dict(e, qc_html=qc_html_rel(out.name), html=str(out)) for e in ext_infos
+    ]
+    info["merged"] = True
+    return info
 
 
 def write_external_qc_reports(

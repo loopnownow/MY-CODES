@@ -379,6 +379,22 @@ def figures_on() -> bool:
     return bool(getattr(_S, "DO_FIGURE_PANELS", True))
 
 
+def panel_titles_on() -> bool:
+    """图内标题开关（默认关：队列与 token 交给图注，避免 train / ext_Validation 进图）。
+
+    读 cfg 上的当前值，测试里可 monkeypatch。
+    """
+    from modules import config as _cfg
+    if hasattr(_cfg, "FIGURE_PANEL_TITLES"):
+        return bool(getattr(_cfg, "FIGURE_PANEL_TITLES"))
+    return bool(getattr(_S, "FIGURE_PANEL_TITLES", False))
+
+
+def panel_title(text: str) -> str:
+    """图内标题文本：关闭时返回空串（ax.set_title("") 即不画）。"""
+    return str(text or "") if panel_titles_on() else ""
+
+
 def landmark_roc_on() -> bool:
     """是否跑 Landmark ROC。
 

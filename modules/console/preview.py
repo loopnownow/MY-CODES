@@ -77,6 +77,7 @@ def xlsx_meta(path: Path, sheet: str = "", col: str = "") -> dict[str, Any]:
         "file": str(path),
         "exists": path.is_file(),
         "sheets": [],
+        "sizes": [],
         "columns": [],
         "values": [],
         "sheet": "",
@@ -87,6 +88,15 @@ def xlsx_meta(path: Path, sheet: str = "", col: str = "") -> dict[str, Any]:
     xl = pd.ExcelFile(path)
     sheets = [str(s) for s in xl.sheet_names]
     out["sheets"] = sheets
+    try:
+        from modules.utils.xlsx_sheet import workbook_info
+
+        out["sizes"] = [
+            {"name": str(s["name"]), "n_rows": int(s["n_rows"]), "n_cols": int(s["n_cols"])}
+            for s in workbook_info(path)
+        ]
+    except Exception as e:
+        print(f"  ⚠ sheet sizes unavailable: {e}", flush=True)
     if not sheet:
         return out
     hit = sheet if sheet in sheets else next(
@@ -622,7 +632,7 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
         if meta is None:
             meta = {"name": hit, "n_rows": 0, "n_cols": 0, "columns": [], "missing": {}, "head": []}
             info[hit] = meta
-        if not meta.get("head"):
+        if not meta.get("head") and not meta.get("head_error"):
             try:
                 head_cols = _header(hit)
                 if len(head_cols) <= _PREVIEW_HEAD_MAX_COLS:
@@ -636,8 +646,13 @@ def _preview_one_workbook(data_path: Path, settings: dict[str, Any]) -> dict[str
                     else:
                         info[hit] = _info_from_frame(_frame(hit), hit, max_rows=_PREVIEW_HEAD_ROWS)
                     meta = info[hit]
-            except Exception:
-                pass
+                else:
+                    # 列太多：至少把表头给界面，别只剩「表头没读到」。
+                    meta["columns"] = list(head_cols[:_PREVIEW_HEAD_MAX_COLS])
+            except Exception as e:
+                # 不吞原因：界面会显示 head_error，便于判断是表坏了还是表头真缺失。
+                meta["head_error"] = f"{type(e).__name__}: {e}"
+                print(f"  ⚠ preview head failed [{hit}]: {e}", flush=True)
         return meta
 
     def _role_row(role: str, label: str, sheet: str, id_col: str = "", score: str = "") -> None:

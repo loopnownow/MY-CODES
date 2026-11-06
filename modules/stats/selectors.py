@@ -45,7 +45,11 @@ _PREP_KEYS: Dict[str, str] = {
 
 
 def _param_settings(spec: BlockSpec) -> Dict[str, object]:
-    """块参数/预处理覆盖 → {settings 键: 值}。未知名 raise。"""
+    """块参数/预处理覆盖 → {settings 键: 值}。未知名 raise。
+
+    ``linear`` 已退役（临床 / 组学筛选后一律原始尺度 OLS）：旧 ini 里写着也忽略，
+    只打一行说明，不再允许关掉。
+    """
     out: Dict[str, object] = {}
     for raw_name, value in (spec.prep or {}).items():
         key = _PREP_KEYS.get(str(raw_name).strip().lower())
@@ -57,7 +61,16 @@ def _param_settings(spec: BlockSpec) -> Dict[str, object]:
         out[key] = value
     table = _LASSO_KEYS if spec.method == "lasso" else _LOGIT_KEYS
     for raw_name, value in (spec.params.get(spec.method) or {}).items():
-        key = table.get(str(raw_name).strip().lower())
+        name = str(raw_name).strip().lower()
+        if name == "linear":
+            if value is False:
+                print(
+                    f"  块 {spec.name!r}.{spec.method}.linear=false 已忽略："
+                    "线性拟合开关已取消（恒为原始尺度 OLS）",
+                    flush=True,
+                )
+            continue
+        key = table.get(name)
         if key is None:
             raise ValueError(
                 f"块 {spec.name!r}.{spec.method} 未知参数 {raw_name!r}；允许: "
