@@ -8,7 +8,6 @@ matplotlib.use("Agg")
 from types import SimpleNamespace  # noqa: E402
 
 import numpy as np  # noqa: E402
-import pytest  # noqa: E402
 
 from modules.stats import curves_dca as dca  # noqa: E402
 from modules.stats import curves_roc as roc  # noqa: E402

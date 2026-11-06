@@ -13,7 +13,7 @@ Stage --candidates
     hand-built registry workbook at 0doc/_library/scanner-registry/scanner-parameter-registry.xlsx (restored t1553u; see MY-SKILLS scanner-registry-digest).
 
 Source Word files were archived out of the tree on 2026-10-22: set ODOC_WORD if the
-archive root is not D:/00db/_lab/doc-word.
+archive root differs from the built-in default.
 
 Both stages are read-only with respect to 0doc; output goes to %TEMP%/lab-scratch (SCRATCH_ROOT overrides).
 """

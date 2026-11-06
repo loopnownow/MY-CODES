@@ -38,7 +38,7 @@ SKILLS_ROOT_ENV = "SKILLS_ROOT"
 BANS_REL = Path("05_manuscript") / "base" / "vocab" / "L1" / "ban-terms.yaml"
 # DEL_ROOT: scratch root for the --execute default; D:\0del is the local {DEL} drive, not a lab path.
 DEL_ROOT_ENV = "DEL_ROOT"
-DEL_ROOT_DEFAULT = Path("D:/0del")
+DEL_ROOT_DEFAULT = Path(os.environ.get(DEL_ROOT_ENV) or "D:/0del")
 OUT_SUBDIR = Path("_by-function") / "vocab-harvest-20261027"
 
 

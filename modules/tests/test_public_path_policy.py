@@ -3,6 +3,10 @@
 Allowlist the documented lab exception in modules.console.paths.DEFAULT_GROK_ROOT.
 Everything else under the repo should prefer env / relative / example paths.
 Lab topology SSOT remains MY-SKILLS lab-paths.yaml (do not reinvent here).
+
+2026-11-06 QC: the old LAB_ABS missed the `{RAW}` (`00db`) and `{DEL}` (`0del`) roots
+and the `R&P` workspace, so hardcoded archive paths stayed green. Those roots are
+allowed only on a line that also names an env var (env-overridable default).
 """
 from __future__ import annotations
 
@@ -23,6 +27,12 @@ ALLOW_FILES = {
 # 本机 lab 形状的绝对路径：单反斜杠与 JSON/JS 里的 `\\` 转义写法都要抓住。
 LAB_ABS = re.compile(
     r"[A-Za-z]:\\{1,2}(?:0Grok|Users\\{1,2}[^\\]+\\{1,2}(?:0Grok|Documents\\{1,2}GitHub))",
+    re.I,
+)
+# `{RAW}` / `{DEL}` 根：仅当同一行点明环境变量名（可覆盖的默认值）才放行。
+ROOT_ABS = re.compile(r"[A-Za-z]:[\\/]{1,2}(?:00db|0del)", re.I)
+ENV_GUARD = re.compile(
+    r"environ|DEL_ROOT|ODOC_WORD|GROK_ROOT|STATS_ROOT|SKILLS_ROOT|MY_SKILLS|GLOSSARY_ROOT",
     re.I,
 )
 # 本机会话态：console 运行时自己写绝对路径，且已被 .gitignore 忽略（不是仓库内容）。
@@ -53,12 +63,16 @@ class TestPublicPathPolicy(unittest.TestCase):
             except (UnicodeDecodeError, OSError):
                 continue
             for i, line in enumerate(text.splitlines(), 1):
-                if LAB_ABS.search(line):
+                bad = bool(LAB_ABS.search(line)) or (
+                    bool(ROOT_ABS.search(line)) and not ENV_GUARD.search(line)
+                )
+                if bad:
                     offenders.append(f"{rel.as_posix()}:{i}: {line.strip()[:120]}")
         self.assertEqual(
             offenders,
             [],
-            "absolute lab paths outside the DEFAULT_GROK_ROOT allowlist:\n"
+            "absolute lab paths outside the DEFAULT_GROK_ROOT allowlist "
+            "({RAW}/{DEL} roots need an env-overridable default on the same line):\n"
             + "\n".join(offenders),
         )
 

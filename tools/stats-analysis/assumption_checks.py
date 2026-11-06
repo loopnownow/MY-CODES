@@ -13,8 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import Dict, List, Tuple, Optional, Union
+from typing import Dict, List, Optional, Union
 
 
 def check_normality(
@@ -467,7 +466,7 @@ def comprehensive_assumption_check(
             print("   → Consider non-parametric alternative (Mann-Whitney, Kruskal-Wallis)")
 
         # Homogeneity of variance
-        print(f"\n3. HOMOGENEITY OF VARIANCE")
+        print("\n3. HOMOGENEITY OF VARIANCE")
         print("-" * 70)
         homogeneity_results = check_homogeneity_of_variance(
             data, value_col, group_col, alpha=alpha, plot=True
@@ -478,7 +477,7 @@ def comprehensive_assumption_check(
 
     else:
         # Overall normality
-        print(f"\n2. NORMALITY CHECK")
+        print("\n2. NORMALITY CHECK")
         print("-" * 70)
         normality_results = check_normality(
             data[value_col].dropna(),

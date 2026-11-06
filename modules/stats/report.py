@@ -444,7 +444,9 @@ def _hl_metrics_html(splits, elem_id: str = "hosmer-lemeshow") -> str:
 
 def _roc_metrics_format_df(mdf: pd.DataFrame) -> pd.DataFrame:
     """Format a ROC_METRICS frame for HTML: no Thr source; DeLong p as extra columns."""
-    num = lambda s, nd=3: s.map(lambda v: "NA" if pd.isna(v) else f"{float(v):.{nd}f}")
+    def num(s, nd=3):
+        return s.map(lambda v: "NA" if pd.isna(v) else f"{float(v):.{nd}f}")
+
     out = {
         "Model": mdf["Model"],
         "Threshold": num(mdf["Threshold"]),

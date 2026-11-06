@@ -24,7 +24,7 @@ import time
 import urllib.request
 import urllib.parse
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict
 from dataclasses import dataclass, asdict
 from urllib.error import HTTPError, URLError
 
@@ -524,7 +524,7 @@ class ReportGenerator:
             lines.append("-" * 40)
             for citation, record in retracted:
                 lines.append(f"\n[{citation.index}] {citation.raw_text[:100]}...")
-                lines.append(f"    Status: RETRACTED")
+                lines.append("    Status: RETRACTED")
                 if record.title:
                     lines.append(f"    Title: {record.title}")
                 if record.retraction_date:
@@ -533,7 +533,7 @@ class ReportGenerator:
                     lines.append(f"    Reason: {record.retraction_reason}")
                 if record.url:
                     lines.append(f"    More Info: {record.url}")
-                lines.append(f"    ⚠️  RECOMMENDATION: Remove this citation immediately")
+                lines.append("    ⚠️  RECOMMENDATION: Remove this citation immediately")
             lines.append("")
 
         # Report expressions of concern
@@ -542,10 +542,10 @@ class ReportGenerator:
             lines.append("-" * 40)
             for citation, record in concerned:
                 lines.append(f"\n[{citation.index}] {citation.raw_text[:100]}...")
-                lines.append(f"    Status: Expression of Concern issued")
+                lines.append("    Status: Expression of Concern issued")
                 if record.title:
                     lines.append(f"    Title: {record.title}")
-                lines.append(f"    ⚠️  RECOMMENDATION: Verify current status before citing")
+                lines.append("    ⚠️  RECOMMENDATION: Verify current status before citing")
             lines.append("")
 
         # Report corrected papers
@@ -554,8 +554,8 @@ class ReportGenerator:
             lines.append("-" * 40)
             for citation, record in corrected:
                 lines.append(f"\n[{citation.index}] {citation.raw_text[:100]}...")
-                lines.append(f"    Status: Correction/Erratum published")
-                lines.append(f"    ℹ️  RECOMMENDATION: Review if correction affects your claims")
+                lines.append("    Status: Correction/Erratum published")
+                lines.append("    ℹ️  RECOMMENDATION: Review if correction affects your claims")
             lines.append("")
 
         # Summary

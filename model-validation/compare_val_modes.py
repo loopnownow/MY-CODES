@@ -37,9 +37,8 @@ from modules.config import settings as S
 from modules.stats import data_io
 from modules.pipeline import run_analysis, build_models
 from modules.stats.models import build_nomogram
-from modules.stats.curves_roc import plot_roc, ROC_METRICS, ROC_LOCK
+from modules.stats.curves_roc import plot_roc, ROC_METRICS
 from modules.stats.val_mode import (
-    resolve_val_mode,
     val_mode_label,
     refit_clinical_prob,
     refit_radscore_ols,

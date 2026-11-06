@@ -193,7 +193,7 @@ def zh_phrases(text: str):
                 spans.append(clause[-size:])
             # A window that starts or ends mid-compound is noise ("接比较这些指标").
             # Drop it when a one-character shift produces a longer-matching span.
-            spans = [s for s in spans if not (s[:1] in ZH_LEAD_BAN)]
+            spans = [s for s in spans if s[:1] not in ZH_LEAD_BAN]
             for gram in spans:
                 gram = gram.strip(ZH_EDGE_PUNCT)
                 if len(gram) < ZH_NGRAM[0] or not CJK.search(gram) or gram in seen:

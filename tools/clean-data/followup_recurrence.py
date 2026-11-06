@@ -486,8 +486,9 @@ def build(cand: pd.DataFrame, R: pd.DataFrame, P: pd.DataFrame, IMG: pd.DataFram
                     ev.append((r["入院"], "出院小结诊断", r["复发原文"]))
                 if r["复发或转移阳性"]:
                     ev_alt.append((r["入院"], "出院小结诊断", r["复发或转移原文"]))
-        keep = lambda lst: sorted([e for e in lst if pd.notna(base) and e[0] > base],
-                                  key=lambda x: x[0])
+        def keep(lst):
+            return sorted([e for e in lst if pd.notna(base) and e[0] > base], key=lambda x: x[0])
+
         ev, ev_alt = keep(ev), keep(ev_alt)
         first_ev = ev[0] if ev else None
         first_ev_alt = ev_alt[0] if ev_alt else None
@@ -553,12 +554,12 @@ def relapse_site(text: str) -> str:
     """复发病灶部位提示（启发式）：远处 / 局部区域 / 未明确。"""
     t = "" if text is None else str(text)
     d = bool(RE_SITE_DISTANT.search(t))
-    l = bool(RE_SITE_LOCAL.search(t))
-    if d and l:
+    loc = bool(RE_SITE_LOCAL.search(t))
+    if d and loc:
         return "局部+远处"
     if d:
         return "远处"
-    if l:
+    if loc:
         return "局部区域"
     return "未明确"
 

@@ -7,12 +7,17 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import sys
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-SKILLS = Path(r"D:\0Grok\0doc\GitHub\MY-SKILLS")
+SKILLS = Path(
+    os.environ.get("SKILLS_ROOT") or os.environ.get("MY_SKILLS") or REPO.parent / "MY-SKILLS"
+).resolve()
+if not (SKILLS / "00_orchestrator").is_dir():
+    raise SystemExit(
+        f"MY-SKILLS checkout not found at {SKILLS}; set SKILLS_ROOT (no silent fallback)"
+    )
 SCRIPT = REPO / "tools" / "orchestrator" / "style_lint.py"
 
 os.environ["SKILLS_ROOT"] = str(SKILLS)
