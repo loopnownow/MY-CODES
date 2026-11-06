@@ -5,7 +5,6 @@ import csv
 import importlib.util
 from pathlib import Path
 
-import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 CLI = REPO / "model-validation" / "split_leakage_check.py"

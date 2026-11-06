@@ -74,7 +74,7 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     ]):
         return None  # type: ignore[return-value]
     assert len(model_list) >= 1
-    from modules.stats.radiomics import score_display_name, fig_label
+    from modules.stats.radiomics import fig_label
 
     y = np.asarray(y).astype(int)
     prev = float(np.mean(y == 1))

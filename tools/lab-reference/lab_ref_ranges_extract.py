@@ -21,7 +21,7 @@ import tempfile
 import zipfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone, timedelta
-from xml.etree import ElementTree as ET
+from pathlib import Path
 
 # docx_extract lives at 05-manuscript/write-paper/ (rehome 2026-10-23)
 _CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -30,14 +30,16 @@ try:
     from docx_extract import extract_text, close_word
 except ImportError:
     extract_text = None
-    close_word = lambda: None
+
+    def close_word():
+        return None
 
 SHANGHAI = timezone(timedelta(hours=8))
 NOW = datetime.now(SHANGHAI).strftime("%Y-%m-%d %H:%M:%S CST")
 
 TIERS = {
-    "01": r"D:\00db\_lab\doc-word\05-manuscript\thesis",
-    "02": r"D:\00db\_lab\doc-word\05-manuscript\manuscripts",
+    "01": os.path.join(os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word", "05-manuscript", "thesis"),
+    "02": os.path.join(os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word", "05-manuscript", "manuscripts"),
 }
 SCRATCH_ROOT = os.environ.get("SCRATCH_ROOT") or os.path.join(tempfile.gettempdir(), "lab-scratch")
 OUT_SCRATCH = os.path.join(SCRATCH_ROOT, "lab-ref-ranges")

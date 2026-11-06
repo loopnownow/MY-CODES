@@ -20,9 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
-import io
 import re
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -779,8 +777,9 @@ def run_audit() -> int:
     print("\n### 1. 行级账目（每行必须且只能出现在一张明细表）")
     chk("明细行数合计 = 输入行数", len(det) + len(det_ex) == len(raw),
         f"{len(det)}+{len(det_ex)} vs {len(raw)}")
-    key = lambda d: set(zip(d["来源文件"].astype(str), d["病历卡号"].astype(str),
-                           d["影像号"].map(num)))
+    def key(d):
+        return set(zip(d["来源文件"].astype(str), d["病历卡号"].astype(str),
+                       d["影像号"].map(num)))
     src, kd, ke = key(raw), key(det), key(det_ex)
     chk("明细键无重复", len(kd) == len(det) and len(ke) == len(det_ex))
     chk("明细并集 = 全部输入行", (kd | ke) == src,

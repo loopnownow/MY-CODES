@@ -15,7 +15,6 @@ import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import norm
 from sklearn.metrics import roc_curve, roc_auc_score
 from MLstatkit import Delong_test
 import statsmodels.api as sm

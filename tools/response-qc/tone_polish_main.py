@@ -25,7 +25,7 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Dict, Tuple
 import os
@@ -537,7 +537,7 @@ def interactive_mode():
             print(f"      Original: \"{imp['original_phrase'][:50]}...\" " if len(imp['original_phrase']) > 50 else f"      Original: \"{imp['original_phrase']}\"")
 
     if result.suggestions:
-        print(f"\n💡 SUGGESTIONS:")
+        print("\n💡 SUGGESTIONS:")
         for i, sug in enumerate(result.suggestions, 1):
             print(f"   {i}. {sug}")
 

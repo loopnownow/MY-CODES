@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -99,11 +100,9 @@ def main():
 
     # --- sources ---
     lung2 = pd.read_excel(REF / "lung2.xlsx", sheet_name="clin")
-    lung2o = pd.read_excel(REF / "lung2.xlsx", sheet_name="clin-old")
     sec = pd.read_excel(REF / "2nd 临床数据补充01版.xlsx")
     sec = sec.copy()
     sec["Patient_ID"] = sec["姓名"].map(lambda z: map_zh(z, cmap, cln_ids, cln_set))
-    n_unmapped = int(sec["Patient_ID"].isna().sum())
     unmapped_names = sorted(sec.loc[sec["Patient_ID"].isna(), "姓名"].astype(str).str.strip().unique())
     sec2 = sec.dropna(subset=["Patient_ID"]).drop_duplicates("Patient_ID", keep="first")
 
@@ -254,8 +253,6 @@ def main():
     for col in cln.columns:
         if col == "Patient_ID":
             continue
-        both = cln_orig[col].notna()
-        changed = both & (cln[col].astype(str) != cln_orig[col].astype(str))
         # allow NaN vs NaN; for numeric compare carefully
         if col in cln_orig.columns:
             def _neq(a, b):

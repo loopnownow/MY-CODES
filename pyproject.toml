@@ -41,3 +41,26 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["modules*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# E402: 入口脚本先注入 sys.path / 设环境变量，再 import 本地模块
+"modules/pipeline.py" = ["E402"]
+"modules/console/console.py" = ["E402"]
+"model-validation/compare_val_modes.py" = ["E402"]
+"modules/tests/test_docx_extract.py" = ["E402"]
+"tools/clean-data/tidy_paths.py" = ["E402"]
+"tools/sync/batch_rerun_pipelines.py" = ["E402"]
+"tools/sync/smoke_test.py" = ["E402"]
+"tools/sync/sync_modules.py" = ["E402"]
+# E701: 一次性抽取脚本沿用单行 if（改写会动历史清洗逻辑）
+"tools/clean-data/extract_discharge.py" = ["E701"]
+# F401: 模板脚手架预置 import 供使用者填写
+"tools/templates/soft_code_template.py" = ["F401"]

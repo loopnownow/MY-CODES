@@ -11,6 +11,11 @@ Rules:
 Record IDs: LAB##-## / CLN##-## / PTH##-##
 """
 
+import os
+
+# ODOC_WORD: Word-original archive root ({RAW}\_lab\doc-word); env-overridable, no per-project paths.
+_WORD_ROOT = os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word"
+
 BANNER = (
     "PEER-REVIEW NUMERIC PLAUSIBILITY ONLY — NOT CLINICAL DECISION SUPPORT. "
     "Do not use for patient care. Prefer Asia/CN / Shanghai RI; never overwrite CN with Western."
@@ -125,8 +130,8 @@ SOURCES = [
     ["SRC-WS405", "guideline", "WS/T 405-2012", "NHC", "https://www.ndls.org.cn/standard/detail/894e6919f35ebaeb7041a5f80b7da013", "Blood cell analysis CN adult RI", "2026-10-19 21:00:00 CST"],
     ["SRC-WS645.2", "guideline", "WS/T 645.2-2026", "NHC", "https://www.nhc.gov.cn/fzs/c100048/202606/1d8e67475848413cb4447e1b49037888/files/WST%20645.2%E2%80%942026-20260612145407318.pdf", "AFP/CEA/CA19-9/CA15-3/CA125 method-stratified RI", "2026-10-19 21:00:00 CST"],
     ["SRC-HOSP-GZ", "secondary_lit", "赣州市人民医院检测项目生物参考区间一览表(2023)", "赣州市人民医院检验科", "https://gzsrmyy.com/upload/main/pdf/2024/07/10/%E6%A3%80%E6%B5%8B%E9%A1%B9%E7%9B%AE%E7%94%9F%E7%89%A9%E5%8F%82%E8%80%83%E5%8C%BA%E9%97%B4-2023.pdf", "Secondary republication of WS/T bands + reagent-insert coag; used only where noted", "2026-10-19 21:00:00 CST"],
-    ["SRC-LOCAL-01", "local_thesis", "D:\\00db\\_lab\\doc-word\\05-manuscript\\thesis", "bank", "", "Thesis harvest — cohort/cutoff quotes only", "2026-10-19 21:00:00 CST"],
-    ["SRC-LOCAL-02", "local_manuscript", "D:\\00db\\_lab\\doc-word\\05-manuscript\\manuscripts", "bank", "", "Manuscript harvest — cohort/cutoff quotes only", "2026-10-19 21:00:00 CST"],
+    ["SRC-LOCAL-01", "local_thesis", os.path.join(_WORD_ROOT, "05-manuscript", "thesis"), "bank", "", "Thesis harvest — cohort/cutoff quotes only", "2026-10-19 21:00:00 CST"],
+    ["SRC-LOCAL-02", "local_manuscript", os.path.join(_WORD_ROOT, "05-manuscript", "manuscripts"), "bank", "", "Manuscript harvest — cohort/cutoff quotes only", "2026-10-19 21:00:00 CST"],
 ]
 
 SOURCE_HEADER = ["source_id", "source_tier", "cite_or_path", "publisher_or_org", "url", "notes", "recorded_at_shanghai"]

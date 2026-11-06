@@ -567,7 +567,7 @@ def main() -> None:
 
     # 4. 导出 Excel
     print("\n开始导出 Excel ...")
-    written = export_to_excel(roi_records, glob_records, out_path)
+    export_to_excel(roi_records, glob_records, out_path)
     print(f"提取完成 -> {out_path}")
 
     # 5. 回读校验

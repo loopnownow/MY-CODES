@@ -912,7 +912,7 @@ def main():
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
-    print(f"\n--- Summary ---")
+    print("\n--- Summary ---")
     print(f"  arXiv:   {stats['arxiv']}")
     print(f"  OA:      {stats['oa']}")
     print(f"  PMC:     {stats['pmc']}")
