@@ -654,7 +654,7 @@ def test_external_cards_can_map_sheets_to_blocks():
 
 
 def test_start_page_goes_straight_to_the_console_after_service_starts():
-    """起始页：没有数据预览卡、没有「载入数据」按钮；开服务后自动进控制台「统计配置」。"""
+    """起始页：没有数据预览卡、没有「载入数据」按钮；开服务后自动进控制台「数据预览」。"""
     proj = (ROOT / "modules" / "console" / "project.html").read_text(encoding="utf-8")
     assert 'id="btnLoadNow"' not in proj and ">载入数据</button>" not in proj
     assert 'id="pvCard"' not in proj and 'id="pvBox"' not in proj
@@ -662,7 +662,7 @@ def test_start_page_goes_straight_to_the_console_after_service_starts():
     assert "btnGoPg" not in proj and ">进入数据预览</button>" not in proj
     assert "function autoOpenConsole" in proj and "autoOpenConsole(p)" in proj
     assert "autoLoadAndPreview" not in proj and "autoOpenPreview" not in proj
-    assert '"tab", "config"' in proj and '"tab", "preview"' not in proj
+    assert '"tab", "preview"' in proj and '"tab", "config"' not in proj
     # 删了 #go 元素后，任何 `go.` / `if (go)` / setGoEnabled 都会在页面初始化时抛 ReferenceError，
     # 整个初始化中断 → 页面点不动（2026-11-04 真踩过）。
     assert 'getElementById("go")' not in proj

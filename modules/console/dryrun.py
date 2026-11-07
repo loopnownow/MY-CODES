@@ -415,14 +415,7 @@ def dry_run_text(project: str, data: Path, settings_path: Path,
             lines.append(f"  {k}={merged[k]}{mark}")
 
     lines += ["", "将写入:"]
-    if merged.get("DO_QC_REPORT", True) and str(merged.get("QC_SHEET") or "").strip():
-        lines.append("  ref/qc.html   ← 工程 ref/")
-    from modules.utils.u_qc import _external_specs_from_settings, qc_html_rel, external_qc_html_name
-    for spec in _external_specs_from_settings(merged):
-        lines.append(
-            f"  {qc_html_rel(external_qc_html_name(spec['name']))}  ← 工程 ref/ 外验 QC"
-            f"  [{spec['name']}] {spec['file']}"
-        )
+    lines.append("  （QC 不在运行时生成：去「数据预览」页点「整体 QC」，写 ref/qc.html 与外验 qc-ext）")
     lines.append("  ref/pipeline/pipeline_run.log   ← 工程 ref/pipeline/ 运行日志")
     if merged.get("DO_FALSE_CLASS", True):
         dests: list[str] = []

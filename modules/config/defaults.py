@@ -119,7 +119,6 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "DO_DROP_DERIVED": False,
     "ENABLE_CORR_FILTER": True,
     "DO_FIGURE_PANELS": True,
-    "DO_QC_REPORT": True,
     "QC_HTML": "ref/qc.html",
     "DO_ICC_FILTER": True,
     "LASSO_CACHE": True,

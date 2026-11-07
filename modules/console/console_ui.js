@@ -1584,20 +1584,6 @@ function bindPairTabs() {
   });
 }
 
-function syncQcHtmlToggle() {
-  const el = $("doQcHtml");
-  if (!el) return;
-  const on = !!(typeof fieldValue === "function" ? fieldValue("DO_QC_REPORT") : S.values && S.values.DO_QC_REPORT);
-  el.checked = on;
-  if (el.dataset.bound) return;
-  el.dataset.bound = "1";
-  el.addEventListener("change", () => {
-    if (typeof setFieldValue === "function") setFieldValue("DO_QC_REPORT", el.checked);
-    else if (S.values) S.values.DO_QC_REPORT = el.checked;
-    if (typeof markDirty === "function") markDirty();
-  });
-}
-
 function syncBaselineToggles() {
   [
     ["doBaselineAll", "DO_BASELINE_ALL"],
@@ -2211,13 +2197,15 @@ function renderProjectInfo() {
   const p = (S.projects || []).find((x) => x.name === proj) || {};
   const data = String(($("data") && $("data").value) || "").trim();
   const settings = String(($("settings") && $("settings").value) || "").trim();
-  const mods = String(($("modulesDir") && $("modulesDir").value) || "").trim();
+  const mods = String(($("modulesDir") && $("modulesDir").value) || (S.values && S.values.MODULES_DIR) || "").trim();
   const prev = S.preview || {};
   const sheets = (prev.sheets || []).length;
   const exts = Array.isArray(prev.external) ? prev.external.length : 0;
-  const nClin = prev.n_clin != null ? prev.n_clin : prev.clin_n;
-  const nRad = prev.n_rad != null ? prev.n_rad : prev.rad_n;
-  const nOv = prev.n_overlap != null ? prev.n_overlap : prev.overlap;
+  const idc = prev.id_check || {};
+  const pickN = (...vals) => vals.find((v) => v != null && v !== "");
+  const nClin = pickN(prev.n_clin, prev.clin_n, idc.clin_n);
+  const nRad = pickN(prev.n_rad, prev.rad_n, idc.rad_n);
+  const nOv = pickN(prev.n_overlap, prev.overlap, idc.overlap);
   const ratio = (nClin != null || nRad != null)
     ? `clin ${nClin == null ? "—" : nClin} / rad ${nRad == null ? "—" : nRad} / 重叠 ${nOv == null ? "—" : nOv}`
     : "—";
@@ -3485,7 +3473,6 @@ function renderForm() {
   root.querySelectorAll("[data-reader-add]").forEach((sel) => {
     sel.onchange = () => addReaderCol(sel.value);
   });
-  syncQcHtmlToggle();
   placeGrpCard();
   syncBaselineToggles();
   syncPartialGates();

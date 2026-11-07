@@ -236,7 +236,6 @@ LABELS = {
     "DO_RAD_FIRTH": "Firth 惩罚 Logistic",
     "ENABLE_CORR_FILTER": "相关过滤",
     "DO_FIGURE_PANELS": "图与显示总闸",
-    "DO_QC_REPORT": "QC HTML",
     "QC_HTML": "质控 HTML（默认 ref/qc.html）",
     "DO_ICC_FILTER": "ICC 预筛选",
     "LASSO_CACHE": "LASSO 缓存",
@@ -445,7 +444,6 @@ HINTS: dict[str, str] = {
     "ICC_SCORE": "ICC 表的显示名（只用于预览与结果页标注，不参与建模）。空=取工作表名。",
     "ENABLE_CORR_FILTER": "组学高相关特征预过滤，阈值见 RAD_COR_CUTOFF。",
     "DO_FIGURE_PANELS": "图与显示总闸。关=不写任何 PNG/TIFF/PDF，结果 HTML 不嵌图，拼板也不跑。开=按各分析开关出图；拼板仍在本块。",
-    "DO_QC_REPORT": "根据 QC_SHEET 写 ref/qc.html。",
     "QC_HTML": "质控 HTML，默认 ref/qc.html。清单另放在各子工程 QC/。",
     "DO_ICC_FILTER": (
         "intra 与 inter 都≥阈值才保留该组学特征。"

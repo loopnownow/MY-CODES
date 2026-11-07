@@ -2564,59 +2564,6 @@ def _apply_console_overlay() -> None:
         print(f"  ⚠ Fig palette skipped: {e}", flush=True)
 
 
-def _maybe_write_qc_report(input_file: Optional[str] = None) -> None:
-    """主循环前生成 ref/qc.html（一次，与结局无关）：主表 + 全部外验合成一份。"""
-    if not bool(getattr(cfg, "DO_QC_REPORT", True)):
-        return
-    sheet = str(getattr(cfg, "QC_SHEET", "") or "").strip()
-    xlsx = input_file or getattr(cfg, "INPUT", "data_merged.xlsx")
-    from modules.config.ini_io import resolve_project_dir
-    from modules.utils.u_qc import (
-        _qc_fingerprint,
-        qc_is_fresh,
-        relocate_legacy_qc_html,
-        resolve_qc_html_path,
-        write_merged_qc,
-    )
-    from pathlib import Path as _Path
-    dest = resolve_project_dir()
-    relocate_legacy_qc_html(dest)
-    cfg.QC_HTML = "ref/qc.html"
-    out_path = resolve_qc_html_path("qc.html", dest)
-    from modules import config as _cfg
-    settings = {
-        "CLIN_SHEET": getattr(_cfg, "CLIN_SHEET", "cln"),
-        "RAD_SHEET": getattr(_cfg, "RAD_SHEET", "rad"),
-        "QC_SHEET": sheet,
-        "ICC_SHEET": getattr(_cfg, "ICC_SHEET", "icc"),
-        "CLIN_ID_COL": getattr(_cfg, "CLIN_ID_COL", "Patient_ID"),
-        "RAD_ID_COL": getattr(_cfg, "RAD_ID_COL", "Patient_ID"),
-        "OUTCOME_COLS": list(getattr(_cfg, "OUTCOME_COLS", None) or []),
-        "SKIP_CLIN_FEATURES": list(getattr(_cfg, "SKIP_CLIN_FEATURES", None) or []),
-        "ICC_THRESHOLD": getattr(_cfg, "ICC_THRESHOLD", 0.75),
-        "ICC_INTRA_COL": getattr(_cfg, "ICC_INTRA_COL", "intra_ICC"),
-        "ICC_INTER_COL": getattr(_cfg, "ICC_INTER_COL", "inter_ICC"),
-        "MODALITY_BLOCKS": list(getattr(_cfg, "MODALITY_BLOCKS", None) or []),
-    }
-    for k in (
-        "EXTERNAL_TESTS", "EXTERNAL_FILE",
-        "EXTERNAL_CLIN_SHEET", "EXTERNAL_RAD_SHEET",
-        "EXTERNAL_RAD_ID_COL",
-    ):
-        if hasattr(cfg, k):
-            settings[k] = getattr(cfg, k)
-    print("\n═══ QC REPORT ═══")
-    try:
-        fp = _qc_fingerprint(_Path(str(xlsx)), settings)
-        if qc_is_fresh(out_path, fp):
-            print(f"  fresh → skip  ({out_path})")
-        else:
-            print(f"  stale/missing → 重算  ({out_path})")
-            write_merged_qc(xlsx, settings, out_dir=dest, out_html=out_path, input_dir=dest)
-    except Exception as e:
-        print(f"  ⚠ QC report failed: {e}")
-
-
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Radiomics + Clinical Pipeline")
     parser.add_argument(
@@ -2691,10 +2638,8 @@ def main(argv: list[str] | None = None) -> None:
 
     code = 0
     try:
-        # 质控报告与结局无关，只写一次
         if args.input:
             cfg.INPUT = args.input
-        _maybe_write_qc_report(args.input)
 
         outcomes = _resolve_outcomes(args.outcome)
 
