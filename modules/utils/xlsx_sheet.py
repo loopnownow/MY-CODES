@@ -79,6 +79,7 @@ def _shared_strings(z: zipfile.ZipFile) -> list[str]:
 
 
 def _cell_value(attrs: bytes, inner: bytes, shared: list[str]):
+    """Cell → value. Empty shared/inline/plain text is missing data (None), not a level."""
     if b't="inlineStr"' in attrs or b"<is>" in inner:
         i = inner.find(b"<t")
         if i < 0:
@@ -87,7 +88,8 @@ def _cell_value(attrs: bytes, inner: bytes, shared: list[str]):
         b = inner.find(b"</t>", a + 1)
         if a < 0 or b < 0:
             return None
-        return inner[a + 1:b].decode("utf-8", errors="replace")
+        text = inner[a + 1:b].decode("utf-8", errors="replace")
+        return text if text.strip() else None
     i = inner.find(b"<v>")
     if i < 0:
         return None
@@ -97,12 +99,15 @@ def _cell_value(attrs: bytes, inner: bytes, shared: list[str]):
     raw = inner[i + 3:j]
     if b't="s"' in attrs:
         try:
-            return shared[int(raw)]
+            text = shared[int(raw)]
         except (ValueError, IndexError):
             return None
+        return text if str(text).strip() else None
     if b't="b"' in attrs:
         return raw == b"1"
     text = raw.decode("ascii", errors="replace")
+    if not text.strip():
+        return None
     if any(ch in text for ch in ".eE"):
         try:
             return float(text)
@@ -279,7 +284,15 @@ def _align_column(values: list, n_rows: int) -> list:
 
 
 def _as_series(values: list) -> pd.Series:
-    s = pd.Series(values, dtype="object")
+    """Column values → numeric series when every non-blank cell is numeric.
+
+    Blank strings count as missing (None), so one empty cell does not turn a
+    numeric feature column into a text/level column.
+    """
+    s = pd.Series(
+        [None if isinstance(v, str) and not v.strip() else v for v in values],
+        dtype="object",
+    )
     num = pd.to_numeric(s, errors="coerce")
     present = s.map(lambda v: v is not None and not (isinstance(v, float) and np.isnan(v)))
     if int(present.sum()) == 0:
