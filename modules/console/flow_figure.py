@@ -1,30 +1,30 @@
+# -*- coding: utf-8 -*-
 """Figure 1（研究流程图）单一源：读 / 校验 / 重画 / 回填 Results 页。
 
-单一源 = ``<项目>/ref/pipeline/figure1_strobe.json``。重画用
-``tools/draw-flowchart/draw_strobe_flow_expanded.py``（fail-closed n-audit）。
-审计或渲染失败时不写任何文件。
+单一源 = ``<项目>/ref/pipeline/figure1_strobe.json``，canonical 结构由
+``modules.flowfigure.spec`` 定义；渲染走 ``modules.flowfigure.layout`` +
+``render_mpl``（进程内，不再起子进程）。审计/渲染失败时不写任何项目文件。
 
-运行: 由 modules.console.http_impl 的 /flow_figure、/api/flow_figure 调用，
-不单独执行。
+运行: 由 modules.console.http_impl 的 /flow_figure、/api/flow_figure 调用。
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
-import subprocess
-import sys
 import tempfile
 from pathlib import Path
+
+from modules.flowfigure import audit as flow_audit
+from modules.flowfigure import layout as flow_layout
+from modules.flowfigure import overrides as flow_overrides
+from modules.flowfigure import render_mpl, results as flow_results, spec as flow_spec
 
 FIG1_SPEC_REL = "ref/pipeline/figure1_strobe.json"
 FIG1_PNG_NAME = "figure1_flow.png"
 FIG1_PDF_NAME = "figure1_flow.pdf"
 FIG1_PNG_REL = f"PNG/{FIG1_PNG_NAME}"
 FIG1_PDF_REL = f"PNG/{FIG1_PDF_NAME}"
-TOOL_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "tools" / "draw-flowchart" / "draw_strobe_flow_expanded.py"
-)
 ANCHOR_TEXT = "A. All Data — Baseline"
 
 
@@ -34,7 +34,7 @@ def spec_path(proj) -> Path:
 
 
 def load_figure1_spec(proj) -> dict:
-    """读 Figure 1 spec；文件缺失抛 FileNotFoundError，JSON 损坏抛 ValueError。"""
+    """读 Figure 1 spec（原样）；文件缺失抛 FileNotFoundError，JSON 损坏抛 ValueError。"""
     path = spec_path(proj)
     if not path.is_file():
         raise FileNotFoundError(f"缺少 Figure 1 spec: {path}")
@@ -87,37 +87,9 @@ def figure1_png_rel(proj) -> str:
     return _join_rel(_dir_rel(proj, dirs[0]), FIG1_PNG_REL)
 
 
-def _figure1_markup(out_dir) -> str:
-    """控制台回填用的 Results 区块 markup（与 report.py 共用同一个 helper）。"""
-    from modules.stats.report import figure1_section_html
-
-    return figure1_section_html(out_dir, force_img=True)
-
-
 def ensure_figure1_section(html_path) -> bool:
-    """幂等插入 Figure 1 区块：已有 id 返回 False，插入并落盘返回 True。
-
-    插入点：包含 ``A. All Data — Baseline`` 的 ``<section>`` 之前；
-    找不到该段时插到 ``</body>`` 之前；两者都没有则 raise（不猜位置）。
-    """
-    path = Path(html_path)
-    if not path.is_file():
-        raise FileNotFoundError(f"Results HTML 不存在: {path}")
-    text = path.read_text(encoding="utf-8")
-    if 'id="figure1-flow"' in text:
-        return False
-    markup = _figure1_markup(path.parent)
-    idx = text.find(ANCHOR_TEXT)
-    if idx >= 0:
-        sec = text.rfind("<section", 0, idx)
-        pos = sec if sec >= 0 else idx
-    else:
-        body = text.lower().rfind("</body>")
-        if body < 0:
-            raise ValueError(f"Results HTML 找不到 Figure 1 插入点: {path}")
-        pos = body
-    _atomic_write_text(path, text[:pos] + markup + text[pos:])
-    return True
+    """幂等插入 Figure 1 区块（实现见 ``modules.flowfigure.results``）。"""
+    return flow_results.ensure_section(html_path)
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
@@ -133,56 +105,39 @@ def _atomic_copy(src: Path, dst: Path) -> None:
     os.replace(tmp, dst)
 
 
-def _run_tool(spec_tmp: Path, out_tmp: Path) -> None:
-    """跑绘图工具一次；returncode 非 0 或没有产物时抛 ValueError（不落盘）。"""
-    env = dict(os.environ)
-    env["MPLBACKEND"] = "Agg"
-    cmd = [
-        sys.executable, str(TOOL_PATH),
-        "--json", str(spec_tmp), "--out", str(out_tmp),
-    ]
-    try:
-        proc = subprocess.run(
-            cmd, cwd=str(TOOL_PATH.parent), capture_output=True, text=True,
-            timeout=180, env=env,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ValueError(f"Figure 1 渲染超时（180s）: {TOOL_PATH}") from exc
-    if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout or "").strip()
-        raise ValueError(
-            f"Figure 1 渲染失败 (rc={proc.returncode}): {detail or '无错误输出'}"
-        )
-    if not out_tmp.is_file() or out_tmp.stat().st_size == 0:
-        raise ValueError(f"Figure 1 渲染失败：未生成 {out_tmp.name}")
+def prepare_geometry(spec: dict) -> tuple[dict, dict]:
+    """normalize -> validate -> audit -> layout；返回 (canonical, geometry)。
+
+    审计失败抛 AuditError（ValueError 子类），调用方不得落盘。
+    """
+    if not isinstance(spec, dict) or not spec:
+        raise ValueError("Figure 1 spec 必须是非空对象")
+    canonical = flow_spec.normalize(spec)
+    flow_spec.validate(canonical)
+    flow_audit.audit(canonical)
+    geometry = flow_layout.build(canonical)
+    geometry = flow_overrides.apply_overrides(geometry, canonical.get("overrides") or {})
+    return canonical, geometry
 
 
 def render_figure1(proj, spec) -> dict:
     """校验 spec → 临时目录渲染 PNG+PDF → 写回单一源与各结果夹 → 回填 Results 页。
 
-    渲染成功后才动项目文件：先原子写 spec，再把 PNG/PDF 复制到每个结果夹的
-    PNG/，最后幂等插入 Figure 1 区块。审计/渲染失败时项目文件不变。
+    渲染成功后才动项目文件：先原子写 canonical spec，再把 PNG/PDF 复制到每个
+    结果夹的 PNG/，最后幂等插入 Figure 1 区块。审计/渲染失败时项目文件不变。
     """
     proj = Path(proj)
-    if not isinstance(spec, dict) or not spec:
-        raise ValueError("Figure 1 spec 必须是非空对象")
-    if not TOOL_PATH.is_file():
-        raise FileNotFoundError(f"缺少绘图工具: {TOOL_PATH}")
-
+    canonical, geometry = prepare_geometry(spec)
     with tempfile.TemporaryDirectory(prefix="figure1_flow_") as td:
         tmp = Path(td)
-        spec_tmp = tmp / "spec.json"
         png_tmp = tmp / FIG1_PNG_NAME
         pdf_tmp = tmp / FIG1_PDF_NAME
-        spec_tmp.write_text(
-            json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8",
-        )
-        _run_tool(spec_tmp, png_tmp)
-        _run_tool(spec_tmp, pdf_tmp)
+        render_mpl.render(geometry, png_tmp)
+        render_mpl.render(geometry, pdf_tmp)
 
         target = spec_path(proj)
         target.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write_text(target, spec_tmp.read_text(encoding="utf-8"))
+        _atomic_write_text(target, flow_spec.to_json_text(canonical))
 
         dirs = results_dirs(proj)
         results: list[str] = []
@@ -207,16 +162,93 @@ def render_figure1(proj, spec) -> dict:
         "pdf_rel": pdf_rel,
         "results": results,
         "patched": patched,
+        "page_cm": geometry["page_cm"],
+        "warnings": geometry["warnings"],
+    }
+
+
+def to_legacy_shape(canonical: dict) -> dict:
+    """canonical v2 -> 旧 spec shape（只给 legacy.html 的旧 Figure 1 面板读）。"""
+    arms = canonical.get("presplit") or []
+    cohorts = canonical.get("cohorts") or []
+    downsample = canonical.get("downsample") or []
+    presplit = {
+        "arm_" + str(index): {
+            "label": arm.get("label") or ("Arm " + str(index + 1)),
+            "n": arm.get("n"),
+            "pp": arm.get("pp"),
+            "non_pp": arm.get("non_pp"),
+        }
+        for index, arm in enumerate(arms)
+    }
+    return {
+        "layout": canonical.get("layout"),
+        "screened": str((canonical.get("screened") or {}).get("text") or ""),
+        "inclusion": list((canonical.get("criteria") or {}).get("inclusion") or []),
+        "presplit": presplit,
+        "downsample": (
+            {"n": downsample[0].get("n"), "reason": downsample[0].get("reason") or ""}
+            if downsample else {}
+        ),
+        "analyzed": str((canonical.get("analyzed") or {}).get("text") or ""),
+        "pos_name": canonical.get("pos_name") or "",
+        "notes": canonical.get("notes") or "",
+        "splits": [
+            {
+                "label": cohort.get("label") or ("Cohort " + str(index + 1)),
+                "n": cohort.get("n"),
+                "pp": cohort.get("pp"),
+                "non_pp": cohort.get("non_pp"),
+            }
+            for index, cohort in enumerate(cohorts)
+        ],
+        "font_size": canonical.get("font_size"),
+        "overrides": canonical.get("overrides") or {"boxes": {}, "edges": {}, "hidden": []},
     }
 
 
 def read_figure1_state(proj) -> dict:
-    """GET 用：当前 spec + 渲染产物路径/是否存在。"""
-    spec = load_figure1_spec(proj)
+    """GET 用：canonical spec + geometry + 产物路径/是否存在。"""
+    proj = Path(proj)
+    canonical = flow_spec.normalize(load_figure1_spec(proj))
+    geometry = flow_layout.build(canonical)
+    geometry = flow_overrides.apply_overrides(geometry, canonical.get("overrides") or {})
     png_rel = figure1_png_rel(proj)
     return {
-        "spec": spec,
+        "spec": canonical,
         "spec_rel": FIG1_SPEC_REL,
         "png_rel": png_rel,
-        "png_exists": bool(png_rel) and (Path(proj) / png_rel).is_file(),
+        "png_exists": bool(png_rel) and (proj / png_rel).is_file(),
+        "geometry": geometry,
+        "warnings": geometry["warnings"],
+        "page_cm": geometry["page_cm"],
+    }
+
+
+def preview_figure1(proj, spec: dict, overrides=None) -> dict:
+    """POST /api/flow_preview 用：临时目录渲染，不写项目；审计失败返回结构化错误。
+
+    返回 {'ok': True, 'png_base64', 'geometry', 'warnings', 'page_cm'}
+    或 {'ok': False, 'error', 'problems'}。
+    """
+    del proj  # 预览不读写项目文件；project 仅用于路由校验
+    try:
+        canonical = flow_spec.normalize(spec)
+        flow_spec.validate(canonical)
+        flow_audit.audit(canonical)
+        applied = canonical.get("overrides") if overrides is None else overrides
+        geometry = flow_layout.build(canonical)
+        geometry = flow_overrides.apply_overrides(geometry, applied or {})
+        with tempfile.TemporaryDirectory(prefix="figure1_preview_") as td:
+            png = Path(td) / FIG1_PNG_NAME
+            render_mpl.render(geometry, png, quiet=True)
+            encoded = base64.b64encode(png.read_bytes()).decode("ascii")
+    except (ValueError, flow_audit.AuditError) as err:
+        return {"ok": False, "error": str(err), "problems": [str(err)]}
+    return {
+        "ok": True,
+        "png_base64": encoded,
+        "geometry": geometry,
+        "warnings": geometry["warnings"],
+        "page_cm": geometry["page_cm"],
     }
