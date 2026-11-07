@@ -5,7 +5,7 @@ modules.pipeline — 主管线
     1. ALL   — 全队列仅 Baseline Table 1
     2. TRAIN — 组学（LASSO 或 Logistic）+ clin_select（训练集拟合）
     3. TEST  — 复用 TRAIN 特征；内部 / 亚组 / 外部验证各自决定套公式、锁定阈值或重拟合。
-              组学 Logistic 在「重新拟合」时锁定入选特征和训练集标准化，只重估系数。
+              组学 Logistic 在「重新拟合」时锁定入选特征和训练集预处理参数（RAD_NORMALIZE 控制是否 z-score），只重估系数。
     4. COMBINED — Nomogram / ROC / Cal / DCA / NRI
     5. Advanced + Results{子项目}.html
 

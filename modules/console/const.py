@@ -104,6 +104,7 @@ CONSOLE_DEFAULTS = {
     "DO_PLOT_TIFF": False,
     "DO_PLOT_PDF": False,
     "DO_LANDMARK_ROC": False,
+    "RAD_NORMALIZE": True,
     "RAD_MARKER_SIDE": "both",
     "RAD_MARKER_MIN_N": 5,
     "DO_ROC": True,

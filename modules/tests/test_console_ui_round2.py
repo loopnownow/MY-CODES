@@ -158,3 +158,42 @@ def test_flowchart_audits_only_the_numbers_it_is_given():
     doc = inspect.getdoc(audit_study) or ""
     assert "只校验已给数字" in doc
     assert "n = -" in STROBE
+
+
+def test_rad_normalize_is_a_title_toggle_on_the_omics_module():
+    """「归一化」在「组学模块」标题行（title-sw 同机制），schema / defaults 都有，默认开。"""
+    from modules.console.const import CONSOLE_DEFAULTS
+    from modules.console.schema import HINTS, LABELS, SECTION_OF
+
+    assert SECTION_OF["RAD_NORMALIZE"][0] == "radprep"
+    assert LABELS["RAD_NORMALIZE"] == "归一化"
+    assert HINTS["RAD_NORMALIZE"]
+    assert CONSOLE_DEFAULTS["RAD_NORMALIZE"] is True
+    assert '"RAD_NORMALIZE"' in SCHEMA
+    assert (
+        'titleKeys = ["RAD_NORMALIZE", "DO_ICC_FILTER", "ICC_REQUIRE_ROW", '
+        '"ENABLE_CORR_FILTER", "LASSO_CACHE"]' in UI
+    )
+    assert "function titleSwitchHtml" in UI
+
+
+def test_marker_matching_and_strip_cover_middle_segments():
+    """标记支持 mid: 中间片段：识别、排除、分类、剥离同一套匹配；手填 _x_ 存成 mid:x。"""
+    from modules.console.schema import HINTS
+
+    assert 'if (raw.indexOf("mid:") === 0) return { anchor: "mid", part: raw.slice(4) };' in UI
+    assert "function delimiterAligned" in UI
+    assert "function stripAnchoredToken" in UI
+    assert "function radMidCandidates" in UI
+    assert "RAD_MID_MAX_ROWS = 40" in UI
+    assert 'counts.set("mid:" + row[0], row[1])' in UI
+    assert 'return "mid:" + core;' in UI
+    assert '["mid", "中间"]' in UI
+    assert '["both", "全部"]' in UI
+    assert 'spec.anchor === "mid" ? "中间"' in UI
+    # 识别出的中间标记走同一套匹配：排除 / 分类 / 剥离都共用 columnMatchesPrefix
+    assert "radMidCandidates(name)" in UI
+    assert "columnMatchesPrefix(name, prefix)" in UI
+    assert "中间" in HINTS["RAD_MARKER_SIDE"]
+    assert "全部" in HINTS["RAD_MARKER_SIDE"]
+    assert "mid:" in HINTS["RAD_FEATURE_PREFIX_EXCLUDE"]

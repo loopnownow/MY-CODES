@@ -215,3 +215,70 @@ def test_auc_prefilter_topk():
     kept = _prefilter_by_auc(X, y, topk=3, verbose=False)
     assert kept.shape[1] == 3
     assert "signal" in kept.columns
+
+
+def test_normalize_switch_controls_scaling_only(monkeypatch):
+    """RAD_NORMALIZE=False 只去掉 z-score；插补、零方差、NZV 与保留列不变。"""
+    from modules.stats import radiomics as radmod
+
+    rng = np.random.RandomState(0)
+    train = pd.DataFrame({
+        "f1": rng.normal(5, 2, 80),
+        "f2": rng.normal(0, 1, 80),
+        "const": np.ones(80),
+    })
+    val = pd.DataFrame({
+        "f1": rng.normal(7, 2, 20),
+        "f2": rng.normal(0, 1, 20),
+        "const": np.ones(20),
+    })
+    monkeypatch.setattr(radmod.cfg, "RAD_NORMALIZE", True, raising=False)
+    x_on, p_on = _fit_preprocess(train, cutoff=1.0, enable_corr=False, verbose=False)
+    monkeypatch.setattr(radmod.cfg, "RAD_NORMALIZE", False, raising=False)
+    x_off, p_off = _fit_preprocess(train, cutoff=1.0, enable_corr=False, verbose=False)
+
+    assert p_on["normalize"] is True
+    assert p_off["normalize"] is False
+    assert list(x_on.columns) == list(x_off.columns) == ["f1", "f2"]
+    assert np.allclose(x_on.mean(), 0.0, atol=1e-12)
+    assert np.allclose(x_on.std(ddof=1), 1.0, atol=1e-12)
+    assert np.allclose(x_off.to_numpy(), train[list(x_off.columns)].to_numpy())
+    assert (p_off["means"] == 0.0).all()
+    assert (p_off["stds"] == 1.0).all()
+    assert np.allclose(p_on["means"], train[["f1", "f2"]].mean())
+
+    xv_on = _apply_preprocess(val, p_on)
+    xv_off = _apply_preprocess(val, p_off)
+    assert np.allclose(xv_off.to_numpy(), val[list(xv_off.columns)].to_numpy())
+    assert not np.allclose(xv_on.to_numpy(), val[list(xv_on.columns)].to_numpy())
+    # 旧缓存/旧结果的 params 没有 normalize 键：仍按存下的 means/stds 套用。
+    legacy = {k: v for k, v in p_on.items() if k != "normalize"}
+    assert np.allclose(_apply_preprocess(val, legacy).to_numpy(), xv_on.to_numpy())
+
+
+def test_rad_normalize_default_and_lasso_cache_key():
+    """RAD_NORMALIZE 默认开、属预处理分节；LASSO 缓存键包含该开关。"""
+    from modules.config.defaults import DEFAULT_SETTINGS
+    from modules.config.ini_io import INI_SECTIONS
+    from modules.stats.radiomics import (
+        _LASSO_CACHE_VERSION,
+        _lasso_cache_digest,
+        _lasso_cache_params,
+    )
+
+    assert DEFAULT_SETTINGS["RAD_NORMALIZE"] is True
+    sec = {k: sid for sid, _t, ks in INI_SECTIONS for k in ks}
+    assert sec["RAD_NORMALIZE"] == "radprep"
+
+    base = dict(
+        alpha=1.0, nfolds=5, n_cs=3, seed=1, max_iter=100, topk=0,
+        c_min=1e-3, c_max=50.0, tol=1e-3, cutoff=0.95, enable_corr=True,
+    )
+    on = _lasso_cache_params(normalize=True, **base)
+    off = _lasso_cache_params(normalize=False, **base)
+    assert on["normalize"] is True and off["normalize"] is False
+    assert on["cache_version"] == off["cache_version"] == _LASSO_CACHE_VERSION
+    assert _LASSO_CACHE_VERSION >= 2
+    X = pd.DataFrame({"f1": [0.0, 1.0, 2.0], "f2": [3.0, 2.0, 1.0]})
+    y = np.array([0, 1, 1])
+    assert _lasso_cache_digest(X, y, on) != _lasso_cache_digest(X, y, off)
