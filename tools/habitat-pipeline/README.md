@@ -13,4 +13,5 @@ Compared against MY-CODES `modules/` and `pre-submit/lxf_PP` by filename + SHA-2
 - Same *basename* only: `pipeline.py` / `radiomics.py` exist under `modules/` but are a different package (stats console engine) — **do not merge into modules/**.
 
 ## lxf_PP
-Related note parked at `D:\0Grok\pre-submit\lxf_PP\ref\code-gates\Desktop7z-habitat-pipeline-t1727u.md`.
+Related note parked at `pre-submit/lxf_PP/ref/code-gates/Desktop7z-habitat-pipeline-t1727u.md`
+(relative to the 0Grok workspace root).
