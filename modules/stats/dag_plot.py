@@ -11,6 +11,7 @@ import networkx as nx
 import numpy as np
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 Edge = Tuple[str, str]
 
@@ -269,14 +270,19 @@ def plot_assumed_dag(
     ax.axis("off")
 
     handles = [
-        mpatches.Patch(facecolor=_COLOR_CLIN, edgecolor=_COLOR_NODE_EDGE, label="Clinical / pathology"),
-        mpatches.Patch(facecolor=_COLOR_RAD, edgecolor=_COLOR_NODE_EDGE, label="Radiomics"),
-        mpatches.Patch(facecolor=_COLOR_OUT, edgecolor=_COLOR_NODE_EDGE, label="Outcome"),
-        mpatches.Patch(facecolor=_COLOR_EDGE, edgecolor=_COLOR_EDGE, label="Assumed edge"),
+        mpatches.Patch(facecolor=_COLOR_CLIN, edgecolor=_COLOR_NODE_EDGE,
+                       label=fig_label("dag", "legend_clin")),
+        mpatches.Patch(facecolor=_COLOR_RAD, edgecolor=_COLOR_NODE_EDGE,
+                       label=fig_label("dag", "legend_rad")),
+        mpatches.Patch(facecolor=_COLOR_OUT, edgecolor=_COLOR_NODE_EDGE,
+                       label=fig_label("dag", "legend_outcome")),
+        mpatches.Patch(facecolor=_COLOR_EDGE, edgecolor=_COLOR_EDGE,
+                       label=fig_label("dag", "legend_edge")),
     ]
     if hi:
         handles.append(
-            mpatches.Patch(facecolor=_COLOR_HI, edgecolor=_COLOR_HI, label="Mediation-related edge")
+            mpatches.Patch(facecolor=_COLOR_HI, edgecolor=_COLOR_HI,
+                           label=fig_label("dag", "legend_med"))
         )
     leg = ax.legend(
         handles=handles, loc="lower right", fontsize=fs - 0.5, frameon=True,

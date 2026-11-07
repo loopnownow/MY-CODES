@@ -103,6 +103,8 @@ const HIDDEN_FORM_KEYS = new Set([
   // 组学块由 modalityBlocksPanel() 渲染；通用字段渲染器会把 dict 列表画成
   // checklist（value="[object Object]"），所以在这里隐藏。
   "MODALITY_BLOCKS",
+  // 图内标签由 figLabelsPanel() 按图分组渲染（嵌套 dict），不交给通用渲染器。
+  "FIG_LABELS",
   "GROUP_FROM_ID",
   "GROUP_FROM_ID_SEP",
   "GROUP_LEVEL_DISPLAY",

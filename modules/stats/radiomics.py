@@ -38,6 +38,7 @@ from joblib import Parallel, delayed
 import statsmodels.api as sm
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 _ICC_CACHE: Dict[str, Optional[pd.DataFrame]] = {}
 
@@ -1419,14 +1420,8 @@ def score_display_name(name: str) -> str:
     return SCORE_DISPLAY.get(str(name), str(name))
 
 
-# 结果图内的显示名（结果表仍用内部名 Combined）
-FIG_LABEL_OVERRIDES = {"Combined": "Nomogram"}
-
-
-def fig_label(name: str) -> str:
-    """图内显示名：先查 FIG_LABEL_OVERRIDES（按原名或展示名），未命中回落 score_display_name。"""
-    disp = score_display_name(name)
-    return FIG_LABEL_OVERRIDES.get(str(name)) or FIG_LABEL_OVERRIDES.get(disp) or disp
+# 图内模型显示名（含 "Combined"→"Nomogram"）在 modules.config.fig_labels.legend_label；
+# 结果表仍用内部名 Combined。
 
 
 def selected_feature_names(result: Optional[RadiomicsResult]) -> List[str]:
@@ -1939,16 +1934,16 @@ def _plot_lasso(X_scaled: pd.DataFrame, y: np.ndarray, lrcv,
                 ax0.plot(log_lambda, path[:, j], linewidth=0.6, color="steelblue", alpha=0.5)
             ax0.set_title(cfg.panel_title("LASSO Path (refit)"))
         ax0.axvline(np.log(lambda_used), color=mark_c, linestyle="--", linewidth=2)
-        ax0.set_xlabel("log(λ)")
-        ax0.set_ylabel("Coefficients")
+        ax0.set_xlabel(fig_label("lasso", "xlabel"))
+        ax0.set_ylabel(fig_label("lasso", "coef_ylabel"))
         cfg.apply_clean_theme(ax0)
     else:
         fig, ax1 = plt.subplots(1, 1, figsize=(6.5, 5))
 
     ax1.plot(log_lambda, mean_scores, marker="o", markersize=3, color=line_c)
     ax1.axvline(np.log(lambda_used), color=mark_c, linestyle="--", linewidth=2)
-    ax1.set_xlabel("log(λ)")
-    ax1.set_ylabel("CV AUC")
+    ax1.set_xlabel(fig_label("lasso", "xlabel"))
+    ax1.set_ylabel(fig_label("lasso", "auc_ylabel"))
     ax1.set_title(cfg.panel_title("CV AUC"))
     cfg.apply_clean_theme(ax1)
 

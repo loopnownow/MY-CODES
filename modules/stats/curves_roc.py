@@ -20,6 +20,7 @@ from MLstatkit import Delong_test
 import statsmodels.api as sm
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label, legend_label
 from modules.stats.val_mode import resolve_val_mode
 
 N_BOOT_AUC = 1000
@@ -275,8 +276,8 @@ def draw_roc_curves(
     ax.set_xlim(-0.02, 1.02)
     ax.set_ylim(-0.02, 1.02)
     ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("1 − Specificity")
-    ax.set_ylabel("Sensitivity")
+    ax.set_xlabel(fig_label("roc", "xlabel"))
+    ax.set_ylabel(fig_label("roc", "ylabel"))
     ax.set_title(cfg.panel_title(title))
     fs = cfg.FIG_FONT_SIZE
     ax.legend(loc="lower right", fontsize=fs, framealpha=0.95, borderpad=0.6)
@@ -312,7 +313,7 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
     is_val = _is_val_dataset(dataset_label)
     if is_val and mode == "lock_threshold" and lock_from is None:
         lock_from = ROC_LOCK.get("train") or {}
-    from modules.stats.radiomics import score_display_name, fig_label
+    from modules.stats.radiomics import score_display_name
 
     assert len(model_list) >= 1
     color_map = _resolve_color_map(list(model_list.keys()), color_map)
@@ -419,7 +420,7 @@ def plot_roc(model_list: Dict[str, np.ndarray], y: np.ndarray, color_map: Option
         if plot_skip:
             continue
         display_name = (
-            f"{fig_label(nm)}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
+            f"{legend_label(nm)}  AUC={auc:.3f} ({ci[0]:.3f}-{ci[1]:.3f})"
         )
         curves.append((display_name, nm, fpr, tpr))
 
@@ -500,20 +501,21 @@ def plot_auc_by_time(metrics: pd.DataFrame, fname: str, title: str,
         y = piece["AUC"].to_numpy(dtype=float)[order]
         lo = piece[ci_low].to_numpy(dtype=float)[order]
         hi = piece[ci_high].to_numpy(dtype=float)[order]
-        ax.plot(x, y, marker="o", linewidth=2.0, color=colors[nm], label=nm)
+        ax.plot(x, y, marker="o", linewidth=2.0, color=colors[nm], label=legend_label(nm))
         ok = np.isfinite(lo) & np.isfinite(hi)
         if ok.any():
             ax.errorbar(x[ok], y[ok], yerr=np.vstack([y[ok] - lo[ok], hi[ok] - y[ok]]),
                         fmt="none", ecolor=colors[nm], elinewidth=1.0, capsize=3)
     ax.axhline(0.5, linestyle="--", color="#888888", linewidth=1.0)
+    unit = str(getattr(cfg, "SURVIVAL_TIME_UNIT", "months") or "months").strip() or "months"
     if numeric:
         ax.set_xticks(sorted({xpos[t] for t in times}))
-        ax.set_xlabel("Time (months)")
+        ax.set_xlabel(fig_label("roc_time", "xlabel", unit=unit))
     else:
         ax.set_xticks([xpos[t] for t in times])
         ax.set_xticklabels([str(t) for t in times])
-        ax.set_xlabel("Time")
-    ax.set_ylabel("AUC")
+        ax.set_xlabel(fig_label("roc_time", "xlabel_cat"))
+    ax.set_ylabel(fig_label("roc_time", "ylabel"))
     ax.set_ylim(0.0, 1.02)
     ax.set_title(cfg.panel_title(title))
     ax.legend(loc="lower right", fontsize=cfg.FIG_FONT_SIZE, framealpha=0.95)
@@ -578,7 +580,6 @@ def plot_landmark_roc(
 ) -> Optional[plt.Figure]:
     """每一对时间列 / 状态列写一行 AUC，并按二分类 ROC 的画法各出一张曲线。"""
     from modules.utils import dry_run as _dry
-    from modules.stats.radiomics import fig_label
     label = str(dataset_label or "all")
     print(f"\n═══ LANDMARK ROC [{label}] ═══")
     pairs = landmarks.get("pairs") if isinstance(landmarks, dict) else None
@@ -628,7 +629,7 @@ def plot_landmark_roc(
             raw_auc = float(roc_auc_score(lab, score))
             fpr, tpr, _thr = roc_curve(lab, score * roc_score_sign(raw_auc))
             display = (
-                f"{fig_label(nm)}  AUC={float(row['AUC']):.3f} "
+                f"{legend_label(nm)}  AUC={float(row['AUC']):.3f} "
                 f"({float(row['AUC_CI_low']):.3f}-{float(row['AUC_CI_high']):.3f})"
             )
             curves.append((display, str(nm), fpr, tpr))
