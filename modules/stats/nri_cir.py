@@ -20,7 +20,7 @@ import matplotlib.patches as patches
 import statsmodels.api as sm
 
 from modules import config as cfg
-from modules.config.fig_labels import fig_label, legend_label
+from modules.config.fig_labels import fig_label
 
 NRI_CUTOFF: Sequence[float] = (0.0, 0.3, 0.7, 1.0)
 CIR_GRID_COLORS: Sequence[str] = ("#0073C2FF", "#EFC000FF", "#0073C2FF", "#EFC000FF")
@@ -486,14 +486,20 @@ def _is_gray_link(color: str) -> bool:
     return c in gray
 
 
-def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, float],
-                         links: List[tuple], grid_colors: Sequence[str],
-                         link_colors: Sequence[str], start_degree: float, title: str):
+CHORD_SECTOR_KEYS: tuple[str, ...] = ("prev_neg", "prev_pos", "new_neg", "new_pos")
+
+
+def _draw_chord_diagram(ax, sector_keys: Sequence[str], sector_sizes: Dict[str, float],
+                         labels: Dict[str, str], links: List[tuple],
+                         grid_colors: Sequence[str], link_colors: Sequence[str],
+                         start_degree: float, title: str):
     """
     4 扇区弦图。start_degree=90° → PC 左、SC 右。
     灰/红/绿均为全宽弦；红/绿加 PC→SC 方向箭头。
 
-    links : [(from_sector, to_sector, value, color_idx), ...]
+    sector_keys 是固定内部键（prev_neg/prev_pos/new_neg/new_pos），显示文本在
+    labels 里，二者解耦：标签文本重名或改名都不会改变扇区几何。
+    links : [(from_sector_key, to_sector_key, value, color_idx), ...]
     """
     total = sum(sector_sizes.values())
     if total <= 0:
@@ -501,20 +507,21 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
         ax.set_title(cfg.panel_title(title))
         return
 
-    gap = 0.03 * 2 * np.pi / max(len(sector_names), 1)
+    gap = 0.03 * 2 * np.pi / max(len(sector_keys), 1)
     angle = np.deg2rad(start_degree)
     bounds = {}
-    for name in sector_names:
-        span = (sector_sizes[name] / total) * (2 * np.pi - gap * len(sector_names))
+    for name in sector_keys:
+        span = (sector_sizes[name] / total) * (2 * np.pi - gap * len(sector_keys))
         bounds[name] = (angle, angle + span)
         angle += span + gap
 
-    for i, name in enumerate(sector_names):
+    for i, name in enumerate(sector_keys):
         t0, t1 = bounds[name]
         _sector_arc(ax, t0, t1, r_in=0.95, r_out=1.0,
-                    color=grid_colors[i % len(grid_colors)], label=legend_label(name))
+                    color=grid_colors[i % len(grid_colors)],
+                    label=labels.get(name, name))
 
-    cursor = {name: bounds[name][0] for name in sector_names}
+    cursor = {name: bounds[name][0] for name in sector_keys}
     for frm, to, val, color_idx in links:
         if val <= 0:
             continue
@@ -536,13 +543,15 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
     ax.set_title(cfg.panel_title(title), fontsize=cfg.FIG_FONT_SIZE, fontweight="normal")
 
 
-def chord_sector_labels(prev_group: str, new_group: str) -> tuple[str, str, str, str]:
-    """重分类弦图四个扇区标签（旧/新 × 阴/阳），走 FIG_LABELS["nri"] 软标签。"""
-    return (
-        fig_label("nri", "prev_label", group=prev_group),
-        fig_label("nri", "prev_label", group=new_group),
-        fig_label("nri", "new_label", group=prev_group),
-        fig_label("nri", "new_label", group=new_group),
+def chord_sector_labels(neg_group: str, pos_group: str) -> tuple[str, str, str, str]:
+    """重分类弦图四个扇区显示文本（旧/新 × 阴/阳），走 FIG_LABELS["nri"] 软标签。
+
+    返回顺序与 CHORD_SECTOR_KEYS 一致（旧阴、旧阳、新阴、新阳）；每个扇区单独覆盖，
+    缺省是 PC/SC + 分组名。
+    """
+    return tuple(
+        fig_label("nri", key, group=neg_group if key.endswith("neg") else pos_group)
+        for key in CHORD_SECTOR_KEYS
     )
 
 
@@ -574,16 +583,22 @@ def cir_plot(data: Sequence[float], a: str, b: str, c: str, d: str,
 
     for ax, vals, link_colors, title in [(axes[0], d0, link_colors_0, title_0),
                                           (axes[1], d1, link_colors_1, title_1)]:
-        sector_names = [a, b, c, d]
+        keys = CHORD_SECTOR_KEYS
         sector_sizes = {
-            a: vals[0] + vals[2],
-            b: vals[1] + vals[3],
-            c: vals[0] + vals[1],
-            d: vals[2] + vals[3],
+            keys[0]: vals[0] + vals[2],
+            keys[1]: vals[1] + vals[3],
+            keys[2]: vals[0] + vals[1],
+            keys[3]: vals[2] + vals[3],
         }
-        links = [(a, c, vals[0], 0), (b, c, vals[1], 1), (a, d, vals[2], 2), (b, d, vals[3], 3)]
-        _draw_chord_diagram(ax, sector_names, sector_sizes, links,
-                             grid_colors, link_colors, start_degree, title)
+        links = [
+            (keys[0], keys[2], vals[0], 0),
+            (keys[1], keys[2], vals[1], 1),
+            (keys[0], keys[3], vals[2], 2),
+            (keys[1], keys[3], vals[3], 3),
+        ]
+        labels = dict(zip(keys, (a, b, c, d)))
+        _draw_chord_diagram(ax, keys, sector_sizes, labels, links,
+                            grid_colors, link_colors, start_degree, title)
 
     fig.tight_layout()
     if cfg.save_plot(f"chord_{dataset_label}", fig, width=12, height=6, dpi=300):

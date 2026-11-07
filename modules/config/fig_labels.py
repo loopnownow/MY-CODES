@@ -58,8 +58,10 @@ FIG_LABEL_DEFAULTS: Dict[str, Dict[str, tuple]] = {
         "ylabel": ("Y 轴", "Δ Predicted probability"),
     },
     "nri": {
-        "prev_label": ("重分类前扇区（旧模型；{group}=分组名）", "PC {group}"),
-        "new_label": ("重分类后扇区（新模型；{group}=分组名）", "SC {group}"),
+        "prev_neg": ("旧模型·阴性组扇区（{group}=分组名）", "PC {group}"),
+        "prev_pos": ("旧模型·阳性组扇区（{group}=分组名）", "PC {group}"),
+        "new_neg": ("新模型·阴性组扇区（{group}=分组名）", "SC {group}"),
+        "new_pos": ("新模型·阳性组扇区（{group}=分组名）", "SC {group}"),
         "no_data": ("无重分类数据时的文字", "(no data)"),
     },
     "lasso": {
@@ -191,7 +193,28 @@ def normalize_fig_labels(raw: Any) -> Dict[str, Dict[str, str]]:
                 )
             inner[key_s] = val
         out[fig_key] = inner
+    _migrate_nri_labels(out)
     return out
+
+
+def _migrate_nri_labels(out: Dict[str, Dict[str, str]]) -> None:
+    """旧版 NRI 两字段（prev_label/new_label）→ 四扇区字段。
+
+    旧键会把重分类前/后的两个分组写成同名，四扇区各自独立后才能分别编辑；
+    迁移保留用户原文，四个新键缺省时同时套用旧值。
+    """
+    nri = out.get("nri")
+    if not nri:
+        return
+    for legacy, targets in (
+        ("prev_label", ("prev_neg", "prev_pos")),
+        ("new_label", ("new_neg", "new_pos")),
+    ):
+        if legacy not in nri:
+            continue
+        text = nri.pop(legacy)
+        for target in targets:
+            nri.setdefault(target, text)
 
 
 def figure_specs() -> List[dict]:
