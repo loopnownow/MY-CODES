@@ -95,6 +95,7 @@ from modules.console.serve import spawn_successor
 from modules.console import registry as project_registry
 from modules.console import flow_fill as flow_prefill
 from modules.console import flow_figure
+from modules.flowfigure import prefill as flow_canonical
 
 PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
 
@@ -509,6 +510,8 @@ class Handler(BaseHTTPRequestHandler):
                     "/flow_chart.html", "/flow_chart"):
             project = qs.get("project") or ""
             gold = STROBE_PATH
+            if (qs.get("legacy") or [""])[0] == "1":
+                gold = STROBE_PATH.parent / "legacy.html"
             if not gold.is_file():
                 self._err(404, f"缺少 {gold}")
                 return
@@ -601,13 +604,14 @@ class Handler(BaseHTTPRequestHandler):
                 out = flow_prefill.fill_flow_spec(
                     _require_project(qs.get("project")), name, qs.get("dir") or ""
                 )
+                canonical = flow_canonical.from_spec(out.get("spec") or {})
             except Exception as e:  # noqa: BLE001 缺失项原文交页面显示，不补数
                 c, b, t = _json_bytes(
                     {"ok": False, "error": str(e), "spec": None, "missing": []}
                 )
                 self._send(c, b, t)
                 return
-            c, b, t = _json_bytes({"ok": True, **out})
+            c, b, t = _json_bytes({"ok": True, **out, "canonical": canonical})
             self._send(c, b, t)
             return
 
@@ -624,6 +628,8 @@ class Handler(BaseHTTPRequestHandler):
                 })
                 self._send(c, b, t)
                 return
+            if (qs.get("shape") or "") == "legacy":
+                state["spec"] = flow_figure.to_legacy_shape(state["spec"])
             c, b, t = _json_bytes({"ok": True, **state})
             self._send(c, b, t)
             return
@@ -1035,6 +1041,17 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("spec 必须是对象")
             info = flow_figure.render_figure1(proj, spec)
             c, b, t = _json_bytes({"ok": True, **info})
+            self._send(c, b, t)
+            return
+
+        if path == "/api/flow_preview":
+            project = _require_project(body.get("project"))
+            proj = project_dir(project, str(body.get("dir") or ""))
+            spec = body.get("spec")
+            if not isinstance(spec, dict):
+                raise ValueError("spec 必须是对象")
+            info = flow_figure.preview_figure1(proj, spec, body.get("overrides"))
+            c, b, t = _json_bytes(info)
             self._send(c, b, t)
             return
 

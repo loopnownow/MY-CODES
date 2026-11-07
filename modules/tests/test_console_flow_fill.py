@@ -9,6 +9,7 @@ import docx
 import pytest
 
 from modules.console import flow_figure
+from modules.flowfigure import spec as flow_spec
 from modules.console.flow_fill import (
     default_manuscript,
     flow_spec_from_docx,
@@ -161,7 +162,7 @@ def test_ensure_figure1_section_falls_back_to_body(tmp_path):
 
 
 def test_render_figure1_end_to_end(tmp_path):
-    """真实工具子进程：写单一源 spec、落 PNG+PDF、回填 Results；跑一次 < 10s。"""
+    """进程内渲染：写 canonical spec、落 PNG+PDF、回填 Results；返回 page_cm/warnings。"""
     proj = tmp_path / "proj"
     proj.mkdir()
     res, html = _write_results_html(proj)
@@ -169,7 +170,9 @@ def test_render_figure1_end_to_end(tmp_path):
     info = flow_figure.render_figure1(proj, MIN_SPEC)
 
     spec_file = proj / flow_figure.FIG1_SPEC_REL
-    assert json.loads(spec_file.read_text(encoding="utf-8")) == MIN_SPEC
+    expected = flow_spec.normalize(MIN_SPEC)
+    assert json.loads(spec_file.read_text(encoding="utf-8")) == expected
+    assert expected["schema_version"] == 2
     png = res / "PNG" / "figure1_flow.png"
     pdf = res / "PNG" / "figure1_flow.pdf"
     assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
@@ -183,9 +186,14 @@ def test_render_figure1_end_to_end(tmp_path):
     assert info["pdf_rel"] == "Results_demo/PNG/figure1_flow.pdf"
     assert info["results"] == ["Results_demo"]
     assert info["patched"] == ["Results_demo/Results_demo.html"]
+    assert info["page_cm"][0] == pytest.approx(16.0, abs=0.05)
+    assert info["warnings"] == []
     state = flow_figure.read_figure1_state(proj)
-    assert state["spec"] == MIN_SPEC
+    assert state["spec"] == expected
     assert state["png_exists"] is True
+    assert state["geometry"]["page_in"][0] > 0
+    assert {box["id"] for box in state["geometry"]["boxes"]} >= {"screened", "analyzed"}
+    assert json.dumps(state)  # GET 响应必须可 JSON 序列化
 
 
 def test_render_figure1_bad_spec_writes_nothing(tmp_path):
@@ -206,3 +214,77 @@ def test_render_figure1_bad_spec_writes_nothing(tmp_path):
     assert not (res / "PNG" / "figure1_flow.png").exists()
     assert not (res / "PNG" / "figure1_flow.pdf").exists()
     assert html.read_text(encoding="utf-8") == before_html
+
+
+def test_state_geometry_matches_rendered_png_page(tmp_path):
+    """GET 的 geometry.page_in 与磁盘 PNG 像素尺寸一致（同一次渲染）。"""
+    from PIL import Image
+
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    res, _html = _write_results_html(proj)
+    flow_figure.render_figure1(proj, MIN_SPEC)
+
+    state = flow_figure.read_figure1_state(proj)
+    png = proj / state["png_rel"]
+    image = Image.open(png)
+    page_w, page_h = state["geometry"]["page_in"]
+    assert abs(image.size[0] - page_w * 300) <= 1
+    assert abs(image.size[1] - page_h * 300) <= 1
+
+
+def test_render_figure1_applies_spec_overrides_and_keeps_them(tmp_path):
+    """overrides 随 spec 落盘，GET 返回的 geometry 已应用平移。"""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    res, _html = _write_results_html(proj)
+    spec = json.loads(json.dumps(MIN_SPEC))
+    spec["overrides"] = {"boxes": {"analyzed": {"x": 0.5, "y": 0.5}}, "edges": {}, "hidden": []}
+
+    flow_figure.render_figure1(proj, spec)
+
+    saved = json.loads((proj / flow_figure.FIG1_SPEC_REL).read_text(encoding="utf-8"))
+    assert saved["overrides"]["boxes"]["analyzed"] == {"x": 0.5, "y": 0.5}
+    state = flow_figure.read_figure1_state(proj)
+    analyzed = next(box for box in state["geometry"]["boxes"] if box["id"] == "analyzed")
+    assert analyzed["x"] == pytest.approx(0.5)
+    assert analyzed["y"] == pytest.approx(0.5)
+    assert state["warnings"] == []
+
+
+def test_read_state_reports_unknown_override_id_as_warning(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    _res, _html = _write_results_html(proj)
+    spec = json.loads(json.dumps(MIN_SPEC))
+    spec["overrides"] = {"boxes": {"ghost": {"x": 1, "y": 1}}, "edges": {}, "hidden": []}
+    from modules.flowfigure import spec as flow_spec
+    from modules.console import flow_figure as figure
+
+    target = proj / figure.FIG1_SPEC_REL
+    target.parent.mkdir(parents=True)
+    target.write_text(flow_spec.to_json_text(flow_spec.normalize(spec)), encoding="utf-8")
+
+    state = figure.read_figure1_state(proj)
+    assert state["warnings"]
+    assert "ghost" in state["warnings"][0]
+
+
+def test_legacy_shape_bridge_round_trips_to_canonical():
+    """legacy.html 读的旧 shape 经 normalize 能回到同一份 canonical（含 overrides）。"""
+    canonical = flow_spec.normalize(MIN_SPEC)
+    canonical["overrides"] = {
+        "boxes": {"analyzed": {"x": 1.0, "y": 2.0}}, "edges": {}, "hidden": [],
+    }
+    legacy = flow_figure.to_legacy_shape(canonical)
+    assert legacy["screened"] == canonical["screened"]["text"]
+    assert "arm_0" in legacy["presplit"]
+    assert legacy["overrides"]["boxes"]["analyzed"] == {"x": 1.0, "y": 2.0}
+
+    back = flow_spec.normalize(legacy)
+    assert back["schema_version"] == 2
+    assert back["layout"] == canonical["layout"]
+    assert back["presplit"][0]["n"] == canonical["presplit"][0]["n"]
+    assert back["downsample"][0]["n"] == canonical["downsample"][0]["n"]
+    assert back["cohorts"][0]["n"] == canonical["cohorts"][0]["n"]
+    assert back["overrides"]["boxes"]["analyzed"] == {"x": 1.0, "y": 2.0}
