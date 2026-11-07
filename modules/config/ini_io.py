@@ -99,7 +99,7 @@ INI_SECTIONS: list[tuple[str, str, list[str]]] = [
     ("switch", "模块开关", [
         "DO_FALSE_CLASS", "DO_FDR", "DO_FWER",
         "VIF_THRESHOLD_WARN", "DO_DROP_DERIVED", "BOOTSTRAP_N",
-        "DO_QC_REPORT", "QC_HTML",
+        "QC_HTML",
         "DO_COMBINED_MODEL",
         "DO_NOMOGRAM", "NOMOGRAM_SOURCE", "DO_CALIBRATION",
         "DO_ROC", "ROC_MV_P_THRESHOLD", "FORCE_CLIN_FOR_ROC", "ROC_PLOT_EXCLUDE",

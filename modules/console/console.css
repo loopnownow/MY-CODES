@@ -62,8 +62,11 @@ header #loadHint .err{color:#ffc9c9}
 #pvDataForm .field-group.exclude>.grp-rest{grid-template-columns:repeat(4,minmax(0,1fr))}
 #pvDataForm .pick-row input[type=text]{flex:1 1 18em;width:100%}
 #pvDataForm #ioCard{padding:0;background:transparent;box-shadow:none;border:0}
-.pv-role{display:grid;gap:4px}
-.pv-role-head,.pv-role-row{display:grid;grid-template-columns:minmax(6em,1.1fr) 5.5em minmax(7em,1fr) minmax(7em,1fr) minmax(7em,1fr);gap:6px;align-items:center}
+#pvDataCard,#pvDataForm,.pv-sec,.pv-file-card,#pvSheets,.pv-role,.pv-role-head,.pv-role-row{min-width:0}
+#pvDataForm,.pv-sec,.pv-file-card,.pv-role,.pv-col{grid-template-columns:minmax(0,1fr)}
+#pvSheets{overflow-x:auto}
+.pv-role{display:grid;gap:4px;min-width:0}
+.pv-role-head,.pv-role-row{display:grid;grid-template-columns:minmax(4.5em,1fr) 4.2em minmax(5.4em,1fr) minmax(5.4em,1fr) minmax(5.4em,1fr);gap:6px;align-items:center;min-width:0}
 .pv-role-head{color:var(--muted);font-size:11px;letter-spacing:.04em}
 .pv-role-row{padding:4px 0;border-top:1px dashed var(--line)}
 .pv-role-row .sheet{font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -71,8 +74,8 @@ header #loadHint .err{color:#ffc9c9}
 .pv-role-row.is-rad .sheet{font-weight:600;color:var(--accent)}
 .pv-role-row.is-off{opacity:.55}
 .pv-role select,.pv-role input{width:100%;min-width:0;font-size:12px;padding:4px 6px}
-.pv-exc{display:grid;gap:4px}
-.pv-exc-head,.pv-exc-row{display:grid;grid-template-columns:minmax(9em,1.4fr) auto minmax(7em,1fr) minmax(7em,1fr) minmax(8em,1fr) auto;gap:6px;align-items:center}
+.pv-exc{display:grid;gap:4px;min-width:0}
+.pv-exc-head,.pv-exc-row{display:grid;grid-template-columns:minmax(9em,1.4fr) auto minmax(7em,1fr) minmax(7em,1fr) minmax(8em,1fr) auto;gap:6px;align-items:center;min-width:0}
 .pv-exc-head{color:var(--muted);font-size:11px;letter-spacing:.04em}
 .pv-exc-row{padding:4px 0;border-top:1px dashed var(--line)}
 .pv-exc-row input,.pv-exc-row select{width:100%;min-width:0;font-size:12px;padding:4px 6px}

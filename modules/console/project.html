@@ -260,7 +260,7 @@ footer{
           <button type="button" id="btnScan" hidden tabindex="-1" aria-hidden="true">探测</button>
         </div>
         <div class="svc-btns">
-          <button type="button" class="pri" id="btnSvcOn" title="启动所选端口的控制台服务，开启后自动进入「统计配置」。">开启服务</button>
+          <button type="button" class="pri" id="btnSvcOn" title="启动所选端口的控制台服务，开启后自动进入「数据预览」。">开启服务</button>
           <button type="button" id="btnSvcOff" title="停止所选端口上的本控制台服务；不关闭其它程序。">关闭服务</button>
         </div>
       </div>
@@ -643,7 +643,7 @@ function pageUrl(p) {
   }
   const dir = fileDir();
   if (dir) q.set("dir", dir);
-  if (PROJECT) q.set("tab", "config");
+  if (PROJECT) q.set("tab", "preview");
   const qs = q.toString();
   return host(p) + "/?" + qs;
 }
