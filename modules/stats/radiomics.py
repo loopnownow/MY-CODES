@@ -1921,7 +1921,7 @@ def _plot_lasso(X_scaled: pd.DataFrame, y: np.ndarray, lrcv,
         if path is not None and path.shape[0] == len(Cs):
             for j in range(min(path.shape[1], X_scaled.shape[1])):
                 ax0.plot(log_lambda, path[:, j], linewidth=0.6, color="steelblue", alpha=0.5)
-            ax0.set_title("LASSO Path (from CV)")
+            ax0.set_title(cfg.panel_title("LASSO Path (from CV)"))
         else:
             from sklearn.linear_model import LogisticRegression
             path = np.zeros((len(Cs), X_scaled.shape[1]))
@@ -1937,7 +1937,7 @@ def _plot_lasso(X_scaled: pd.DataFrame, y: np.ndarray, lrcv,
                 path[i, :] = m.coef_.ravel()
             for j in range(path.shape[1]):
                 ax0.plot(log_lambda, path[:, j], linewidth=0.6, color="steelblue", alpha=0.5)
-            ax0.set_title("LASSO Path (refit)")
+            ax0.set_title(cfg.panel_title("LASSO Path (refit)"))
         ax0.axvline(np.log(lambda_used), color=mark_c, linestyle="--", linewidth=2)
         ax0.set_xlabel("log(λ)")
         ax0.set_ylabel("Coefficients")
@@ -1949,7 +1949,7 @@ def _plot_lasso(X_scaled: pd.DataFrame, y: np.ndarray, lrcv,
     ax1.axvline(np.log(lambda_used), color=mark_c, linestyle="--", linewidth=2)
     ax1.set_xlabel("log(λ)")
     ax1.set_ylabel("CV AUC")
-    ax1.set_title("CV AUC")
+    ax1.set_title(cfg.panel_title("CV AUC"))
     cfg.apply_clean_theme(ax1)
 
     fig.tight_layout()

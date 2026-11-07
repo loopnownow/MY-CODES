@@ -329,7 +329,9 @@ def plot_habitat_fractions(df: pd.DataFrame, out_dir: str | Path) -> Dict[str, P
             patch.set_facecolor(color)
             patch.set_alpha(0.65)
         ax.set_ylabel("Volume fraction within nodule (%)")
-        ax.set_title("Distribution of habitat volume fractions (n = {})".format(len(df)))
+        ax.set_title(cfg.panel_title(
+            "Distribution of habitat volume fractions (n = {})".format(len(df))
+        ))
         ax.grid(axis="y", linestyle="--", alpha=0.4)
         fig.tight_layout()
         p1 = out / "suppl_fig_s1_habitat_fractions.png"
@@ -353,10 +355,12 @@ def plot_habitat_fractions(df: pd.DataFrame, out_dir: str | Path) -> Dict[str, P
             )
             for i, patch in enumerate(ax.artists if hasattr(ax, "artists") else []):
                 pass
-            ax.set_title(lab)
+            ax.set_title(cfg.panel_title(lab))
             ax.grid(axis="y", linestyle="--", alpha=0.35)
         axes[0].set_ylabel("Volume fraction (%)")
-        fig.suptitle("Habitat fractions by nodule-level K-means fallback", y=1.02)
+        fig.suptitle(cfg.panel_title(
+            "Habitat fractions by nodule-level K-means fallback"
+        ), y=1.02)
         fig.tight_layout()
         p2 = out / "suppl_fig_s2_habitat_by_fallback.png"
         fig.savefig(p2, dpi=200, bbox_inches="tight")
