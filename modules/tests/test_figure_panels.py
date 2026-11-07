@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import os
+import re
+from pathlib import Path
 
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 
@@ -59,6 +62,53 @@ def test_report_nomogram_calibration_headings(tmp_path, monkeypatch):
     both = rp._nomogram_calibration_html(str(tmp_path))
     assert both.index("<h3>Nomogram</h3>") < both.index("<h3>Calibration</h3>")
     assert "panel_nomogram_calibration.png" not in both
+
+
+def test_every_figure_title_goes_through_panel_switch():
+    """静态契约：modules/（不含 tests）里 set_title(/suptitle( 都必须经图内标题开关或清空。"""
+    root = Path(__file__).resolve().parents[1]
+    allowed = ("panel_title", "panel_titles_on")
+    empty_reset = re.compile(r"""(?:set_title|suptitle)\(\s*["']{2}""")
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        if "tests" in path.parts:
+            continue
+        for lineno, line in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), 1,
+        ):
+            if "set_title(" not in line and "suptitle(" not in line:
+                continue
+            if any(tok in line for tok in allowed) or empty_reset.search(line):
+                continue
+            offenders.append(f"{path.relative_to(root).as_posix()}:{lineno}: {line.strip()}")
+    assert not offenders, "图内标题必须经 cfg.panel_title / cfg.panel_titles_on：\n" + "\n".join(offenders)
+
+
+def test_figure_title_switch_off_and_on(monkeypatch):
+    """行为契约：开关关时 axes 标题为空；开时恢复既有标题文字；轴标签不变。"""
+    from modules.stats import vif_analysis
+
+    frames = []
+
+    def _cap(filename, fig, *args, **kwargs):
+        frames.append(fig)
+        return False
+
+    monkeypatch.setattr(vif_analysis.cfg, "save_plot", _cap)
+    df = pd.DataFrame({"Variable": ["age", "sex"], "VIF": [1.2, 3.4]})
+
+    monkeypatch.setattr(vif_analysis.cfg, "FIGURE_PANEL_TITLES", False, raising=False)
+    vif_analysis.plot_vif_bar(df, dataset_label="train")
+    ax = frames[-1].axes[0]
+    assert ax.get_title() == ""
+    assert ax.get_xlabel() == "VIF"
+    assert ax.get_ylabel() == ""
+
+    monkeypatch.setattr(vif_analysis.cfg, "FIGURE_PANEL_TITLES", True, raising=False)
+    vif_analysis.plot_vif_bar(df, dataset_label="train")
+    ax = frames[-1].axes[0]
+    assert ax.get_title() == "Variance Inflation Factor (train)"
+    assert ax.get_xlabel() == "VIF"
 
 
 def test_partial_pairs_cross_two_lists():

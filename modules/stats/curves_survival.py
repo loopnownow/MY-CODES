@@ -233,7 +233,7 @@ def plot_km_overall(
     ax.set_xlabel(f"Time ({time_unit})")
     ax.set_ylabel("Recurrence-free probability")
     ttl = title or f"Kaplan–Meier — Recurrence-free ({dataset_label})"
-    ax.set_title(ttl)
+    ax.set_title(cfg.panel_title(ttl))
     ax.legend(loc="best", frameon=True)
     cfg.apply_clean_theme(ax, grid=True, legend=True)
     fig.tight_layout()
@@ -332,7 +332,7 @@ def plot_km_by_group(
     ax.set_xlabel(f"Time ({time_unit})")
     ax.set_ylabel("Recurrence-free probability")
     ttl = title or f"Kaplan–Meier by {group_name} ({dataset_label})"
-    ax.set_title(ttl)
+    ax.set_title(cfg.panel_title(ttl))
     ax.legend(loc="best", frameon=True)
     cfg.apply_clean_theme(ax, grid=True, legend=True)
     fig.tight_layout()

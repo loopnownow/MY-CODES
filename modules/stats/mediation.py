@@ -238,7 +238,8 @@ def plot_mediation_path(res: Dict[str, Any], path_id: str, label: str) -> None:
     title = f"{path_id}: {label}"
     if len(title) > 64:
         title = title[:61] + "…"
-    ax.set_title(title, fontsize=fs, color="#111111", fontweight="normal", pad=8)
+    ax.set_title(cfg.panel_title(title), fontsize=fs, color="#111111",
+                 fontweight="normal", pad=8)
     fig.tight_layout()
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in path_id)
     wrote = cfg.save_plot(f"mediation_{safe}", fig, width=8.4, height=4.2)
