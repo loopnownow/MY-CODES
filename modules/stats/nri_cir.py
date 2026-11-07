@@ -497,7 +497,7 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
     """
     total = sum(sector_sizes.values())
     if total <= 0:
-        ax.text(0, 0, "(no data)", ha="center", va="center")
+        ax.text(0, 0, fig_label("nri", "no_data"), ha="center", va="center")
         ax.set_title(cfg.panel_title(title))
         return
 
@@ -534,6 +534,16 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(cfg.panel_title(title), fontsize=cfg.FIG_FONT_SIZE, fontweight="normal")
+
+
+def chord_sector_labels(prev_group: str, new_group: str) -> tuple[str, str, str, str]:
+    """重分类弦图四个扇区标签（旧/新 × 阴/阳），走 FIG_LABELS["nri"] 软标签。"""
+    return (
+        fig_label("nri", "prev_label", group=prev_group),
+        fig_label("nri", "prev_label", group=new_group),
+        fig_label("nri", "new_label", group=prev_group),
+        fig_label("nri", "new_label", group=new_group),
+    )
 
 
 def cir_plot(data: Sequence[float], a: str, b: str, c: str, d: str,
