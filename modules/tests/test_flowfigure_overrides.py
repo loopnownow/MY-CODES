@@ -29,23 +29,33 @@ def _box(geometry, box_id):
 
 def test_move_box_translates_boundary_edge_endpoints():
     geometry = _geometry()
-    box = _box(geometry, "analyzed")
+    box = _box(geometry, "cohort-0")
     old_x, old_y = box["x"], box["y"]
     edges_before = geometry["edges"]
+    top_x = old_x + box["w"] / 2
     attached = [
         index for index, edge in enumerate(edges_before)
-        if abs(edge["b"][0] - (old_x + box["w"] / 2)) < 1e-6 and abs(edge["b"][1] - old_y) < 1e-6
+        if (
+            abs(edge["a"][0] - top_x) < 1e-6 and abs(edge["a"][1] - (old_y + box["h"])) < 1e-6
+        ) or (
+            abs(edge["b"][0] - top_x) < 1e-6 and abs(edge["b"][1] - old_y) < 1e-6
+        )
     ]
     assert attached
 
-    result = overrides.apply_overrides(geometry, {"boxes": {"analyzed": {"x": old_x + 0.3, "y": old_y - 0.1}}})
-    moved = _box(result, "analyzed")
-    assert moved["x"] == old_x + 0.3
-    assert moved["y"] == old_y - 0.1
+    result = overrides.apply_overrides(geometry, {"boxes": {"cohort-0": {"x": old_x + 0.3, "y": old_y - 0.1}}})
+    moved = _box(result, "cohort-0")
+    assert moved["x"] == pytest.approx(old_x + 0.3)
+    assert moved["y"] == pytest.approx(old_y - 0.1)
     for index in attached:
-        endpoint = result["edges"][index]["b"]
-        assert endpoint[0] == pytest.approx(old_x + box["w"] / 2 + 0.3)
-        assert endpoint[1] == pytest.approx(old_y - 0.1)
+        edge = result["edges"][index]
+        for end in ("a", "b"):
+            old_end = edges_before[index][end]
+            on_top = abs(old_end[1] - old_y) < 1e-6
+            on_bottom = abs(old_end[1] - (old_y + box["h"])) < 1e-6
+            if abs(old_end[0] - top_x) < 1e-6 and (on_top or on_bottom):
+                assert edge[end][0] == pytest.approx(old_end[0] + 0.3)
+                assert edge[end][1] == pytest.approx(old_end[1] - 0.1)
     assert result["page_in"] == geometry["page_in"]
 
 
@@ -75,10 +85,10 @@ def test_unknown_ids_are_dropped_with_warnings():
 
 def test_move_is_clamped_to_page():
     geometry = _geometry()
-    box = _box(geometry, "analyzed")
+    box = _box(geometry, "cohort-0")
     result = overrides.apply_overrides(
-        geometry, {"boxes": {"analyzed": {"x": -5, "y": 999}}},
+        geometry, {"boxes": {"cohort-0": {"x": -5, "y": 999}}},
     )
-    moved = _box(result, "analyzed")
-    assert moved["x"] == 0.0
-    assert moved["y"] == result["page_in"][1] - box["h"]
+    moved = _box(result, "cohort-0")
+    assert moved["x"] == pytest.approx(0.0)
+    assert moved["y"] == pytest.approx(result["page_in"][1] - box["h"])

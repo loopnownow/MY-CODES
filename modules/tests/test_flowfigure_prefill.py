@@ -29,8 +29,8 @@ STUDY_SPEC = {
 def test_from_spec_maps_to_canonical_and_validates():
     out = prefill.from_spec(STUDY_SPEC)
     assert out["spec"]["layout"] == "study"
-    assert out["spec"]["schema_version"] == 2
-    assert out["spec"]["analyzed"]["n"] == 310
+    assert out["spec"]["schema_version"] == 3
+    assert out["spec"]["included"]["n"] == 310
     assert out["problems"] == []
 
 
@@ -73,5 +73,5 @@ def test_from_docx_maps_methods_and_keeps_missing(tmp_path):
     assert out["file"] == "Manuscript_demo_V1.docx"
     assert out["spec"]["layout"] == "study"
     assert out["spec"]["screened"]["n"] == 375
-    assert out["spec"]["analyzed"]["n"] == 310
+    assert out["spec"]["included"]["n"] == 310
     assert "training set n" in out["missing"]
