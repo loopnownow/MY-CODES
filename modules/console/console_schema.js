@@ -100,6 +100,9 @@ const HIDDEN_FORM_KEYS = new Set([
   "CORR_F_REF",
   "OUTCOME_OVERRIDES",
   "PAIRWISE_OVERRIDES",
+  // 组学块由 modalityBlocksPanel() 渲染；通用字段渲染器会把 dict 列表画成
+  // checklist（value="[object Object]"），所以在这里隐藏。
+  "MODALITY_BLOCKS",
   "GROUP_FROM_ID",
   "GROUP_FROM_ID_SEP",
   "GROUP_LEVEL_DISPLAY",
