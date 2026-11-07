@@ -134,6 +134,17 @@ def test_prepare_blocks_leaves_text_when_switch_off(monkeypatch):
     assert not pd.api.types.is_numeric_dtype(blocks["CTA"]["echo"])
 
 
+def test_prepare_blocks_drops_all_empty_columns():
+    """整列空值列先去掉（不是文本、也不能建模）；有值的数值列不受影响。"""
+    raw = _frame()
+    raw["blank"] = [None, None, None, None]
+    specs = {"CTA": normalize_blocks([{"name": "CTA", "method": "logistic"}])[0]}
+    blocks = data_io._prepare_blocks({"CTA": raw}, ["P1", "P2", "P3", "P4"], specs)
+    cta = blocks["CTA"]
+    assert "blank" not in cta.columns
+    assert "num" in cta.columns and pd.api.types.is_numeric_dtype(cta["num"])
+
+
 def test_encoded_block_levels_keep_original_labels():
     """编码后 Table 1/2 与列线图要显示原始文字（Hyperechoic…），不是 0/1/2。"""
     data_io.CLIN_LEVEL_MAPS = {}

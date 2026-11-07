@@ -1343,26 +1343,52 @@ def _prefix_id_names(extra=None) -> set[str]:
 
 
 def _marker_anchor(token: str) -> tuple[str, str]:
-    """保存下来的标记 → (端, 正文)。
+    """保存下来的标记 → (匹配方式, 正文)。
 
-    检出的后缀存成 suffix:_Vgm，只认列名结尾。
-    没有这前缀的旧标记仍只认列名开头，不根据首字符猜测。
+    匹配方式：end = suffix: 只认结尾；start = prefix: 只认开头；
+    mid = mid: 只认分隔符对齐的任意位置；auto = 裸标记，先按开头旧规则，
+    再按分隔符对齐的任意位置。不根据首字符猜测端。
     """
     raw = str(token or "")
-    mark = "suffix:"
-    if raw.startswith(mark):
-        return "end", raw[len(mark):]
-    if raw.startswith("prefix:"):
-        return "start", raw[len("prefix:"):]
-    return "start", raw
+    for mark, anchor in (
+        ("suffix:", "end"),
+        ("prefix:", "start"),
+        ("mid:", "mid"),
+    ):
+        if raw.startswith(mark):
+            return anchor, raw[len(mark):]
+    return "auto", raw
+
+
+def _delimiter_aligned(name: str, part: str) -> bool:
+    """标记正文是否以下划线对齐方式出现在列名任意位置。
+
+    命中任一：列名等于正文、以「正文_」开头、以「_正文」结尾、
+    含「_正文_」。比较前先去掉正文首尾下划线。
+    """
+    p = str(part).strip("_")
+    if not p:
+        return False
+    s = str(name)
+    return (
+        s == p
+        or s.startswith(p + "_")
+        or s.endswith("_" + p)
+        or ("_" + p + "_") in s
+    )
 
 
 def _column_matches_prefix(name: str, prefix: str) -> bool:
-    """列名是否命中已选标记。筛选和分类共用。不在名称中间匹配。
+    """列名是否命中已选标记。筛选和分类共用。
 
-    前缀只认列名开头。以 __ 结尾时同时覆盖少一个下划线的族
-    （perfusion_weighted__ 也命中 perfusion_weighted_Frontal_L）。
-    后缀（suffix: 开头的保存值）只认列名结尾。
+    标记按保存形式分四种：
+    - suffix:PART 只认列名结尾；
+    - prefix:PART 只认列名开头；
+    - mid:PART 认分隔符对齐的任意位置（列名等于 PART、PART_ 开头、
+      _PART 结尾、或 _PART_ 在中间；比较前去 PART 首尾下划线）；
+    - 裸 PART 先按旧规则认列名开头，以 __ 结尾时同时覆盖少一个下划线的族
+      （perfusion_weighted__ 也命中 perfusion_weighted_Frontal_L），
+      再按与 mid: 相同的分隔符对齐规则认任意位置。
     """
     s = str(name)
     anchor, part = _marker_anchor(prefix)
@@ -1370,17 +1396,25 @@ def _column_matches_prefix(name: str, prefix: str) -> bool:
         return False
     if anchor == "end":
         return s.endswith(part)
-    if s.startswith(part):
-        return True
-    if part.endswith("__"):
-        broad = part[:-1]
-        if broad and s.startswith(broad):
+    if anchor in ("start", "auto"):
+        if s.startswith(part):
             return True
-    return False
+        if part.endswith("__"):
+            broad = part[:-1]
+            if broad and s.startswith(broad):
+                return True
+        if anchor == "start":
+            return False
+    return _delimiter_aligned(s, part)
 
 
 def _strip_anchored_token(name: str, token: str) -> str:
-    """只剥已选标记所在的那一端，与 _column_matches_prefix 同一套规则。"""
+    """剥掉命中标记及其相邻的下划线，与 _column_matches_prefix 同一套规则。
+
+    end 去结尾标记；start / 裸标记先去掉开头标记，再去分隔符对齐处的标记；
+    mid 只去分隔符对齐处。开头的「PART_」整段去掉；中间「_PART_」收成一个
+    下划线；结尾「_PART」整段去掉。残留的双下划线由显示层再收。
+    """
     s = str(name)
     anchor, part = _marker_anchor(token)
     if not part:
@@ -1389,12 +1423,26 @@ def _strip_anchored_token(name: str, token: str) -> str:
         if s.endswith(part):
             return s[: -len(part)]
         return s
-    if s.startswith(part):
-        return s[len(part):]
-    if part.endswith("__"):
-        broad = part[:-1]
-        if broad and s.startswith(broad):
-            return s[len(broad):]
+    if anchor in ("start", "auto"):
+        if s.startswith(part):
+            return s[len(part):]
+        if part.endswith("__"):
+            broad = part[:-1]
+            if broad and s.startswith(broad):
+                return s[len(broad):]
+        if anchor == "start":
+            return s
+    p = str(part).strip("_")
+    if not p:
+        return s
+    if s == p:
+        return ""
+    if s.startswith(p + "_"):
+        return s[len(p) + 1:]
+    if s.endswith("_" + p):
+        return s[: -len(p) - 1]
+    if ("_" + p + "_") in s:
+        return s.replace("_" + p + "_", "_", 1)
     return s
 
 
@@ -1438,7 +1486,7 @@ def _merge_block_frames(blocks: Dict[str, pd.DataFrame]) -> pd.DataFrame:
 
 
 def _prepare_rad_frame(rad_raw: pd.DataFrame, id_col: str = "") -> pd.DataFrame:
-    """统一组学表 ID 列为 Name，去掉 Group，并丢掉前缀筛选命中的特征。"""
+    """统一组学表 ID 列为 Name，去掉 Group，并丢掉选中标记命中的特征。"""
     rad = rad_raw.copy()
     if "Name" not in rad.columns:
         preferred = str(id_col or getattr(cfg, "RAD_ID_COL", "") or "").strip()
@@ -1552,6 +1600,18 @@ def _prepare_blocks(
         frame = text_encode.prepare_frame(
             frame, frame_label=name, auto=(None if encode_on else False)
         )
+        # 整列空值列不是文本、也不能建模：先去掉，日志与后续 ICC/相关筛选不再为它报警。
+        empty_cols = [
+            str(c) for c in frame.columns
+            if c != "Name" and not pd.api.types.is_numeric_dtype(frame[c])
+            and int(frame[c].notna().sum()) == 0
+        ]
+        if empty_cols:
+            frame = frame.drop(columns=empty_cols)
+            print(
+                f"  ◆ 模态块 {name!r}: {len(empty_cols)} 个整列空值列（不进建模）: "
+                f"{empty_cols[:8]}{' …' if len(empty_cols) > 8 else ''}"
+            )
         text_cols = [
             str(c) for c in frame.columns
             if c != "Name" and not pd.api.types.is_numeric_dtype(frame[c])

@@ -698,11 +698,12 @@ def _widget_for(key: str, value: Any, sheets: list[str], clin_cols: list[str],
         return field
     if key == "RAD_MARKER_SIDE":
         field["widget"] = "select"
-        field["options"] = ["prefix", "suffix", "both"]
+        field["options"] = ["prefix", "suffix", "mid", "both"]
         field["option_labels"] = {
             "prefix": "前缀",
             "suffix": "后缀",
-            "both": "二者",
+            "mid": "中间",
+            "both": "全部",
         }
         return field
     if key == "RAD_FEATURE_SOURCE":
