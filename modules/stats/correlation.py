@@ -416,7 +416,7 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
     cbar.set_label("Spearman ρ", fontsize=fs)
     cbar.ax.tick_params(labelsize=fs)
-    ax.set_title("Spearman Correlation — Selected Features",
+    ax.set_title(cfg.panel_title("Spearman Correlation — Selected Features"),
                  fontsize=fs, fontweight="normal")
     cfg.apply_clean_theme(ax, grid=False, legend=False)
     fig.tight_layout()

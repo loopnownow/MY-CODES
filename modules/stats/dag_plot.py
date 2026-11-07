@@ -264,7 +264,8 @@ def plot_assumed_dag(
             fc = _COLOR_CLIN
         _draw_rounded_node(ax, pos[n], labels[n], fc, fs, sizes[n])
 
-    ax.set_title(title, fontsize=fs + 1, pad=12, color=_COLOR_TEXT, fontweight="normal")
+    ax.set_title(cfg.panel_title(title), fontsize=fs + 1, pad=12, color=_COLOR_TEXT,
+                 fontweight="normal")
     ax.axis("off")
 
     handles = [

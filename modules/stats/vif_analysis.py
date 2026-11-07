@@ -156,7 +156,7 @@ def plot_vif_bar(vif_df: pd.DataFrame, dataset_label: str = "combined",
     ax.set_yticklabels(df["Variable"].tolist(), fontsize=fs)
     ax.invert_yaxis()
     ax.set_xlabel("VIF", fontsize=fs)
-    ax.set_title(f"Variance Inflation Factor ({dataset_label})",
+    ax.set_title(cfg.panel_title(f"Variance Inflation Factor ({dataset_label})"),
                  fontsize=fs, fontweight="normal")
     ax.legend(loc="lower right", fontsize=fs)
     cfg.apply_clean_theme(ax, grid=True, legend=True)

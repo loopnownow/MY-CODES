@@ -373,7 +373,7 @@ def plot_idi(idi_res: Dict, dataset_label: str = "train",
     lo = idi_res.get("IDI_CI_low", np.nan)
     hi = idi_res.get("IDI_CI_high", np.nan)
     fs = cfg.FIG_FONT_SIZE
-    ax.set_title("Integrated Discrimination Improvement (IDI)",
+    ax.set_title(cfg.panel_title("Integrated Discrimination Improvement (IDI)"),
                  fontweight="normal", fontsize=fs)
     ax.set_ylabel("Δ Predicted probability", fontsize=fs)
     ci_txt = (
@@ -497,7 +497,7 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
     total = sum(sector_sizes.values())
     if total <= 0:
         ax.text(0, 0, "(no data)", ha="center", va="center")
-        ax.set_title(title)
+        ax.set_title(cfg.panel_title(title))
         return
 
     gap = 0.03 * 2 * np.pi / max(len(sector_names), 1)
@@ -532,7 +532,7 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
     ax.set_ylim(-1.3, 1.3)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title(title, fontsize=cfg.FIG_FONT_SIZE, fontweight="normal")
+    ax.set_title(cfg.panel_title(title), fontsize=cfg.FIG_FONT_SIZE, fontweight="normal")
 
 
 def cir_plot(data: Sequence[float], a: str, b: str, c: str, d: str,
