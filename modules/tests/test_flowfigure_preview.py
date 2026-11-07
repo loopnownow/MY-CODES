@@ -55,9 +55,9 @@ def test_preview_audit_failure_returns_problems_and_writes_nothing(tmp_path):
 
 def test_preview_applies_overrides():
     geometry = flow_figure.preview_figure1(
-        ".", SPEC, {"boxes": {"analyzed": {"x": 0.5, "y": 0.5}}},
+        ".", SPEC, {"boxes": {"arm-0": {"x": 0.5, "y": 0.5}}},
     )["geometry"]
-    box = next(item for item in geometry["boxes"] if item["id"] == "analyzed")
+    box = next(item for item in geometry["boxes"] if item["id"] == "arm-0")
     assert (box["x"], box["y"]) == (0.5, 0.5)
 
 

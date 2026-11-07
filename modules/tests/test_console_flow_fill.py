@@ -172,7 +172,7 @@ def test_render_figure1_end_to_end(tmp_path):
     spec_file = proj / flow_figure.FIG1_SPEC_REL
     expected = flow_spec.normalize(MIN_SPEC)
     assert json.loads(spec_file.read_text(encoding="utf-8")) == expected
-    assert expected["schema_version"] == 2
+    assert expected["schema_version"] == 3
     png = res / "PNG" / "figure1_flow.png"
     pdf = res / "PNG" / "figure1_flow.pdf"
     assert png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
@@ -192,7 +192,7 @@ def test_render_figure1_end_to_end(tmp_path):
     assert state["spec"] == expected
     assert state["png_exists"] is True
     assert state["geometry"]["page_in"][0] > 0
-    assert {box["id"] for box in state["geometry"]["boxes"]} >= {"screened", "analyzed"}
+    assert {box["id"] for box in state["geometry"]["boxes"]} >= {"screened", "cohort-0"}
     assert json.dumps(state)  # GET 响应必须可 JSON 序列化
 
 
@@ -239,16 +239,16 @@ def test_render_figure1_applies_spec_overrides_and_keeps_them(tmp_path):
     proj.mkdir()
     res, _html = _write_results_html(proj)
     spec = json.loads(json.dumps(MIN_SPEC))
-    spec["overrides"] = {"boxes": {"analyzed": {"x": 0.5, "y": 0.5}}, "edges": {}, "hidden": []}
+    spec["overrides"] = {"boxes": {"arm-0": {"x": 0.5, "y": 0.5}}, "edges": {}, "hidden": []}
 
     flow_figure.render_figure1(proj, spec)
 
     saved = json.loads((proj / flow_figure.FIG1_SPEC_REL).read_text(encoding="utf-8"))
-    assert saved["overrides"]["boxes"]["analyzed"] == {"x": 0.5, "y": 0.5}
+    assert saved["overrides"]["boxes"]["arm-0"] == {"x": 0.5, "y": 0.5}
     state = flow_figure.read_figure1_state(proj)
-    analyzed = next(box for box in state["geometry"]["boxes"] if box["id"] == "analyzed")
-    assert analyzed["x"] == pytest.approx(0.5)
-    assert analyzed["y"] == pytest.approx(0.5)
+    arm = next(box for box in state["geometry"]["boxes"] if box["id"] == "arm-0")
+    assert arm["x"] == pytest.approx(0.5)
+    assert arm["y"] == pytest.approx(0.5)
     assert state["warnings"] == []
 
 
@@ -282,7 +282,7 @@ def test_legacy_shape_bridge_round_trips_to_canonical():
     assert legacy["overrides"]["boxes"]["analyzed"] == {"x": 1.0, "y": 2.0}
 
     back = flow_spec.normalize(legacy)
-    assert back["schema_version"] == 2
+    assert back["schema_version"] == 3
     assert back["layout"] == canonical["layout"]
     assert back["presplit"][0]["n"] == canonical["presplit"][0]["n"]
     assert back["downsample"][0]["n"] == canonical["downsample"][0]["n"]
