@@ -62,9 +62,10 @@ def _render(raw, out):
 def test_expanded_spec_renders_all_nodes(tmp_path):
     _canonical, geometry = _render(EXPANDED, tmp_path / "expanded.png")
     ids = {box["id"] for box in geometry["boxes"]}
-    assert {"screened", "arm-0", "arm-1", "downsample-0", "cohort-0", "cohort-1"} <= ids
+    assert {"screened", "arm-0", "arm-1", "downsample-0", "cohort-0"} <= ids
+    assert "cohort-1" not in ids  # Test set 与 Test Cohort 同 n，去重
     assert "analyzed" not in ids
-    assert geometry["labels"][0]["text"] == "n=249 (PP n=53 · non-PP n=196)"
+    assert not any(label["id"] == "analyzed" for label in geometry["labels"])
 
 
 def test_published_spec_renders_criteria_and_cohorts(tmp_path):
