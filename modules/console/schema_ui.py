@@ -223,6 +223,10 @@ def hydrate_console_settings(settings: dict[str, Any]) -> dict[str, Any]:
     )
     if "MODALITY_BLOCKS" in settings:
         settings["MODALITY_BLOCKS"] = _as_blocks(settings.get("MODALITY_BLOCKS"))
+    if "FIG_LABELS" in settings:
+        from modules.config.fig_labels import normalize_fig_labels
+
+        settings["FIG_LABELS"] = normalize_fig_labels(settings.get("FIG_LABELS"))
     if "TEXT_ENCODE" in settings:
         from modules.stats.text_encode import normalize_spec
 

@@ -154,6 +154,16 @@ def test_normalize_fig_labels_contract():
     with pytest.raises(ValueError, match="必须是字符串"):
         normalize_fig_labels({"roc": {"xlabel": None}})
 
+    # 旧版 NRI 两字段 → 四扇区字段（保留原文；显式新键优先）。
+    assert normalize_fig_labels(
+        {"nri": {"prev_label": "旧", "new_label": "新"}}
+    ) == {"nri": {
+        "prev_neg": "旧", "prev_pos": "旧", "new_neg": "新", "new_pos": "新",
+    }}
+    assert normalize_fig_labels(
+        {"nri": {"prev_label": "旧", "prev_neg": "旧-阴"}}
+    ) == {"nri": {"prev_neg": "旧-阴", "prev_pos": "旧"}}
+
 
 def test_figure_specs_shape_and_json():
     import json
@@ -230,7 +240,9 @@ def test_vif_labels_default_and_override(monkeypatch):
 
 
 def test_nri_sector_labels_default_and_override(monkeypatch):
-    """NRI 重分类弦图的扇区标签走 fig_label("nri")：默认 PC/SC + 分组名，可手写覆盖。"""
+    """NRI 重分类弦图四个扇区标签各自走软标签；文本重名也不破坏扇区几何。"""
+    from matplotlib.patches import Polygon
+
     import modules.config as cfg
     from modules.stats import nri_cir
 
@@ -260,16 +272,42 @@ def test_nri_sector_labels_default_and_override(monkeypatch):
 
     monkeypatch.setattr(
         cfg, "FIG_LABELS",
-        {"nri": {"prev_label": "旧 {group}", "new_label": "新 {group}"}},
+        {"nri": {
+            "prev_neg": "旧-{group}", "prev_pos": "旧+{group}",
+            "new_neg": "新-{group}", "new_pos": "新+{group}",
+        }},
         raising=False,
     )
     assert nri_cir.chord_sector_labels("Neg", "Pos") == (
-        "旧 Neg", "旧 Pos", "新 Neg", "新 Pos",
+        "旧-Neg", "旧+Pos", "新-Neg", "新+Pos",
     )
-    nri_cir.cir_plot(data, a="旧 Neg", b="旧 Pos", c="新 Neg", d="新 Pos")
+    nri_cir.cir_plot(data, a="旧-Neg", b="旧+Pos", c="新-Neg", d="新+Pos")
     texts = _texts()
-    assert "旧 Neg" in texts and "旧 Pos" in texts
-    assert "新 Neg" in texts and "新 Pos" in texts
+    assert "旧-Neg" in texts and "旧+Pos" in texts
+    assert "新-Neg" in texts and "新+Pos" in texts
+
+    # 回归：四个扇区写成同一文本时也不能塌（曾经用标签当 dict 键 → 只剩 2 个扇区）
+    monkeypatch.setattr(
+        cfg, "FIG_LABELS",
+        {"nri": {
+            "prev_neg": "同", "prev_pos": "同",
+            "new_neg": "同", "new_pos": "同",
+        }},
+        raising=False,
+    )
+    nri_cir.cir_plot(data, a="同", b="同", c="同", d="同")
+    sectors = [p for p in frames[-1].axes[0].patches if isinstance(p, Polygon)]
+    assert len(sectors) == 4
+
+    # 旧版两字段配置（用户已存）→ 迁移后直接生效，不再回落 PC/SC。
+    monkeypatch.setattr(
+        cfg, "FIG_LABELS",
+        {"nri": {"prev_label": "Pseudoprogress", "new_label": "Non-pseudoprogress"}},
+        raising=False,
+    )
+    assert nri_cir.chord_sector_labels("Neg", "Pos") == (
+        "Pseudoprogress", "Pseudoprogress", "Non-pseudoprogress", "Non-pseudoprogress",
+    )
 
 
 def test_partial_pairs_cross_two_lists():
