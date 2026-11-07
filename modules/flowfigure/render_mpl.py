@@ -63,9 +63,26 @@ def render(geometry: dict, out_path, quiet: bool = False) -> Path:
                 linespacing=1.42,
             )
 
+    for label in geometry.get("labels") or []:
+        align = label.get("align") or "center"
+        ax.text(
+            label["x"], label["y"], label["text"],
+            ha="left" if align == "left" else "center",
+            va="top", fontsize=label["fs"], fontfamily=FONT,
+            color=EDGE, linespacing=1.42,
+        )
+
     for edge in geometry["edges"]:
         (x1, y1), (x2, y2) = edge["a"], edge["b"]
-        if edge["kind"] == "arrow":
+        if edge["kind"] == "dashed":
+            ax.add_patch(
+                FancyArrowPatch(
+                    (x1, y1), (x2, y2), arrowstyle="-", mutation_scale=1,
+                    linewidth=0.9, color=EDGE, shrinkA=0, shrinkB=0,
+                    linestyle=(0, (4, 3)),
+                )
+            )
+        elif edge["kind"] == "arrow":
             ax.add_patch(
                 FancyArrowPatch(
                     (x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=11,

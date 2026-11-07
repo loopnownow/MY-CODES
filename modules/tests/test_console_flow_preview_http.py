@@ -102,3 +102,50 @@ def test_preview_post_without_token_is_rejected():
         _stop_server(httpd)
     assert status == 403
     assert "token" in json.loads(body)["error"]
+
+
+def test_save_design_post_forwards_spec(monkeypatch):
+    captured = {}
+
+    def fake(proj, spec):
+        captured.update(project=str(proj), spec=spec)
+        return {"draft_rel": "ref/pipeline/figure1_strobe.draft.json", "saved_at": "2026-11-07 21:00:00"}
+
+    monkeypatch.setattr(http_impl.flow_figure, "save_design", fake)
+    monkeypatch.setattr(http_impl, "_require_project", lambda value: str(value))
+    monkeypatch.setattr(
+        http_impl, "project_dir", lambda name, explicit_dir="": Path("C:/fake") / str(name),
+    )
+    spec = {"layout": "expanded-split-downsample", "screened": {"text": "x", "n": 1}}
+    httpd, port = _start_server()
+    try:
+        status, body = _post(
+            port, "/api/flow_save_design", {"project": "demo", "spec": spec},
+            token=CONSOLE_TOKEN, origin=f"http://127.0.0.1:{port}",
+        )
+    finally:
+        _stop_server(httpd)
+    assert status == 200
+    assert json.loads(body)["ok"] is True
+    assert captured["spec"] == spec
+
+
+def test_discard_design_post_returns_flag(monkeypatch):
+    monkeypatch.setattr(
+        http_impl.flow_figure, "discard_design",
+        lambda proj: {"draft_rel": "ref/pipeline/figure1_strobe.draft.json", "discarded": True},
+    )
+    monkeypatch.setattr(http_impl, "_require_project", lambda value: str(value))
+    monkeypatch.setattr(
+        http_impl, "project_dir", lambda name, explicit_dir="": Path("C:/fake") / str(name),
+    )
+    httpd, port = _start_server()
+    try:
+        status, body = _post(
+            port, "/api/flow_discard_design", {"project": "demo"},
+            token=CONSOLE_TOKEN, origin=f"http://127.0.0.1:{port}",
+        )
+    finally:
+        _stop_server(httpd)
+    assert status == 200
+    assert json.loads(body)["discarded"] is True

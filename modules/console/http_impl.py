@@ -1044,6 +1044,25 @@ class Handler(BaseHTTPRequestHandler):
             self._send(c, b, t)
             return
 
+        if path == "/api/flow_save_design":
+            project = _require_project(body.get("project"))
+            proj = project_dir(project, str(body.get("dir") or ""))
+            spec = body.get("spec")
+            if not isinstance(spec, dict):
+                raise ValueError("spec 必须是对象")
+            info = flow_figure.save_design(proj, spec)
+            c, b, t = _json_bytes({"ok": True, **info})
+            self._send(c, b, t)
+            return
+
+        if path == "/api/flow_discard_design":
+            project = _require_project(body.get("project"))
+            proj = project_dir(project, str(body.get("dir") or ""))
+            info = flow_figure.discard_design(proj)
+            c, b, t = _json_bytes({"ok": True, **info})
+            self._send(c, b, t)
+            return
+
         if path == "/api/flow_preview":
             project = _require_project(body.get("project"))
             proj = project_dir(project, str(body.get("dir") or ""))
