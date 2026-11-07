@@ -164,8 +164,8 @@ def test_figure_specs_shape_and_json():
     assert isinstance(specs, list) and len(specs) >= 12
     ids = [s["id"] for s in specs]
     for need in ("roc", "roc_time", "dca", "calibration", "nomogram", "km",
-                 "shap", "vif", "correlation", "lasso", "dag", "mediation",
-                 "qc_habitat", "legend"):
+                 "shap", "vif", "correlation", "idi", "nri", "lasso", "dag",
+                 "mediation", "qc_habitat", "legend"):
         assert need in ids
     for spec in specs:
         assert isinstance(spec["id"], str) and spec["id"]
@@ -227,6 +227,49 @@ def test_vif_labels_default_and_override(monkeypatch):
     ax = frames[-1].axes[0]
     assert ax.get_xlabel() == "方差膨胀因子"
     assert [t.get_text() for t in ax.get_legend().get_texts()] == ["阈值 5"]
+
+
+def test_nri_sector_labels_default_and_override(monkeypatch):
+    """NRI 重分类弦图的扇区标签走 fig_label("nri")：默认 PC/SC + 分组名，可手写覆盖。"""
+    import modules.config as cfg
+    from modules.stats import nri_cir
+
+    frames = []
+
+    def _cap(filename, fig, *args, **kwargs):
+        frames.append(fig)
+        return False
+
+    monkeypatch.setattr(nri_cir.cfg, "save_plot", _cap)
+    data = [10, 2, 3, 5, 4, 6, 1, 2]
+
+    def _texts():
+        out = []
+        for ax in frames[-1].axes:
+            out.extend(t.get_text() for t in ax.texts)
+        return out
+
+    monkeypatch.setattr(cfg, "FIG_LABELS", {}, raising=False)
+    assert nri_cir.chord_sector_labels("Neg", "Pos") == (
+        "PC Neg", "PC Pos", "SC Neg", "SC Pos",
+    )
+    nri_cir.cir_plot(data, a="PC Neg", b="PC Pos", c="SC Neg", d="SC Pos")
+    texts = _texts()
+    assert "PC Neg" in texts and "PC Pos" in texts
+    assert "SC Neg" in texts and "SC Pos" in texts
+
+    monkeypatch.setattr(
+        cfg, "FIG_LABELS",
+        {"nri": {"prev_label": "旧 {group}", "new_label": "新 {group}"}},
+        raising=False,
+    )
+    assert nri_cir.chord_sector_labels("Neg", "Pos") == (
+        "旧 Neg", "旧 Pos", "新 Neg", "新 Pos",
+    )
+    nri_cir.cir_plot(data, a="旧 Neg", b="旧 Pos", c="新 Neg", d="新 Pos")
+    texts = _texts()
+    assert "旧 Neg" in texts and "旧 Pos" in texts
+    assert "新 Neg" in texts and "新 Pos" in texts
 
 
 def test_partial_pairs_cross_two_lists():
