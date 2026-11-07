@@ -19,7 +19,7 @@ PROJECT = (CONSOLE / "project.html").read_text(encoding="utf-8")
 CSS = (CONSOLE / "console.css").read_text(encoding="utf-8")
 UI = (CONSOLE / "console_ui.js").read_text(encoding="utf-8")
 SCHEMA_JS = (CONSOLE / "console_schema.js").read_text(encoding="utf-8")
-STROBE = (CONSOLE / "strobe" / "index.html").read_text(encoding="utf-8")
+LEGACY_STROBE = (CONSOLE / "strobe" / "legacy.html").read_text(encoding="utf-8")
 SCHEMA = (ROOT / "modules" / "console" / "schema.py").read_text(encoding="utf-8")
 INI_IO = (ROOT / "modules" / "config" / "ini_io.py").read_text(encoding="utf-8")
 CSS_TIGHT = re.sub(r"\s+", "", CSS)
@@ -158,7 +158,7 @@ def test_flowchart_audits_only_the_numbers_it_is_given():
     audit_study({"included_n": 10})
     doc = inspect.getdoc(audit_study) or ""
     assert "只校验已给数字" in doc
-    assert "n = -" in STROBE
+    assert "n = -" in LEGACY_STROBE
 
 
 def test_rad_normalize_is_a_title_toggle_on_the_omics_module():
