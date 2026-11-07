@@ -38,9 +38,9 @@ def test_expanded_geometry_has_stable_box_ids_and_analyzed_label():
     }
     geometry = layout.build(spec_mod.normalize(raw))
     ids = [box["id"] for box in geometry["boxes"]]
-    assert ids == ["screened", "arm-0", "arm-1", "downsample-0", "cohort-0", "cohort-1"]
+    assert ids == ["screened", "arm-0", "arm-1", "downsample-0", "cohort-0"]
     assert "analyzed" not in ids
-    assert "90 analyzed" in geometry["labels"][0]["text"]
+    assert "analyzed" not in {label["id"] for label in geometry["labels"]}
     assert geometry["page_in"][0] == pytest.approx(
         spec_mod.TARGET_WIDTH_CM / spec_mod.CM_PER_INCH, abs=0.05,
     )
@@ -60,7 +60,7 @@ def test_study_geometry_exposes_steps_models_explain_and_included():
     assert "analyzed" not in ids
 
 
-def test_steps_order_controls_vertical_order():
+def test_steps_order_controls_horizontal_order():
     base = {
         "screened": "screened (n = 10)",
         "cohorts": [{"id": "cohort-0", "label": "Training Cohort", "n": 10}],
@@ -73,7 +73,8 @@ def test_steps_order_controls_vertical_order():
     first = layout.build(spec_mod.normalize(base))
     lasso = next(box for box in first["boxes"] if box["id"] == "step-0")
     roc = next(box for box in first["boxes"] if box["id"] == "step-1")
-    assert lasso["y"] < roc["y"]
+    assert lasso["x"] < roc["x"]
+    assert lasso["y"] == pytest.approx(roc["y"])
 
     reversed_spec = {
         **base,
@@ -87,7 +88,8 @@ def test_steps_order_controls_vertical_order():
     bottom = next(box for box in second["boxes"] if box["id"] == "step-1")
     assert top["lines"][0] == "ROC AUC"
     assert bottom["lines"][0] == "LASSO logistic"
-    assert top["y"] < bottom["y"]
+    assert top["x"] < bottom["x"]
+    assert top["y"] == pytest.approx(bottom["y"])
 
 
 def test_external_uses_dashed_bracket_and_stays_out_of_arithmetic():
