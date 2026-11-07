@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.inspection import permutation_importance
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 
 def _fit_sklearn_logit(X: np.ndarray, y: np.ndarray) -> LogisticRegression:
@@ -105,7 +106,7 @@ def run_shap(
         fs = cfg.FIG_FONT_SIZE
         ax.set_yticks(range(len(imp)))
         ax.set_yticklabels(short_lab, fontsize=fs)
-        ax.set_xlabel("mean |SHAP value|", fontsize=fs)
+        ax.set_xlabel(fig_label("shap", "xlabel"), fontsize=fs)
         ax.set_title(cfg.panel_title(f"SHAP importance — radiomics (train){suf}"), fontsize=fs)
         cfg.apply_clean_theme(ax, grid=True, legend=False)
         ax.grid(axis="y", visible=False)
@@ -128,7 +129,7 @@ def run_shap(
             shap.summary_plot(
                 shap_values, Xmat[idx], feature_names=short_names,
                 show=False, max_display=min(20, len(feats)),
-                plot_size=None, color_bar_label="Feature value",
+                plot_size=None, color_bar_label=fig_label("shap", "cbar"),
             )
             fig2 = plt.gcf()
             fig2.patch.set_facecolor("white")
@@ -179,7 +180,7 @@ def run_shap(
         fs = cfg.FIG_FONT_SIZE
         ax.set_yticks(range(len(imp)))
         ax.set_yticklabels([str(x) for x in imp["Feature"]], fontsize=fs)
-        ax.set_xlabel("Permutation importance (Δ AUC)", fontsize=fs)
+        ax.set_xlabel(fig_label("permutation", "xlabel"), fontsize=fs)
         ax.set_title(cfg.panel_title(f"Permutation importance — radiomics (train){suf}"), fontsize=fs)
         cfg.apply_clean_theme(ax, grid=True, legend=False)
         ax.grid(axis="y", visible=False)

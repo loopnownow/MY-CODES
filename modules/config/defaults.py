@@ -249,6 +249,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # 图内标题默认关：队列与令牌（train / ext_Validation）交给图注，不写进图里。
     "FIGURE_PANEL_TITLES": False,
     "FIGURE_PANEL_GAP_PX": 8,
+    # 图内软标签：{figure_id: {key: 文本}}；空=用 modules.config.fig_labels 的默认文本。
+    "FIG_LABELS": {},
     "FIG_FONT_SIZE": 11.0,
     "FIG_FONT_FAMILY": "Arial",
     "FIG_PALETTE": "npg",

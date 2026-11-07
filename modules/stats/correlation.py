@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 DEFAULT_NBOOT = 1000
 DEFAULT_CONF_LEVEL = 0.95
@@ -414,7 +415,7 @@ def run_correlation(rad_df: Optional[pd.DataFrame] = None, clin_df: Optional[pd.
                 ax.text(j, i, s, ha="center", va="center",
                         fontsize=fs, fontweight="normal")
     cbar = fig.colorbar(im, ax=ax, shrink=0.8)
-    cbar.set_label("Spearman ρ", fontsize=fs)
+    cbar.set_label(fig_label("correlation", "cbar"), fontsize=fs)
     cbar.ax.tick_params(labelsize=fs)
     ax.set_title(cfg.panel_title("Spearman Correlation — Selected Features"),
                  fontsize=fs, fontweight="normal")

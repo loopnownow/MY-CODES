@@ -25,6 +25,7 @@ from sklearn.metrics import roc_auc_score
 import statsmodels.api as sm
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 NOMOGRAM_POINTS_MAX = 100
 NOMOGRAM_DPI = 300
@@ -497,7 +498,7 @@ def _plot_nomogram(
                 "Nomogram for Individualized Risk Prediction",
                 ha="center", va="center", fontsize=13, fontweight="normal", color=C_AXIS)
 
-    _left_label(y_points, "Points")
+    _left_label(y_points, fig_label("nomogram", "points"))
     _draw_axis(y_points, 0, canvas, C_POINTS, lw=1.9)
     pts_ticks = np.linspace(0, 100, 11)
     _draw_ticks(y_points, pts_ticks, [f"{t:.0f}" for t in pts_ticks], C_POINTS,
@@ -558,7 +559,7 @@ def _plot_nomogram(
             return 0.0
         return float(np.clip(tp / total_max * canvas, 0, canvas))
 
-    _left_label(y_total, "Total Points")
+    _left_label(y_total, fig_label("nomogram", "total_points"))
     _draw_axis(y_total, 0, canvas, C_TOTAL, lw=1.9)
     if total_max <= 100:
         step = 10
@@ -576,7 +577,7 @@ def _plot_nomogram(
         C_TOTAL, label_above=False, fontsize=7.5,
     )
 
-    _left_label(y_prob, "Predicted\nProbability", fontsize=8.8)
+    _left_label(y_prob, fig_label("nomogram", "risk"), fontsize=8.8)
     p_at_0 = _total_points_to_prob(0, lp0, scale)
     p_at_max = _total_points_to_prob(total_max, lp0, scale)
     p_lo, p_hi = min(p_at_0, p_at_max), max(p_at_0, p_at_max)

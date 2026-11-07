@@ -791,6 +791,109 @@ function modelOptionItems() {
 function modelOptionValues() {
   return modelOptionItems().map(o => o.v);
 }
+
+// ---- 图内标签（FIG_LABELS 软标签）：按图分组手写，空=默认 ----
+function figLabelSpecs() {
+  // 图/字段清单由后端 figure_specs() 注入到 schema 的 FIG_LABELS 字段。
+  const f = S.schema && S.schema.find((x) => x.key === "FIG_LABELS");
+  return (f && Array.isArray(f.figures)) ? f.figures : [];
+}
+function figLabelValues() {
+  const v = fieldValue("FIG_LABELS");
+  return (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+}
+function figLabelOverride(figure, key) {
+  const g = figLabelValues()[figure];
+  const one = (g && typeof g === "object" && !Array.isArray(g)) ? g : {};
+  const v = one[key];
+  return (v == null) ? "" : String(v);
+}
+function figLabelCount() {
+  const all = figLabelValues();
+  let n = 0;
+  Object.keys(all).forEach((gid) => {
+    const g = all[gid];
+    if (!g || typeof g !== "object") return;
+    Object.keys(g).forEach((k) => {
+      if (String(g[k] == null ? "" : g[k]).trim()) n += 1;
+    });
+  });
+  return n;
+}
+function figLegendKeys(spec) {
+  // 图例伪组：注册表给的模型名 + 已有覆盖键 + 常规三模型 + 本课题现有分数名。
+  const keys = [];
+  ((spec && spec.fields) || []).forEach((x) => keys.push(String(x.key)));
+  Object.keys(figLabelValues().legend || {}).forEach((k) => keys.push(k));
+  ["Clinical", "RadScore", "Combined"].concat(blockScoreNames()).forEach((k) => keys.push(k));
+  return uniqKeep(keys);
+}
+function figLabelRow(figure, key, label, def) {
+  const val = figLabelOverride(figure, key);
+  return `<div class="kv-row"><span class="grp-chip" title="${esc(label)}">${esc(label)}</span><input data-fig-label="${esc(figure)}" data-fig-key="${esc(key)}" value="${esc(val)}" placeholder="${esc(def)}" spellcheck="false"/></div>`;
+}
+function figLabelGroup(spec) {
+  const figure = String((spec && spec.id) || "");
+  if (!figure) return "";
+  const fields = (spec.fields && Array.isArray(spec.fields)) ? spec.fields : [];
+  const rows = figure === "legend"
+    ? figLegendKeys(spec).map((k) => {
+      const f = fields.find((x) => String(x.key) === k);
+      return figLabelRow(
+        figure, k, (f && f.label) || k,
+        (f && f.default != null) ? String(f.default) : k
+      );
+    })
+    : fields.map((x) => figLabelRow(
+      figure, x.key, x.label || x.key, x.default != null ? String(x.default) : ""
+    ));
+  if (!rows.length) return "";
+  const reset = `<button type="button" class="rad-prefix-rescan" data-fig-reset="${esc(figure)}" title="清空这一组的覆盖，全部回默认">恢复默认</button>`;
+  return `<div class="fig-label-group" data-fig-group="${esc(figure)}"><div class="kv-sub">${esc(spec.title || figure)}${reset}</div>${rows.join("")}</div>`;
+}
+function figLabelsPanel() {
+  const specs = figLabelSpecs();
+  if (!specs.length) return "";
+  const groups = specs.map(figLabelGroup).filter(Boolean).join("");
+  if (!groups) return "";
+  const open = S.kvFoldOpen && S.kvFoldOpen.FIG_LABELS ? " open" : "";
+  const n = figLabelCount();
+  return `<details class="kv-fold" data-fold="FIG_LABELS"${open}>
+    <summary>图内标签（软标签） <span class="kv-sum">${n ? "已改 " + n + " 项" : "全部默认"}</span></summary>
+    <div class="kv-rows fig-labels">${groups}</div>
+  </details>`;
+}
+function setFigLabel(figure, key, raw) {
+  // 写嵌套 FIG_LABELS[图][字段]；空字符串=删覆盖（用默认）。
+  const gid = String(figure || "").trim();
+  const k = String(key || "").trim();
+  if (!gid || !k) return;
+  const s = String(raw == null ? "" : raw).trim();
+  const all = Object.assign({}, figLabelValues());
+  const one = Object.assign({}, (all[gid] && typeof all[gid] === "object") ? all[gid] : {});
+  if (s) one[k] = s;
+  else delete one[k];
+  if (Object.keys(one).length) all[gid] = one;
+  else delete all[gid];
+  setFieldValue("FIG_LABELS", all);
+  markDirty();
+  const d = document.querySelector('details[data-fold="FIG_LABELS"]');
+  const sum = d && d.querySelector("summary .kv-sum");
+  if (sum) {
+    const n = figLabelCount();
+    sum.textContent = n ? ("已改 " + n + " 项") : "全部默认";
+  }
+}
+function resetFigLabelGroup(figure) {
+  const gid = String(figure || "").trim();
+  if (!gid) return;
+  const all = Object.assign({}, figLabelValues());
+  delete all[gid];
+  setFieldValue("FIG_LABELS", all);
+  markDirty();
+  renderForm();
+}
+
 function prettyModelName(v) {
   const t = nameToken(v);
   const hit = modelOptionItems().find(o => nameToken(o.v) === t);
@@ -3339,6 +3442,7 @@ function renderForm() {
       <div class="sec-body fig-body">
         ${bools.length ? `<div class="sec-bools">${bools.map(renderField).join("")}</div>` : ""}
         ${rest.length ? `<div class="fig-fields">${rest.map(renderField).join("")}</div>` : ""}
+        ${figLabelsPanel()}
       </div>
     </div>`;
     }
@@ -5321,6 +5425,12 @@ function bindDelegates() {
       markDirty();
       return;
     }
+    const figReset = e.target.closest("[data-fig-reset]");
+    if (figReset) {
+      e.preventDefault();
+      resetFigLabelGroup(figReset.getAttribute("data-fig-reset") || "");
+      return;
+    }
     const kvDel = e.target.closest("[data-kv-del]");
     if (kvDel) {
       e.preventDefault();
@@ -5366,6 +5476,10 @@ function bindDelegates() {
   });
   document.body.addEventListener("change", (e) => {
     const t = e.target;
+    if (t.dataset.figLabel) {
+      setFigLabel(t.getAttribute("data-fig-label"), t.getAttribute("data-fig-key"), t.value);
+      return;
+    }
     if (t.dataset.list) {
       const key = t.dataset.list;
       const wrap = t.closest(".checks");
