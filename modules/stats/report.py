@@ -298,7 +298,12 @@ def _cleanup_unreferenced_pngs(html_path: str, out_dir: str) -> int:
     for name in os.listdir(png_dir):
         if not name.lower().endswith(".png"):
             continue
-        if name in refs or name.lower().startswith("panel_"):
+        # t1736u: keep study-flow Fig1 even if a future template omits the <img>
+        if (
+            name in refs
+            or name.lower().startswith("panel_")
+            or name.lower() in {"figure1_flow.png", "figure1_strobe.png"}
+        ):
             continue
         try:
             os.remove(os.path.join(png_dir, name))
@@ -2765,6 +2770,17 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
             f"<p>One or more requested analyses did not complete. "
             f"Do not treat missing modules as having been run.</p>"
             f"<ul>{items}</ul></section>"
+        )
+
+    # t1736u: pin study-flow Fig1 so _cleanup_unreferenced_pngs keeps PNG/figure1_flow.png
+    if _f_exists("figure1_flow.png", out_dir):
+        html_parts.append(
+            '<section id="figure1-flow">'
+            '<h2>Figure 1 — Study flow</h2>'
+            '<p class="note">STROBE-style patient flow (Eligible → train/test split → '
+            'training downsample → analyzed cohorts). Asset: PNG/figure1_flow.png.</p>'
+            + _img_tag("figure1_flow.png", "Figure 1 study flow", out_dir)
+            + '</section>'
         )
 
     html_parts.append(_build_panel(
