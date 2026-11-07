@@ -25,12 +25,24 @@ FIG1_PNG_NAME = "figure1_flow.png"
 FIG1_PDF_NAME = "figure1_flow.pdf"
 FIG1_PNG_REL = f"PNG/{FIG1_PNG_NAME}"
 FIG1_PDF_REL = f"PNG/{FIG1_PDF_NAME}"
+FIG1_DRAFT_REL = "ref/pipeline/figure1_strobe.draft.json"
 ANCHOR_TEXT = "A. All Data — Baseline"
 
 
 def spec_path(proj) -> Path:
     """项目内 Figure 1 spec 的绝对路径。"""
     return Path(proj) / FIG1_SPEC_REL
+
+
+def draft_path(proj) -> Path:
+    """项目内 Figure 1 草稿 JSON 的绝对路径（保存设计用，不动正式 spec）。"""
+    return Path(proj) / FIG1_DRAFT_REL
+
+
+def _timestamp() -> str:
+    import time
+
+    return time.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def load_figure1_spec(proj) -> dict:
@@ -167,6 +179,75 @@ def render_figure1(proj, spec) -> dict:
     }
 
 
+def _read_draft(proj) -> dict | None:
+    """读草稿文件；不存在返回 None，JSON 损坏抛 ValueError。"""
+    path = draft_path(proj)
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Figure 1 草稿 JSON 解析失败: {path}: {exc}") from exc
+    if not isinstance(data, dict) or not isinstance(data.get("spec"), dict):
+        raise ValueError(f"Figure 1 草稿缺少 spec: {path}")
+    return data
+
+
+def _canonical_of(proj) -> dict | None:
+    """正式 spec 的 canonical（不存在返回 None；损坏抛出，不静默）。"""
+    path = spec_path(proj)
+    if not path.is_file():
+        return None
+    return flow_spec.normalize(load_figure1_spec(proj))
+
+
+def _content_equal(left: dict, right: dict) -> bool:
+    return json.dumps(left, ensure_ascii=False, sort_keys=True) == json.dumps(
+        right, ensure_ascii=False, sort_keys=True,
+    )
+
+
+def save_design(proj, spec: dict) -> dict:
+    """保存设计草稿：canonical 写 draft，不审计、不渲染、不动正式 spec/PNG/PDF/Results。"""
+    if not isinstance(spec, dict) or not spec:
+        raise ValueError("Figure 1 spec 必须是非空对象")
+    canonical = flow_spec.normalize(spec)
+    saved_at = _timestamp()
+    payload = {"saved_at": saved_at, "spec": canonical}
+    target = draft_path(proj)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _atomic_write_text(
+        target, json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+    )
+    return {"draft_rel": FIG1_DRAFT_REL, "saved_at": saved_at, "spec": canonical}
+
+
+def discard_design(proj) -> dict:
+    """丢弃设计草稿；不存在时返回 discarded=False（不报错）。"""
+    target = draft_path(proj)
+    discarded = target.is_file()
+    if discarded:
+        target.unlink()
+    return {"draft_rel": FIG1_DRAFT_REL, "discarded": discarded}
+
+
+def draft_state(proj) -> dict | None:
+    """GET 用的草稿视图：spec + saved_at + stale + generated。"""
+    draft = _read_draft(proj)
+    if draft is None:
+        return None
+    canonical = _canonical_of(proj)
+    png_rel = figure1_png_rel(proj)
+    generated = bool(canonical is not None and png_rel and (Path(proj) / png_rel).is_file())
+    stale = bool(canonical is None or not _content_equal(draft["spec"], canonical))
+    return {
+        "spec": draft["spec"],
+        "saved_at": draft.get("saved_at") or "",
+        "stale": stale,
+        "generated": generated,
+    }
+
+
 def to_legacy_shape(canonical: dict) -> dict:
     """canonical v2 -> 旧 spec shape（只给 legacy.html 的旧 Figure 1 面板读）。"""
     arms = canonical.get("presplit") or []
@@ -208,9 +289,17 @@ def to_legacy_shape(canonical: dict) -> dict:
 
 
 def read_figure1_state(proj) -> dict:
-    """GET 用：canonical spec + geometry + 产物路径/是否存在。"""
+    """GET 用：canonical spec + geometry + 产物路径 + 草稿视图。
+
+    正式 spec 不存在但草稿存在时，用草稿填充 spec/geometry（页面可继续编辑）。
+    """
     proj = Path(proj)
-    canonical = flow_spec.normalize(load_figure1_spec(proj))
+    draft = draft_state(proj)
+    canonical = _canonical_of(proj)
+    if canonical is None:
+        if draft is None:
+            raise FileNotFoundError(f"缺少 Figure 1 spec: {spec_path(proj)}")
+        canonical = draft["spec"]
     geometry = flow_layout.build(canonical)
     geometry = flow_overrides.apply_overrides(geometry, canonical.get("overrides") or {})
     png_rel = figure1_png_rel(proj)
@@ -222,6 +311,7 @@ def read_figure1_state(proj) -> dict:
         "geometry": geometry,
         "warnings": geometry["warnings"],
         "page_cm": geometry["page_cm"],
+        "draft": draft,
     }
 
 
@@ -231,7 +321,6 @@ def preview_figure1(proj, spec: dict, overrides=None) -> dict:
     返回 {'ok': True, 'png_base64', 'geometry', 'warnings', 'page_cm'}
     或 {'ok': False, 'error', 'problems'}。
     """
-    del proj  # 预览不读写项目文件；project 仅用于路由校验
     try:
         canonical = flow_spec.normalize(spec)
         flow_spec.validate(canonical)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""流程图页新契约：单一源 v2 + /api/flow_preview；旧编辑器只保留 legacy.html。"""
+"""流程图页新契约：v3 表单 + 头部按钮 + 适应/缩放 + 撤销 + 草稿；旧编辑器只在 legacy.html。"""
 from __future__ import annotations
 
 import threading
@@ -32,25 +32,77 @@ def test_page_keeps_the_console_contract():
     assert '"/flow_figure?project="' in html
     assert '"/api/flow_figure"' in html
     assert '"/api/flow_preview"' in html
+    assert '"/api/flow_save_design"' in html
+    assert '"/api/flow_discard_design"' in html
     assert '"/files/"' in html
     assert '"/flow_files?project="' in html
     assert '"/flow_spec?project="' in html
     assert "X-Console-Token" in html
 
 
-def test_page_exposes_the_v2_form_and_preview():
+def test_header_buttons_are_all_in_the_title_row():
     html = _read(STROBE)
     for element_id in (
-        "layout", "screened-text", "screened-n", "inclusion", "exclusion",
-        "presplit-rows", "downsample-rows", "cohort-rows",
-        "analyzed-text", "analyzed-n", "pos-name", "notes",
-        "preview-img", "handles", "tune", "reset", "btn-save", "btn-fill",
+        "btn-undo", "btn-save-design", "btn-save", "btn-tune", "btn-reset",
+        "btn-discard", "btn-zoom-out", "btn-zoom-in", "btn-fit",
+        "manuscript", "btn-fill", "btn-reload", "draft-badge", "zoom-label",
     ):
         assert f'id="{element_id}"' in html, element_id
-    assert "微调版式" in html
-    assert "恢复默认版式" in html
-    assert "未生成" in html and "按手稿重做" in html
-    assert "已按 " in html and "请核对后保存" in html
+    for text in ("撤销", "保存设计", "保存并生成 Figure 1", "微调版式",
+                 "恢复默认版式", "放弃草稿", "适应", "按手稿填写", "重新加载"):
+        assert text in html, text
+    aside = html[html.index("<aside>"):html.index("</aside>")]
+    assert "btn-save" not in aside
+    assert "btn-undo" not in aside
+
+
+def test_page_layout_uses_flex_heights_not_calc_vh():
+    html = _read(STROBE)
+    assert "flex-direction:column" in html
+    assert "flex:1 1 auto" in html
+    assert "min-height:0" in html
+    assert "calc(100vh" not in html
+    assert 'id="canvas"' in html and 'id="canvas-inner"' in html
+
+
+def test_zoom_and_fit_controls():
+    html = _read(STROBE)
+    assert "wheel" in html
+    assert "preventDefault" in html
+    assert "ZOOM_MIN" in html and "ZOOM_MAX" in html and "ZOOM_STEP" in html
+    assert "applyZoom" in html and "fitWindow" in html
+    assert "requestAnimationFrame" in html
+    assert "renderHandles" in html
+
+
+def test_undo_stack_and_shortcut():
+    html = _read(STROBE)
+    assert "MAX_UNDO" in html
+    assert "commitHistory" in html and "undo" in html
+    assert "keydown" in html
+    assert "ctrlKey" in html
+    assert "TEXTAREA" in html
+
+
+def test_draft_ui_and_badge():
+    html = _read(STROBE)
+    assert "draft-badge" in html
+    assert "草稿（" in html
+    assert "saveDesign" in html and "discardDraft" in html
+    assert "saved_at" in html
+    assert "generated" in html and "stale" in html
+
+
+def test_form_has_all_v3_groups_and_no_layout_selector():
+    html = _read(STROBE)
+    for element_id in (
+        "screened-text", "inclusion", "exclusion", "included-text",
+        "presplit-rows", "downsample-rows", "cohort-rows", "external-rows",
+        "step-rows", "analyzed-label", "analyzed-n", "pos-name", "notes",
+    ):
+        assert f'id="{element_id}"' in html, element_id
+    assert 'id="layout"' not in html
+    assert "版式 layout" not in html
 
 
 def test_page_drops_the_legacy_editor():
@@ -68,14 +120,14 @@ def test_legacy_page_keeps_the_old_editor_for_comparison():
     assert "localStorage" in legacy
     assert "bootLegacyFigure1" in legacy
     assert "paintCanvas" in legacy
-    assert "ref/Figure1_flow.json" in legacy
 
 
-def test_server_serves_legacy_on_flag_and_exposes_preview_route():
+def test_server_serves_legacy_on_flag_and_exposes_routes():
     http = _read(HTTP)
     assert '"legacy.html"' in http
     assert 'qs.get("legacy")' in http
-    assert '"/api/flow_preview"' in http
+    for route in ('"/api/flow_preview"', '"/api/flow_save_design"', '"/api/flow_discard_design"'):
+        assert route in http, route
     assert "flow_figure.preview_figure1" in http
 
 
@@ -85,6 +137,8 @@ def test_preview_helper_is_exported():
     assert callable(flow_figure.preview_figure1)
     assert callable(flow_figure.render_figure1)
     assert callable(flow_figure.read_figure1_state)
+    assert callable(flow_figure.save_design)
+    assert callable(flow_figure.discard_design)
 
 
 def _start_server():
@@ -131,7 +185,6 @@ def test_strobe_route_serves_new_page_and_legacy_on_flag():
 
         status, legacy = _get(port, "/strobe?legacy=1")
         assert status == 200
-        assert "SCI Figure 1 · 研究流程图" in legacy
         assert "localStorage" in legacy
         assert "bootLegacyFigure1" in legacy
     finally:

@@ -1,32 +1,31 @@
 # -*- coding: utf-8 -*-
-"""Figure 1 spec v2：canonical 结构、旧 spec 映射、校验与 JSON 写回。
+"""Figure 1 spec v3：canonical 结构、旧 spec 映射、校验与 JSON 写回。
 
-单一源是 ``<project>/ref/pipeline/figure1_strobe.json``；本模块只做纯数据变换，
-不读项目文件、不画图。canonical 结构::
+canonical 结构::
 
     {
-      "schema_version": 2,
-      "layout": "expanded-split-downsample" | "study" | "published-a",
+      "schema_version": 3,
+      "layout": "<来源标记，渲染忽略>",
       "screened": {"text": str, "n": int | None},
       "criteria": {"inclusion": [str],
                    "exclusion": [{"reason": str, "n": int | None}]},
-      "presplit": [{"id": "arm-0", "label": str,
-                    "n": int | None, "pp": int | None, "non_pp": int | None}],
-      "downsample": [{"arm": "arm-0", "n": int | None,
-                      "class": "pp" | "non_pp", "reason": str}],
-      "cohorts": [{"id": "cohort-0", "label": str,
-                   "n": int | None, "pp": int | None, "non_pp": int | None}],
-      "analyzed": {"text": str, "n": int | None},
+      "included": {"text": str, "n": int | None, "pp": int | None, "non_pp": int | None},
+      "presplit": [{"id": "arm-0", "label": str, "n": ..., "pp": ..., "non_pp": ...}],
+      "downsample": [{"arm": "arm-0", "n": ..., "class": "pp" | "non_pp", "reason": str}],
+      "cohorts": [{"id": "cohort-0", "label": str, "n": ..., "pp": ..., "non_pp": ...}],
+      "external": [{"id": "external-0", "label": str, "n": ..., "pp": ..., "non_pp": ...}],
+      "analyzed": {"text": str, "label": str, "n": ..., "pp": ..., "non_pp": ...},
+      "pipeline": {"balance": ..., "balance_n": ...,
+                   "steps": [{"kind": str, "enabled": bool,
+                              "label": str?, "items": [str]?}]},
       "pos_name": str,
       "notes": str,
       "overrides": {"boxes": {}, "edges": {}, "hidden": []},
       "font_size": 12.0
     }
 
-旧 spec（没有 ``schema_version``）由字段形态自动映射：
-``presplit``/``splits`` 形态 -> expanded；``splits`` -> published-a；
-``kind == "study"`` / ``screened_n`` / ``included_n`` -> study。
-
+``layout`` 只是来源标记，版式由字段决定（单一渲染器）。v1/v2 旧 spec 自动归一到
+v3：旧 pipeline 布尔键 -> 默认 steps；study 的 included_n -> included；analyzed 照读。
 未知顶级键原样保留；``normalize`` 幂等；``validate`` 显式报错，不做静默回退。
 """
 from __future__ import annotations
@@ -36,21 +35,35 @@ import json
 import re
 
 # -- CONFIG -------------------------------------------------------------------
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 TARGET_WIDTH_CM = 16.0
 MAX_WIDTH_CM = 17.2
 DEFAULT_FONT_SIZE_PT = 12.0
 MARGIN_IN = 0.12
 CM_PER_INCH = 2.54
 DEFAULT_POS_NAME = "positive"
-
+DEFAULT_LAYOUT = "expanded-split-downsample"
+# 历史来源标记（layout 只作标记，渲染忽略；旧 CLI 包装仍用它做兼容检查）
 LAYOUT_EXPANDED = "expanded-split-downsample"
 LAYOUT_STUDY = "study"
 LAYOUT_PUBLISHED = "published-a"
 LAYOUTS = (LAYOUT_EXPANDED, LAYOUT_STUDY, LAYOUT_PUBLISHED)
 
-MODEL_KEYS = ("clinical", "radiomics", "plaque", "nomogram")
-METRIC_KEYS = ("roc", "calibration", "dca", "nri", "idi")
+DEFAULT_STEPS = (
+    "lasso_logistic", "nomogram", "calibration", "roc", "nri_idi", "dca",
+)
+STEP_KINDS = DEFAULT_STEPS + ("models", "explain")
+STEP_LABELS = {
+    "lasso_logistic": "LASSO logistic",
+    "nomogram": "Nomogram",
+    "calibration": "Calibration",
+    "roc": "ROC AUC",
+    "nri_idi": "NRI / IDI",
+    "dca": "DCA",
+    "models": "Models",
+    "explain": "DAG / Mediation",
+}
+MODEL_KEYS = ("clinical", "radiomics", "nomogram")
 EXPLAIN_KEYS = ("dag", "mediation")
 BALANCE_KEYS = ("downsample", "smote")
 
@@ -59,16 +72,14 @@ _LEADING_COUNT = re.compile(
     r"^\s*(\d+)\s+(?:patients?|subjects?|cases?|women|men)\b", re.I
 )
 
-# 旧 shape 里由 canonical 重建的键；其余键视为未知键并保留。
 _REPLACED_KEYS = {
     "schema_version", "layout", "screened", "analyzed", "inclusion", "exclusion",
     "presplit", "arms", "splits", "cohorts", "downsample", "pos_name", "notes",
     "overrides", "font_size", "criteria", "screened_n", "included_n",
     "training", "test", "validation", "included_positive", "included_negative",
     "included_positive_label", "included_negative_label", "balance", "balance_n",
-    "lasso", "models", "metrics", "explain",
+    "lasso", "models", "metrics", "explain", "included", "external",
 }
-# 条目内部由 canonical 重建的键；其余条目键保留。
 _ENTRY_REBUILT = {
     "id", "label", "n", "pp", "non_pp", "n_n", "pp_n", "non_pp_n",
     "positive", "negative", "positive_label", "negative_label",
@@ -103,6 +114,38 @@ def parse_n(value) -> int | None:
     return None
 
 
+_PAIR_IN_PARENS = re.compile(r"\(([^)]*)\)")
+_PAIR_PP = re.compile(
+    r"(\d+)\s*(?:patients?\s*)?(?:with\s*)?(?:pseudo[-\s]?progression|pp)\b", re.I
+)
+_PAIR_NON = re.compile(
+    r"(\d+)\s*(?:patients?\s*)?(?:with(?:out)?\s*)?"
+    r"(?:non[-\s]?pseudo[-\s]?progression|non[-\s]?pp)\b",
+    re.I,
+)
+
+
+def pair_from_text(text, n: int | None = None) -> tuple[int | None, int | None]:
+    """从 ``… (53 pseudoprogression vs 196 non-pseudoprogression)`` 解析 PP/non-PP。
+
+    只接受两数之和等于 n（n 已知时）的组合；否则返回 ``(None, None)``，绝不猜。
+    """
+    text = str(text or "")
+    if not text:
+        return None, None
+    for group in _PAIR_IN_PARENS.findall(text):
+        numbers = [int(item) for item in re.findall(r"\d+", group)]
+        if len(numbers) == 2 and (n is None or numbers[0] + numbers[1] == n):
+            return numbers[0], numbers[1]
+    left = _PAIR_PP.search(text)
+    right = _PAIR_NON.search(text)
+    if left and right:
+        pp, non_pp = int(left.group(1)), int(right.group(1))
+        if n is None or pp + non_pp == n:
+            return pp, non_pp
+    return None, None
+
+
 def unwrap(raw) -> dict:
     """取出真正的 spec：兼容旧的 ``{"spec": {...}, "meta": ...}`` 包装。"""
     if not isinstance(raw, dict):
@@ -112,29 +155,19 @@ def unwrap(raw) -> dict:
     return raw
 
 
-def infer_layout(raw: dict) -> str:
-    """按字段形态推断 layout；显式 layout 非法时直接报错。"""
-    layout = raw.get("layout")
-    if layout is not None and layout != "":
-        if layout not in LAYOUTS:
-            raise ValueError(
-                f"未知 spec.layout={layout!r}；只支持 {', '.join(LAYOUTS)}"
-            )
-        return str(layout)
+def _infer_layout(raw: dict) -> str:
     if "presplit" in raw or "arms" in raw:
-        return LAYOUT_EXPANDED
+        return "expanded-split-downsample"
     if raw.get("kind") == "study" or any(
         key in raw for key in (
             "screened_n", "included_n", "training", "test", "validation",
             "pipeline", "balance", "models", "metrics", "explain",
         )
     ):
-        return LAYOUT_STUDY
+        return "study"
     if "splits" in raw:
-        return LAYOUT_PUBLISHED
-    raise ValueError(
-        "spec 缺少 layout，且无法从字段推断（presplit/splits/study 三选一）"
-    )
+        return "published-a"
+    return DEFAULT_LAYOUT
 
 
 # -- field mapping ------------------------------------------------------------
@@ -142,8 +175,7 @@ def _screened(src: dict) -> dict:
     raw = src.get("screened")
     if isinstance(raw, dict):
         text = str(raw.get("text") or raw.get("label") or "").strip()
-        n = parse_n(raw)
-        return {"text": text, "n": n}
+        return {"text": text, "n": parse_n(raw)}
     if raw not in (None, ""):
         text = str(raw).strip()
         return {"text": text, "n": parse_n(text)}
@@ -153,21 +185,6 @@ def _screened(src: dict) -> dict:
         return {"text": "", "n": None}
     top = f"{n} patients screened" if n is not None else "Patients screened"
     return {"text": f"{period}\n{top}" if period else top, "n": n}
-
-
-def _analyzed(src: dict, layout: str) -> dict:
-    raw = src.get("analyzed")
-    if isinstance(raw, dict):
-        text = str(raw.get("text") or raw.get("label") or "").strip()
-        return {"text": text, "n": parse_n(raw)}
-    if raw not in (None, ""):
-        text = str(raw).strip()
-        return {"text": text, "n": parse_n(text)}
-    if layout == LAYOUT_STUDY:
-        n = parse_n(src.get("included_n"))
-        text = f"Patients included\n(n = {n})" if n is not None else "Patients included"
-        return {"text": text, "n": n}
-    return {"text": "", "n": None}
 
 
 def _criteria(src: dict) -> dict:
@@ -187,8 +204,7 @@ def _criteria(src: dict) -> dict:
         else:
             reason = str(entry).strip()
             n = parse_n(reason)
-        item = {key: copy.deepcopy(val) for key, val in (entry.items() if isinstance(entry, dict) else [])
-                if key not in _ENTRY_REBUILT}
+        item = _entry_extras(entry) if isinstance(entry, dict) else {}
         item["reason"] = reason
         item["n"] = n
         exclusion.append(item)
@@ -201,6 +217,28 @@ def _entry_extras(entry: dict) -> dict:
         for key, val in entry.items()
         if key not in _ENTRY_REBUILT
     }
+
+
+def _included(src: dict) -> dict:
+    raw = src.get("included")
+    if isinstance(raw, dict):
+        text = str(raw.get("text") or raw.get("label") or "").strip()
+        n = parse_n(raw.get("n"))
+        pp = parse_n(raw.get("pp", raw.get("positive")))
+        non_pp = parse_n(raw.get("non_pp", raw.get("negative")))
+        if pp is None and non_pp is None:
+            pp, non_pp = pair_from_text(text, n)
+        return {"text": text, "n": n, "pp": pp, "non_pp": non_pp}
+    if isinstance(raw, str) and raw.strip():
+        text = raw.strip()
+        n = parse_n(text)
+        pp, non_pp = pair_from_text(text, n)
+        return {"text": text, "n": n, "pp": pp, "non_pp": non_pp}
+    n = parse_n(src.get("included_n"))
+    pp = parse_n(src.get("included_positive"))
+    non_pp = parse_n(src.get("included_negative"))
+    text = str(src.get("included_text") or "").strip()
+    return {"text": text, "n": n, "pp": pp, "non_pp": non_pp}
 
 
 def _presplit(src: dict) -> list[dict]:
@@ -265,34 +303,32 @@ def _cohort_entries(raw) -> list[dict]:
     return out
 
 
-def _cohorts(src: dict, layout: str) -> list[dict]:
-    if layout == LAYOUT_STUDY:
-        raw = src.get("cohorts")
-        if raw not in (None, "", [], {}):
-            return _cohort_entries(raw)
-        out = []
-        for key, label, box_id in (
-            ("training", "Training set", "cohort-training"),
-            ("test", "Test set", "cohort-test"),
-            ("validation", "Validation set", "cohort-validation"),
-        ):
-            raw_entry = src.get(key)
-            if not raw_entry:
-                continue
-            if not isinstance(raw_entry, dict):
-                raise ValueError(f"{key} 必须是对象（n/positive/negative）")
-            out.append({
-                "id": box_id,
-                "label": str(raw_entry.get("label") or label).strip(),
-                "n": parse_n(raw_entry.get("n")),
-                "pp": parse_n(raw_entry.get("positive")),
-                "non_pp": parse_n(raw_entry.get("negative")),
-            })
-        return out
+def _cohorts(src: dict) -> list[dict]:
+    raw = src.get("cohorts")
+    if raw not in (None, "", [], {}):
+        return _cohort_entries(raw)
     raw = src.get("splits")
-    if raw is None:
-        raw = src.get("cohorts")
-    return _cohort_entries(raw)
+    if raw not in (None, "", [], {}):
+        return _cohort_entries(raw)
+    out = []
+    for key, label, box_id in (
+        ("training", "Training set", "cohort-training"),
+        ("test", "Test set", "cohort-test"),
+        ("validation", "Validation set", "cohort-validation"),
+    ):
+        raw_entry = src.get(key)
+        if not raw_entry:
+            continue
+        if not isinstance(raw_entry, dict):
+            raise ValueError(f"{key} 必须是对象（n/positive/negative）")
+        out.append({
+            "id": box_id,
+            "label": str(raw_entry.get("label") or label).strip(),
+            "n": parse_n(raw_entry.get("n")),
+            "pp": parse_n(raw_entry.get("positive")),
+            "non_pp": parse_n(raw_entry.get("negative")),
+        })
+    return out
 
 
 def _downsample(src: dict, presplit: list[dict]) -> list[dict]:
@@ -305,15 +341,14 @@ def _downsample(src: dict, presplit: list[dict]) -> list[dict]:
     ids = [arm["id"] for arm in presplit]
     labels = [arm["label"] for arm in presplit]
     out = []
-    for index, entry in enumerate(items):
+    for entry in items:
         entry = dict(entry or {})
         target = entry.get("arm")
         arm_id = ids[0]
         if isinstance(target, int) and not isinstance(target, bool):
-            pos = target
-            if not 0 <= pos < len(ids):
+            if not 0 <= target < len(ids):
                 raise ValueError(f"downsample.arm {target!r} 越界")
-            arm_id = ids[pos]
+            arm_id = ids[target]
         elif isinstance(target, str) and target:
             if target in ids:
                 arm_id = target
@@ -335,6 +370,105 @@ def _downsample(src: dict, presplit: list[dict]) -> list[dict]:
     return out
 
 
+def _external(src: dict) -> list[dict]:
+    raw = src.get("external")
+    if raw in (None, "", [], {}):
+        return []
+    if isinstance(raw, dict):
+        raw = list(raw.values())
+    if not isinstance(raw, (list, tuple)):
+        raise ValueError("external 必须是数组")
+    out = []
+    for index, entry in enumerate(raw):
+        entry = dict(entry or {}) if isinstance(entry, dict) else {"label": str(entry)}
+        item = _entry_extras(entry)
+        item["id"] = str(entry.get("id") or f"external-{index}")
+        item["label"] = str(entry.get("label") or f"External {index + 1}").strip()
+        item["n"] = parse_n(entry.get("n"))
+        item["pp"] = parse_n(entry.get("pp", entry.get("positive")))
+        item["non_pp"] = parse_n(entry.get("non_pp", entry.get("negative")))
+        out.append(item)
+    return out
+
+
+def _analyzed(src: dict) -> dict:
+    raw = src.get("analyzed")
+    if isinstance(raw, dict):
+        text = str(raw.get("text") or raw.get("label") or "").strip()
+        label = str(raw.get("label") or "").strip()
+        n = parse_n(raw.get("n"))
+        if n is None:
+            n = parse_n(text)
+        pp = parse_n(raw.get("pp", raw.get("positive")))
+        non_pp = parse_n(raw.get("non_pp", raw.get("negative")))
+        if pp is None and non_pp is None:
+            pp, non_pp = pair_from_text(text, n)
+        return {
+            "text": text,
+            "label": label,
+            "n": n,
+            "pp": pp,
+            "non_pp": non_pp,
+        }
+    if raw not in (None, ""):
+        text = str(raw).strip()
+        n = parse_n(text)
+        pp, non_pp = pair_from_text(text, n)
+        return {"text": text, "label": "", "n": n, "pp": pp, "non_pp": non_pp}
+    return {"text": "", "label": "", "n": None, "pp": None, "non_pp": None}
+
+
+def _default_steps() -> list[dict]:
+    return [{"kind": kind, "enabled": False} for kind in DEFAULT_STEPS]
+
+
+def _steps_from_legacy(src: dict, pipeline: dict) -> list[dict]:
+    models = [str(x) for x in (pipeline.get("models", src.get("models")) or [])]
+    metrics = [str(x) for x in (pipeline.get("metrics", src.get("metrics")) or [])]
+    explain = [str(x) for x in (pipeline.get("explain", src.get("explain")) or [])]
+    lasso = bool(pipeline.get("lasso", src.get("lasso")))
+    enabled = {
+        "lasso_logistic": lasso,
+        "nomogram": "nomogram" in models,
+        "calibration": "calibration" in metrics,
+        "roc": "roc" in metrics,
+        "nri_idi": "nri" in metrics or "idi" in metrics,
+        "dca": "dca" in metrics,
+    }
+    steps = [{"kind": kind, "enabled": enabled.get(kind, False)} for kind in DEFAULT_STEPS]
+    model_items = [item for item in models if item in ("clinical", "radiomics")]
+    if model_items:
+        steps.append({"kind": "models", "enabled": True, "items": model_items})
+    if explain:
+        steps.append({"kind": "explain", "enabled": True, "items": explain})
+    return steps
+
+
+def _steps(src: dict, pipeline: dict) -> list[dict]:
+    raw = pipeline.get("steps")
+    if isinstance(raw, list):
+        out = []
+        for entry in raw:
+            entry = dict(entry or {}) if isinstance(entry, dict) else {"kind": str(entry)}
+            kind = str(entry.get("kind") or "").strip()
+            item = _entry_extras(entry)
+            item["kind"] = kind
+            item["enabled"] = bool(entry.get("enabled"))
+            label = str(entry.get("label") or "").strip()
+            if label:
+                item["label"] = label
+            items = entry.get("items")
+            if items:
+                item["items"] = [str(x) for x in items]
+            out.append(item)
+        return out
+    legacy_keys = ("lasso", "models", "metrics", "explain", "balance")
+    has_legacy = any(
+        key in pipeline or key in src for key in legacy_keys
+    )
+    return _steps_from_legacy(src, pipeline) if has_legacy else _default_steps()
+
+
 def _pipeline(src: dict) -> dict:
     raw = src.get("pipeline") if isinstance(src.get("pipeline"), dict) else {}
     balance = raw.get("balance", src.get("balance"))
@@ -342,44 +476,49 @@ def _pipeline(src: dict) -> dict:
     return {
         "balance": balance,
         "balance_n": parse_n(raw.get("balance_n", src.get("balance_n"))),
-        "lasso": bool(raw.get("lasso", src.get("lasso"))),
-        "models": [str(key) for key in (raw.get("models", src.get("models")) or [])],
-        "metrics": [str(key) for key in (raw.get("metrics", src.get("metrics")) or [])],
-        "explain": [str(key) for key in (raw.get("explain", src.get("explain")) or [])],
+        "steps": _steps(src, raw),
     }
 
 
 def normalize(raw) -> dict:
-    """旧 spec / study spec -> canonical v2；未知键保留，结果幂等。"""
+    """旧 spec / study spec -> canonical v3；未知键保留，结果幂等。"""
     src = copy.deepcopy(unwrap(raw))
-    layout = infer_layout(src)
-
     out = {
         key: copy.deepcopy(val)
         for key, val in src.items()
         if key not in _REPLACED_KEYS and key != "pipeline"
     }
-    if layout != LAYOUT_STUDY and "pipeline" in src:
-        # 非 study 版式不画 pipeline；保留下来交给 validate 显式报错。
-        out["pipeline"] = copy.deepcopy(src["pipeline"])
     out["schema_version"] = SCHEMA_VERSION
-    out["layout"] = layout
+    out["layout"] = str(src.get("layout") or _infer_layout(src))
     out["screened"] = _screened(src)
     out["criteria"] = _criteria(src)
-    presplit = _presplit(src) if layout == LAYOUT_EXPANDED else []
-    out["presplit"] = presplit
-    out["downsample"] = _downsample(src, presplit) if layout == LAYOUT_EXPANDED else []
-    out["cohorts"] = _cohorts(src, layout)
-    out["analyzed"] = _analyzed(src, layout)
+    out["included"] = _included(src)
+    out["presplit"] = _presplit(src)
+    out["downsample"] = _downsample(src, out["presplit"])
+    out["cohorts"] = _cohorts(src)
+    out["external"] = _external(src)
+    out["analyzed"] = _analyzed(src)
+    out["pipeline"] = _pipeline(src)
     out["pos_name"] = str(
         src.get("pos_name") or src.get("included_positive_label") or DEFAULT_POS_NAME
     ).strip()
     out["notes"] = str(src.get("notes") or "")
-    out["overrides"] = copy.deepcopy(src.get("overrides") or {"boxes": {}, "edges": {}, "hidden": []})
+    out["overrides"] = copy.deepcopy(
+        src.get("overrides") or {"boxes": {}, "edges": {}, "hidden": []}
+    )
     out["font_size"] = float(src.get("font_size") or DEFAULT_FONT_SIZE_PT)
-    if layout == LAYOUT_STUDY:
-        out["pipeline"] = _pipeline(src)
     return out
+
+
+def _has_content(spec: dict) -> bool:
+    if (spec.get("screened") or {}).get("text") or (spec.get("screened") or {}).get("n"):
+        return True
+    if (spec.get("included") or {}).get("n") is not None:
+        return True
+    for key in ("presplit", "cohorts", "external"):
+        if spec.get(key):
+            return True
+    return False
 
 
 def validate(spec: dict) -> None:
@@ -391,46 +530,41 @@ def validate(spec: dict) -> None:
             f"spec.schema_version={spec.get('schema_version')!r}，需要 {SCHEMA_VERSION}；"
             "先走 spec.normalize"
         )
-    layout = spec.get("layout")
-    if layout not in LAYOUTS:
-        raise ValueError(f"未知 spec.layout={layout!r}")
-    if layout != LAYOUT_STUDY and spec.get("pipeline"):
-        raise ValueError(f"layout {layout!r} 不画 pipeline 行；改用 study 或删掉该键")
+    if not str(spec.get("layout") or "").strip():
+        raise ValueError("spec.layout 必须是非空字符串（来源标记）")
+    if not _has_content(spec):
+        raise ValueError("spec 没有任何可画的节点（screened/included/presplit/cohorts/external）")
 
-    arms = spec.get("presplit") or []
-    cohorts = spec.get("cohorts") or []
-    for index, arm in enumerate(arms):
-        if not isinstance(arm, dict) or not arm.get("id"):
-            raise ValueError(f"presplit[{index}] 缺少 id")
-    for index, cohort in enumerate(cohorts):
-        if not isinstance(cohort, dict) or not cohort.get("id"):
-            raise ValueError(f"cohorts[{index}] 缺少 id")
-    arm_ids = [arm["id"] for arm in arms]
-    if len(set(arm_ids)) != len(arm_ids):
-        raise ValueError("presplit 的 id 不唯一")
-    cohort_ids = [cohort["id"] for cohort in cohorts]
-    if len(set(cohort_ids)) != len(cohort_ids):
-        raise ValueError("cohorts 的 id 不唯一")
+    for key in ("presplit", "cohorts", "external"):
+        entries = spec.get(key) or []
+        ids = [str(entry.get("id") or "") for entry in entries]
+        if len(set(ids)) != len(ids) or "" in ids:
+            raise ValueError(f"{key} 的 id 必须唯一且非空")
+    downsample = spec.get("downsample") or []
+    arm_ids = {str(arm.get("id")) for arm in (spec.get("presplit") or [])}
+    for entry in downsample:
+        if arm_ids and str(entry.get("arm")) not in arm_ids:
+            raise ValueError(f"downsample.arm={entry.get('arm')!r} 不在 presplit 里")
 
-    if layout == LAYOUT_EXPANDED:
-        if not arms:
-            raise ValueError("expanded 版式至少需要 1 个 presplit 臂")
-        if not cohorts:
-            raise ValueError("expanded 版式至少需要 1 个 cohort")
-        if len(arms) != len(cohorts):
-            raise ValueError(
-                f"{len(arms)} 个 presplit 臂 vs {len(cohorts)} 个 cohort；按索引配对，数量必须一致"
-            )
-        known = set(arm_ids)
-        for entry in spec.get("downsample") or []:
-            if entry.get("arm") not in known:
-                raise ValueError(f"downsample.arm={entry.get('arm')!r} 不在 presplit 里")
-    elif layout == LAYOUT_PUBLISHED:
-        if not (spec.get("screened") or {}).get("text") and not (spec.get("analyzed") or {}).get("text"):
-            raise ValueError("published-a 版式至少需要 screened 或 analyzed 文本")
-    else:  # study
-        if not cohorts and spec.get("analyzed", {}).get("n") is None:
-            raise ValueError("study 版式至少需要 cohorts 或 analyzed.n")
+    pipeline = spec.get("pipeline") or {}
+    balance = pipeline.get("balance")
+    if balance not in (None, "", *BALANCE_KEYS):
+        raise ValueError("pipeline.balance 必须是 downsample/smote 或留空")
+    seen_kinds = []
+    for step in pipeline.get("steps") or []:
+        kind = str(step.get("kind") or "")
+        if kind not in STEP_KINDS:
+            raise ValueError(f"pipeline.steps kind={kind!r} 不在白名单 {STEP_KINDS}")
+        seen_kinds.append(kind)
+        items = [str(item) for item in (step.get("items") or [])]
+        if kind == "models":
+            unknown = [item for item in items if item not in MODEL_KEYS]
+            if unknown:
+                raise ValueError(f"models items 非法：{unknown}")
+        if kind == "explain":
+            unknown = [item for item in items if item not in EXPLAIN_KEYS]
+            if unknown:
+                raise ValueError(f"explain items 非法：{unknown}")
 
 
 def to_json_text(spec: dict) -> str:

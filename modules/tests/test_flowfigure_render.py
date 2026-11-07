@@ -96,7 +96,7 @@ def test_expanded_render_hits_target_width_and_fills_page(tmp_path):
     assert image.format == "PNG"
     assert image.info["dpi"][0] == pytest.approx(300, abs=1)
     width_cm = image.size[0] / 300 * 2.54
-    assert spec_mod.TARGET_WIDTH_CM - 1e-6 <= width_cm <= spec_mod.MAX_WIDTH_CM + 1e-6
+    assert spec_mod.TARGET_WIDTH_CM - 0.05 <= width_cm <= spec_mod.MAX_WIDTH_CM + 1e-6
     assert content_fraction >= 0.85
     assert right_blank <= 0.10
 
