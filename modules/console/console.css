@@ -1386,3 +1386,35 @@ input[type=text],input[type=number],select,textarea,.addfind-row>input[type=text
   display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5em,1fr));
   gap:4px 10px;margin:0 0 6px;min-width:0;
 }
+
+/* 图内标签（软标签，FIG_LABELS）：占满「图与显示」整行，说明列 + 输入列不再挤在 1/8 窄格 */
+[data-sec="fig"] .sec-body.fig-body > details[data-fold="FIG_LABELS"]{
+  grid-column:1/-1;min-width:0;
+}
+[data-sec="fig"] .fig-body .kv-rows.fig-labels{
+  display:grid;gap:2px;min-width:0;
+}
+.kv-rows.fig-labels .fig-label-group{
+  display:grid;gap:2px;padding:6px 0;
+  border-top:1px dashed var(--line);
+}
+.kv-rows.fig-labels .fig-label-group:first-child{border-top:0;padding-top:0}
+.kv-rows.fig-labels .kv-sub{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin:0 0 2px;
+}
+.kv-rows.fig-labels .kv-sub .rad-prefix-rescan{flex:0 0 auto}
+.kv-rows.fig-labels .kv-row{
+  display:grid;grid-template-columns:minmax(11em,auto) minmax(0,1fr);
+  gap:10px;align-items:center;margin:0;
+}
+.kv-rows.fig-labels .kv-row .grp-chip{
+  width:auto;max-width:none;min-width:0;margin:0;
+  white-space:normal;overflow:visible;text-overflow:clip;
+}
+.kv-rows.fig-labels .kv-row input{width:100%;min-width:0;flex:none;padding:3px 6px}
+@media (max-width:760px){
+  .kv-rows.fig-labels .kv-row{grid-template-columns:1fr}
+}
+/* 四宫格模式里卡片很窄：说明/输入上下排，避免输入框只剩几个像素 */
+.sec-quad .kv-rows.fig-labels .kv-row{grid-template-columns:minmax(0,1fr)}

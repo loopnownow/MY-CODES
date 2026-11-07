@@ -23,6 +23,7 @@ import statsmodels.api as sm
 from scipy.stats import chi2 as chi2_dist
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 DEFAULT_N_BINS = 8
 HL_DENOM_MIN = 1e-12
@@ -150,8 +151,8 @@ def plot_calibration(pred: np.ndarray, y: np.ndarray, n_bins: int = DEFAULT_N_BI
     ax.set_xlim(-0.02, 1.02)
     ax.set_ylim(-0.02, 1.02)
     ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("Predicted Probability")
-    ax.set_ylabel("Observed Proportion")
+    ax.set_xlabel(fig_label("calibration", "xlabel"))
+    ax.set_ylabel(fig_label("calibration", "ylabel"))
     suffix = " (recalibrated)" if recalibrate else " (raw)"
     if dataset_label and dataset_label not in ("all", "demo"):
         ax.set_title(cfg.panel_title(f"Calibration — {dataset_label}{suffix}"))

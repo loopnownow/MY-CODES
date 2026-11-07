@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from PIL import Image
 
 
@@ -109,6 +110,123 @@ def test_figure_title_switch_off_and_on(monkeypatch):
     ax = frames[-1].axes[0]
     assert ax.get_title() == "Variance Inflation Factor (train)"
     assert ax.get_xlabel() == "VIF"
+
+
+def test_fig_label_defaults_overrides_and_templates(monkeypatch):
+    """fig_label：默认文本 / 覆盖 / 模板格式化 / 未知键与非字符串值 raise。"""
+    import modules.config as cfg
+    from modules.config import fig_labels as fl
+
+    monkeypatch.setattr(cfg, "FIG_LABELS", {}, raising=False)
+    assert fl.fig_label("roc", "xlabel") == "1 − Specificity"
+    assert fl.fig_label("roc", "ylabel") == "Sensitivity"
+    assert fl.fig_label("km", "xlabel", unit="months") == "Time (months)"
+    assert fl.fig_label("vif", "legend", warn=5) == "VIF=5"
+    assert fl.fig_label("nomogram", "risk") == "Predicted\nProbability"
+
+    monkeypatch.setattr(cfg, "FIG_LABELS", {"roc": {"xlabel": "1 - FPR"}}, raising=False)
+    assert fl.fig_label("roc", "xlabel") == "1 - FPR"
+    assert fl.fig_label("roc", "ylabel") == "Sensitivity"
+
+    monkeypatch.setattr(cfg, "FIG_LABELS", {"km": {"xlabel": "t ({unit})"}}, raising=False)
+    assert fl.fig_label("km", "xlabel", unit="年") == "t (年)"
+
+    with pytest.raises(ValueError, match="未知图形/键"):
+        fl.fig_label("nope", "xlabel")
+
+    monkeypatch.setattr(cfg, "FIG_LABELS", {"roc": {"xlabel": 3}}, raising=False)
+    with pytest.raises(ValueError, match="必须是字符串"):
+        fl.fig_label("roc", "xlabel")
+
+
+def test_normalize_fig_labels_contract():
+    from modules.config.fig_labels import normalize_fig_labels
+
+    assert normalize_fig_labels(None) == {}
+    assert normalize_fig_labels("") == {}
+    assert normalize_fig_labels({"roc": {"xlabel": "A"}}) == {"roc": {"xlabel": "A"}}
+    # 未知 figure/key 原样保留（向前兼容）。
+    assert normalize_fig_labels({"future": {"k": "v"}}) == {"future": {"k": "v"}}
+    with pytest.raises(ValueError, match="必须是对象"):
+        normalize_fig_labels(["roc"])
+    with pytest.raises(ValueError, match="必须是对象"):
+        normalize_fig_labels({"roc": []})
+    with pytest.raises(ValueError, match="必须是字符串"):
+        normalize_fig_labels({"roc": {"xlabel": None}})
+
+
+def test_figure_specs_shape_and_json():
+    import json
+
+    from modules.config.fig_labels import figure_specs
+
+    specs = figure_specs()
+    assert isinstance(specs, list) and len(specs) >= 12
+    ids = [s["id"] for s in specs]
+    for need in ("roc", "roc_time", "dca", "calibration", "nomogram", "km",
+                 "shap", "vif", "correlation", "lasso", "dag", "mediation",
+                 "qc_habitat", "legend"):
+        assert need in ids
+    for spec in specs:
+        assert isinstance(spec["id"], str) and spec["id"]
+        assert isinstance(spec["title"], str) and spec["title"]
+        assert isinstance(spec["fields"], list) and spec["fields"]
+        for field in spec["fields"]:
+            assert set(field) == {"key", "label", "default"}
+            assert all(isinstance(v, str) and v for v in field.values())
+    json.dumps(specs)  # 必须 JSON 可序列化（console 直接收）
+    by_id = {s["id"]: s for s in specs}
+    assert [f["key"] for f in by_id["legend"]["fields"]] == ["Clinical", "RadScore", "Combined"]
+    assert by_id["legend"]["fields"][2]["default"] == "Nomogram"
+    assert [f["key"] for f in by_id["dca"]["fields"]] == [
+        "xlabel", "ylabel", "treat_all", "treat_none",
+    ]
+
+
+def test_legend_label_override(monkeypatch):
+    import modules.config as cfg
+    from modules.config.fig_labels import legend_label
+
+    monkeypatch.setattr(cfg, "FIG_LABELS", {}, raising=False)
+    assert legend_label("Combined") == "Nomogram"
+    assert legend_label("Clinical") == "Clinical"
+    assert legend_label("RadScore") == "RadScore"
+
+    monkeypatch.setattr(
+        cfg, "FIG_LABELS", {"legend": {"Combined": "联合模型"}}, raising=False,
+    )
+    assert legend_label("Combined") == "联合模型"
+    assert legend_label("RadScore") == "RadScore"
+
+
+def test_vif_labels_default_and_override(monkeypatch):
+    """空 FIG_LABELS 时图内文字与旧硬编码逐字一致；覆盖后按配置出图。"""
+    from modules.stats import vif_analysis
+
+    frames = []
+
+    def _cap(filename, fig, *args, **kwargs):
+        frames.append(fig)
+        return False
+
+    monkeypatch.setattr(vif_analysis.cfg, "save_plot", _cap)
+    df = pd.DataFrame({"Variable": ["age", "sex"], "VIF": [1.2, 3.4]})
+
+    monkeypatch.setattr(vif_analysis.cfg, "FIG_LABELS", {}, raising=False)
+    vif_analysis.plot_vif_bar(df, dataset_label="train", warn=5)
+    ax = frames[-1].axes[0]
+    assert ax.get_xlabel() == "VIF"
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["VIF=5"]
+
+    monkeypatch.setattr(
+        vif_analysis.cfg, "FIG_LABELS",
+        {"vif": {"xlabel": "方差膨胀因子", "legend": "阈值 {warn:g}"}},
+        raising=False,
+    )
+    vif_analysis.plot_vif_bar(df, dataset_label="train", warn=5)
+    ax = frames[-1].axes[0]
+    assert ax.get_xlabel() == "方差膨胀因子"
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["阈值 5"]
 
 
 def test_partial_pairs_cross_two_lists():

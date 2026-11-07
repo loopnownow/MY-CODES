@@ -135,6 +135,7 @@ SECTION_DEFS: list[tuple[str, str, list[str]]] = [
         "FIGURE_PANEL_DPI", "FIGURE_PANEL_MEDIATION_NCOLS",
         "FIGURE_PANEL_LABEL_POS", "FIGURE_PANEL_LABELS", "FIGURE_PANEL_TITLES", "FIGURE_PANEL_GAP_PX",
         "FIG_FONT_SIZE", "FIG_PALETTE", "FIG_COLORS_MAIN", "FIG_COLORS_AUX",
+        "FIG_LABELS",
     ]),
     ("radmark", "前缀 / 筛选 / 分类 / 剥离", [
         "RAD_MARKER_SIDE", "RAD_MARKER_MIN_N",
@@ -345,6 +346,7 @@ LABELS = {
     "FIG_PALETTE": "画图配色方案",
     "FIG_COLORS_MAIN": "主色 5（Combined / RadScore / Clinical / Reader / Extra）",
     "FIG_COLORS_AUX": "辅色 5（其余模型 / KM 分层 / 回退）",
+    "FIG_LABELS": "图内标签（软标签）",
     "MODULES_DIR": "算法库 modules",
 }
 
@@ -559,6 +561,7 @@ HINTS: dict[str, str] = {
     "FIG_PALETTE": "画图配色：20 套命名色板 + custom。npg 默认；okabe/aaas/nejm/lancet/jama/jco/frontiers/bmj 期刊风；tol/tolbright 色盲安全；radiology 本组；ibm/tableau 投影；d3/set1/dark2/paired 多模型；uchicago 学术；gray 黑白印刷。",
     "FIG_COLORS_MAIN": "5 个主色，依次给 Combined、RadScore、Clinical、Reader、Age。",
     "FIG_COLORS_AUX": "5 个辅色，给其余曲线、KM 分层和未点名的模型。",
+    "FIG_LABELS": "按图分组手写图内文字：轴标签、图例固定词、模型显示名。留空=用默认（placeholder 就是默认值）；只影响 PNG 图内文字，不改列名、不改结果表。模型名用英文键（Clinical / RadScore / Combined / 各块分数名）。Figure 1 流程图里的文字在「流程图」页改。",
     "MODULES_DIR": "共享算法库 modules 的文件夹。填本仓 modules 的绝对路径（或设置后由 settings.ini 提供）。换盘或拷贝算法库时改这里。",
 }
 HINTS = merge_icc_tips(HINTS)

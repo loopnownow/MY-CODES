@@ -39,6 +39,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from modules.config.fig_labels import fig_label
+
 # ═════════════════════════════════════════════════════════════════
 # §1  Defaults
 # ═════════════════════════════════════════════════════════════════
@@ -328,7 +330,7 @@ def plot_habitat_fractions(df: pd.DataFrame, out_dir: str | Path) -> Dict[str, P
         for patch, color in zip(bp["boxes"], colors):
             patch.set_facecolor(color)
             patch.set_alpha(0.65)
-        ax.set_ylabel("Volume fraction within nodule (%)")
+        ax.set_ylabel(fig_label("qc_habitat", "ylabel"))
         ax.set_title(cfg.panel_title(
             "Distribution of habitat volume fractions (n = {})".format(len(df))
         ))
@@ -357,7 +359,7 @@ def plot_habitat_fractions(df: pd.DataFrame, out_dir: str | Path) -> Dict[str, P
                 pass
             ax.set_title(cfg.panel_title(lab))
             ax.grid(axis="y", linestyle="--", alpha=0.35)
-        axes[0].set_ylabel("Volume fraction (%)")
+        axes[0].set_ylabel(fig_label("qc_habitat", "ylabel_split"))
         fig.suptitle(cfg.panel_title(
             "Habitat fractions by nodule-level K-means fallback"
         ), y=1.02)

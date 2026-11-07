@@ -21,6 +21,7 @@ from statsmodels.duration.hazard_regression import PHReg
 from statsmodels.duration.survfunc import SurvfuncRight, survdiff
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 SURVIVAL_METRICS: Dict[str, pd.DataFrame] = {}
 COX_METRICS: Dict[str, pd.DataFrame] = {}
@@ -230,8 +231,8 @@ def plot_km_overall(
     stats_row = _draw_km(ax, time, event, "All patients", color)
     ax.set_ylim(-0.02, 1.05)
     ax.set_xlim(left=0)
-    ax.set_xlabel(f"Time ({time_unit})")
-    ax.set_ylabel("Recurrence-free probability")
+    ax.set_xlabel(fig_label("km", "xlabel", unit=time_unit))
+    ax.set_ylabel(fig_label("km", "ylabel"))
     ttl = title or f"Kaplan–Meier — Recurrence-free ({dataset_label})"
     ax.set_title(cfg.panel_title(ttl))
     ax.legend(loc="best", frameon=True)
@@ -329,8 +330,8 @@ def plot_km_by_group(
 
     ax.set_ylim(-0.02, 1.05)
     ax.set_xlim(left=0)
-    ax.set_xlabel(f"Time ({time_unit})")
-    ax.set_ylabel("Recurrence-free probability")
+    ax.set_xlabel(fig_label("km", "xlabel", unit=time_unit))
+    ax.set_ylabel(fig_label("km", "ylabel"))
     ttl = title or f"Kaplan–Meier by {group_name} ({dataset_label})"
     ax.set_title(cfg.panel_title(ttl))
     ax.legend(loc="best", frameon=True)

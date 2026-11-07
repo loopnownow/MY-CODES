@@ -874,3 +874,47 @@ def test_preview_resolves_default_exclude_inside_the_results_folder(tmp_path, mo
     assert Path(str(exc.get("file"))).name == "false_classification.xlsx"
     assert str(tmp_path / "ASL") in str(exc.get("file"))
     assert exc.get("n") == 1
+
+
+def test_fig_labels_panel_edits_in_figure_texts():
+    """图内软标签：schema 归「图与显示」、注册表注入 build_schema、面板按图分组写 FIG_LABELS。"""
+    from modules.config.defaults import DEFAULT_SETTINGS, merged_settings
+    from modules.config.fig_labels import figure_specs
+    from modules.console.console import HINTS, LABELS, SECTION_OF, build_schema
+    from modules.console.const import CONSOLE_DEFAULTS
+
+    assert SECTION_OF["FIG_LABELS"][0] == "fig"
+    assert LABELS["FIG_LABELS"] == "图内标签（软标签）"
+    assert "留空=用默认" in HINTS["FIG_LABELS"]
+    assert CONSOLE_DEFAULTS["FIG_LABELS"] == {}
+    assert DEFAULT_SETTINGS["FIG_LABELS"] == {}
+
+    specs = figure_specs()
+    assert len(specs) >= 12
+    assert any(g["id"] == "legend" for g in specs)
+    legend = next(g for g in specs if g["id"] == "legend")
+    assert {"Clinical", "RadScore", "Combined"} <= {f["key"] for f in legend["fields"]}
+
+    fields = {f["key"]: f for f in build_schema(dict(merged_settings()))}
+    assert fields["FIG_LABELS"]["section"] == "fig"
+    assert fields["FIG_LABELS"]["figures"] == specs
+    assert fields["FIG_LABELS"]["value"] == {}
+
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    js_schema = (ROOT / "modules" / "console" / "console_schema.js").read_text(encoding="utf-8")
+    hidden = js_schema.split("const HIDDEN_FORM_KEYS = new Set([", 1)[1].split("]);", 1)[0]
+    assert '"FIG_LABELS"' in hidden
+    assert "function figLabelsPanel" in ui and "function figLabelGroup" in ui
+    assert "function figLegendKeys" in ui and "blockScoreNames()" in ui
+    assert 'data-fig-label=' in ui and 'data-fig-key=' in ui and 'data-fig-reset=' in ui
+    assert 'data-fold="FIG_LABELS"' in ui
+    assert "图内标签（软标签）" in ui
+    assert 'setFieldValue("FIG_LABELS", all)' in ui
+    # 空输入=删覆盖→用默认；placeholder 就是默认值
+    assert "if (s) one[k] = s;" in ui and "else delete one[k];" in ui
+    assert 'placeholder="${esc(def)}"' in ui
+    # 面板占满「图与显示」整行（不然挤在 1/8 窄格里，输入框只剩几个字符）
+    css = (ROOT / "modules" / "console" / "console.css").read_text(encoding="utf-8")
+    assert 'details[data-fold="FIG_LABELS"]' in css and "grid-column:1/-1" in css
+    assert ".kv-rows.fig-labels .kv-row" in css
+    assert "minmax(11em,auto) minmax(0,1fr)" in css

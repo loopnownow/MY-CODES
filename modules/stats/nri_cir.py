@@ -20,6 +20,7 @@ import matplotlib.patches as patches
 import statsmodels.api as sm
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label, legend_label
 
 NRI_CUTOFF: Sequence[float] = (0.0, 0.3, 0.7, 1.0)
 CIR_GRID_COLORS: Sequence[str] = ("#0073C2FF", "#EFC000FF", "#0073C2FF", "#EFC000FF")
@@ -375,7 +376,7 @@ def plot_idi(idi_res: Dict, dataset_label: str = "train",
     fs = cfg.FIG_FONT_SIZE
     ax.set_title(cfg.panel_title("Integrated Discrimination Improvement (IDI)"),
                  fontweight="normal", fontsize=fs)
-    ax.set_ylabel("Δ Predicted probability", fontsize=fs)
+    ax.set_ylabel(fig_label("idi", "ylabel"), fontsize=fs)
     ci_txt = (
         f"IDI = {idi_v:.4f} (95% CI {lo:.4f}–{hi:.4f})"
         if np.isfinite(lo) and np.isfinite(hi)
@@ -511,7 +512,7 @@ def _draw_chord_diagram(ax, sector_names: List[str], sector_sizes: Dict[str, flo
     for i, name in enumerate(sector_names):
         t0, t1 = bounds[name]
         _sector_arc(ax, t0, t1, r_in=0.95, r_out=1.0,
-                    color=grid_colors[i % len(grid_colors)], label=name)
+                    color=grid_colors[i % len(grid_colors)], label=legend_label(name))
 
     cursor = {name: bounds[name][0] for name in sector_names}
     for frm, to, val, color_idx in links:
