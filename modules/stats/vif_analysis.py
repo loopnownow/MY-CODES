@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 
 def format_vif(value, decimals: int = 3) -> str:
@@ -150,12 +151,13 @@ def plot_vif_bar(vif_df: pd.DataFrame, dataset_label: str = "combined",
     vals = pd.to_numeric(df["VIF"], errors="coerce").to_numpy()
     colors = ["#e67e22" if v >= warn else "#2980b9" for v in vals]
     ax.barh(y, vals, color=colors, edgecolor="none", height=0.7)
-    ax.axvline(warn, color="#e67e22", ls="--", lw=1, label=f"VIF={warn:g}")
+    ax.axvline(warn, color="#e67e22", ls="--", lw=1,
+               label=fig_label("vif", "legend", warn=warn))
     ax.set_yticks(y)
     fs = cfg.FIG_FONT_SIZE
     ax.set_yticklabels(df["Variable"].tolist(), fontsize=fs)
     ax.invert_yaxis()
-    ax.set_xlabel("VIF", fontsize=fs)
+    ax.set_xlabel(fig_label("vif", "xlabel"), fontsize=fs)
     ax.set_title(cfg.panel_title(f"Variance Inflation Factor ({dataset_label})"),
                  fontsize=fs, fontweight="normal")
     ax.legend(loc="lower right", fontsize=fs)

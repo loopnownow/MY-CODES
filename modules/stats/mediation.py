@@ -14,6 +14,7 @@ import statsmodels.api as sm
 import matplotlib.pyplot as plt
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label
 
 
 def _as_num(s) -> np.ndarray:
@@ -222,15 +223,17 @@ def plot_mediation_path(res: Dict[str, Any], path_id: str, label: str) -> None:
 
     a, b = res.get("a", np.nan), res.get("b", np.nan)
     cp, acme = res.get("c_prime", np.nan), res.get("ACME", np.nan)
-    ax.text(3.15, 3.55, f"a = {_fmt_coef(a)}", fontsize=fs, color=c_path,
+    ax.text(3.15, 3.55, f"{fig_label('mediation', 'a')} = {_fmt_coef(a)}", fontsize=fs, color=c_path,
             ha="center",
             bbox=dict(boxstyle="round,pad=0.18", facecolor="white",
                       edgecolor="#E5E7EB", alpha=0.96), zorder=5)
-    ax.text(6.85, 3.55, f"b = {_fmt_coef(b)}", fontsize=fs, color=c_path,
+    ax.text(6.85, 3.55, f"{fig_label('mediation', 'b')} = {_fmt_coef(b)}", fontsize=fs, color=c_path,
             ha="center",
             bbox=dict(boxstyle="round,pad=0.18", facecolor="white",
                       edgecolor="#E5E7EB", alpha=0.96), zorder=5)
-    ax.text(5.0, 1.15, f"c′ = {_fmt_coef(cp)}    ACME = {_fmt_coef(acme)}",
+    ax.text(5.0, 1.15,
+            f"{fig_label('mediation', 'direct')} = {_fmt_coef(cp)}    "
+            f"{fig_label('mediation', 'acme')} = {_fmt_coef(acme)}",
             fontsize=fs, color=c_direct, ha="center",
             bbox=dict(boxstyle="round,pad=0.28", facecolor="#FFF5F5",
                       edgecolor="#FECACA", alpha=0.96), zorder=5)

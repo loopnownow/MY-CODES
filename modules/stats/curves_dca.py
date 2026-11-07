@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve
 
 from modules import config as cfg
+from modules.config.fig_labels import fig_label, legend_label
 
 DCA_THRESHOLD_MIN = 0.01
 DCA_THRESHOLD_MAX = 0.99
@@ -74,7 +75,6 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     ]):
         return None  # type: ignore[return-value]
     assert len(model_list) >= 1
-    from modules.stats.radiomics import fig_label
 
     y = np.asarray(y).astype(int)
     prev = float(np.mean(y == 1))
@@ -111,19 +111,19 @@ def plot_dca(model_list: Dict[str, np.ndarray], y: np.ndarray,
     for nm in names:
         sub = dca_df[dca_df["Model"] == nm]
         ax.plot(sub["threshold"], sub["NB"], color=model_colors[nm], linewidth=2.1,
-                linestyle="solid", label=fig_label(nm), solid_capstyle="round", zorder=3)
+                linestyle="solid", label=legend_label(nm), solid_capstyle="round", zorder=3)
     sub = dca_df[dca_df["Model"] == "Treat All"]
     ax.plot(sub["threshold"], sub["NB"], color=model_colors["Treat All"], linewidth=1.4,
-            linestyle="--", label="Treat All", zorder=2)
+            linestyle="--", label=fig_label("dca", "treat_all"), zorder=2)
     sub = dca_df[dca_df["Model"] == "Treat None"]
     ax.plot(sub["threshold"], sub["NB"], color=model_colors["Treat None"], linewidth=1.4,
-            linestyle=":", label="Treat None", zorder=2)
+            linestyle=":", label=fig_label("dca", "treat_none"), zorder=2)
 
     ymax = dca_df["NB"].max()
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.05, (ymax + 0.06) if np.isfinite(ymax) else 1.0)
-    ax.set_xlabel("Threshold Probability")
-    ax.set_ylabel("Net Benefit")
+    ax.set_xlabel(fig_label("dca", "xlabel"))
+    ax.set_ylabel(fig_label("dca", "ylabel"))
     ax.set_title(cfg.panel_title(f"Decision Curve — {dataset_label}"))
     fs = cfg.FIG_FONT_SIZE
     ax.legend(loc="upper right", fontsize=fs, framealpha=0.95, borderpad=0.6)

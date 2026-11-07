@@ -937,4 +937,10 @@ def build_schema(settings: dict[str, Any], sheets: list[str] | None = None,
         [x for _s, _t, ks in SECTION_DEFS for x in ks]
     )}
     fields.sort(key=lambda f: (order.get(f["key"], 10_000), f["key"]))
+    # FIG_LABELS 的界面按图分组，图/字段清单来自后端软标签注册表（stats-core 维护）。
+    from modules.config.fig_labels import figure_specs
+
+    for f in fields:
+        if f["key"] == "FIG_LABELS":
+            f["figures"] = figure_specs()
     return fields
