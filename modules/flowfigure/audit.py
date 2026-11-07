@@ -25,9 +25,10 @@ def _audit_node(node: dict, label: str, problems: list[str]) -> None:
         problems.append(f"{label}: n ({n}) != pp ({pp}) + non_pp ({non_pp})")
 
 
-def audit(spec: dict) -> None:
-    """按块审计 canonical v3；失败抛 AuditError（消息含 ``n-audit failed``）。"""
+def audit(spec: dict) -> list[str]:
+    """按块审计 canonical v3；失败抛 AuditError，可恢复的问题以 warning 列表返回。"""
     problems: list[str] = []
+    warnings: list[str] = []
     screened = spec.get("screened") or {}
     included = spec.get("included") or {}
     analyzed = spec.get("analyzed") or {}
@@ -42,20 +43,22 @@ def audit(spec: dict) -> None:
     if exclusions:
         missing = [i + 1 for i, item in enumerate(exclusions) if _n(item.get("n")) is None]
         if missing:
-            problems.append(
-                "cannot parse n from exclusion item(s) " + ", ".join(map(str, missing))
+            warnings.append(
+                "exclusion 缺 n（第 " + "、".join(map(str, missing))
+                + " 条），跳过 screened−Σexclusion 校验（不猜数）"
             )
-        grouped = _n(screened.get("n"))
-        target = _n(included.get("n"))
-        if target is None:
-            target = _n(analyzed.get("n"))
-        if grouped is not None and target is not None and not missing:
-            excl_sum = sum(_n(item.get("n")) or 0 for item in exclusions)
-            if grouped - excl_sum != target:
-                problems.append(
-                    f"screened ({grouped}) − Σ exclusion n ({excl_sum}) = "
-                    f"{grouped - excl_sum}, not {target}"
-                )
+        else:
+            grouped = _n(screened.get("n"))
+            target = _n(included.get("n"))
+            if target is None:
+                target = _n(analyzed.get("n"))
+            if grouped is not None and target is not None:
+                excl_sum = sum(_n(item.get("n")) or 0 for item in exclusions)
+                if grouped - excl_sum != target:
+                    problems.append(
+                        f"screened ({grouped}) − Σ exclusion n ({excl_sum}) = "
+                        f"{grouped - excl_sum}, not {target}"
+                    )
 
     # -- presplit 块：有臂才查臂合计与降采样算术 --
     arm_ns = [_n(arm.get("n")) for arm in presplit]
@@ -180,3 +183,4 @@ def audit(spec: dict) -> None:
 
     if problems:
         raise AuditError("n-audit failed: " + "; ".join(problems) + ". Do not invent n.")
+    return warnings

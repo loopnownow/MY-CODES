@@ -40,20 +40,20 @@ def test_page_keeps_the_console_contract():
     assert "X-Console-Token" in html
 
 
-def test_header_buttons_are_all_in_the_title_row():
+def test_header_has_six_buttons_and_conditional_extras():
     html = _read(STROBE)
-    for element_id in (
-        "btn-undo", "btn-save-design", "btn-save", "btn-tune", "btn-reset",
-        "btn-discard", "btn-zoom-out", "btn-zoom-in", "btn-fit",
-        "manuscript", "btn-fill", "btn-reload", "draft-badge", "zoom-label",
-    ):
-        assert f'id="{element_id}"' in html, element_id
-    for text in ("撤销", "保存设计", "保存并生成 Figure 1", "微调版式",
-                 "恢复默认版式", "放弃草稿", "适应", "按手稿填写", "重新加载"):
-        assert text in html, text
-    aside = html[html.index("<aside>"):html.index("</aside>")]
-    assert "btn-save" not in aside
-    assert "btn-undo" not in aside
+    header = html[html.index("<header>"):html.index("</header>")]
+    main_ids = ["btn-undo", "btn-save-design", "btn-reload", "btn-save", "btn-tune", "btn-fill"]
+    labels = ["撤销", "保存", "加载", "生成 Fig 1", "微调", "填写"]
+    for element_id, label in zip(main_ids, labels):
+        assert f'id="{element_id}"' in header, element_id
+        assert ">" + label + "<" in header, label
+    for conditional in ("btn-discard", "btn-reset", "btn-clear-text"):
+        assert f'id="{conditional}"' in header
+        assert f'id="{conditional}" hidden' in header
+    assert 'id="manuscript"' not in header
+    assert 'id="manuscript"' in html[html.index("<aside>"):html.index("</aside>")]
+    assert "恢复默认版式" in header and "放弃草稿" in header and "清除手动文字" in header
 
 
 def test_page_layout_uses_flex_heights_not_calc_vh():
@@ -63,6 +63,15 @@ def test_page_layout_uses_flex_heights_not_calc_vh():
     assert "min-height:0" in html
     assert "calc(100vh" not in html
     assert 'id="canvas"' in html and 'id="canvas-inner"' in html
+
+
+def test_zoom_controls_float_in_preview():
+    html = _read(STROBE)
+    preview = html[html.index('class="preview-col"'):]
+    assert "zoom-float" in preview
+    assert all(f'id="{element_id}"' in preview for element_id in (
+        "btn-zoom-out", "btn-zoom-in", "btn-fit", "zoom-label",
+    ))
 
 
 def test_zoom_and_fit_controls():
@@ -84,6 +93,14 @@ def test_undo_stack_and_shortcut():
     assert "TEXTAREA" in html
 
 
+def test_tune_double_click_text_edit():
+    html = _read(STROBE)
+    assert "dblclick" in html
+    assert "editText" in html
+    assert 'overrides.text' in html
+    assert "清除手动文字" in html
+
+
 def test_draft_ui_and_badge():
     html = _read(STROBE)
     assert "draft-badge" in html
@@ -103,6 +120,7 @@ def test_form_has_all_v3_groups_and_no_layout_selector():
         assert f'id="{element_id}"' in html, element_id
     assert 'id="layout"' not in html
     assert "版式 layout" not in html
+    assert "仅审计，不画" in html
 
 
 def test_page_drops_the_legacy_editor():
