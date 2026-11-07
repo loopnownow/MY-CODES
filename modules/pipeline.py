@@ -133,7 +133,14 @@ from modules.stats.report import generate_results_html
 from modules.stats.models import build_nomogram
 from modules.stats.curves_calibration import plot_calibration
 from modules.stats.curves_dca import plot_dca
-from modules.stats.nri_cir import nri, cir_plot, nri_from_probs, idi_from_probs, plot_idi
+from modules.stats.nri_cir import (
+    chord_sector_labels,
+    cir_plot,
+    idi_from_probs,
+    nri,
+    nri_from_probs,
+    plot_idi,
+)
 from modules.stats.curves_survival import plot_survival_bundle
 from modules.stats import advanced as advanced_stats
 from modules.stats import selectors
@@ -1571,12 +1578,13 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     n0, n1 = gmap.get(0, "Negative"), gmap.get(1, "Positive")
                     chord_file = ""
                     if counts and sum(counts) > 0:
+                        chord_a, chord_b, chord_c, chord_d = chord_sector_labels(n0, n1)
                         cir_plot(
                             counts,
-                            a=f"PC {n0}",
-                            b=f"PC {n1}",
-                            c=f"SC {n0}",
-                            d=f"SC {n1}",
+                            a=chord_a,
+                            b=chord_b,
+                            c=chord_c,
+                            d=chord_d,
                             title_0=f"Reclassification ({n0})",
                             title_1=f"Reclassification ({n1})",
                             dataset_label=chord_label,

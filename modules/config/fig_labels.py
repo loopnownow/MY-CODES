@@ -57,6 +57,11 @@ FIG_LABEL_DEFAULTS: Dict[str, Dict[str, tuple]] = {
     "idi": {
         "ylabel": ("Y 轴", "Δ Predicted probability"),
     },
+    "nri": {
+        "prev_label": ("重分类前扇区（旧模型；{group}=分组名）", "PC {group}"),
+        "new_label": ("重分类后扇区（新模型；{group}=分组名）", "SC {group}"),
+        "no_data": ("无重分类数据时的文字", "(no data)"),
+    },
     "lasso": {
         "xlabel": ("X 轴", "log(λ)"),
         "coef_ylabel": ("Y 轴（系数路径）", "Coefficients"),
@@ -99,6 +104,7 @@ _FIGURE_TITLES: Dict[str, str] = {
     "vif": "VIF 条形图",
     "correlation": "相关热图",
     "idi": "IDI",
+    "nri": "NRI（重分类弦图）",
     "lasso": "LASSO 路径",
     "dag": "DAG 图",
     "mediation": "中介效应图",
