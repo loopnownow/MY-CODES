@@ -279,6 +279,28 @@ def _img_tag(png_name: str, alt: str = "", out_dir: Optional[str] = None) -> str
     return f'<p class="muted">[Not available: {png_name}]</p>'
 
 
+def figure1_section_html(out_dir: Optional[str] = None, force_img: bool = False) -> str:
+    """Results 里 pinned 的 Figure 1（study flow）区块 markup。
+
+    控制台页内保存（modules.console.flow_figure）复用这一份，避免两处漂移。
+    force_img=True 时不看图形总闸/文件是否存在，直接输出 img（保存已先落盘）。
+    """
+    if force_img:
+        img = (
+            '<img src="PNG/figure1_flow.png" alt="Figure 1 study flow" class="fig">'
+        )
+    else:
+        img = _img_tag("figure1_flow.png", "Figure 1 study flow", out_dir)
+    return (
+        '<section id="figure1-flow">'
+        '<h2>Figure 1 — Study flow</h2>'
+        '<p class="note">STROBE-style patient flow (Eligible → train/test split → '
+        'training downsample → analyzed cohorts). Asset: PNG/figure1_flow.png.</p>'
+        + img
+        + '</section>'
+    )
+
+
 def _cleanup_unreferenced_pngs(html_path: str, out_dir: str) -> int:
     """删除 PNG/ 中未被 HTML 引用的 .png（保留 panel 与报告内嵌图）。"""
     png_dir = os.path.join(out_dir, "PNG")
@@ -2783,14 +2805,7 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
 
     # t1736u: pin study-flow Fig1 so _cleanup_unreferenced_pngs keeps PNG/figure1_flow.png
     if _f_exists("figure1_flow.png", out_dir):
-        html_parts.append(
-            '<section id="figure1-flow">'
-            '<h2>Figure 1 — Study flow</h2>'
-            '<p class="note">STROBE-style patient flow (Eligible → train/test split → '
-            'training downsample → analyzed cohorts). Asset: PNG/figure1_flow.png.</p>'
-            + _img_tag("figure1_flow.png", "Figure 1 study flow", out_dir)
-            + '</section>'
-        )
+        html_parts.append(figure1_section_html(out_dir))
 
     html_parts.append(_build_panel(
         "all", data.all, res_all["rad"], res_all["clin"],
