@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import threading
 import traceback
@@ -398,6 +399,51 @@ def register_project(
     return out
 
 
+_PAGE_TOKEN_RE = r'<meta\s+name="console-token"\s+content="([^"]*)"'
+
+
+def starter_token_valid(project: str, directory: str = "") -> bool:
+    """启动页 meta 里的 token 是否仍与注册表一致（一致 = 不必轮换）。"""
+    key = str(project or "").strip()
+    if not key:
+        return False
+    try:
+        proj = project_dir(key, directory)
+    except Exception:
+        return False
+    starter = Path(proj) / f"{key}.html"
+    if not starter.is_file():
+        return False
+    entry = project_registry.get(key)
+    if entry is None or not entry.dir_ok():
+        return False
+    m = re.search(_PAGE_TOKEN_RE, starter.read_text(encoding="utf-8", errors="replace"))
+    token = (m.group(1) if m else "").strip()
+    if not token or token == "__CONSOLE_TOKEN__":
+        return False
+    return project_registry.token_hash(token) == entry.token_sha256
+
+
+def register_from_page(
+    project: str,
+    directory: str = "",
+    *,
+    scopes: list[str] | None = None,
+) -> dict[str, Any]:
+    """radconsole://register 入口：页面 token 仍有效时只确认登记，不轮换。
+
+    轮换会让其它已打开的同一课题页面（别的标签页 / 别的副本）拿旧 token 撞
+    403 origin not allowed；只有页面缺 token、token 与注册表不符、或目录换了
+    才发新 token。
+    """
+    return register_project(
+        project,
+        directory,
+        scopes=scopes,
+        rotate=not starter_token_valid(project, directory),
+    )
+
+
 def cmd_register(args: argparse.Namespace) -> int:
     scopes = [s.strip() for s in str(getattr(args, "scopes", "") or "").split(",") if s.strip()]
     result = register_project(
@@ -502,8 +548,10 @@ def main(argv: list[str] | None = None) -> None:
                 else:
                     scopes_q = (qs.get("scopes") or [""])[0]
                     scopes = [s.strip() for s in scopes_q.split(",") if s.strip()] or None
-                    result = register_project(
-                        project_q, dir_q, scopes=scopes, rotate=True,
+                    # 页面 token 仍有效时只确认登记、不轮换（多标签安全）；
+                    # 要强制重发 token 用 CLI: console.py register --rotate
+                    result = register_from_page(
+                        project_q, dir_q, scopes=scopes,
                     )
             except Exception as e:
                 result = {"ok": False, "op": action, "project": project_q, "error": str(e)}
