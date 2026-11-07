@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<meta name="console-token" content="__CONSOLE_TOKEN__"/>
 <script>
 try {
   if (new URLSearchParams(location.search).has("project")) {
@@ -359,6 +360,60 @@ try {
       .header-actions { margin-left: 0; }
       footer { position: sticky; bottom: 0; z-index: 2; }
     }
+    .fig1 details {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--soft);
+      padding: 10px 12px 12px;
+    }
+    .fig1 summary {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 650;
+      list-style: none;
+    }
+    .fig1 summary::-webkit-details-marker { display: none; }
+    .fig1 summary::before {
+      content: "▸";
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .fig1 details[open] summary::before { content: "▾"; }
+    .fig1 summary .chip {
+      margin-left: auto;
+      font-weight: 400;
+      max-width: 52%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fig1 label.field { margin-top: 8px; }
+    .fig1 .fig1-arm {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .fig1 .fig1-arm-head { display: flex; align-items: center; gap: 6px; }
+    .fig1 .fig1-arm-head .grow { flex: 1; }
+    .fig1 .fig1-arm .row { gap: 6px; }
+    .fig1 .fig1-arm input, .fig1 .fig1-arm textarea { font-size: 12px; }
+    .fig1 .fig1-arm textarea { min-height: 44px; }
+    .fig1 .fig1-msg { margin: 8px 0 0; }
+    .fig1 .fig1-preview {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 6px;
+    }
+    .fig1 .fig1-preview img { display: block; width: 100%; height: auto; }
     html.from-console #flow-steps { display: none; }
   </style>
 </head>
@@ -366,7 +421,7 @@ try {
   <header>
     <div class="brand">
       <h1>SCI Figure 1 · 研究流程图</h1>
-      <p>实际出图的框、人数和步骤只来自稿件 Materials and Methods。左侧示例只看版式，不写入论文图。</p>
+      <p>Figure 1 以项目源文件 ref/pipeline/figure1_strobe.json 为准（带 ?project 时，见左侧「Figure 1（项目源文件）」面板）；交互画布与手稿填写只作辅助，不写入项目源文件。</p>
     </div>
     <div class="header-actions">
       <button type="button" class="btn" id="btn-example">看版式示例</button>
@@ -387,6 +442,58 @@ try {
         <div>没做的模型和分析不画</div>
       </div>
       <div id="qc" class="qc empty">填写筛查或纳入分析后，右侧会实时出图。</div>
+
+      <section class="sec fig1" id="fig1-panel" hidden>
+        <details id="fig1-details" open>
+          <summary>
+            <span>Figure 1（项目源文件）</span>
+            <span class="chip" id="fig1-layout">—</span>
+          </summary>
+          <p class="hint" id="fig1-status">尚未读取。</p>
+          <div class="row" style="margin-top:8px">
+            <button type="button" class="btn" id="fig1-reload">重新加载</button>
+          </div>
+          <div id="fig1-form" hidden>
+            <label class="field" for="fig1-screened">筛查总述 screened</label>
+            <textarea id="fig1-screened" rows="3" spellcheck="false"></textarea>
+            <label class="field" for="fig1-inclusion">纳入标准 inclusion（每行一条，顺序即图内顺序）</label>
+            <textarea id="fig1-inclusion" rows="4" spellcheck="false"></textarea>
+            <label class="field" for="fig1-analyzed">分析人数 analyzed</label>
+            <textarea id="fig1-analyzed" rows="2" spellcheck="false"></textarea>
+            <label class="field" for="fig1-pos-name">阳性名称 pos_name</label>
+            <input id="fig1-pos-name" type="text" spellcheck="false" placeholder="pseudoprogression" />
+            <label class="field" for="fig1-notes">备注 notes</label>
+            <textarea id="fig1-notes" rows="3" spellcheck="false"></textarea>
+
+            <div class="sec-h" style="margin-top:12px">
+              <h2>分组前 presplit</h2>
+              <span class="hint" id="fig1-presplit-hint"></span>
+            </div>
+            <div id="fig1-presplit-rows" class="list"></div>
+
+            <div class="sec-h" style="margin-top:12px">
+              <h2>降采样 downsample</h2>
+            </div>
+            <div id="fig1-downsample-rows" class="list"></div>
+
+            <div class="sec-h" style="margin-top:12px">
+              <h2>最终队列 splits</h2>
+              <span class="hint" id="fig1-splits-hint"></span>
+            </div>
+            <div id="fig1-split-rows" class="list"></div>
+
+            <div class="row" style="margin-top:12px">
+              <button type="button" class="btn btn-primary" id="fig1-save">保存并生成 Figure 1</button>
+            </div>
+            <p class="hint fig1-msg" id="fig1-msg" aria-live="polite"></p>
+            <div id="fig1-preview-wrap" class="fig1-preview" hidden>
+              <a id="fig1-preview-link" target="_blank" rel="noopener"><img id="fig1-preview" alt="Figure 1 预览" /></a>
+              <p class="hint" id="fig1-preview-note"></p>
+            </div>
+            <p class="hint" id="fig1-preview-hint" hidden></p>
+          </div>
+        </details>
+      </section>
 
       <section class="sec">
         <div class="sec-h">
@@ -599,6 +706,42 @@ try {
     manuscript: document.getElementById("manuscript-file"),
     note: document.getElementById("manuscript-note"),
     size: document.getElementById("size-hint")
+  };
+
+  const FIG1_SPEC_REL = "ref/pipeline/figure1_strobe.json";
+  const FIG1_TOKEN_SENTINEL = "__CONSOLE_TOKEN__";
+
+  const fig1 = {
+    spec: null,
+    specRel: "",
+    busy: false,
+    presplitKey: "presplit",
+    splitsKey: "splits"
+  };
+
+  const fig1Els = {
+    panel: document.getElementById("fig1-panel"),
+    status: document.getElementById("fig1-status"),
+    form: document.getElementById("fig1-form"),
+    screened: document.getElementById("fig1-screened"),
+    inclusion: document.getElementById("fig1-inclusion"),
+    analyzed: document.getElementById("fig1-analyzed"),
+    posName: document.getElementById("fig1-pos-name"),
+    notes: document.getElementById("fig1-notes"),
+    layout: document.getElementById("fig1-layout"),
+    presplitRows: document.getElementById("fig1-presplit-rows"),
+    presplitHint: document.getElementById("fig1-presplit-hint"),
+    downsampleRows: document.getElementById("fig1-downsample-rows"),
+    splitRows: document.getElementById("fig1-split-rows"),
+    splitHint: document.getElementById("fig1-splits-hint"),
+    save: document.getElementById("fig1-save"),
+    reload: document.getElementById("fig1-reload"),
+    msg: document.getElementById("fig1-msg"),
+    previewWrap: document.getElementById("fig1-preview-wrap"),
+    previewLink: document.getElementById("fig1-preview-link"),
+    previewImg: document.getElementById("fig1-preview"),
+    previewNote: document.getElementById("fig1-preview-note"),
+    previewHint: document.getElementById("fig1-preview-hint")
   };
 
   const measure = document.createElement("canvas").getContext("2d");
@@ -2764,6 +2907,466 @@ try {
       });
   }
 
+  // ── Figure 1 项目源文件面板（ref/pipeline/figure1_strobe.json 单一源）──
+  function fig1HasOwn(obj, key) {
+    return !!(obj && Object.prototype.hasOwnProperty.call(obj, key));
+  }
+
+  function fig1Clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  function fig1ConsoleToken() {
+    function pick(doc) {
+      try {
+        const el = doc && doc.querySelector ? doc.querySelector('meta[name="console-token"]') : null;
+        const val = el ? String(el.getAttribute("content") || "").trim() : "";
+        return val && val !== FIG1_TOKEN_SENTINEL ? val : "";
+      } catch (e) {
+        return "";
+      }
+    }
+    const own = pick(document);
+    if (own) return own;
+    try {
+      if (window.parent && window.parent !== window) return pick(window.parent.document);
+    } catch (e) {}
+    return "";
+  }
+
+  function fig1SetStatus(text, bad) {
+    if (!fig1Els.status) return;
+    fig1Els.status.textContent = text;
+    fig1Els.status.classList.toggle("err", !!bad);
+  }
+
+  function fig1SetMsg(text, bad) {
+    if (!fig1Els.msg) return;
+    fig1Els.msg.textContent = text || "";
+    fig1Els.msg.classList.toggle("err", !!bad);
+  }
+
+  function fig1Field(row, name) {
+    return row ? row.querySelector('[data-fig1-field="' + name + '"]') : null;
+  }
+
+  function fig1NumText(value) {
+    return value == null || value === "" ? "" : String(value);
+  }
+
+  function fig1ItemNum(item, field) {
+    if (!item) return "";
+    if (fig1HasOwn(item, field)) return item[field];
+    if (fig1HasOwn(item, field + "_n")) return item[field + "_n"];
+    return "";
+  }
+
+  function fig1ReadNum(row, field) {
+    const inp = fig1Field(row, field);
+    if (!inp) return undefined;
+    const text = String(inp.value || "").trim();
+    if (!text) return undefined;
+    const n = Number(text);
+    return Number.isFinite(n) ? Math.trunc(n) : undefined;
+  }
+
+  function fig1SetNum(item, field, value) {
+    let target = null;
+    [field, field + "_n"].forEach(function (alias) {
+      if (target === null && fig1HasOwn(item, alias)) target = alias;
+    });
+    if (value === undefined) {
+      if (target) delete item[target];
+      return;
+    }
+    item[target || field] = value;
+  }
+
+  function fig1ArmEntries(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+      return raw.map(function (entry, i) {
+        return {
+          key: null,
+          index: i,
+          item: entry && typeof entry === "object" ? entry : { label: String(entry == null ? "" : entry) }
+        };
+      });
+    }
+    if (typeof raw === "object") {
+      return Object.keys(raw).map(function (key) {
+        const val = raw[key];
+        return {
+          key: key,
+          index: null,
+          item: val && typeof val === "object" ? val : { label: String(val == null ? "" : val) }
+        };
+      });
+    }
+    return [];
+  }
+
+  function fig1ArmRow(entry, kind) {
+    const row = document.createElement("div");
+    row.className = "fig1-arm";
+    row.setAttribute("data-fig1-arm", kind);
+    if (entry.key != null) row.setAttribute("data-fig1-key", entry.key);
+    if (entry.index != null) row.setAttribute("data-fig1-index", String(entry.index));
+    const head = document.createElement("div");
+    head.className = "fig1-arm-head";
+    if (entry.key != null) {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = entry.key;
+      head.appendChild(chip);
+    }
+    const label = document.createElement("input");
+    label.type = "text";
+    label.className = "grow";
+    label.placeholder = "label（图内文字）";
+    label.value = entry.item.label == null ? "" : String(entry.item.label);
+    label.setAttribute("data-fig1-field", "label");
+    head.appendChild(label);
+    row.appendChild(head);
+    const nums = document.createElement("div");
+    nums.className = "row";
+    [["n", "n"], ["pp", "pp"], ["non_pp", "non_pp"]].forEach(function (pair) {
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.min = "0";
+      inp.step = "1";
+      inp.className = "grow";
+      inp.placeholder = pair[1];
+      inp.value = fig1NumText(fig1ItemNum(entry.item, pair[0]));
+      inp.setAttribute("data-fig1-field", pair[0]);
+      nums.appendChild(inp);
+    });
+    row.appendChild(nums);
+    return row;
+  }
+
+  function fig1FillArmRows(container, raw, kind) {
+    container.innerHTML = "";
+    const entries = fig1ArmEntries(raw);
+    entries.forEach(function (entry) {
+      container.appendChild(fig1ArmRow(entry, kind));
+    });
+    if (!entries.length) {
+      const p = document.createElement("p");
+      p.className = "hint";
+      p.textContent = kind === "presplit" ? "spec 没有 presplit（或 arms）分组。" : "spec 没有 splits（或 cohorts）队列。";
+      container.appendChild(p);
+    }
+    return entries;
+  }
+
+  function fig1DownsampleEntries(raw) {
+    if (Array.isArray(raw)) {
+      return raw.map(function (entry, i) {
+        return { index: i, item: entry && typeof entry === "object" ? entry : {} };
+      });
+    }
+    if (raw && typeof raw === "object") return [{ index: null, item: raw }];
+    return [{ index: null, item: null }];
+  }
+
+  function fig1DownsampleRow(entry) {
+    const item = entry.item || {};
+    const row = document.createElement("div");
+    row.className = "fig1-arm";
+    row.setAttribute("data-fig1-arm", "downsample");
+    if (entry.index != null) row.setAttribute("data-fig1-index", String(entry.index));
+    const line = document.createElement("div");
+    line.className = "row";
+    const nInp = document.createElement("input");
+    nInp.type = "number";
+    nInp.min = "0";
+    nInp.step = "1";
+    nInp.className = "n-input";
+    nInp.placeholder = "降采样 n";
+    nInp.value = fig1NumText(fig1ItemNum(item, "n"));
+    nInp.setAttribute("data-fig1-field", "n");
+    line.appendChild(nInp);
+    const armInp = document.createElement("input");
+    armInp.type = "text";
+    armInp.className = "grow";
+    armInp.placeholder = "arm（序号或臂 label）";
+    armInp.value = item.arm == null ? "" : String(item.arm);
+    armInp.setAttribute("data-fig1-field", "arm");
+    line.appendChild(armInp);
+    row.appendChild(line);
+    const reason = document.createElement("textarea");
+    reason.rows = 2;
+    reason.placeholder = "reason（图内文字）";
+    reason.value = item.reason == null ? "" : String(item.reason);
+    reason.setAttribute("data-fig1-field", "reason");
+    row.appendChild(reason);
+    return row;
+  }
+
+  function fig1FillDownsample(raw) {
+    fig1Els.downsampleRows.innerHTML = "";
+    fig1DownsampleEntries(raw).forEach(function (entry) {
+      fig1Els.downsampleRows.appendChild(fig1DownsampleRow(entry));
+    });
+  }
+
+  function fig1FillPreview(payload) {
+    const project = projectName();
+    const rel = String((payload && payload.png_rel) || "");
+    const exists = !!payload && !!payload.png_exists && !!rel;
+    fig1Els.previewWrap.hidden = !exists;
+    fig1Els.previewHint.hidden = exists;
+    fig1Els.previewImg.removeAttribute("src");
+    if (exists && project) {
+      const url = "/files/" + encodeURIComponent(project) + "/"
+        + rel.split("/").map(encodeURIComponent).join("/")
+        + "?t=" + Date.now();
+      fig1Els.previewImg.src = url;
+      fig1Els.previewImg.alt = "Figure 1 · " + rel;
+      fig1Els.previewLink.href = url.split("?")[0];
+      fig1Els.previewNote.textContent = "预览 " + rel + "（点图看原图；保存后自动刷新）";
+    } else if (rel) {
+      fig1Els.previewHint.textContent = "PNG 未找到：" + rel + "（点「保存并生成 Figure 1」后出现）";
+    } else {
+      fig1Els.previewHint.textContent = "项目里还没有结果夹，保存后无处复制 PNG/PDF。";
+    }
+  }
+
+  function fig1Fill(spec, payload) {
+    fig1.presplitKey = spec.presplit != null ? "presplit" : "arms";
+    fig1.splitsKey = spec.splits != null ? "splits" : "cohorts";
+    fig1Els.screened.value = spec.screened == null ? "" : String(spec.screened);
+    fig1Els.inclusion.value = Array.isArray(spec.inclusion) ? spec.inclusion.map(String).join("\n") : "";
+    fig1Els.analyzed.value = spec.analyzed == null ? "" : String(spec.analyzed);
+    fig1Els.posName.value = spec.pos_name == null ? "" : String(spec.pos_name);
+    fig1Els.notes.value = spec.notes == null ? "" : String(spec.notes);
+    fig1Els.layout.textContent = spec.layout || "（spec 未写 layout）";
+    fig1Els.presplitHint.textContent = fig1.presplitKey === "presplit" ? "键：presplit" : "键：arms";
+    fig1Els.splitHint.textContent = fig1.splitsKey === "splits" ? "键：splits" : "键：cohorts";
+    fig1FillArmRows(fig1Els.presplitRows, spec[fig1.presplitKey], "presplit");
+    fig1FillDownsample(spec.downsample);
+    fig1FillArmRows(fig1Els.splitRows, spec[fig1.splitsKey], "split");
+    fig1Els.form.hidden = false;
+    fig1FillPreview(payload || {});
+  }
+
+  function fig1BuildArmValue(spec, key, rows) {
+    const raw = spec[key];
+    const entries = fig1ArmEntries(raw);
+    if (entries.length !== rows.length) {
+      throw new Error("分组行数与 spec 不一致，先点「重新加载」");
+    }
+    const items = entries.map(function (entry, i) {
+      const row = rows[i];
+      const base = entry.item && typeof entry.item === "object" ? fig1Clone(entry.item) : {};
+      const labelInp = fig1Field(row, "label");
+      const label = labelInp ? String(labelInp.value || "").trim() : "";
+      if (label) base.label = label;
+      else delete base.label;
+      ["n", "pp", "non_pp"].forEach(function (field) {
+        fig1SetNum(base, field, fig1ReadNum(row, field));
+      });
+      return base;
+    });
+    if (Array.isArray(raw)) return items;
+    const obj = {};
+    entries.forEach(function (entry, i) {
+      obj[entry.key] = items[i];
+    });
+    return obj;
+  }
+
+  function fig1BuildDownsample(spec) {
+    const rows = fig1Els.downsampleRows.querySelectorAll(".fig1-arm");
+    const original = spec.downsample;
+    const isList = Array.isArray(original);
+    const entries = isList
+      ? original
+      : (original && typeof original === "object" ? [original] : [null]);
+    if (rows.length !== entries.length) {
+      throw new Error("downsample 行数与 spec 不一致，先点「重新加载」");
+    }
+    function build(row, base) {
+      const item = base && typeof base === "object" ? fig1Clone(base) : {};
+      fig1SetNum(item, "n", fig1ReadNum(row, "n"));
+      const reasonInp = fig1Field(row, "reason");
+      const reason = reasonInp ? String(reasonInp.value || "").trim() : "";
+      if (reason) item.reason = reason;
+      else delete item.reason;
+      const armInp = fig1Field(row, "arm");
+      const armText = armInp ? String(armInp.value || "").trim() : "";
+      if (!armText) delete item.arm;
+      else if (/^-?\d+$/.test(armText)) item.arm = Number(armText);
+      else item.arm = armText;
+      return item;
+    }
+    if (isList) {
+      return entries.map(function (base, i) {
+        return build(rows[i], base);
+      });
+    }
+    if (!original) {
+      const one = build(rows[0], null);
+      return Object.keys(one).length ? one : undefined;
+    }
+    return build(rows[0], original);
+  }
+
+  function fig1BuildSpec() {
+    if (!fig1.spec) throw new Error("还没有读取 Figure 1 spec");
+    const spec = fig1Clone(fig1.spec);
+    spec.screened = fig1Els.screened.value;
+    spec.inclusion = fig1Els.inclusion.value.split(/\r?\n/).map(function (s) {
+      return s.trim();
+    }).filter(Boolean);
+    spec.analyzed = fig1Els.analyzed.value;
+    spec.pos_name = fig1Els.posName.value.trim();
+    spec.notes = fig1Els.notes.value;
+    if (spec[fig1.presplitKey] != null || spec.presplit != null || spec.arms != null) {
+      spec[fig1.presplitKey] = fig1BuildArmValue(
+        spec, fig1.presplitKey, fig1Els.presplitRows.querySelectorAll(".fig1-arm")
+      );
+    }
+    if (spec[fig1.splitsKey] != null || spec.splits != null || spec.cohorts != null) {
+      spec[fig1.splitsKey] = fig1BuildArmValue(
+        spec, fig1.splitsKey, fig1Els.splitRows.querySelectorAll(".fig1-arm")
+      );
+    }
+    const down = fig1BuildDownsample(spec);
+    if (down === undefined || (down && !Array.isArray(down) && typeof down === "object"
+        && !Object.keys(down).length)) {
+      delete spec.downsample;
+    } else {
+      spec.downsample = down;
+    }
+    return spec;
+  }
+
+  function fig1Load() {
+    const project = projectName();
+    if (!project) {
+      fig1Els.panel.hidden = true;
+      return Promise.resolve(false);
+    }
+    fig1Els.panel.hidden = false;
+    fig1SetStatus("读取 " + FIG1_SPEC_REL + " …", false);
+    fig1SetMsg("", false);
+    return fetch("/flow_figure?project=" + encodeURIComponent(project), { cache: "no-store" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("服务端未提供 /flow_figure（HTTP " + r.status + "），请重启控制台服务");
+        return r.json();
+      })
+      .then(function (d) {
+        if (!d || !d.ok) throw new Error((d && d.error) || "Figure 1 spec 读取失败");
+        fig1.spec = d.spec;
+        fig1.specRel = d.spec_rel || FIG1_SPEC_REL;
+        fig1Fill(d.spec, d);
+        fig1SetStatus(
+          "源文件：" + fig1.specRel + "（改完点「保存并生成 Figure 1」；校验失败不会写文件）",
+          false
+        );
+        return true;
+      })
+      .catch(function (err) {
+        fig1.spec = null;
+        fig1Els.form.hidden = true;
+        fig1SetStatus(
+          "读取 Figure 1 项目源文件失败：" + String(err && err.message ? err.message : err)
+            + "。本面板不回退为手稿数字；请先生成 " + FIG1_SPEC_REL + " 再点「重新加载」。",
+          true
+        );
+        return false;
+      });
+  }
+
+  function fig1Save() {
+    if (fig1.busy) return;
+    const project = projectName();
+    if (!project) {
+      fig1SetMsg("未带 project 参数，无法保存（本面板只在控制台流程图 tab 可用）。", true);
+      return;
+    }
+    if (!fig1.spec) {
+      fig1SetMsg("还没有读取 Figure 1 spec，先点「重新加载」。", true);
+      return;
+    }
+    let spec;
+    try {
+      spec = fig1BuildSpec();
+    } catch (err) {
+      fig1SetMsg("无法组装 spec：" + String(err && err.message ? err.message : err), true);
+      return;
+    }
+    const token = fig1ConsoleToken();
+    if (!token) {
+      fig1SetMsg(
+        "页面没有 console token（meta[name=console-token]），无法保存。"
+          + "请从控制台「流程图」tab 打开本页，或重启控制台服务。",
+        true
+      );
+      return;
+    }
+    fig1.busy = true;
+    const buttons = [fig1Els.save, fig1Els.reload];
+    buttons.forEach(function (b) { if (b) b.disabled = true; });
+    fig1SetMsg("正在保存并重新生成 Figure 1 …（n 审计或渲染失败时不会写任何文件）", false);
+    fetch("/api/flow_figure", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Console-Token": token },
+      cache: "no-store",
+      body: JSON.stringify({ project: project, spec: spec })
+    })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          let data = null;
+          try {
+            data = text ? JSON.parse(text) : null;
+          } catch (e) {
+            data = null;
+          }
+          if (!r.ok || !data || !data.ok) {
+            const detail = (data && data.error) || (text || "").slice(0, 300) || "无错误输出";
+            throw new Error("HTTP " + r.status + "：" + detail);
+          }
+          return data;
+        });
+      })
+      .then(function (data) {
+        const patched = Array.isArray(data.patched) ? data.patched : [];
+        const results = Array.isArray(data.results) ? data.results : [];
+        return fig1Load().then(function (reloaded) {
+          const parts = ["已保存并重新生成：" + (data.spec_rel || FIG1_SPEC_REL)];
+          if (data.png_rel) parts.push("PNG：" + data.png_rel);
+          if (data.pdf_rel) parts.push("PDF：" + data.pdf_rel);
+          parts.push(results.length ? "结果夹 " + results.length + " 个" : "未找到结果夹，PNG/PDF 未复制");
+          parts.push(patched.length
+            ? "Results HTML 已回填：" + patched.join("、")
+            : "Results HTML 未改动（已有 Figure 1 区块或没有 Results 页）");
+          if (!reloaded) parts.push("（重新读取 spec 失败，请看上方状态）");
+          fig1SetMsg(parts.join("；"), !reloaded);
+        });
+      })
+      .catch(function (err) {
+        fig1SetMsg("保存失败：" + String(err && err.message ? err.message : err), true);
+      })
+      .then(function () {
+        fig1.busy = false;
+        buttons.forEach(function (b) { if (b) b.disabled = false; });
+      });
+  }
+
+  function fig1Reload() {
+    if (fig1.busy) return;
+    fig1.busy = true;
+    if (fig1Els.reload) fig1Els.reload.disabled = true;
+    fig1Load().then(function (ok) {
+      fig1.busy = false;
+      if (fig1Els.reload) fig1Els.reload.disabled = false;
+      if (ok) fig1SetMsg("已重新加载（未保存的改动已丢弃）。", false);
+    });
+  }
+
   function download(name, blob) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -2974,6 +3577,8 @@ try {
     state.structKey = "";
     refresh(true);
   });
+  if (fig1Els.save) fig1Els.save.addEventListener("click", fig1Save);
+  if (fig1Els.reload) fig1Els.reload.addEventListener("click", fig1Reload);
   window.addEventListener("resize", function () {
     if (scene.boxes.length) applyView();
   });
@@ -3095,12 +3700,8 @@ try {
     else paintNow();
   }
   const hadStore = qs.get("example") === "1" ? false : restore();
-  if (qs.get("example") === "1") {
-    loadExample(true);
-    booted = true;
-    loadManuscriptList();
-  } else if (!hadStore && qs.get("project")) {
-    fetch("/files/" + encodeURIComponent(qs.get("project")) + "/ref/Figure1_flow.json", { cache: "no-store" })
+  function bootLegacyFigure1() {
+    return fetch("/files/" + encodeURIComponent(qs.get("project")) + "/ref/Figure1_flow.json", { cache: "no-store" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (d) {
@@ -3111,8 +3712,22 @@ try {
           return file ? fillFromManuscript(true) : false;
         });
       })
-      .catch(function () {})
-      .then(paintWhenReady);
+      .catch(function () {});
+  }
+  if (qs.get("example") === "1") {
+    loadExample(true);
+    booted = true;
+    loadManuscriptList();
+    if (projectName()) fig1Load();
+  } else if (projectName()) {
+    fig1Load().then(function (ok) {
+      if (ok) return loadManuscriptList();
+      if (hadStore) {
+        loadManuscriptList();
+        return false;
+      }
+      return bootLegacyFigure1();
+    }).catch(function () {}).then(paintWhenReady);
   } else {
     loadManuscriptList();
     paintWhenReady();

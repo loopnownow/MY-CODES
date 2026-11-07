@@ -94,6 +94,7 @@ from modules.console.run import (
 from modules.console.serve import spawn_successor
 from modules.console import registry as project_registry
 from modules.console import flow_fill as flow_prefill
+from modules.console import flow_figure
 
 PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
 
@@ -523,6 +524,8 @@ class Handler(BaseHTTPRequestHandler):
                     f"<title>SCI Figure 1 · {project}</title>",
                     1,
                 )
+            # 流程图页自带 meta console-token：注入后独立标签页也能直接保存 Figure 1。
+            html = _inject_page_token(html, CONSOLE_TOKEN)
             self._send(
                 200, html.encode("utf-8"), "text/html; charset=utf-8", frame="self"
             )
@@ -605,6 +608,23 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(c, b, t)
                 return
             c, b, t = _json_bytes({"ok": True, **out})
+            self._send(c, b, t)
+            return
+
+        # Figure 1 单一源：流程图页读当前 spec 与渲染产物（免 token，同 /flow_files）
+        if path == "/flow_figure":
+            try:
+                proj = project_dir(_require_project(qs.get("project")), qs.get("dir") or "")
+                state = flow_figure.read_figure1_state(proj)
+            except Exception as e:  # noqa: BLE001 原文错误回页面，不回退空 spec 当成功
+                c, b, t = _json_bytes({
+                    "ok": False,
+                    "error": str(e),
+                    "spec_rel": flow_figure.FIG1_SPEC_REL,
+                })
+                self._send(c, b, t)
+                return
+            c, b, t = _json_bytes({"ok": True, **state})
             self._send(c, b, t)
             return
 
@@ -1004,6 +1024,17 @@ class Handler(BaseHTTPRequestHandler):
                     "overlay": ov,
                 })
             c, b, t = _json_bytes({"ok": True, **info, "settings": str(settings_path)})
+            self._send(c, b, t)
+            return
+
+        if path == "/api/flow_figure":
+            project = _require_project(body.get("project"))
+            proj = project_dir(project, str(body.get("dir") or ""))
+            spec = body.get("spec")
+            if not isinstance(spec, dict):
+                raise ValueError("spec 必须是对象")
+            info = flow_figure.render_figure1(proj, spec)
+            c, b, t = _json_bytes({"ok": True, **info})
             self._send(c, b, t)
             return
 

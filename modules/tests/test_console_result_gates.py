@@ -612,7 +612,7 @@ def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
     assert 'data-sec="radblocks"' in ui and 'data-sec="combined"' in ui
     assert "blk-stage-k" in ui and "预处理" in ui and "筛选" in ui and "模型" in ui
     assert 'data-blk-param="' in ui and 'data-blk-param-bool="firth"' in ui
-    assert "data-blk-param], [data-blk-param-bool]" in ui
+    assert "[data-blk-param], [data-blk-param-bool]" in ui
     assert ".blk-card" in css and ".blk-stage" in css
 
 
@@ -622,6 +622,14 @@ def test_omics_block_params_are_per_method_and_pruned():
     from modules.console.const import CONSOLE_DEFAULTS
 
     ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    js_schema = (ROOT / "modules" / "console" / "console_schema.js").read_text(encoding="utf-8")
+    # [object Object]：通用字段渲染器不再画 MODALITY_BLOCKS，块面板是唯一渲染器
+    hidden = js_schema.split("const HIDDEN_FORM_KEYS = new Set([", 1)[1].split("]);", 1)[0]
+    assert '"MODALITY_BLOCKS"' in hidden
+    # 隐藏后仍保留「组学模块」这张卡（补空分组，标题取 schema 的 section_title，位置在 radprep 后）
+    assert 'if (!map.has("radblocks"))' in ui
+    assert 'title: (rb && rb.section_title) || "组学模块"' in ui
+    assert 'groups.splice(rbIdx + 1, 0, g)' in ui
     # 「归一化」在组学模块标题行（默认开）
     assert schema.SECTION_OF["RAD_NORMALIZE"][0] == "radprep"
     assert schema.LABELS["RAD_NORMALIZE"] == "归一化"
@@ -631,17 +639,28 @@ def test_omics_block_params_are_per_method_and_pruned():
         'titleKeys = ["RAD_NORMALIZE", "DO_ICC_FILTER", "ICC_REQUIRE_ROW", '
         '"ENABLE_CORR_FILTER", "LASSO_CACHE"]' in ui
     )
-    # lasso 块给 alpha/nfolds/λ 范围等；logistic 块给 uni_p/mv_p（firth 是 bool）
-    lasso = ui.split("lasso: [", 1)[1].split("logistic: [", 1)[0]
-    for name in (
-        "alpha", "nfolds", "n_lambdas", "c_max", "c_min",
-        "max_iter", "tol", "prefilter_topk", "n_jobs",
-    ):
-        assert f'["{name}",' in lasso, name
-    assert "linear" not in lasso
+    # lasso 常用四项内联，其余进「更多参数」折叠；参数框 placeholder 显示当前全局值
+    lasso_inline = ui.split("lasso: [", 1)[1].split("lasso_more: [", 1)[0]
+    for name in ("prefilter_topk", "nfolds", "n_lambdas", "alpha"):
+        assert f'["{name}",' in lasso_inline, name
+    lasso_more = ui.split("lasso_more: [", 1)[1].split("logistic: [", 1)[0]
+    for name in ("c_max", "c_min", "max_iter", "tol", "n_jobs"):
+        assert f'["{name}",' in lasso_more, name
     logit = ui.split("logistic: [", 1)[1].split("const BLK_PARAM_KEYS", 1)[0]
     for name in ("uni_p", "mv_p"):
         assert f'["{name}",' in logit, name
+    for key in ("LASSO_PREFILTER_TOPK", "LASSO_NFOLDS", "LASSO_N_LAMBDAS", "ALPHA",
+                "LASSO_C_MAX", "LASSO_C_MIN", "LASSO_MAX_ITER", "LASSO_TOL",
+                "LASSO_N_JOBS", "RAD_LOGIT_UNI_P", "RAD_LOGIT_MV_P"):
+        assert f'"{key}"' in ui, key
+    assert "function blkGlobalPlaceholder" in ui and '"全局 " + v' in ui
+    assert 'data-fold="blk-more-params"' in ui and "更多参数" in ui
+    # Firth 未设时跟随全局 DO_RAD_FIRTH，并在面板标「继承全局」
+    assert "function blkFirthState" in ui and 'fieldValue("DO_RAD_FIRTH")' in ui
+    assert "继承全局" in ui and "function blkInheritHint" in ui
+    # 线性拟合开关已取消（线性拟合不再出现在块面板或 params 里）
+    assert "data-blk-linear" not in ui and "blkLinearState" not in ui
+    assert '"linear"' not in lasso_inline and '"linear"' not in logit
     # 换方法剪参数；载入清理；发给后端前再清一遍
     assert "function cleanBlkParams" in ui and "function sanitizeBlkParams" in ui
     assert "cur.params = cleanBlkParams(cur)" in ui

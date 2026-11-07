@@ -131,6 +131,7 @@ def test_linear_fit_switch_is_gone_from_the_console():
     )
     assert '"CLIN_SCORE_LINEAR"' not in SCHEMA
     assert "data-blk-param-bool=\"linear\"" not in UI
+    assert "data-blk-linear" not in UI
     assert "筛选后一律原始尺度 OLS" in UI
 
 

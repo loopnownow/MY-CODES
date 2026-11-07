@@ -3035,6 +3035,17 @@ function renderForm() {
     }
     map.get(f.section).fields.push(f);
   }
+  // MODALITY_BLOCKS 在 HIDDEN_FORM_KEYS 里（通用渲染器会把它画成 [object Object]），
+  // 但「组学模块」这张卡片仍要存在：补一个空分组，标题仍用 schema 的 section_title，
+  // 位置放在 radprep 之后，保持「组学 / LASSO → Logistic → Combined」的原顺序。
+  if (!map.has("radblocks")) {
+    const rb = S.schema.find((f) => f.section === "radblocks");
+    const g = {id: "radblocks", title: (rb && rb.section_title) || "组学模块", fields: []};
+    map.set("radblocks", g);
+    const rbIdx = groups.findIndex((x) => x.id === "radprep");
+    if (rbIdx >= 0) groups.splice(rbIdx + 1, 0, g);
+    else groups.push(g);
+  }
   const moveAfterClin = ["radblocks", "combined", "rad", "radlog"];
   if (groups.some((g) => moveAfterClin.indexOf(g.id) >= 0)) {
     const moved = [];
@@ -4335,31 +4346,51 @@ function delReaderCol(col) {
 }
 
 // 每块的参数覆盖只允许当前 method 的键：lasso 只认 λ/α/折数等，logistic 只认 uni_p/mv_p/firth。
-// 与 modules/stats/selectors.py _LASSO_KEYS / _LOGIT_KEYS 对齐（linear 已退役，不写）。
+// 与 modules/stats/selectors.py _LASSO_KEYS / _LOGIT_KEYS 对齐。参数框留空=继承，
+// placeholder 显示当前全局值；lasso 常用四项内联，其余收进「更多参数」。
 const BLK_PARAM_FIELDS = {
   lasso: [
-    ["alpha", "α（空=继承全局）"],
-    ["nfolds", "折数（空=继承全局）"],
-    ["n_lambdas", "λ 个数（空=继承全局）"],
-    ["c_max", "C 最大（空=继承全局）"],
-    ["c_min", "C 最小（空=继承全局）"],
-    ["max_iter", "最大迭代（空=继承全局）"],
-    ["tol", "容差（空=继承全局）"],
-    ["prefilter_topk", "预筛 TopK（空=继承全局）"],
-    ["n_jobs", "并行核数（空=继承全局）"],
+    ["prefilter_topk", "LASSO_PREFILTER_TOPK"],
+    ["nfolds", "LASSO_NFOLDS"],
+    ["n_lambdas", "LASSO_N_LAMBDAS"],
+    ["alpha", "ALPHA"],
+  ],
+  lasso_more: [
+    ["c_max", "LASSO_C_MAX"],
+    ["c_min", "LASSO_C_MIN"],
+    ["max_iter", "LASSO_MAX_ITER"],
+    ["tol", "LASSO_TOL"],
+    ["n_jobs", "LASSO_N_JOBS"],
   ],
   logistic: [
-    ["uni_p", "单因素 p（空=继承全局）"],
-    ["mv_p", "多因素 p（空=继承全局）"],
+    ["uni_p", "RAD_LOGIT_UNI_P"],
+    ["mv_p", "RAD_LOGIT_MV_P"],
   ],
 };
 const BLK_PARAM_KEYS = {
-  lasso: BLK_PARAM_FIELDS.lasso.map((row) => row[0]),
+  lasso: BLK_PARAM_FIELDS.lasso.map((row) => row[0])
+    .concat(BLK_PARAM_FIELDS.lasso_more.map((row) => row[0])),
   logistic: BLK_PARAM_FIELDS.logistic.map((row) => row[0]).concat(["firth"]),
 };
 
 function blkMethod(blk) {
   return String((blk || {}).method || "").trim().toLowerCase();
+}
+
+function blkGlobalValue(key) {
+  // 块参数 placeholder 用：当前全局设置值（空=没设）。
+  const v = fieldValue(key);
+  if (v === undefined || v === null || v === "") return "";
+  return String(v).trim();
+}
+
+function blkGlobalPlaceholder(key) {
+  const v = blkGlobalValue(key);
+  return v === "" ? "空=继承全局" : ("全局 " + v);
+}
+
+function blkParamInput(b, name, globalKey) {
+  return `<input data-blk-param="${name}" value="${esc(blkParamOf(b, name))}" placeholder="${esc(blkGlobalPlaceholder(globalKey))}" title="${esc("留空=继承全局 " + globalKey + "；当前全局 " + (blkGlobalValue(globalKey) || "未设"))}" spellcheck="false"/>`;
 }
 
 function cleanBlkParams(blk) {
@@ -4416,11 +4447,29 @@ function blkParamOf(b, name) {
   return (v === undefined || v === null) ? "" : v;
 }
 
-function blkParamInputs(b, method) {
-  const fields = BLK_PARAM_FIELDS[method] || [];
-  return fields.map((row) =>
-    `<input data-blk-param="${row[0]}" value="${esc(blkParamOf(b, row[0]))}" placeholder="${esc(row[1])}" spellcheck="false"/>`
-  ).join("");
+function blkParamInputs(b, group) {
+  return (BLK_PARAM_FIELDS[group] || []).map((row) => blkParamInput(b, row[0], row[1])).join("");
+}
+
+function blkFirthState(b) {
+  // Firth 三态：显式 true/false = 本块覆盖；未设时跟随全局 DO_RAD_FIRTH。
+  const raw = blkParamOf(b, "firth");
+  const override = (raw === true || raw === false) ? raw : null;
+  const global = !!fieldValue("DO_RAD_FIRTH");
+  return { on: override === null ? global : override, inherit: override === null, global: global };
+}
+
+function blkInheritHint(state, globalKey) {
+  if (!state.inherit) return "";
+  return `<span class="blk-inherit" title="未单独设置，继承全局 ${esc(globalKey)}">继承全局（${state.global ? "开" : "关"}）</span>`;
+}
+
+function blkMoreParamsFold(b) {
+  const open = S.kvFoldOpen && S.kvFoldOpen["blk-more-params"] ? " open" : "";
+  return `<details class="kv-fold blk-more" data-fold="blk-more-params"${open}>
+        <summary>更多参数</summary>
+        <div class="blk-more-body">${blkParamInputs(b, "lasso_more")}</div>
+      </details>`;
 }
 
 function modalityBlocksPanel() {
@@ -4434,14 +4483,13 @@ function modalityBlocksPanel() {
     const corr = !(b.prep && b.prep.corr === false);
     const cut = (b.prep && b.prep.corr_cutoff != null) ? b.prep.corr_cutoff : "";
     const method = blkMethod(b);
-    const firth = blkParamOf(b, "firth");
-    const firthOn = firth !== false;
+    const firth = blkFirthState(b);
     const stageFilter = method === "logistic"
       ? `${blkParamInputs(b, "logistic")}
-         <label class="pexcl" title="开=该块多因素用 Firth"><input type="checkbox" data-blk-param-bool="firth"${firthOn ? " checked" : ""}/> Firth</label>
+         <label class="pexcl" title="开=该块多因素用 Firth；未设时继承全局 DO_RAD_FIRTH"><input type="checkbox" data-blk-param-bool="firth"${firth.on ? " checked" : ""}/> Firth</label>${blkInheritHint(firth, "DO_RAD_FIRTH")}
          <span class="dim">筛选后一律原始尺度 OLS（线性拟合开关已取消）</span>`
       : (method === "lasso"
-        ? `${blkParamInputs(b, "lasso")}
+        ? `${blkParamInputs(b, "lasso")}${blkMoreParamsFold(b)}
          <span class="dim">LASSO 参数只作用于本块；空=继承「组学 / LASSO」模块（分数同为原始尺度 OLS）</span>`
         : '<span class="dim">未选方法 → 该块不建模</span>');
     return `<div class="blk-card" data-blk-row="${i}"${b.enabled === false ? ' data-off="1"' : ""}>
@@ -4563,6 +4611,11 @@ function applyBlkRow(el) {
   if (field === "method") {
     // 换方法后参数输入行要立刻换成本方法的，不能等到下次重画。
     renderForm();
+    return;
+  }
+  if (paramBool) {
+    // 勾选后「继承全局」提示要跟着变；推迟重画，避免 label 还在处理这次点击。
+    setTimeout(() => renderForm(), 0);
     return;
   }
   if (field === "name" || field === "sheet") {
