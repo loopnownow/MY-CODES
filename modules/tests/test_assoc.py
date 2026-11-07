@@ -532,8 +532,9 @@ def test_prefix_exclude_drops_matching_rad_features(monkeypatch):
 
     untouched = data_io.drop_excluded_rad_columns(frame, prefixes=["", "  "])
     assert list(untouched.columns) == list(frame.columns)
-    mid = data_io.drop_excluded_rad_columns(frame, prefixes=["ACC_L"])
-    assert "relcbf__ACC_L" in mid.columns
+    aligned = data_io.drop_excluded_rad_columns(frame, prefixes=["ACC_L"])
+    assert "relcbf__ACC_L" not in aligned.columns
+    assert "perfusion_weighted__ACC_L" not in aligned.columns
     kept_id = data_io.drop_excluded_rad_columns(
         pd.DataFrame({"relcbf__id": ["a"], "relcbf__ACC_L": [1.0]}),
         prefixes=["relcbf__"],
@@ -609,17 +610,20 @@ def test_prefix_exclude_double_underscore_covers_single(monkeypatch):
 
 
 def test_suffix_marker_matches_only_when_tagged():
-    """结尾标记必须带 suffix:。裸的 _Vgm 不因首字符被当成后缀。"""
+    """结尾标记带 suffix: 时只认结尾；裸标记按分隔符对齐认任意位置。"""
     from modules.stats import data_io
     from modules.stats.radiomics import display_rad_feature, prefix_group_plan
 
     name = "Left Lateral Ventricle_Vgm"
     assert data_io._column_matches_prefix(name, "suffix:_Vgm")
-    assert not data_io._column_matches_prefix(name, "_Vgm")
+    # 裸标记先去掉首尾下划线，再按分隔符对齐匹配：_Vgm 与中间段 _Vgm_ 同规则。
+    assert data_io._column_matches_prefix(name, "_Vgm")
+    assert data_io._column_matches_prefix("Keep_Vgm_Inside_Name", "_Vgm")
     assert not data_io._column_matches_prefix(name, "suffix:_Vcsf")
     assert not data_io._column_matches_prefix("Keep_Vgm_Inside_Name", "suffix:_Vgm")
+    assert not data_io._column_matches_prefix("_Vgm_Left", "suffix:_Vgm")
     assert data_io._column_matches_prefix("relcbf__ACC_L", "relcbf__")
-    assert not data_io._column_matches_prefix("relcbf__ACC_L", "ACC_L")
+    assert data_io._column_matches_prefix("relcbf__ACC_L", "ACC_L")
 
     frame = pd.DataFrame({
         "Patient_ID": ["a"],
@@ -629,8 +633,8 @@ def test_suffix_marker_matches_only_when_tagged():
     })
     dropped = data_io.drop_excluded_rad_columns(frame, prefixes=["suffix:_Vcsf", "suffix:_Vwm"])
     assert list(dropped.columns) == ["Patient_ID", "Left Lateral Ventricle_Vgm"]
-    untouched = data_io.drop_excluded_rad_columns(frame, prefixes=["_Vcsf", "_Vwm"])
-    assert "Left Lateral Ventricle_Vcsf" in untouched.columns
+    bare = data_io.drop_excluded_rad_columns(frame, prefixes=["_Vcsf", "_Vwm"])
+    assert list(bare.columns) == ["Patient_ID", "Left Lateral Ventricle_Vgm"]
 
     import modules.config as cfg
     old_strip = getattr(cfg, "RAD_FEATURE_DISPLAY_STRIP", [])
@@ -640,7 +644,7 @@ def test_suffix_marker_matches_only_when_tagged():
         assert display_rad_feature(name) == "Left Lateral Ventricle"
         assert display_rad_feature("CSF_Vcsf") == "CSF"
         cfg.RAD_FEATURE_DISPLAY_STRIP = ["_Vgm"]
-        assert display_rad_feature(name) == name
+        assert display_rad_feature(name) == "Left Lateral Ventricle"
         cfg.RAD_FEATURE_DISPLAY_STRIP = ["original_"]
         assert display_rad_feature("original_firstorder_Mean") == "firstorder_Mean"
         cfg.RAD_FEATURE_PREFIX_GROUP = {
@@ -666,6 +670,47 @@ def test_suffix_marker_matches_only_when_tagged():
     assert plan["csf"] == ["Left Lateral Ventricle_Vcsf"]
     assert plan["vwm"] == ["Brain Stem_Vwm"]
     assert plan["seq"] == ["perfusion_weighted_Frontal_L"]
+
+
+def test_marker_matches_delimiter_aligned_middle_segment(monkeypatch):
+    """筛选/剥离也识别 fbn_32 这类中间片段；prefix:/suffix: 仍只认各自一端。"""
+    from modules.stats import data_io
+    from modules.stats.radiomics import display_rad_feature
+
+    middle = "h0_delta_abs_h0_standard_fbn_32_intensity_skewness_KE2A"
+    starts = "fbn_32_intensity_skewness_KE2A"
+    assert data_io._column_matches_prefix(middle, "fbn_32")
+    assert data_io._column_matches_prefix(middle, "mid:fbn_32")
+    assert data_io._column_matches_prefix(middle, "mid:_fbn_32_")
+    assert not data_io._column_matches_prefix(middle, "prefix:fbn_32")
+    assert data_io._column_matches_prefix(starts, "prefix:fbn_32")
+    assert not data_io._column_matches_prefix(middle, "suffix:fbn_32")
+    assert data_io._column_matches_prefix("h0_standard_KE2A_fbn_32", "fbn_32")
+    assert data_io._column_matches_prefix("fbn_32", "mid:fbn_32")
+
+    frame = pd.DataFrame({
+        "Patient_ID": ["a", "b"],
+        "h0_delta_abs_h0_standard_fbn_32_intensity_skewness_KE2A": [1.0, 2.0],
+        "h0_delta_abs_h0_standard_fbn_32_intensity_mean_KE2A": [3.0, 4.0],
+        "h0_delta_abs_h0_standard_fbs_16_intensity_skewness_KE2A": [5.0, 6.0],
+    })
+    monkeypatch.setattr(data_io.cfg, "RAD_ID_COL", "Patient_ID", raising=False)
+    monkeypatch.setattr(data_io.cfg, "RAD_ID_COLS", ["Patient_ID"], raising=False)
+    monkeypatch.setattr(data_io.cfg, "RAD_FEATURE_PREFIX_EXCLUDE", ["fbn_32"], raising=False)
+    dropped = data_io.drop_excluded_rad_columns(frame)
+    assert [c for c in dropped.columns if "fbn_32" in c] == []
+    assert "h0_delta_abs_h0_standard_fbs_16_intensity_skewness_KE2A" in dropped.columns
+    assert "Patient_ID" in dropped.columns
+
+    import modules.config as cfg
+    old_strip = getattr(cfg, "RAD_FEATURE_DISPLAY_STRIP", [])
+    try:
+        cfg.RAD_FEATURE_DISPLAY_STRIP = ["fbn_32"]
+        assert display_rad_feature(middle) == "h0_delta_abs_h0_standard_intensity_skewness_KE2A"
+        cfg.RAD_FEATURE_DISPLAY_STRIP = ["mid:fbn_32"]
+        assert display_rad_feature(middle) == "h0_delta_abs_h0_standard_intensity_skewness_KE2A"
+    finally:
+        cfg.RAD_FEATURE_DISPLAY_STRIP = old_strip
 
 
 def test_expand_corr_predictors_keeps_radscore_and_components():

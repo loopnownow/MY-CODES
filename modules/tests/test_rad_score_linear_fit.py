@@ -85,6 +85,49 @@ def test_refit_locked_result_follows_score_fit(base_cfg, monkeypatch):
     assert np.allclose(refit.radscore, res.radscore, atol=1e-8)
 
 
+def test_grouped_refit_reestimates_lasso_on_eval_layer():
+    """分组 refit：lasso 组按本层重估原始尺度 OLS，分数长度=本层行数（不再沿用训练长度）。"""
+    from dataclasses import replace
+
+    from modules.stats.radiomics import RadiomicsResult, score_map
+    from modules.stats.val_mode import refit_radscore_ols
+
+    train_df, _ = _frame(seed=7, n=90)
+    eval_df, y_eval = _frame(seed=11, n=40)
+    group = RadiomicsResult(
+        features=["f1", "f2"], coefs=np.array([1.0, -0.5]),
+        radscore=np.zeros(len(train_df)), intercept=0.25,
+        betas=pd.Series({"f1": 1.0, "f2": -0.5}), ols=None,
+        lambda_used=0.05, formula_df=None, formula_text=None,
+        method="lasso", score_name="RadScore_CTA", group_name="CTA",
+    )
+    result = RadiomicsResult(
+        features=[], coefs=np.array([]), radscore=None, intercept=None,
+        betas=None, ols=None, lambda_used=float("nan"), formula_df=None,
+        formula_text=None, method="lasso", groups=[group],
+    )
+
+    out = rad.refit_locked_result(result, eval_df, y_eval)
+    scores = score_map(out)
+    assert set(scores) == {"RadScore_CTA"}
+    arr = np.asarray(scores["RadScore_CTA"], dtype=float)
+    assert len(arr) == len(eval_df)
+    assert np.isfinite(arr).all()
+    expected = refit_radscore_ols(eval_df, y_eval, ["f1", "f2"])
+    assert expected is not None and np.allclose(arr, expected)
+    # 不是把训练公式直接套到本层（refit 必须重估系数）。
+    assert not np.allclose(arr, rad.apply_locked_radscore(group, eval_df))
+
+    # 无锁定公式的组：不沿用训练长度分数，给本层全 NaN。
+    blank_group = replace(group, features=[], betas=None, intercept=None)
+    blank = rad.refit_locked_result(
+        replace(result, groups=[blank_group]), eval_df, y_eval,
+    )
+    blank_arr = np.asarray(score_map(blank)["RadScore_CTA"], dtype=float)
+    assert len(blank_arr) == len(eval_df)
+    assert np.isnan(blank_arr).all()
+
+
 def test_block_param_linear_is_retired():
     """组学模块面板的「线性拟合」勾选已取消：旧 ini 里写着也忽略，不再改配置。"""
     from modules.config.blocks import normalize_blocks

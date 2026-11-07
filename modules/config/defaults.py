@@ -193,6 +193,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "DO_RAD_FIRTH": False,
     "RAD_FEATURE_SOURCE": "both",
     "RAD_COR_CUTOFF": 0.95,
+    # 组学预处理是否在插补后做 z-score 中心化/缩放；False 只用插补后的原始尺度。
+    "RAD_NORMALIZE": True,
     "ALPHA": 1.0,
     "LASSO_NFOLDS": 10,
     "LASSO_N_LAMBDAS": 15,

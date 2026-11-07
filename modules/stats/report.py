@@ -2409,10 +2409,19 @@ def _radiomics_logistic_html(rad_res, panel_label: str) -> str:
             )
         else:
             collinear_note = "∞ = exactly collinear with another listed feature (VIF not estimable). "
+        if bool(getattr(cfg, "RAD_NORMALIZE", True)):
+            scale_note = (
+                "Univariate logistic on training-set median-imputed, z-scored radiomics features. "
+                "Odds ratios are per 1 training SD. "
+            )
+        else:
+            scale_note = (
+                "Univariate logistic on training-set median-imputed radiomics features without "
+                "z-scoring (RAD_NORMALIZE=False). Odds ratios are per 1 raw unit. "
+            )
         foot = (
-            "Univariate logistic on training-set median-imputed, z-scored radiomics features. "
-            "Odds ratios are per 1 training SD. "
-            f"Candidate-pool entry uses {gate} and no complete separation.{adj_note} "
+            scale_note
+            + f"Candidate-pool entry uses {gate} and no complete separation.{adj_note} "
             f"VIF is reported for collinearity warning "
             f"(warn ≥ {getattr(cfg, 'VIF_THRESHOLD_WARN', 5):g}) and does not exclude candidates. "
             + collinear_note

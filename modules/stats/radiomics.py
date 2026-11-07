@@ -3,13 +3,15 @@ radiomics.py — 影像组学全管线：预处理 → LASSO 或 Logistic 特征
 ═══════════════════════════════════════════════════════════════════
 功能：对影像组学特征矩阵执行完整的特征工程和建模流程：
     Step 1 — 预处理（zero-variance 剔除 + 中位数插补 + 标准化 + near-zero-variance 剔除）
+            标准化由 RAD_NORMALIZE 控制；关时不做中心化/缩放，其余步骤照旧。
     Step 2 — LASSO / 弹性网交叉验证特征选择（默认 10-fold CV，以 AUC 优化）
     Step 3 — 在原始尺度上拟合 OLS，构建 RadScore
     另：DO_RAD_LOGISTIC 时走 run_radiomics_logistic（与临床相同的 Logistic 筛选，界值用 RAD_LOGIT_*）。
-    验证层「重新拟合」锁定入选特征与训练集标准化，只重估系数。
+    验证层「重新拟合」锁定入选特征与训练集预处理参数，只重估系数。
 
 预处理与建模均使用 numpy / pandas / sklearn / statsmodels 实现。
-高相关过滤由 config.ENABLE_CORR_FILTER 与 config.RAD_COR_CUTOFF 控制。
+高相关过滤由 config.ENABLE_CORR_FILTER 与 config.RAD_COR_CUTOFF 控制；
+是否做 z-score 中心化/缩放由 RAD_NORMALIZE 控制（默认开）。
 正式入口：python -m modules.pipeline
 ═══════════════════════════════════════════════════════════════════
 """
@@ -71,7 +73,7 @@ class RadiomicsResult:
     groups: Optional[list] = None
     group_name: Optional[str] = None
     score_name: Optional[str] = None
-    # Logistic 路径的分数口径：logit（默认，标准化尺度 log-odds）或 ols（原始尺度线性回归）。
+    # Logistic 路径的分数口径：logit（默认，预处理尺度 log-odds）或 ols（原始尺度线性回归）。
     score_fit: str = "logit"
 
 
@@ -106,13 +108,16 @@ def _fit_preprocess(
     """
     Fit radiomics preprocess on this matrix only (fold-train or final train).
 
-    Steps: drop IDs → zv → median impute → center/scale → nzv → optional Spearman filter.
+    Steps: drop IDs → zv → median impute → center/scale (RAD_NORMALIZE) → nzv
+    → optional Spearman filter. With RAD_NORMALIZE=False no center/scale is
+    done and params["means"]=0, params["stds"]=1 are stored.
     Returns (transformed X, params) for `_apply_preprocess`.
     """
     if cutoff is None:
         cutoff = float(getattr(cfg, "RAD_COR_CUTOFF", 0.95))
     if enable_corr is None:
         enable_corr = bool(getattr(cfg, "ENABLE_CORR_FILTER", True))
+    normalize = bool(getattr(cfg, "RAD_NORMALIZE", True))
     X = _rad_feature_frame(full_rad).apply(pd.to_numeric, errors="coerce").copy()
 
     variances = X.var(skipna=True)
@@ -121,9 +126,15 @@ def _fit_preprocess(
     medians = X.median()
     X = X.fillna(medians)
 
-    means = X.mean()
-    stds = X.std(ddof=1).replace(0, 1.0)
-    X = (X - means) / stds
+    if normalize:
+        means = X.mean()
+        stds = X.std(ddof=1).replace(0, 1.0)
+        X = (X - means) / stds
+    else:
+        if verbose:
+            print("  RAD_NORMALIZE=False: skip z-score centering/scaling", flush=True)
+        means = pd.Series(0.0, index=X.columns)
+        stds = pd.Series(1.0, index=X.columns)
 
     keep_cols = []
     for col in X.columns:
@@ -162,12 +173,18 @@ def _fit_preprocess(
         "keep_cols": list(X.columns),
         "cutoff": cutoff,
         "enable_corr": enable_corr,
+        "normalize": normalize,
     }
     return X, params
 
 
 def _apply_preprocess(full_rad: pd.DataFrame, params: dict) -> pd.DataFrame:
-    """Apply fold-train / final-train preprocess params; never re-estimate."""
+    """Apply fold-train / final-train preprocess params; never re-estimate.
+
+    Uses the stored medians/means/stds, so RAD_NORMALIZE=False params
+    (means=0, stds=1) come out on the imputed raw scale. Old params without
+    the "normalize" key are applied as stored (they keep real means/stds).
+    """
     X = _rad_feature_frame(full_rad).apply(pd.to_numeric, errors="coerce").copy()
     cols = list(params["medians"].index)
     X = X.reindex(columns=cols)
@@ -376,7 +393,11 @@ def _filter_rad_by_icc(full_rad: pd.DataFrame) -> pd.DataFrame:
 
 
 def display_rad_feature(name: str) -> str:
-    """缩短组学特征显示名。只剥列名开头或结尾的标记，不改内部列名。"""
+    """缩短组学特征显示名：剥掉显示标记，再收双下划线、去首尾下划线。
+
+    标记的匹配位置由 data_io._marker_anchor / _strip_anchored_token 决定
+    （开头、结尾、或分隔符对齐的任意位置）。不改内部列名。
+    """
     from modules.stats.data_io import _marker_anchor, _strip_anchored_token
 
     s = str(name)
@@ -489,7 +510,8 @@ def _fold_preprocess_and_path(
     cutoff: float,
     enable_corr: bool,
 ) -> np.ndarray:
-    """One CV fold: fit impute/scale/NZV/corr/AUC-prefilter on fold-train only."""
+    """One CV fold: fit impute/scale(RAD_NORMALIZE)/NZV/corr/AUC-prefilter on
+    fold-train only, then apply the stored params to fold-val."""
     Xtr_raw = X_df.iloc[list(tr_idx)]
     Xva_raw = X_df.iloc[list(va_idx)]
     ytr = np.asarray(y)[tr_idx]
@@ -509,7 +531,7 @@ def _fold_preprocess_and_path(
     )
 
 
-_LASSO_CACHE_VERSION = 1
+_LASSO_CACHE_VERSION = 2
 
 
 def _lasso_cache_dir() -> Path:
@@ -538,7 +560,9 @@ def _lasso_cache_digest(X_df: pd.DataFrame, y: np.ndarray, params: dict) -> str:
 def _lasso_cache_params(
     alpha: float, nfolds: int, n_cs: int, seed: int, max_iter: int, topk: int,
     c_min: float, c_max: float, tol: float, cutoff: float, enable_corr: bool,
+    normalize: bool,
 ) -> dict:
+    """LASSO cache key payload; every entry here changes the fitted result."""
     import sklearn
     return {
         "cache_version": _LASSO_CACHE_VERSION,
@@ -554,6 +578,7 @@ def _lasso_cache_params(
         "tol": float(tol),
         "cutoff": float(cutoff),
         "enable_corr": bool(enable_corr),
+        "normalize": bool(normalize),
     }
 
 
@@ -679,15 +704,16 @@ def _fit_lasso_cv_path(
     """
     LASSO C-path CV on TRAIN only (not nested CV).
 
-    Imputation, scaling, NZV, correlation filter and AUC prefilter are fit
-    inside each fold on fold-train and applied to fold-val. Final model is
-    refit on the full training matrix after the same pipeline.
+    Imputation, scaling (RAD_NORMALIZE), NZV, correlation filter and AUC
+    prefilter are fit inside each fold on fold-train and applied to fold-val.
+    Final model is refit on the full training matrix after the same pipeline.
     """
     y = np.asarray(y).astype(int)
     if cutoff is None:
         cutoff = float(getattr(cfg, "RAD_COR_CUTOFF", 0.95))
     if enable_corr is None:
         enable_corr = bool(getattr(cfg, "ENABLE_CORR_FILTER", True))
+    normalize = bool(getattr(cfg, "RAD_NORMALIZE", True))
     c_min = float(getattr(cfg, "LASSO_C_MIN", 1e-3))
     c_max = float(getattr(cfg, "LASSO_C_MAX", 50.0))
     tol = float(getattr(cfg, "LASSO_TOL", 1e-3))
@@ -695,7 +721,7 @@ def _fit_lasso_cv_path(
     use_cache = bool(getattr(cfg, "LASSO_CACHE", True))
     cache_params = _lasso_cache_params(
         alpha, nfolds, n_cs, seed, max_iter, int(topk or 0),
-        c_min, c_max, tol, float(cutoff), bool(enable_corr),
+        c_min, c_max, tol, float(cutoff), bool(enable_corr), normalize,
     )
     digest = _lasso_cache_digest(X_df, y, cache_params) if use_cache else ""
     if use_cache:
@@ -767,7 +793,8 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
     """影像组学主函数：ICC/源过滤 → 折内预处理的 LASSO CV → 全训练集重拟合 RadScore。
 
     交叉验证不是 nested CV：仍是 TRAIN 上 StratifiedKFold 的 C 路径。
-    需要从数据估计的步骤（插补/标准化/NZV/相关过滤/AUC 预筛）只在折内训练侧拟合。
+    需要从数据估计的步骤（插补/标准化(RAD_NORMALIZE)/NZV/相关过滤/AUC 预筛）
+    只在折内训练侧拟合。
     LASSO 入选后构建 Table 2（原始尺度，同 Baseline Table 1 格式）。
     """
     from modules.utils import dry_run as _dry
@@ -886,14 +913,14 @@ def run_radiomics(full_rad: pd.DataFrame, y_group: np.ndarray,
 def apply_locked_radscore(result: RadiomicsResult, full_rad: pd.DataFrame) -> np.ndarray:
     """把已锁定的 RadScore 套到另一层。
 
-    Logistic 先套训练集的插补和标准化，再乘 log-odds 系数。
-    LASSO 的系数已在原始尺度，直接线性相加。
+    Logistic 先套训练集的插补和（RAD_NORMALIZE=False 时省略的）中心化/缩放，
+    再乘 log-odds 系数。LASSO 的系数已在原始尺度，直接线性相加。
     """
     feats = [str(f) for f in (result.features or [])]
     if result.intercept is None or result.betas is None or not feats:
         raise ValueError("RadScore formula is empty")
     params = getattr(result, "preprocess", None)
-    # 只有 Logistic 的 log-odds 系数是在标准化尺度上估的；
+    # 只有 Logistic 的 log-odds 系数是在预处理尺度上估的；
     # LASSO 的 OLS 系数、以及 Logistic + RAD_SCORE_LINEAR 的 OLS 系数都在原始尺度。
     use_scaling = (
         bool(params)
@@ -917,7 +944,8 @@ def refit_radscore_logistic(
     full_rad: pd.DataFrame,
     y: np.ndarray,
 ) -> Optional[np.ndarray]:
-    """锁定入选特征，套训练集插补和标准化，在本层重估 Logistic 系数。
+    """锁定入选特征，套训练集插补和（RAD_NORMALIZE=False 时省略的）中心化/缩放，
+    在本层重估 Logistic 系数。
 
     返回与 full_rad 等长的线性预测值。失败时返回 None，调用方保留训练公式。
     """
@@ -1115,13 +1143,22 @@ def _logistic_pool_note(
             "Radiomics candidate pool: univariate logistic p "
             f"< {p_threshold:g} (n = {len(candidates)}). "
         )
+    if bool(getattr(cfg, "RAD_NORMALIZE", True)):
+        scale_note = (
+            "Features were median-imputed and z-scored on the training set before regression; "
+            "odds ratios are per 1 training SD."
+        )
+    else:
+        scale_note = (
+            "Features were median-imputed on the training set without z-scoring "
+            "(RAD_NORMALIZE=False); odds ratios are per 1 raw unit."
+        )
     parts = [
         entry
         + f"VIF ≥ {warn:g} was used to exclude radiomics candidates (highest VIF removed first, "
         "iteratively) and is therefore an entry criterion, not only a collinearity flag. "
         "Complete-separation terms do not enter. "
-        "Features were median-imputed and z-scored on the training set before regression; "
-        "odds ratios are per 1 training SD."
+        + scale_note
     ]
     if removed:
         parts.append(
@@ -1453,16 +1490,44 @@ def apply_locked_result(result: RadiomicsResult, full_rad: pd.DataFrame) -> Radi
 
 def refit_locked_result(result: RadiomicsResult, full_rad: pd.DataFrame,
                         y: np.ndarray) -> RadiomicsResult:
-    """锁定各类入选特征，在本层重估系数。失败则退回训练公式。"""
+    """锁定各类入选特征，在本层重估系数。
+
+    返回的每个 RadScore 长度都等于 len(full_rad)。分组结果里 Logistic 组按
+    得分口径重估（OLS 原始尺度 / logit 训练集预处理参数），LASSO 等其余组按
+    原始尺度 OLS 重估；重估失败退回锁定公式，长度不符直接报错。无锁定公式
+    的组只在分数长度匹配时沿用，否则给本层全 NaN。
+    """
     from dataclasses import replace
 
+    n = len(full_rad)
+
+    def _checked(score, label: str) -> np.ndarray:
+        """校验分数长度等于本层行数；不符直接报错，不返回错位数组。"""
+        if score is None:
+            raise ValueError(f"{label}: 本层重估未得到 RadScore")
+        arr = np.asarray(score, dtype=float)
+        if arr.shape != (n,):
+            raise ValueError(
+                f"{label}: RadScore 长度 {arr.shape} 与本层行数 {(n,)} 不一致"
+            )
+        return arr
+
     def _refit_one(res: RadiomicsResult) -> Optional[np.ndarray]:
-        """按分数口径重估：OLS 走原始尺度，logit 走训练集标准化尺度。"""
+        """按分数口径重估：OLS 走原始尺度，logit 走训练集预处理参数。"""
         if str(getattr(res, "score_fit", "logit") or "logit") == "ols":
             from modules.stats.val_mode import refit_radscore_ols
 
             return refit_radscore_ols(full_rad, y, list(res.features or []))
         return refit_radscore_logistic(res, full_rad, y)
+
+    def _locked_formula(res: RadiomicsResult, label: str) -> np.ndarray:
+        """锁定公式套到本层；失败直接报错，不退回训练长度分数。"""
+        try:
+            return _checked(apply_locked_radscore(res, full_rad), label)
+        except ValueError:
+            raise
+        except Exception as e:
+            raise ValueError(f"{label}: 锁定公式套用失败 ({e})") from e
 
     groups = list(getattr(result, "groups", None) or [])
     if not groups:
@@ -1475,20 +1540,36 @@ def refit_locked_result(result: RadiomicsResult, full_rad: pd.DataFrame,
     out = []
     for g in groups:
         label = str(getattr(g, "score_name", "") or getattr(g, "group_name", "") or "group")
-        if str(getattr(g, "method", "") or "") != "logistic" or not g.features:
-            out.append(g)
+        has_formula = bool(g.features) and g.betas is not None and g.intercept is not None
+        if not has_formula:
+            rs = g.radscore
+            if rs is not None and np.asarray(rs, dtype=float).shape == (n,):
+                out.append(g)
+            else:
+                print(f"  ⚠ {label} has no locked formula — NaN RadScore on this layer")
+                out.append(replace(g, radscore=np.full(n, np.nan, dtype=float)))
             continue
-        rs = _refit_one(g)
-        if rs is None:
-            print(f"  ⚠ {label} refit failed — keep train formula")
-            try:
-                rs = apply_locked_radscore(g, full_rad)
-            except Exception:
-                rs = g.radscore
+        is_logistic = str(getattr(g, "method", "") or "") == "logistic"
+        if is_logistic:
+            rs = _refit_one(g)
         else:
-            fit_kind = "OLS (raw scale)" if str(getattr(g, "score_fit", "logit") or "logit") == "ols" \
-                else "logistic (train scaling)"
+            from modules.stats.val_mode import refit_radscore_ols
+
+            rs = refit_radscore_ols(full_rad, y, list(g.features))
+        if rs is None:
+            print(f"  ⚠ {label} refit failed — apply locked formula")
+            rs = _locked_formula(g, label)
+        else:
+            if is_logistic:
+                fit_kind = (
+                    "OLS (raw scale)"
+                    if str(getattr(g, "score_fit", "logit") or "logit") == "ols"
+                    else "logistic (train scaling)"
+                )
+            else:
+                fit_kind = "OLS (raw scale)"
             print(f"  Refit {label} ({len(g.features)} locked features, {fit_kind})")
+            rs = _checked(rs, label)
         out.append(replace(g, radscore=rs))
     return replace(result, groups=out, radscore=None)
 

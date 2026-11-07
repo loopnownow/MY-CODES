@@ -34,7 +34,8 @@ def test_lasso_cache_switch_defaults_on_and_sits_on_radprep_title():
     root = Path(__file__).resolve().parents[1]
     js = (root / "console" / "console_ui.js").read_text(encoding="utf-8")
     assert (
-        'titleKeys = ["DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"]'
+        'titleKeys = ["RAD_NORMALIZE", "DO_ICC_FILTER", "ICC_REQUIRE_ROW", '
+        '"ENABLE_CORR_FILTER", "LASSO_CACHE"]'
         in js
     )
 

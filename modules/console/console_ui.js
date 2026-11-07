@@ -43,6 +43,10 @@ function collectOverlay() {
 
 function payload() {
   const overlay = Object.assign({}, S.values);
+  // 发给后端的块参数只保留当前 method 的键，旧 ini 里跨方法写错的参数不落地。
+  if (Array.isArray(overlay.MODALITY_BLOCKS)) {
+    overlay.MODALITY_BLOCKS = cleanModalityBlocks(overlay.MODALITY_BLOCKS);
+  }
   const tab = typeof outcomeTab === "function" ? outcomeTab() : "";
   if (tab) overlay.GROUP_SOURCE_COL = tab;
   return {
@@ -668,24 +672,79 @@ function radIdNames() {
     .concat((S.preview && S.preview.rad_id_cols) || []).map(String));
 }
 function markerAnchor(stored) {
+  // 已保存标记 → (匹配方式, 正文)，与 data_io._marker_anchor 一致：
+  // suffix:/prefix:/mid: 三种显式写法，无冒号 = 裸标记（auto）。
   const raw = String(stored || "");
   if (raw.indexOf("suffix:") === 0) return { anchor: "end", part: raw.slice(7) };
   if (raw.indexOf("prefix:") === 0) return { anchor: "start", part: raw.slice(7) };
-  return { anchor: "start", part: raw };
+  if (raw.indexOf("mid:") === 0) return { anchor: "mid", part: raw.slice(4) };
+  return { anchor: "auto", part: raw };
+}
+function markerCore(part) {
+  return String(part == null ? "" : part).replace(/^_+/, "").replace(/_+$/, "");
+}
+function delimiterAligned(s, p) {
+  // 与 data_io._delimiter_aligned 一致：先去掉正文首尾下划线，再看整名/开头/结尾/中段对齐。
+  const core = markerCore(p);
+  if (!core) return false;
+  const name = String(s);
+  if (name === core || name.indexOf(core + "_") === 0) return true;
+  if (name.slice(-(core.length + 1)) === "_" + core) return true;
+  return name.indexOf("_" + core + "_") >= 0;
 }
 function columnMatchesPrefix(name, prefix) {
-  // 与 data_io._column_matches_prefix 同规则。suffix: 才认结尾。
+  // 与 data_io._column_matches_prefix 同规则：
+  // suffix: 只认结尾；prefix: 只认开头；mid:/裸标记 认 _ 分隔的任意位置；
+  // 裸标记先按旧开头规则，再按分隔符对齐规则。
   const s = String(name);
   const spec = markerAnchor(prefix);
   const p = spec.part;
   if (!p) return false;
   if (spec.anchor === "end") return s.slice(-p.length) === p;
-  if (s.indexOf(p) === 0) return true;
-  if (p.slice(-2) === "__") {
-    const broad = p.slice(0, -1);
-    if (broad && s.indexOf(broad) === 0) return true;
+  if (spec.anchor === "start" || spec.anchor === "auto") {
+    if (s.indexOf(p) === 0) return true;
+    if (p.slice(-2) === "__") {
+      const broad = p.slice(0, -1);
+      if (broad && s.indexOf(broad) === 0) return true;
+    }
+    if (spec.anchor === "start") return false;
   }
-  return false;
+  return delimiterAligned(s, p);
+}
+function stripAnchoredToken(name, token) {
+  // 与 data_io._strip_anchored_token 一致：剥掉命中标记与相邻下划线，双下划线由显示层再收。
+  const s = String(name || "");
+  const spec = markerAnchor(token);
+  const p = spec.part;
+  if (!p) return s;
+  if (spec.anchor === "end") {
+    return s.slice(-p.length) === p ? s.slice(0, -p.length) : s;
+  }
+  if (spec.anchor === "start" || spec.anchor === "auto") {
+    if (s.indexOf(p) === 0) return s.slice(p.length);
+    if (p.slice(-2) === "__") {
+      const broad = p.slice(0, -1);
+      if (broad && s.indexOf(broad) === 0) return s.slice(broad.length);
+    }
+    if (spec.anchor === "start") return s;
+  }
+  const core = markerCore(p);
+  if (!core) return s;
+  if (s === core) return "";
+  if (s.indexOf(core + "_") === 0) return s.slice(core.length + 1);
+  if (s.slice(-(core.length + 1)) === "_" + core) return s.slice(0, -(core.length + 1));
+  return s.replace("_" + core + "_", "_");
+}
+function displayStrippedName(name, tokens) {
+  // 与 radiomics.display_rad_feature 一致：按正文长度从长到短剥标记，再收双下划线、去首尾下划线。
+  const toks = (Array.isArray(tokens) ? tokens : [])
+    .map((x) => String(x || ""))
+    .filter(Boolean)
+    .sort((a, b) => markerAnchor(b).part.length - markerAnchor(a).part.length);
+  let s = String(name || "");
+  toks.forEach((tok) => { s = stripAnchoredToken(s, tok); });
+  while (s.indexOf("__") >= 0) s = s.replace("__", "_");
+  return s.replace(/^_+/, "").replace(/_+$/, "");
 }
 function excludedRadName(name) {
   const prefs = asList(fieldValue("RAD_FEATURE_PREFIX_EXCLUDE")).filter(Boolean);
@@ -1662,6 +1721,7 @@ function ensureConsoleFields() {
       add_options: modelOptionValues(),
     });
   }
+  sanitizeBlkParams();
 }
 
 let ioSheetOpts = [];
@@ -3135,7 +3195,7 @@ function renderForm() {
     </div>`;
     }
     if (g.id === "radprep" || g.id === "radblocks") {
-      const titleKeys = ["DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"];
+      const titleKeys = ["RAD_NORMALIZE", "DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"];
       const titleSet = new Set(titleKeys);
       const rows = blkRows();
       const hasRad = !!pickExistingSheet(
@@ -3159,7 +3219,7 @@ function renderForm() {
         if (left.indexOf(f) < 0) left.push(f);
       }
       const shown = left;
-      const hint = "每块一张工作表（工作表与 ID 列在「数据预览」页分配）。每块两段：预处理（ICC / 相关 / 界值）→ 筛选（LASSO / Logistic，含每块 uni_p·mv_p·Firth）。留空 = 继承本模块顶部的全局设置。";
+      const hint = "每块一张工作表（工作表与 ID 列在「数据预览」页分配）。每块两段：预处理（ICC / 相关 / 界值）→ 筛选（LASSO / Logistic；每块按方法给 α·折数·λ 或 uni_p·mv_p·Firth）。归一化在标题行。留空 = 继承本模块顶部的全局设置。";
       const head = sectionHead("radblocks", g.title, rows.length ? rows.length : "未用", hint, titleKeys);
       return `<div class="sec-block${head.dim}" data-sec="radblocks">
       ${head.html}
@@ -3782,6 +3842,23 @@ function coarseRadSuffix(name) {
   if (i <= 0 || i >= s.length - 1) return "";
   return s.slice(i);
 }
+const RAD_MID_MAX_ROWS = 40;
+function radMidCandidates(name) {
+  // 中间标记候选：列名按 _ 切分，取非首非尾的 1..3 元片段；纯数字不算标记。
+  const parts = String(name || "").split("_");
+  const out = [];
+  if (parts.length < 3) return out;
+  for (let n = 1; n <= 3; n += 1) {
+    for (let i = 1; i + n <= parts.length - 1; i += 1) {
+      const seg = parts.slice(i, i + n);
+      if (seg.some((x) => !x)) continue;
+      const tok = seg.join("_");
+      if (/^\d+$/.test(tok)) continue;
+      out.push(tok);
+    }
+  }
+  return out;
+}
 function markerSide() {
   const raw = fieldValue("RAD_MARKER_SIDE");
   const s = String(raw == null ? "" : raw).trim();
@@ -3800,7 +3877,8 @@ function markerDetectPhrase() {
   const minN = markerMinN();
   const sideLab = side === "prefix" ? "前缀"
     : (side === "suffix" ? "后缀"
-      : (side === "both" ? "前缀或后缀" : ("侧 " + side)));
+      : (side === "mid" ? "中间"
+        : (side === "both" ? "前缀、后缀或中间" : ("侧 " + side))));
   return sideLab + "，至少 " + minN + " 列";
 }
 function markerChoicesFromNames(names) {
@@ -3808,8 +3886,10 @@ function markerChoicesFromNames(names) {
   const minN = markerMinN();
   const wantPre = side === "prefix" || side === "both";
   const wantSuf = side === "suffix" || side === "both";
+  const wantMid = side === "mid" || side === "both";
   const pre = new Map();
   const suf = new Map();
+  const mid = new Map();
   (names || []).forEach((raw) => {
     const name = String(raw || "");
     if (!name) return;
@@ -3817,10 +3897,21 @@ function markerChoicesFromNames(names) {
     if (p) pre.set(p, (pre.get(p) || 0) + 1);
     const sx = coarseRadSuffix(name);
     if (sx) suf.set(sx, (suf.get(sx) || 0) + 1);
+    if (!wantMid) return;
+    radMidCandidates(name).forEach((tok) => {
+      mid.set(tok, (mid.get(tok) || 0) + 1);
+    });
   });
   const counts = new Map();
   if (wantPre) pre.forEach((n, p) => { if (n >= minN) counts.set(p, n); });
   if (wantSuf) suf.forEach((n, sx) => { if (n >= minN) counts.set("suffix:" + sx, n); });
+  if (wantMid) {
+    [...mid.entries()]
+      .filter((row) => row[1] >= minN)
+      .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)))
+      .slice(0, RAD_MID_MAX_ROWS)
+      .forEach((row) => { counts.set("mid:" + row[0], row[1]); });
+  }
   const kept = [...counts.keys()].sort((a, b) =>
     (counts.get(b) - counts.get(a)) || (a < b ? -1 : (a > b ? 1 : 0))
   );
@@ -3837,10 +3928,16 @@ function radFeatureNames() {
   return out;
 }
 function storedMarkerForTyped(tok) {
+  // 手填标记 → 保存形式：只在开头出现=裸标记；只在结尾出现=suffix:；只在中间出现=mid:。
+  // 两侧都带下划线的手填值（如 _fbn_32_）按中间片段存 mid: 并去掉两侧下划线。
   const s = String(tok || "").trim();
-  if (!s || s.indexOf("suffix:") === 0 || s.indexOf("prefix:") === 0) return s;
+  if (!s) return "";
+  if (s.indexOf("suffix:") === 0 || s.indexOf("prefix:") === 0 || s.indexOf("mid:") === 0) return s;
+  const core = markerCore(s);
+  if (s.length > 1 && s.slice(0, 1) === "_" && s.slice(-1) === "_" && core) return "mid:" + core;
   let startN = 0;
   let endN = 0;
+  let midN = 0;
   radFeatureNames().forEach((name) => {
     if (name.indexOf(s) === 0) startN += 1;
     else if (s.slice(-2) === "__") {
@@ -3848,8 +3945,11 @@ function storedMarkerForTyped(tok) {
       if (broad && name.indexOf(broad) === 0) startN += 1;
     }
     if (name.slice(-s.length) === s) endN += 1;
+    if (core && name.indexOf("_" + core + "_") >= 0) midN += 1;
   });
-  if (endN > startN) return "suffix:" + s;
+  if (startN > 0) return s;
+  if (endN > 0 && midN === 0) return "suffix:" + s;
+  if (midN > 0) return "mid:" + core;
   return s;
 }
 function radPrefixChoices() {
@@ -3900,7 +4000,15 @@ async function rediscoverRadPrefixes() {
   }
 }
 function radPrefixDetectedCounts() {
-  return markerChoicesFromNames(radFeatureNames());
+  // 识别结果按预览数据（rad_cols / rad_id_cols 数组对象）与标记侧/最少列数缓存，避免每次重画都重算中间片段。
+  const raw = (S.preview && S.preview.rad_cols) || [];
+  const ids = (S.preview && S.preview.rad_id_cols) || [];
+  const key = markerSide() + "|" + markerMinN();
+  const hit = S.markerDetectCache;
+  if (hit && hit.raw === raw && hit.ids === ids && hit.key === key) return hit.out;
+  const out = markerChoicesFromNames(radFeatureNames());
+  S.markerDetectCache = { raw: raw, ids: ids, key: key, out: out };
+  return out;
 }
 function radPrefixCoverCount(prefix, counts) {
   if (counts && counts.has(prefix)) return counts.get(prefix) || 0;
@@ -3987,7 +4095,7 @@ function radPrefixGroupBar(names) {
 }
 function radPrefixStripComboRow(prefix, n, exclOn, stripVal, names, assigned) {
   const spec = markerAnchor(prefix);
-  const side = spec.anchor === "end" ? "后缀" : "前缀";
+  const side = spec.anchor === "end" ? "后缀" : (spec.anchor === "mid" ? "中间" : "前缀");
   const shown = side + " " + spec.part;
   const label = n ? `${shown} · ${n}` : shown;
   const chip = `<span class="grp-chip" title="${esc(prefix)}">${esc(label)}</span>`;
@@ -4226,11 +4334,93 @@ function delReaderCol(col) {
   renderForm();
 }
 
+// 每块的参数覆盖只允许当前 method 的键：lasso 只认 λ/α/折数等，logistic 只认 uni_p/mv_p/firth。
+// 与 modules/stats/selectors.py _LASSO_KEYS / _LOGIT_KEYS 对齐（linear 已退役，不写）。
+const BLK_PARAM_FIELDS = {
+  lasso: [
+    ["alpha", "α（空=继承全局）"],
+    ["nfolds", "折数（空=继承全局）"],
+    ["n_lambdas", "λ 个数（空=继承全局）"],
+    ["c_max", "C 最大（空=继承全局）"],
+    ["c_min", "C 最小（空=继承全局）"],
+    ["max_iter", "最大迭代（空=继承全局）"],
+    ["tol", "容差（空=继承全局）"],
+    ["prefilter_topk", "预筛 TopK（空=继承全局）"],
+    ["n_jobs", "并行核数（空=继承全局）"],
+  ],
+  logistic: [
+    ["uni_p", "单因素 p（空=继承全局）"],
+    ["mv_p", "多因素 p（空=继承全局）"],
+  ],
+};
+const BLK_PARAM_KEYS = {
+  lasso: BLK_PARAM_FIELDS.lasso.map((row) => row[0]),
+  logistic: BLK_PARAM_FIELDS.logistic.map((row) => row[0]).concat(["firth"]),
+};
+
+function blkMethod(blk) {
+  return String((blk || {}).method || "").trim().toLowerCase();
+}
+
+function cleanBlkParams(blk) {
+  // params 只留当前 method；未知键（如旧 ini 把 firth 写进 params.lasso）直接丢掉。
+  const m = blkMethod(blk);
+  if (!m) return {};
+  const src = (blk && blk.params && typeof blk.params === "object") ? blk.params[m] : null;
+  const one = (src && typeof src === "object") ? src : {};
+  const allow = BLK_PARAM_KEYS[m];
+  if (!allow) {
+    // 后端不认识的方法会直接报错；这里只保证不夹带别的 method 的参数。
+    return Object.keys(one).length ? { [m]: Object.assign({}, one) } : {};
+  }
+  const keep = {};
+  allow.forEach((name) => {
+    const v = one[name];
+    if (v === undefined || v === null) return;
+    keep[name] = v;
+  });
+  return Object.keys(keep).length ? { [m]: keep } : {};
+}
+
+function blkParamsDirty(blk) {
+  const m = blkMethod(blk);
+  const params = (blk && blk.params && typeof blk.params === "object") ? blk.params : {};
+  const keys = Object.keys(params);
+  if (!m) return keys.length > 0;
+  if (keys.some((k) => k !== m)) return true;
+  const allow = BLK_PARAM_KEYS[m];
+  if (!allow) return false;
+  return Object.keys(params[m] || {}).some((k) => allow.indexOf(k) < 0);
+}
+
+function cleanModalityBlocks(list) {
+  // 组学块列表的干净副本：params 只保留各块当前 method 的键。
+  if (!Array.isArray(list)) return list;
+  return list.map((blk) => {
+    if (!blk || typeof blk !== "object") return blk;
+    return Object.assign({}, blk, { params: cleanBlkParams(blk) });
+  });
+}
+
+function sanitizeBlkParams() {
+  // 载入旧配置时清掉跨方法的块参数，避免 params.lasso.firth 这类键到后端才报 ValueError。
+  if (!S.values || !Array.isArray(S.values.MODALITY_BLOCKS)) return;
+  if (!S.values.MODALITY_BLOCKS.some(blkParamsDirty)) return;
+  S.values.MODALITY_BLOCKS = cleanModalityBlocks(S.values.MODALITY_BLOCKS);
+}
+
 function blkParamOf(b, name) {
-  const m = String((b || {}).method || "").trim().toLowerCase();
+  const m = blkMethod(b);
   const p = (b && b.params && b.params[m]) || {};
   const v = p[name];
   return (v === undefined || v === null) ? "" : v;
+}
+
+function blkParamInputs(b, method) {
+  const fields = BLK_PARAM_FIELDS[method] || [];
+  return fields.map((row) =>
+    `<input data-blk-param="${row[0]}" value="${esc(blkParamOf(b, row[0]))}" placeholder="${esc(row[1])}" spellcheck="false"/>`
+  ).join("");
 }
 
 function modalityBlocksPanel() {
@@ -4243,18 +4433,16 @@ function modalityBlocksPanel() {
     const icc = !(b.prep && b.prep.icc === false);
     const corr = !(b.prep && b.prep.corr === false);
     const cut = (b.prep && b.prep.corr_cutoff != null) ? b.prep.corr_cutoff : "";
-    const method = String(b.method || "").trim().toLowerCase();
-    const uniP = blkParamOf(b, "uni_p");
-    const mvP = blkParamOf(b, "mv_p");
+    const method = blkMethod(b);
     const firth = blkParamOf(b, "firth");
     const firthOn = firth !== false;
     const stageFilter = method === "logistic"
-      ? `<input data-blk-param="uni_p" value="${esc(uniP)}" placeholder="单因素 p（空=全局）" spellcheck="false"/>
-         <input data-blk-param="mv_p" value="${esc(mvP)}" placeholder="多因素 p（空=全局）" spellcheck="false"/>
+      ? `${blkParamInputs(b, "logistic")}
          <label class="pexcl" title="开=该块多因素用 Firth"><input type="checkbox" data-blk-param-bool="firth"${firthOn ? " checked" : ""}/> Firth</label>
          <span class="dim">筛选后一律原始尺度 OLS（线性拟合开关已取消）</span>`
       : (method === "lasso"
-        ? '<span class="dim">LASSO 参数继承全局（λ 搜索在「组学 / LASSO」模块）；分数本来就是原始尺度 OLS</span>'
+        ? `${blkParamInputs(b, "lasso")}
+         <span class="dim">LASSO 参数只作用于本块；空=继承「组学 / LASSO」模块（分数同为原始尺度 OLS）</span>`
         : '<span class="dim">未选方法 → 该块不建模</span>');
     return `<div class="blk-card" data-blk-row="${i}"${b.enabled === false ? ' data-off="1"' : ""}>
       <div class="blk-head">
@@ -4331,6 +4519,10 @@ function applyBlkRow(el) {
   if (field === "enabled") cur.enabled = !!el.checked;
   else if (field) cur[field] = String(el.value || "").trim();
   if (field === "name" && !cur.name) return;
+  if (field === "method") {
+    // 换方法就只留新方法的参数；选「跳过」清空。旧方法参数不再混进 params。
+    cur.params = cleanBlkParams(cur);
+  }
   const prep = el.getAttribute("data-blk-prep");
   if (prep) {
     cur.prep = Object.assign({}, cur.prep || {});
@@ -4345,7 +4537,7 @@ function applyBlkRow(el) {
   }
   const paramName = el.getAttribute("data-blk-param");
   if (paramName) {
-    const m = String(cur.method || "").trim().toLowerCase();
+    const m = blkMethod(cur);
     cur.params = Object.assign({}, cur.params || {});
     if (m) {
       const one = Object.assign({}, cur.params[m] || {});
@@ -4358,7 +4550,7 @@ function applyBlkRow(el) {
   }
   const paramBool = el.getAttribute("data-blk-param-bool");
   if (paramBool) {
-    const m = String(cur.method || "").trim().toLowerCase();
+    const m = blkMethod(cur);
     cur.params = Object.assign({}, cur.params || {});
     if (m) {
       const one = Object.assign({}, cur.params[m] || {});
@@ -4368,6 +4560,11 @@ function applyBlkRow(el) {
   }
   rows[i] = cur;
   setFieldValue("MODALITY_BLOCKS", rows);
+  if (field === "method") {
+    // 换方法后参数输入行要立刻换成本方法的，不能等到下次重画。
+    renderForm();
+    return;
+  }
   if (field === "name" || field === "sheet") {
     const nameInput = row.querySelector("[data-blk=name]");
     if (nameInput && !nameInput.value.trim() && cur.name) nameInput.value = cur.name;
@@ -4378,7 +4575,7 @@ function radPrefixStripCombo(prefixF, stripF, asSection) {
   if (!prefixF && !stripF) return "";
   const open = S.kvFoldOpen && S.kvFoldOpen.RAD_PREFIX_STRIP_COMBO ? " open" : "";
   const sideNow = markerSide();
-  const sideOpts = [["prefix", "前缀"], ["suffix", "后缀"], ["both", "二者"]];
+  const sideOpts = [["prefix", "前缀"], ["suffix", "后缀"], ["mid", "中间"], ["both", "全部"]];
   if (sideNow && !sideOpts.some((pair) => pair[0] === sideNow)) sideOpts.push([sideNow, sideNow]);
   const sideHtml = sideOpts.map((pair) =>
     `<option value="${esc(pair[0])}"${pair[0] === sideNow ? " selected" : ""}>${esc(pair[1])}</option>`

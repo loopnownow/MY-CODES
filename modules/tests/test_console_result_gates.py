@@ -593,7 +593,7 @@ def test_preview_lists_every_role_sheet_and_the_intersection(tmp_path, monkeypat
 
 
 def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
-    """组学模块按块三段式（预处理/筛选/模型，含每块 uni_p/mv_p）；Combined 主模型独立成段。"""
+    """组学模块按块三段式（预处理/筛选/模型，按方法给 lasso 或 logistic 参数）；Combined 主模型独立成段。"""
     from modules.console import schema
 
     ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
@@ -604,16 +604,51 @@ def test_modality_blocks_are_three_stages_and_combined_is_its_own_module():
     assert schema.SECTION_OF["CLIN_BLOCK_METHOD"][0] == "combined"
     radprep = [k for s, _t, ks in schema.SECTION_DEFS if s == "radprep" for k in ks]
     assert "MODALITY_BLOCKS" not in radprep
+    assert "RAD_NORMALIZE" in radprep
     radblocks = [k for s, _t, ks in schema.SECTION_DEFS if s == "radblocks" for k in ks]
     assert radblocks == ["MODALITY_BLOCKS"]
     assert schema.SECTION_OF["MODALITY_BLOCKS"][0] == "radblocks"
     assert "function modalityBlocksPanel" in ui and "function combinedPanel" in ui
     assert 'data-sec="radblocks"' in ui and 'data-sec="combined"' in ui
     assert "blk-stage-k" in ui and "预处理" in ui and "筛选" in ui and "模型" in ui
-    assert 'data-blk-param="uni_p"' in ui and 'data-blk-param="mv_p"' in ui
-    assert 'data-blk-param-bool="firth"' in ui
+    assert 'data-blk-param="' in ui and 'data-blk-param-bool="firth"' in ui
     assert "data-blk-param], [data-blk-param-bool]" in ui
     assert ".blk-card" in css and ".blk-stage" in css
+
+
+def test_omics_block_params_are_per_method_and_pruned():
+    """每块参数只按当前 method 显示与保存；旧 ini 的跨方法参数（params.lasso.firth）载入即清掉。"""
+    from modules.console import schema
+    from modules.console.const import CONSOLE_DEFAULTS
+
+    ui = (ROOT / "modules" / "console" / "console_ui.js").read_text(encoding="utf-8")
+    # 「归一化」在组学模块标题行（默认开）
+    assert schema.SECTION_OF["RAD_NORMALIZE"][0] == "radprep"
+    assert schema.LABELS["RAD_NORMALIZE"] == "归一化"
+    assert "归一化" in schema.HINTS["RAD_NORMALIZE"]
+    assert CONSOLE_DEFAULTS["RAD_NORMALIZE"] is True
+    assert (
+        'titleKeys = ["RAD_NORMALIZE", "DO_ICC_FILTER", "ICC_REQUIRE_ROW", '
+        '"ENABLE_CORR_FILTER", "LASSO_CACHE"]' in ui
+    )
+    # lasso 块给 alpha/nfolds/λ 范围等；logistic 块给 uni_p/mv_p（firth 是 bool）
+    lasso = ui.split("lasso: [", 1)[1].split("logistic: [", 1)[0]
+    for name in (
+        "alpha", "nfolds", "n_lambdas", "c_max", "c_min",
+        "max_iter", "tol", "prefilter_topk", "n_jobs",
+    ):
+        assert f'["{name}",' in lasso, name
+    assert "linear" not in lasso
+    logit = ui.split("logistic: [", 1)[1].split("const BLK_PARAM_KEYS", 1)[0]
+    for name in ("uni_p", "mv_p"):
+        assert f'["{name}",' in logit, name
+    # 换方法剪参数；载入清理；发给后端前再清一遍
+    assert "function cleanBlkParams" in ui and "function sanitizeBlkParams" in ui
+    assert "cur.params = cleanBlkParams(cur)" in ui
+    assert "sanitizeBlkParams();" in ui
+    assert "cleanModalityBlocks(overlay.MODALITY_BLOCKS)" in ui
+    assert '"firth"' in ui  # logistic 的 firth 仍留在允许表里
+    assert "参数继承全局" not in ui
 
 
 def test_clinical_prep_and_filter_are_big_two_column_modules():

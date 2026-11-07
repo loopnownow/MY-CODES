@@ -156,7 +156,7 @@ def test_hover_hints_not_resident_body():
     assert 'titleKeys = ["DO_HEATMAP", "DO_CORR", "DO_PARTIAL"]' in UI
     assert 'titleKeys = ["DO_DAG", "DO_SHAP", "DO_MEDIATION"]' in UI
     assert 'titleKeys = ["DO_FALSE_CLASS", "DO_FDR", "DO_FWER"]' in UI
-    assert 'titleKeys = ["DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"]' in UI
+    assert 'titleKeys = ["RAD_NORMALIZE", "DO_ICC_FILTER", "ICC_REQUIRE_ROW", "ENABLE_CORR_FILTER", "LASSO_CACHE"]' in UI
     assert 'titleKeys = ["LASSO_PLOT_PATH"]' in UI
     assert 'titleKeys = ["DO_PLOT_TIFF", "DO_PLOT_PDF"]' in UI
     assert 'titleKeys = ["DO_RAD_FIRTH"]' in UI
