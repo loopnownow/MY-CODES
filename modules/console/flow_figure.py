@@ -126,9 +126,10 @@ def prepare_geometry(spec: dict) -> tuple[dict, dict]:
         raise ValueError("Figure 1 spec 必须是非空对象")
     canonical = flow_spec.normalize(spec)
     flow_spec.validate(canonical)
-    flow_audit.audit(canonical)
+    warnings = flow_audit.audit(canonical)
     geometry = flow_layout.build(canonical)
     geometry = flow_overrides.apply_overrides(geometry, canonical.get("overrides") or {})
+    geometry["warnings"].extend(warnings)
     return canonical, geometry
 
 
@@ -302,6 +303,10 @@ def read_figure1_state(proj) -> dict:
         canonical = draft["spec"]
     geometry = flow_layout.build(canonical)
     geometry = flow_overrides.apply_overrides(geometry, canonical.get("overrides") or {})
+    try:
+        geometry["warnings"].extend(flow_audit.audit(canonical))
+    except flow_audit.AuditError as err:
+        geometry["warnings"].append(f"审计未通过：{err}")
     png_rel = figure1_png_rel(proj)
     return {
         "spec": canonical,
@@ -324,10 +329,11 @@ def preview_figure1(proj, spec: dict, overrides=None) -> dict:
     try:
         canonical = flow_spec.normalize(spec)
         flow_spec.validate(canonical)
-        flow_audit.audit(canonical)
+        warnings = flow_audit.audit(canonical)
         applied = canonical.get("overrides") if overrides is None else overrides
         geometry = flow_layout.build(canonical)
         geometry = flow_overrides.apply_overrides(geometry, applied or {})
+        geometry["warnings"].extend(warnings)
         with tempfile.TemporaryDirectory(prefix="figure1_preview_") as td:
             png = Path(td) / FIG1_PNG_NAME
             render_mpl.render(geometry, png, quiet=True)

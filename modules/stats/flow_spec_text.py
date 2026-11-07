@@ -80,6 +80,21 @@ _COHORT_RESPECTIVELY = re.compile(
     r"[^.\n]{0,80}?\((\d[\d,]*)\s+and\s+(\d[\d,]*)\s+" + _COHORT_NOUN + r"[^)]*\)",
     re.I,
 )
+_ALLOC = re.compile(
+    r"(?:In total|A total of)[,\s]+(\d[\d,]*)\s+patients[^.]{0,160}?"
+    r"(?:training|derivation)\s+(?:cohort|set)[^.]{0,40}?\(\s*n\s*=\s*(\d+)\s*\)"
+    r"[^.]{0,160}?(?:validation|test)\s+(?:cohort|set)[^.]{0,40}?\(\s*n\s*=\s*(\d+)\s*\)",
+    re.I,
+)
+_FINAL_TRAIN = re.compile(
+    r"(?:final training cohort of|leaving)\s+(\d[\d,]*)\s+(?:training\s+)?patients",
+    re.I,
+)
+_ANALYZED_FILE = re.compile(
+    r"(?:analysis file|analytic sample)[^.]{0,80}?comprised\s+(\d[\d,]*)\s+patients"
+    r"|comprised\s+(\d[\d,]*)\s+patients",
+    re.I,
+)
 _CRITERIA_HARD_STOPS = (
     r"\bExclusion criteria\b",
     r"\bInclusion criteria\b",
@@ -320,6 +335,7 @@ def spec_from_text(text: str) -> dict:
     spec: dict = {"kind": "study", "source": "materials-and-methods"}
     evidence: dict[str, str] = {}
     missing: list[str] = []
+    allocation = _ALLOC.search(text)
 
     period = _period(text)
     if period:
@@ -332,6 +348,9 @@ def spec_from_text(text: str) -> dict:
     if screened:
         spec["screened_n"] = _count(screened.group(1))
         evidence["screened_n"] = _snippet(text, screened.start(), screened.end())
+    elif allocation:
+        spec["screened_n"] = _count(allocation.group(1))
+        evidence["screened_n"] = _snippet(text, allocation.start(), allocation.end())
     else:
         missing.append("screened n")
 
@@ -383,8 +402,44 @@ def spec_from_text(text: str) -> dict:
                 "negative": entry["negative"],
             }
             evidence[key] = entry["evidence"]
+    final_train = _FINAL_TRAIN.search(text)
+    analyzed_file = _ANALYZED_FILE.search(text)
+    if allocation:
+        pre_train = _count(allocation.group(2))
+        pre_test = _count(allocation.group(3))
+        spec["presplit"] = {
+            "training": {"label": "Training set", "n": pre_train},
+            "test": {"label": "Test set", "n": pre_test},
+        }
+        spec.setdefault("training", {"n": pre_train})
+        spec.setdefault("test", {"n": pre_test})
+        if final_train:
+            final_n = _count(final_train.group(1))
+            if final_n < pre_train:
+                spec["downsample"] = {
+                    "n": pre_train - final_n,
+                    "reason": "Downsampling for class imbalance",
+                    "arm": "Training set",
+                }
+                spec["splits"] = [
+                    {"label": "Training Cohort", "n": final_n},
+                    {"label": "Validation Cohort", "n": pre_test},
+                ]
+                evidence["downsample"] = f"derived: {pre_train} - {final_n} = {pre_train - final_n}"
+        if analyzed_file:
+            total = _count(analyzed_file.group(1) or analyzed_file.group(2))
+            spec["analyzed"] = {"n": total}
+            window = text[max(0, analyzed_file.start() - 200):analyzed_file.end() + 260]
+            pair = _pair_summing_to(window, total) or _pair_summing_to(text, total)
+            if pair:
+                spec["analyzed"]["pp"] = pair["positive"]
+                spec["analyzed"]["non_pp"] = pair["negative"]
+            evidence["analyzed"] = _snippet(text, analyzed_file.start(), analyzed_file.end())
+        # "were included and divided" 的 N 是入口人数，不是 included 节点
+        if spec.get("included_n") == spec.get("screened_n"):
+            spec.pop("included_n", None)
     for key, label in (("training", "training set n"), ("test", "test set n")):
-        if key not in spec:
+        if key not in spec and allocation is None:
             missing.append(label)
 
     if re.search(r"\bSMOTE\b", text) and re.search(r"downsampl", text, flags=re.I):

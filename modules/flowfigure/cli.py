@@ -27,9 +27,9 @@ def render_spec(spec: dict, out_path, audit: bool = True, expected_layout: str |
             f"spec.layout={canonical['layout']!r}，此处只接受 {expected_layout!r}"
         )
     spec_mod.validate(canonical)
-    if audit:
-        audit_mod.audit(canonical)
+    warnings = audit_mod.audit(canonical) if audit else []
     geometry = layout_mod.build(canonical)
+    geometry["warnings"].extend(warnings)
     return render_mpl.render(geometry, out_path)
 
 
