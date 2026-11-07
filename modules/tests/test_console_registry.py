@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import threading
 from http.client import HTTPConnection
+from pathlib import Path
 
 import pytest
 
@@ -299,3 +300,96 @@ def test_flow_files_route_reports_errors_instead_of_faking_a_list(reg_file, proj
         assert payload3["spec"] is None
     finally:
         _stop_server(httpd)
+
+
+# ── 重新登记幂等：页面 token 仍有效时不轮换（多标签安全）─────────────
+PROJECT_PAGE = (
+    (Path(__file__).resolve().parents[1] / "console" / "project.html").read_text(
+        encoding="utf-8"
+    )
+)
+
+
+def _page_token(page: Path) -> str:
+    import re
+
+    m = re.search(
+        r'<meta\s+name="console-token"\s+content="([^"]*)"',
+        page.read_text(encoding="utf-8"),
+    )
+    return m.group(1) if m else ""
+
+
+def _fake_project(tmp_path: Path, name: str, monkeypatch) -> Path:
+    proj = tmp_path / name
+    proj.mkdir()
+    page = proj / f"{name}.html"
+    page.write_text(
+        '<head>\n<meta name="console-token" content="__CONSOLE_TOKEN__"/>\n</head>',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cons, "project_dir", lambda project, explicit="": proj)
+    return proj
+
+
+def test_starter_token_valid_rejects_unregistered_project(reg_file, tmp_path, monkeypatch):
+    proj = _fake_project(tmp_path, "proj_eps", monkeypatch)
+    assert cons.starter_token_valid("proj_eps", str(proj)) is False
+
+
+def test_register_from_page_keeps_token_when_page_still_valid(reg_file, tmp_path, monkeypatch):
+    """页面 token 与注册表一致 → 只确认登记，不换 token（不会打翻其它标签页）。"""
+    proj = _fake_project(tmp_path, "proj_gamma", monkeypatch)
+
+    first = cons.register_from_page("proj_gamma", str(proj))
+    assert first["token_written"] is True
+    token = _page_token(proj / "proj_gamma.html")
+    assert project_registry.lookup(token).project == "proj_gamma"
+    before = (proj / "proj_gamma.html").read_text(encoding="utf-8")
+
+    second = cons.register_from_page("proj_gamma", str(proj))
+    assert second["token_written"] is False
+    assert _page_token(proj / "proj_gamma.html") == token
+    assert (proj / "proj_gamma.html").read_text(encoding="utf-8") == before
+    assert project_registry.lookup(token).project == "proj_gamma"
+
+
+def test_register_from_page_rotates_when_page_token_is_stale(reg_file, tmp_path, monkeypatch):
+    """页面 meta 里是失效 token（旧标签页 / 被外部换过）→ 才重发 token。"""
+    proj = _fake_project(tmp_path, "proj_delta", monkeypatch)
+    first = cons.register_from_page("proj_delta", str(proj))
+    assert first["token_written"] is True
+    page = proj / "proj_delta.html"
+    old = _page_token(page)
+    page.write_text(
+        page.read_text(encoding="utf-8").replace(old, "stale-token-not-in-registry"),
+        encoding="utf-8",
+    )
+
+    third = cons.register_from_page("proj_delta", str(proj))
+    assert third["token_written"] is True
+    new = _page_token(page)
+    assert new != "stale-token-not-in-registry"
+    assert project_registry.lookup(old) is None
+    assert project_registry.lookup(new).project == "proj_delta"
+
+
+def test_start_page_recovers_from_stale_token_instead_of_showing_the_403():
+    """file:// 页 token 失效时不得把裸 403 显示给用户，自动落到同源控制台页。"""
+    assert "function tokenDeniedText(" in PROJECT_PAGE
+    assert "function recoverFromTokenDenied(" in PROJECT_PAGE
+    assert "本页 token 已失效，正在进入同源控制台" in PROJECT_PAGE
+    for call in (
+        'recoverFromTokenDenied(e, msg, "进入控制台失败")',
+        'recoverFromTokenDenied(e, loadMsg, "加载失败")',
+        'recoverFromTokenDenied(e, loadMsg, "选择失败")',
+        'recoverFromTokenDenied(e, loadMsg, "清空失败")',
+    ):
+        assert call in PROJECT_PAGE
+    # 两处 JS 哨兵 + 一处 meta 占位符仍在（rotate 只能改 meta）
+    assert PROJECT_PAGE.count("__CONSOLE_TOKEN__") == 3
+
+
+def test_start_page_register_reports_when_nothing_was_rotated():
+    assert "j.token_written" in PROJECT_PAGE
+    assert "本页 token 仍有效，无需刷新" in PROJECT_PAGE

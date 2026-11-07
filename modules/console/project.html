@@ -849,6 +849,7 @@ async function pickXlsx(dest, title) {
     syncLinks();
     if (loadMsg) loadMsg.textContent = "已选 " + j.rel + "。点「加载数据」。";
   } catch (e) {
+    if (await recoverFromTokenDenied(e, loadMsg, "选择失败")) return;
     if (loadMsg) loadMsg.textContent = "选择失败：" + (e && e.message ? e.message : e);
   }
 }
@@ -908,7 +909,11 @@ async function hydrateSettings(p) {
       }
     }
     syncLinks();
-  } catch (e) {}
+  } catch (e) {
+    if (location.protocol === "file:" && tokenDeniedText(e && e.message)) {
+      setRegMsg("本页 token 已失效：点「重新登记」，或直接打开 http://127.0.0.1:" + (p || port()) + "/ 进控制台。");
+    }
+  }
 }
 function onServiceReady(p) {
   setSide(1);
@@ -941,6 +946,7 @@ async function autoOpenConsole(p) {
     const j = await r.json();
     if (!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
   } catch (e) {
+    if (await recoverFromTokenDenied(e, msg, "进入控制台失败")) return;
     msg.innerHTML = '<span class="err">进入控制台失败：' + esc(e && e.message ? e.message : e) + "</span>";
     return;
   }
@@ -999,6 +1005,7 @@ async function clearBadKeys() {
     if (loadMsg) loadMsg.textContent = "已清空 " + cleared.join("、") + "，正在重新加载…";
     await loadWorkbook();
   } catch (e) {
+    if (await recoverFromTokenDenied(e, loadMsg, "清空失败")) return;
     if (loadMsg) loadMsg.textContent = "清空失败：" + (e && e.message ? e.message : e);
   }
 }
@@ -1080,6 +1087,7 @@ async function loadWorkbook() {
     msg.textContent = "数据已加载。选 sheet 后点「进入配置」。";
   } catch (e) {
     markDataStale();
+    if (await recoverFromTokenDenied(e, loadMsg, "加载失败")) return;
     if (loadMsg) loadMsg.textContent = "加载失败：" + (e && e.message ? e.message : e);
     showClearBad((e && e.badKeys) || []);
   }
@@ -1110,6 +1118,22 @@ function apiHeaders(extra) {
   return h;
 }
 syncTokenFromMeta();
+// token 失效（rotate 后的旧标签页 / 未注入）时服务端回 403 origin not allowed：
+// 不再把裸错误显示给用户，自动落到同源控制台页（http://127.0.0.1:<port>/），
+// 那条路径不依赖 file:// 页的 token。
+function tokenDeniedText(s) {
+  return /origin not allowed|invalid console token/i.test(String(s == null ? "" : s));
+}
+async function recoverFromTokenDenied(err, el, label) {
+  const text = (err && err.message) || String(err || "");
+  if (location.protocol !== "file:" || !tokenDeniedText(text)) return false;
+  const livePort = await ensureLive();
+  if (!livePort) return false;
+  if (el) el.textContent = "本页 token 已失效，正在进入同源控制台…";
+  holdForConsole = true;
+  location.href = pageUrl(livePort);
+  return true;
+}
 const btnRegister = document.getElementById("btnRegister");
 const regMsg = document.getElementById("regMsg");
 const regBlock = document.getElementById("regBlock");
@@ -1160,8 +1184,13 @@ async function registerProject() {
     setRegMsg("登记失败：" + (j.error || "未知错误"));
     return;
   }
-  setRegMsg("已登记（token 已写入本页），即将刷新…");
-  setTimeout(() => location.reload(), 800);
+  const wrote = !!j.token_written;
+  if (wrote) {
+    setRegMsg("已登记（token 已写入本页），即将刷新…");
+    setTimeout(() => location.reload(), 800);
+    return;
+  }
+  setRegMsg("已登记：本页 token 仍有效，无需刷新。");
 }
 if (btnRegister) btnRegister.onclick = () => registerProject();
 let occupant = null;
