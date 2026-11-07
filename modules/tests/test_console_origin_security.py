@@ -124,7 +124,9 @@ def test_start_html_embeds_token_for_loopback():
         html = resp.read().decode("utf-8")
         assert resp.status == 200
         assert CONSOLE_TOKEN in html
-        assert "__CONSOLE_TOKEN__" not in html
+        # 只写 meta；页面 JS 里两处 `__CONSOLE_TOKEN__` 哨兵必须保留占位符
+        # （写死具体 token 后 rotate 再也改不到，页面会拿旧 token 当有效值）
+        assert html.count("__CONSOLE_TOKEN__") == 2
         conn.close()
     finally:
         _stop_server(httpd)

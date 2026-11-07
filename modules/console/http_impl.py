@@ -7,6 +7,7 @@ preview / dryrun / run / serve），没有 _INJECTED 注入表，也没有 __get
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import sys
 import threading
@@ -95,6 +96,26 @@ from modules.console import registry as project_registry
 from modules.console import flow_fill as flow_prefill
 
 PROJECT_HTML_PATH = HTML_PATH.parent / "project.html"
+
+
+def _inject_page_token(html: str, token: str) -> str:
+    """把 token 只写进 `<meta name="console-token">`，其余原样返回。
+
+    页面 JS 里的 `__CONSOLE_TOKEN__` 是「本页未注入」哨兵，必须保留占位符；
+    meta 缺失时把 meta 插到 `<head>` 之后。
+    """
+    if re.search(r'<meta\s+name="console-token"', html):
+        return re.sub(
+            project_registry.META_TOKEN_RE,
+            lambda m: m.group(1) + token + m.group(2),
+            html,
+            count=1,
+        )
+    return html.replace(
+        "<head>", f'<head><meta name="console-token" content="{token}">', 1
+    )
+
+
 _PROBE_SAFE_GET = frozenset({"/api/health", "/api/port"})
 # HTML 防嵌入头：deny = 任何页面都不得嵌入（默认）；self = 只允许同源页面嵌入
 # （控制台自己的流程图 iframe 走 self）。
@@ -434,14 +455,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._err(404, f"缺少 {HTML_PATH}")
                 return
             html = HTML_PATH.read_text(encoding="utf-8")
-            if "__CONSOLE_TOKEN__" in html:
-                html = html.replace("__CONSOLE_TOKEN__", CONSOLE_TOKEN)
-            else:
-                html = html.replace(
-                    "<head>",
-                    f'<head><meta name="console-token" content="{CONSOLE_TOKEN}">',
-                    1,
-                )
+            html = _inject_page_token(html, CONSOLE_TOKEN)
             # Cache-bust static assets so Ctrl+F5 is enough after edits
             asset_vers = {}
             if CSS_PATH.is_file():
@@ -463,14 +477,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._err(404, f"缺少 {PROJECT_HTML_PATH}")
                 return
             html = PROJECT_HTML_PATH.read_text(encoding="utf-8")
-            if "__CONSOLE_TOKEN__" in html:
-                html = html.replace("__CONSOLE_TOKEN__", CONSOLE_TOKEN)
-            else:
-                html = html.replace(
-                    "<head>",
-                    f'<head><meta name="console-token" content="{CONSOLE_TOKEN}">',
-                    1,
-                )
+            html = _inject_page_token(html, CONSOLE_TOKEN)
             # 机器无关的算法库默认值：模板里只有 __MODULES_DEFAULT__ 占位，
             # 注入 json.dumps 得到的 JS 字符串字面量（反斜杠/引号按 JS 转义）
             html = html.replace(
