@@ -46,9 +46,9 @@ from pathlib import Path
 # 1. 配置区（只改这里）
 # ============================================================
 
-MODEL_PATH = r"E:\study\0old_files\train\xa\global_habitat_model.joblib"
-POOLED_FEATURES_PATH = r"E:\study\0old_files\train\xa\cohort_pooled_features.npy"
-OUTPUT_DIR = r"E:\study\0old_files\train\xa\k_optimization"
+MODEL_PATH = os.environ.get("GLOBAL_MODEL_PATH", "data/global_habitat_model.joblib")
+POOLED_FEATURES_PATH = os.environ.get("GLOBAL_POOLED_FEATURES", "data/cohort_pooled_features.npy")
+OUTPUT_DIR = os.environ.get("GLOBAL_K_OPT_DIR", "results/k_optimization")
 
 # 可视化参数
 MAX_VOXELS_FOR_SCATTER = 8000      # PCA散点图最大采样数（防内存爆炸）

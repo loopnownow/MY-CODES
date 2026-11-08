@@ -41,13 +41,13 @@ CONFIG = {
     # ---- 待处理任务列表：每项为一组 (img_root, roi_root)，name 必须唯一 ----
     # img_root == roi_root（或 roi_root 缺省）-> 同目录模式；不同 -> 跨根目录模式
     "tasks": [
-        {"name": "lung_xlm_baoceng", "img_root": r"H:\baoceng\main", "roi_root": r"H:\baoceng\seg"},
-        {"name": "lung_xlm_thin",    "img_root": r"H:\thin\main",    "roi_root": r"H:\thin\seg"},
+        {"name": "lung_xlm_baoceng", "img_root": os.environ.get("MATCH_IMG_ROOT_1", "data/baoceng/main"), "roi_root": os.environ.get("MATCH_ROI_ROOT_1", "data/baoceng/seg")},
+        {"name": "lung_xlm_thin",    "img_root": os.environ.get("MATCH_IMG_ROOT_2", "data/thin/main"),    "roi_root": os.environ.get("MATCH_ROI_ROOT_2", "data/thin/seg")},
     ],
 
-    "output_dir": r"G:\lung_xlm",
-    "log_dir": r"G:\lung_xlm\utility\logs",
-    "checkpoint_dir": r"G:\lung_xlm\utility\checkpoints\match_img",
+    "output_dir": os.environ.get("MATCH_OUTPUT_DIR", "results/match_img"),
+    "log_dir": os.environ.get("MATCH_LOG_DIR", "logs/match_img"),
+    "checkpoint_dir": os.environ.get("MATCH_CHECKPOINT_DIR", "checkpoints/match_img"),
 
     # ---- 支持的扩展名（复合扩展名放前面，如 .nii.gz，避免被 .nii 提前截断） ----
     "img_extensions": [".nii.gz", ".nii", ".nrrd", ".dcm"],

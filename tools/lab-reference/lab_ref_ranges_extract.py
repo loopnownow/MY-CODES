@@ -12,6 +12,7 @@ Run: python lab_ref_ranges_extract.py
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import os
@@ -23,9 +24,10 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-# docx_extract lives at 05-manuscript/write-paper/ (rehome 2026-10-23)
-_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.insert(0, os.path.join(_CODE_ROOT, "05-manuscript", "write-paper"))
+# docx_extract lives in this repo at tools/write-paper/ (after the 2026-11 t1823u rehome;
+# the old 05-manuscript/write-paper/ path pointed into the retired _code layout).
+_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_CODE_ROOT, "tools", "write-paper"))
 try:
     from docx_extract import extract_text, close_word
 except ImportError:
@@ -305,7 +307,10 @@ def scan_text(text: str, source_path: str, tier: str, method: str):
             }
 
 
-def main():
+def main(argv: list[str] | None = None):
+    ap = argparse.ArgumentParser(
+        description="Harvest lab/clinical/pathology indicator mentions from 05-manuscript sources")
+    ap.parse_args(argv)
     os.makedirs(TXT_DIR, exist_ok=True)
     os.makedirs(INV_DIR, exist_ok=True)
     mentions = []

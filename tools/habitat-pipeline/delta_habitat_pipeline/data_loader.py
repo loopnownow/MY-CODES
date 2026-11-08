@@ -16,13 +16,13 @@ image_path、roi_path、name_dcm 三列（兼容旧列名 folder_path / nii_path
 以及新版列名 img_path / name）：
 
     image_path                          roi_path                        name_dcm
-    E:\study\img\...\patient_A\1        E:\study\roi\...\patient_a1.nii.gz  patient_A
-    E:\study\img\...\patient_A\2        E:\study\roi\...\patient_a2.nii.gz  patient_A
+    data\img\patient_A\1                data\roi\patient_a1.nii.gz      patient_A
+    data\img\patient_A\2                data\roi\patient_a2.nii.gz      patient_A
 
     （combind.csv 格式，含 exam 列，时间点由 exam 列判断）
     roi_path                            img_path                        name         exam
-    E:\study\roi\...\patient_B1.nii.gz  E:\study\img\...\studyX\1.nii.gz  patient_B  1
-    E:\study\roi\...\patient_B2.nii.gz  E:\study\img\...\studyY\2.nii.gz  patient_B  2
+    data\roi\patient_b1.nii.gz          data\img\studyX\1.nii.gz        patient_B    1
+    data\roi\patient_b2.nii.gz          data\img\studyY\2.nii.gz        patient_B    2
 
 解析规则
 --------
@@ -57,9 +57,9 @@ def _clean_path(raw: str) -> str:
     去除路径末尾的中文括号注释。
 
     支持全角括号（（））和半角括号（()）的混合使用：
-        'E:\\img\\1（治疗前）'              → 'E:\\img\\1'
-        'E:\\roi\\mask1.nii.gz（治疗前）'   → 'E:\\roi\\mask1.nii.gz'
-        'E:\\img\\1(baseline)'              → 'E:\\img\\1'
+        'data\\img\\1（治疗前）'              → 'data\\img\\1'
+        'data\\roi\\mask1.nii.gz（治疗前）'   → 'data\\roi\\mask1.nii.gz'
+        'data\\img\\1(baseline)'              → 'data\\img\\1'
 
     Parameters
     ----------
@@ -82,8 +82,8 @@ def _normalize_name(name_dcm: str) -> Optional[str]:
     """
     将 DCM 真实姓名规范化为「小写下划线」命名 key。
 
-        'patient_A'   → 'patient_a'
-        '  Li Lian Zhong ' → 'li_lian_zhong'
+        'Patient A'   → 'patient_a'
+        '  Demo Case ' → 'demo_case'
 
     规则：去首尾空白 → 转小写 → 连续空白压缩为单个下划线。
 

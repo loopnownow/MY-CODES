@@ -69,7 +69,7 @@ if _PIPELINE_DIR not in sys.path:
 # ============================================================
 
 # 所有中间结果 & 最终结果的根目录（可改为任意本地路径）
-OUTPUT_ROOT = r"E:\study\results_xa"
+OUTPUT_ROOT = os.environ.get("PLOT_OUTPUT_ROOT", "results/xa")
 
 
 # 各阶段输出子目录（由 pipeline.py 的 _setup_dirs() 自动创建）

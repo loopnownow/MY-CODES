@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import joblib
 
 # 处理 habitat.py 在其他文件夹的情况
-habitat_module_path = r"E:\study\delta_habitat_pipeline"
+habitat_module_path = os.environ.get("HABITAT_MODULE_PATH", "delta_habitat_pipeline")
 if os.path.exists(habitat_module_path):
     sys.path.insert(0, os.path.abspath(habitat_module_path))
 
@@ -37,8 +37,8 @@ from habitat import compute_voxel_feature_maps, CohortHabitatModel
 CFG = {
     # === 支持多路径（推荐写法）===
     "preprocessed_roots": [
-        r"E:\study\results_la\01_preprocessed",
-        r"E:\study\results_xa\01_preprocessed",
+        os.environ.get("HABITAT_PRE_LIVER", "results/la/01_preprocessed"),
+        os.environ.get("HABITAT_PRE_XA", "results/xa/01_preprocessed"),
     ],
 
     "patient_ids": None,
@@ -46,15 +46,15 @@ CFG = {
     "force_recompute": False,
 
     # === habitat.py 位置（关键！）===
-    "habitat_module_path": r"E:\study\delta_habitat_pipeline",
+    "habitat_module_path": os.environ.get("HABITAT_MODULE_PATH", "delta_habitat_pipeline"),
 
     # === 输出 ===
-    "output_dir": r"E:\study\0old_files\train",
+    "output_dir": os.environ.get("HABITAT_TRAIN_DIR", "data/train"),
     "pooled_features_name": "3-7_laxa_cohort_pooled_features.npy",
     "model_name": "3-7_laxa_global_habitat_model.joblib",
 
     # k_optimization 输出目录（支持 str 或 list[str]）
-    "k_optimization_dirs": r"E:\study\0old_files\train\3-7_laxa_k_optimization",
+    "k_optimization_dirs": os.environ.get("HABITAT_K_OPT_DIR", "data/train/k_optimization"),
 
     # === 建模参数 ===
     "k_range": range(3, 7),                 # 评估 K=1,2,3,4,5,6

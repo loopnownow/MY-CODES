@@ -27,11 +27,11 @@ from sklearn.metrics import roc_curve, auc, accuracy_score, confusion_matrix
 # ═══════════════════════════════════════════════════════════════════
 CFG = {
     # ── 输入路径 ──────────────────────────────────────────────────
-    "feature_csv": r"E:\study\results_xa\06_selected\delta_features_selected.csv",
-    "label_csv": r"E:\study\QC_train.csv",
+    "feature_csv": os.environ.get("ROC_FEATURE_CSV", "data/features/delta_features_selected.csv"),
+    "label_csv": os.environ.get("ROC_LABEL_CSV", "data/QC_train.csv"),
 
     # ── 输出路径 ──────────────────────────────────────────────────
-    "output_dir": r"E:\study\results_xa\06_selected",
+    "output_dir": os.environ.get("ROC_OUTPUT_DIR", "results/roc"),
     "output_roc_png": "roc_curve.png",
     "output_metrics_csv": "roc_metrics.csv",
     "output_metrics_txt": "roc_metrics_report.txt",

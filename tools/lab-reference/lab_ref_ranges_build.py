@@ -7,6 +7,7 @@ Wrap-up 2026-10-19: reclassify auto study_cutoff over-tags → cohort_*.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import os
@@ -403,7 +404,10 @@ def load_alias_map():
     return ["alias", "canonical_id", "category", "name_en", "name_zh", "docs_hit", "notes"], []
 
 
-def main():
+def main(argv: list[str] | None = None):
+    ap = argparse.ArgumentParser(
+        description="Build lab-reference-ranges.xlsx from curated rows + inventory quotes")
+    ap.parse_args(argv)
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(SCRATCH, exist_ok=True)
 

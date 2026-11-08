@@ -7,9 +7,14 @@ Lab topology SSOT remains MY-SKILLS lab-paths.yaml (do not reinvent here).
 2026-11-06 QC: the old LAB_ABS missed the `{RAW}` (`00db`) and `{DEL}` (`0del`) roots
 and the `R&P` workspace, so hardcoded archive paths stayed green. Those roots are
 allowed only on a line that also names an env var (env-overridable default).
+
+2026-11-08 t1823u: also flag ANY absolute drive-letter default at module level
+(env-overridable lines pass) and patient PII (all-caps 3-token name next to
+imaging paths), so the public repo cannot drift back to a local machine layout.
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import threading
@@ -43,6 +48,14 @@ LOCAL_STATE_FILES = {
 }
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", "egg-info"}
 SUFFIXES = {".py", ".md", ".txt", ".toml", ".ini", ".yml", ".yaml", ".cfg", ".json", ".html", ".js", ".css"}
+
+# t1823u: 任意盘符的绝对路径只允许作为 env 可覆盖默认值（同一行须出现 ENV_GUARD 名称）。
+DRIVE_LITERAL = re.compile(r"^[A-Za-z]:[\\/]")
+# 测试夹具本身使用合成盘符（C:\tmp、D:\fake…），不参与本策略。
+TEST_DIRS = {"modules/tests", "test"}
+# t1823u: 全大写三连姓名 + 影像路径同现 → 疑似患者 PII 回潮（脱敏后用 patient_A 等占位）。
+PII_NAME = re.compile(r"\b[A-Z]{2,}(?: [A-Z]{2,}){2,}\b")
+PII_CTX = re.compile(r"\.nii|\.dcm|img[/\\]|roi[/\\]|DICOM", re.I)
 
 
 class TestPublicPathPolicy(unittest.TestCase):
@@ -134,6 +147,74 @@ class TestModulesDefaultInjection(unittest.TestCase):
         self.assertNotIn("__MODULES_DEFAULT__", body)
         self.assertIn(f"const DEFAULT_MODULES = {literal}", body)
         self.assertEqual(MODULES_ROOT.name, "modules")
+
+
+class TestNoHardcodedDriveDefaults(unittest.TestCase):
+    """t1823u: 模块级常量不得写死本机盘符；env 可覆盖的默认值由同一行的 ENV_GUARD 放行。"""
+
+    def test_module_level_drive_literals_are_env_guarded(self) -> None:
+        offenders: list[str] = []
+        for path in sorted(ROOT.rglob("*.py")):
+            rel = path.relative_to(ROOT).as_posix()
+            if any(part in SKIP_DIRS or part.endswith(".egg-info") for part in path.parts):
+                continue
+            if rel in ALLOW_FILES or any(rel == d or rel.startswith(d + "/") for d in TEST_DIRS):
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+                tree = ast.parse(text)
+            except (UnicodeDecodeError, OSError, SyntaxError):
+                continue
+            lines = text.splitlines()
+            for node in tree.body:
+                if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                    value = getattr(node, "value", None)
+                    if value is None:
+                        continue
+                    for sub in ast.walk(value):
+                        if not (isinstance(sub, ast.Constant) and isinstance(sub.value, str)):
+                            continue
+                        if not DRIVE_LITERAL.match(sub.value):
+                            continue
+                        src = lines[sub.lineno - 1] if sub.lineno <= len(lines) else ""
+                        if ENV_GUARD.search(src):
+                            continue
+                        offenders.append(f"{rel}:{sub.lineno}: {src.strip()[:120]}")
+        self.assertEqual(
+            offenders,
+            [],
+            "module-level absolute drive literal without an env-overridable default "
+            "(add os.environ.get(...) on the same line, or an allowlist entry):\n"
+            + "\n".join(offenders),
+        )
+
+
+class TestNoPatientPiiLeak(unittest.TestCase):
+    """t1823u: 影像路径与全大写三连姓名同现 → 疑似患者 PII；公开仓只允许合成占位。"""
+
+    def test_no_patient_name_next_to_imaging_paths(self) -> None:
+        offenders: list[str] = []
+        for path in sorted(ROOT.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in SUFFIXES:
+                continue
+            if any(part in SKIP_DIRS or part.endswith(".egg-info") for part in path.parts):
+                continue
+            rel = path.relative_to(ROOT).as_posix()
+            if rel in LOCAL_STATE_FILES:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for i, line in enumerate(text.splitlines(), 1):
+                if PII_NAME.search(line) and PII_CTX.search(line):
+                    offenders.append(f"{rel}:{i}: {line.strip()[:120]}")
+        self.assertEqual(
+            offenders,
+            [],
+            "patient-name-like token next to imaging paths; replace with synthetic "
+            "placeholders (patient_A / 张三):\n" + "\n".join(offenders),
+        )
 
 
 if __name__ == "__main__":
