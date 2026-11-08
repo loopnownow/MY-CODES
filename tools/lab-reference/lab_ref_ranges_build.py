@@ -34,7 +34,7 @@ from lab_ref_ranges_rows import (
     SOURCES,
 )
 
-OUT_DIR = Path(os.environ.get("LAB_REF_RANGES") or Path(__file__).resolve().parents[5] / "0doc" / "_library" / "lab-ref-ranges")
+OUT_DIR = Path(os.environ.get("LAB_REF_RANGES") or Path(__file__).resolve().parents[5] / "_Docs" / "_library" / "lab-ref-ranges")
 OUT_XLSX = os.path.join(OUT_DIR, "lab-reference-ranges.xlsx")
 INV_JSONL = os.path.join(OUT_DIR, "inventory", "indicators-from-01-02.jsonl")
 SCRATCH_ROOT = os.environ.get("SCRATCH_ROOT") or os.path.join(tempfile.gettempdir(), "lab-scratch")

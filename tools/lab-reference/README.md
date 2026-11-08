@@ -8,7 +8,7 @@ Rehomed 2026-10-23 from `_code\_infra\lab-reference\`.
 
 Scripts that build (a) lab reference-ranges workbook and (b) imaging-scanner
 
-parameter registry under `%GROK_ROOT%\0doc\_library\scanner-registry\` (live xlsx; t1553u).
+parameter registry under `%GROK_ROOT%\_Docs\_library\scanner-registry\` (live xlsx; t1553u).
 
 
 
@@ -24,9 +24,9 @@ parameter registry under `%GROK_ROOT%\0doc\_library\scanner-registry\` (live xls
 
 ```text
 
-python %GROK_ROOT%\0doc\_code\03-research\fill-protocol\lab-reference\scanner_registry_extract.py --stage all
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\lab-reference\scanner_registry_extract.py --stage all
 
-python %GROK_ROOT%\0doc\_code\03-research\fill-protocol\lab-reference\scanner_registry_build.py
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\lab-reference\scanner_registry_build.py
 
 ```
 

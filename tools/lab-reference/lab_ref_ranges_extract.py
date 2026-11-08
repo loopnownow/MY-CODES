@@ -6,7 +6,7 @@ Peer-review numeric plausibility KB only — NOT clinical decision support.
 Never invents ref_low/ref_high/mean/sd. Quotes only what appears in source text.
 
 Outputs under %TEMP%\\lab-scratch\\lab-ref-ranges\\ (env SCRATCH_ROOT overrides) and inventory under
-<GROK_ROOT>\\0doc\\_library\\lab-ref-ranges\\inventory\\
+<GROK_ROOT>\\_Docs\\_library\\lab-ref-ranges\\inventory\\
 
 Run: python lab_ref_ranges_extract.py
 """
@@ -38,18 +38,18 @@ SHANGHAI = timezone(timedelta(hours=8))
 NOW = datetime.now(SHANGHAI).strftime("%Y-%m-%d %H:%M:%S CST")
 
 TIERS = {
-    "01": os.path.join(os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word", "05-manuscript", "thesis"),
-    "02": os.path.join(os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word", "05-manuscript", "manuscripts"),
+    "01": os.path.join(os.environ.get("ODOC_WORD") or r"D:\MyProjects\_DataBase\_lab\doc-word", "05-manuscript", "thesis"),
+    "02": os.path.join(os.environ.get("ODOC_WORD") or r"D:\MyProjects\_DataBase\_lab\doc-word", "05-manuscript", "manuscripts"),
 }
 SCRATCH_ROOT = os.environ.get("SCRATCH_ROOT") or os.path.join(tempfile.gettempdir(), "lab-scratch")
 OUT_SCRATCH = os.path.join(SCRATCH_ROOT, "lab-ref-ranges")
 _LAB_ROOT = Path(__file__).resolve().parents[5]  # tools/<tool>/ -> lab root（公开仓不留绝对盘符）
-INV_DIR = os.environ.get("LAB_REF_RANGES_INV") or str(_LAB_ROOT / "0doc" / "_library" / "lab-ref-ranges" / "inventory")
+INV_DIR = os.environ.get("LAB_REF_RANGES_INV") or str(_LAB_ROOT / "_Docs" / "_library" / "lab-ref-ranges" / "inventory")
 TXT_DIR = os.path.join(OUT_SCRATCH, "txt")
 JSONL_PATH = os.path.join(INV_DIR, "indicators-from-01-02.jsonl")
 LOG_PATH = os.path.join(INV_DIR, "extraction-log.md")
-ALIAS_TSV = os.environ.get("LAB_REF_RANGES_ALIAS") or str(_LAB_ROOT / "0doc" / "_library" / "lab-ref-ranges" / "alias-map.tsv")
-GAPS_MD = os.environ.get("LAB_REF_RANGES_GAPS") or str(_LAB_ROOT / "0doc" / "_library" / "lab-ref-ranges" / "inventory" / "gaps-stub.md")
+ALIAS_TSV = os.environ.get("LAB_REF_RANGES_ALIAS") or str(_LAB_ROOT / "_Docs" / "_library" / "lab-ref-ranges" / "alias-map.tsv")
+GAPS_MD = os.environ.get("LAB_REF_RANGES_GAPS") or str(_LAB_ROOT / "_Docs" / "_library" / "lab-ref-ranges" / "inventory" / "gaps-stub.md")
 
 # alias (regex or literal) -> canonical_id, category, name_en, name_zh
 # Longer / more specific patterns listed first where order matters in ALIAS_RULES

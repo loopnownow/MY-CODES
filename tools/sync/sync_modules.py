@@ -3,11 +3,11 @@
 sync_modules.py — 各项目只留 settings.py + console，算法一律用 modules。
 
 用法:
-  python 0doc/_code/02-data-processing/_shared/sync/sync_modules.py            # dry-run (all stage roots; ZERAD_ROOT/ORAD_ROOT = one root)
-  python 0doc/_code/02-data-processing/_shared/sync/sync_modules.py --apply
-  python 0doc/_code/02-data-processing/_shared/sync/sync_modules.py --check
-  python 0doc/_code/02-data-processing/_shared/sync/sync_modules.py --keys
-  python 0doc/_code/02-data-processing/_shared/sync/sync_modules.py --check
+  python _Docs/GitHub/MY-CODES/tools/sync/sync_modules.py            # dry-run (all stage roots; ZERAD_ROOT/ORAD_ROOT = one root)
+  python _Docs/GitHub/MY-CODES/tools/sync/sync_modules.py --apply
+  python _Docs/GitHub/MY-CODES/tools/sync/sync_modules.py --check
+  python _Docs/GitHub/MY-CODES/tools/sync/sync_modules.py --keys
+  python _Docs/GitHub/MY-CODES/tools/sync/sync_modules.py --check
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ from modules.config.ini_io import read_ini, write_ini  # noqa: E402
 
 GOLD = STATS_ROOT / "modules"
 SHIM = Path(__file__).resolve().parent / "project-shim"  # 随本脚本一起搬
-BAK_ROOT = Path(os.environ.get("DEL_ROOT") or r"D:\0del") / "harvested" / "modules_bak"  # t1490u
+BAK_ROOT = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del") / "harvested" / "modules_bak"  # t1490u
 # 2026-10-25：_code 副本已退役（指针见 02-data-processing\stats-analysis\README.md），
 # 不再有 GOLD↔MASTER 双份；GOLD 即主库 modules 本身。
 
@@ -82,7 +82,7 @@ STRAY_DIRS = ("stats", "utils")
 
 
 def _stash(path: Path, bak: Path, proj: Path) -> None:
-    """Never delete: move path into bak (under 0del), keeping its project-relative path."""
+    r"""Never delete: move path into bak (under {DEL} = <GROK_ROOT>\.Del), keeping its project-relative path."""
     dest = bak / path.relative_to(proj)
     k = 1
     while dest.exists():
@@ -328,7 +328,7 @@ def apply_keys(dry: bool) -> list[str]:
 
 
 def apply_rows(all_rows: list[tuple[Path, list[dict]]], stamp: str) -> int:
-    """Never delete: replaced or removed items are moved into BAK_ROOT (under 0del)."""
+    r"""Never delete: replaced or removed items are moved into BAK_ROOT (under {DEL} = <GROK_ROOT>\.Del)."""
     n = 0
     for proj, rows in all_rows:
         bak = BAK_ROOT / f"{proj.name}_{stamp}"

@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 # Live stage folder under GROK_ROOT (was PREPARING_DIRNAME / "preparing").
 DRAFTING_DIRNAME = "drafting"
 PREPARING_DIRNAME = DRAFTING_DIRNAME  # back-compat alias; prefer DRAFTING_DIRNAME
-DEFAULT_GROK_ROOT = Path(r"D:\0Grok")  # lab machine fallback; always prefer GROK_ROOT env
+DEFAULT_GROK_ROOT = Path(r"D:\MyProjects")  # lab machine fallback (was D:\0Grok, t1791u); always prefer GROK_ROOT env
 STAGE_ROOT_NAMES = (
     "pre-submit", "in-review", "accepted",
 )

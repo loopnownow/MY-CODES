@@ -470,7 +470,14 @@ def _steps(src: dict, pipeline: dict) -> list[dict]:
 
 
 def _pipeline(src: dict) -> dict:
-    raw = src.get("pipeline") if isinstance(src.get("pipeline"), dict) else {}
+    raw = src.get("pipeline")
+    if raw in (None, "", [], {}):
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(
+            "spec.pipeline 必须是对象（v3 方法行 steps）；旧版 pipeline 布尔/列表不再支持"
+            "（methods 行见 references/methods-pipeline.md）"
+        )
     balance = raw.get("balance", src.get("balance"))
     balance = str(balance).strip() if balance not in (None, "") else None
     return {
@@ -545,6 +552,13 @@ def validate(spec: dict) -> None:
     for entry in downsample:
         if arm_ids and str(entry.get("arm")) not in arm_ids:
             raise ValueError(f"downsample.arm={entry.get('arm')!r} 不在 presplit 里")
+    presplit = spec.get("presplit") or []
+    cohorts = spec.get("cohorts") or []
+    if presplit and cohorts and len(cohorts) != len(presplit):
+        raise ValueError(
+            f"cohorts 数（{len(cohorts)}）必须与 presplit 臂数（{len(presplit)}）一致；"
+            "外部验证队列请写 external（不要塞进 splits/cohorts）"
+        )
 
     pipeline = spec.get("pipeline") or {}
     balance = pipeline.get("balance")

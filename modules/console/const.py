@@ -34,8 +34,8 @@ PORT_HI = 8776
 CHECK_PORT = 8780
 PORT_FILE = CONSOLE_DIR / "console.port.json"
 # Live registry lives under the local doc tree (outside the GitHub clone).
-# Lab default: <GROK_ROOT>/0doc/console.projects.json
-REGISTRY_PATH = GROK_ROOT / "0doc" / "console.projects.json"
+# Lab default: <GROK_ROOT>/_Docs/console.projects.json (was <GROK_ROOT>/0doc, t1791u)
+REGISTRY_PATH = GROK_ROOT / "_Docs" / "console.projects.json"
 HOST = "127.0.0.1"
 _TOKEN_SAFE_GET = {
     "/", "/console.html", "/xlm_console.html",

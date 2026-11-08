@@ -14,7 +14,7 @@ Record IDs: LAB##-## / CLN##-## / PTH##-##
 import os
 
 # ODOC_WORD: Word-original archive root ({RAW}\_lab\doc-word); env-overridable, no per-project paths.
-_WORD_ROOT = os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word"
+_WORD_ROOT = os.environ.get("ODOC_WORD") or r"D:\MyProjects\_DataBase\_lab\doc-word"
 
 BANNER = (
     "PEER-REVIEW NUMERIC PLAUSIBILITY ONLY — NOT CLINICAL DECISION SUPPORT. "
