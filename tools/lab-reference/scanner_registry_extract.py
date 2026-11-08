@@ -26,9 +26,10 @@ import re
 import sys
 import tempfile
 
-# docx_extract lives at 05-manuscript/write-paper/ (rehome 2026-10-23)
-_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.insert(0, os.path.join(_CODE_ROOT, "05-manuscript", "write-paper"))
+# docx_extract lives in this repo at tools/write-paper/ (after the 2026-11 t1823u rehome;
+# the old 05-manuscript/write-paper/ path pointed into the retired _code layout).
+_CODE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(_CODE_ROOT, "tools", "write-paper"))
 from docx_extract import extract_text  # noqa: E402
 
 # --- configuration -----------------------------------------------------------

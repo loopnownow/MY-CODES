@@ -5,13 +5,15 @@
 用法：修改配置后运行
 """
 
+import os
 import re
 import csv
 from pathlib import Path
 
 # ==================== 配置区（软编码，置顶） ====================
-TXT_DIR = r"F:\IDs\DMB_zjl"          # 源目录（含 .txt 文件）
-OUTPUT_CSV = r"F:\IDs\patient_data.csv"  # 输出 CSV
+# 2026-11 t1823u: 公开仓不留本机盘符；env 可覆盖，默认相对当前工作目录。
+TXT_DIR = os.environ.get("CLN_TXT_DIR", "data/cln/txt")  # 源目录（含 .txt 文件）
+OUTPUT_CSV = os.environ.get("CLN_PATIENT_OUTPUT", "out/patient_data.csv")  # 输出 CSV
 # ================================================================
 
 # 检验指标关键词字典（LAB_DICT）

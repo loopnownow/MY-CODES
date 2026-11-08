@@ -6,10 +6,10 @@ import re
 
 # ================= 配置区域 (软编码) =================
 # 1. 目标目录路径
-TARGET_DIR = r"G:\RDL_yt\results\checkpoints"
+TARGET_DIR = os.environ.get("HABITAT_DELETE_TARGET", "results/checkpoints")
 
 # 2. 报错记录文件路径 (用于读取 Patient_ID)
-ERR_CSV_PATH = r"G:\RDL_yt\QC\cac_err.csv"
+ERR_CSV_PATH = os.environ.get("HABITAT_DELETE_ERR_CSV", "out/cac_err.csv")
 
 # 3. 关键词设置 (针对文件名的第二层过滤)
 # 只有同时包含 Patient_ID 且包含以下任一关键词的文件才会被处理

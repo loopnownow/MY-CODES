@@ -117,19 +117,32 @@ def test_extra_project_roots_current_stages():
     from modules.console import console as cons
 
     names = {p.name.lower() for p in cons.EXTRA_PROJECT_ROOTS}
-    assert names == {"pre-submit", "in-review", "accepted"}
+    assert names == {"pre-submit", "reviewing", "accepted"}
     assert cons.RAD_ROOT.name == "drafting"
+
+
+def test_stage_name_alias_keeps_legacy_in_review_readable(tmp_path):
+    """t1817u rename: `reviewing` is the live name; old `in-review` stays readable."""
+    from modules.console.paths import normalize_stage_name, stage_root_dirs
+
+    assert normalize_stage_name("in-review") == "reviewing"
+    assert normalize_stage_name("submitting") == "reviewing"
+    assert normalize_stage_name("reviewing") == "reviewing"
+    (tmp_path / "reviewing" / "tyt_DSI").mkdir(parents=True)
+    (tmp_path / "in-review" / "tyt_DSI").mkdir(parents=True)
+    names = [p.name for p in stage_root_dirs(tmp_path)]
+    assert names == ["reviewing", "in-review"]
 
 
 def test_project_dir_explicit_dir(tmp_path, monkeypatch):
     from modules.console import console as cons
 
     monkeypatch.setattr(settings_layer, "GROK_ROOT", tmp_path)
-    in_review = tmp_path / "in-review" / "tyt_DSI"
-    in_review.mkdir(parents=True)
-    (in_review / "tyt_DSI.xlsx").write_bytes(b"xx")
-    got = cons.project_dir("tyt_DSI", str(in_review))
-    assert got == in_review.resolve()
+    reviewing = tmp_path / "reviewing" / "tyt_DSI"
+    reviewing.mkdir(parents=True)
+    (reviewing / "tyt_DSI.xlsx").write_bytes(b"xx")
+    got = cons.project_dir("tyt_DSI", str(reviewing))
+    assert got == reviewing.resolve()
 
 
 def test_fig_palettes_ten_named_plus_custom():
@@ -178,7 +191,7 @@ def test_open_result_folder_project_only(tmp_path, monkeypatch):
     from modules.console import console as cons
 
     monkeypatch.setattr(settings_layer, "GROK_ROOT", tmp_path)
-    proj = tmp_path / "in-review" / "tyt_DSI"
+    proj = tmp_path / "reviewing" / "tyt_DSI"
     proj.mkdir(parents=True)
     html = proj / "MCI" / "ResultsMCI.html"
     html.parent.mkdir()

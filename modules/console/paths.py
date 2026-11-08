@@ -14,9 +14,40 @@ from urllib.parse import urlsplit
 DRAFTING_DIRNAME = "drafting"
 PREPARING_DIRNAME = DRAFTING_DIRNAME  # back-compat alias; prefer DRAFTING_DIRNAME
 DEFAULT_GROK_ROOT = Path(r"D:\MyProjects")  # lab machine fallback (was D:\0Grok, t1791u); always prefer GROK_ROOT env
+# Live stage folders under GROK_ROOT. t1817u (2026-11-08): `in-review` was
+# renamed to `reviewing`; legacy spellings stay readable (see
+# LEGACY_STAGE_ALIASES) but new code must only write the canonical names.
 STAGE_ROOT_NAMES = (
-    "pre-submit", "in-review", "accepted",
+    "pre-submit", "reviewing", "accepted",
 )
+LEGACY_STAGE_ALIASES = {
+    "in-review": "reviewing",   # pre-2026-11 stage folder name
+    "submitting": "reviewing",  # earlier spelling of the same stage
+}
+
+
+def normalize_stage_name(name: str) -> str:
+    """Live stage name for ``name`` (``in-review`` -> ``reviewing``)."""
+    key = str(name).strip().lower()
+    return LEGACY_STAGE_ALIASES.get(key, key)
+
+
+def stage_root_dirs(grok_root: Path, *, include_drafting: bool = False) -> list[Path]:
+    """Existing stage roots: canonical names first, then legacy dirs on disk.
+
+    Read-side compatibility only: new folders must be created under
+    ``STAGE_ROOT_NAMES``; ``in-review`` trees that already exist stay
+    discoverable until they are renamed.
+    """
+    roots: list[Path] = []
+    names = (DRAFTING_DIRNAME, *STAGE_ROOT_NAMES) if include_drafting else STAGE_ROOT_NAMES
+    for name in (*names, *LEGACY_STAGE_ALIASES):
+        p = grok_root / name
+        if p.is_dir():
+            resolved = p.resolve()
+            if resolved not in roots:
+                roots.append(resolved)
+    return roots
 
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _CONSOLE_ORIGIN_PORT_LO = 8765

@@ -54,8 +54,8 @@ from joblib import Parallel, delayed
 CFG = {
     # ── 路径配置 ──────────────────────────────────────────────────
     "default_output_dir": r"results_xa/06_selected",
-    "debug_feature_csv":  r"E:\study\results_xa\05_delta\all_patients_delta_features.csv",
-    "debug_label_csv":    r"E:\study\QC_train.csv",
+    "debug_feature_csv":  os.environ.get("LASSO_DEBUG_FEATURE_CSV", "data/features/all_patients_delta_features.csv"),
+    "debug_label_csv":    os.environ.get("LASSO_DEBUG_LABEL_CSV", "data/QC_train.csv"),
 
     # ── Step 1：近零方差过滤 ──────────────────────────────────────
     # 方差低于此值的特征在所有样本中几乎无变化，对分类无区分能力，直接剔除

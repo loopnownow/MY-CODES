@@ -17,8 +17,16 @@ if str(_TIDY) not in sys.path:
     sys.path.insert(0, str(_TIDY))
 
 # ==================== CONFIG ====================
-# 历史落点在 done\；可用 WKL_UGIB_ROOT 覆盖
-PROJ = Path(os.environ.get("WKL_UGIB_ROOT") or Path(__file__).resolve().parents[5] / "in-review" / "wkl_UGIB")
+# 历史落点在 done\；可用 WKL_UGIB_ROOT 覆盖（t1817u: 阶段夹 in-review -> reviewing；
+# reviewing 不存在时回退到旧 in-review 目录，仅读侧兼容）
+_LAB_ROOT = Path(__file__).resolve().parents[5]
+_env_proj = os.environ.get("WKL_UGIB_ROOT")
+if _env_proj:
+    PROJ = Path(_env_proj)
+else:
+    _live = _LAB_ROOT / "reviewing" / "wkl_UGIB"
+    _legacy = _LAB_ROOT / "in-review" / "wkl_UGIB"
+    PROJ = _live if _live.is_dir() else _legacy
 XLSX = PROJ / "wkl_UGIB.xlsx"
 INI = PROJ / "ref" / "settings.ini"
 MODULES_DIR = Path(os.environ.get("MODULES_DIR", str(STATS_ROOT / "modules")))

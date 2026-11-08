@@ -28,21 +28,21 @@ LIB = Path(os.environ.get("STATS_ROOT") or Path(__file__).resolve().parents[2]) 
 
 if str(LIB) not in sys.path:
     sys.path.insert(0, str(LIB))
-from modules.console.paths import grok_root  # GROK_ROOT env -> frozen lab default (C1)
+from modules.console.paths import grok_root, stage_root_dirs  # GROK_ROOT env -> frozen lab default (C1)
 GROK_ROOT = grok_root(LIB / "modules")  # 阶段根父目录；不由 LIB 反推
 
 GOLD = LIB / "modules"
 
 STAGE_NAMES = (
 
-    "drafting", "pre-submit", "in-review", "accepted",
+    "drafting", "pre-submit", "reviewing", "accepted",
 
 
 )
 
 _rad = os.environ.get("ZERAD_ROOT") or os.environ.get("ORAD_ROOT")
 
-STAGE_ROOTS = [Path(_rad)] if _rad else [GROK_ROOT / n for n in STAGE_NAMES if (GROK_ROOT / n).is_dir()]
+STAGE_ROOTS = [Path(_rad)] if _rad else stage_root_dirs(GROK_ROOT, include_drafting=True)
 
 TMP_DIR = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del") / "harvested" / "smoke"  # 临时输出落 {DEL} 的 harvested 档（.Del 根保持只有三档；见 My rule.md §5.3）
 

@@ -35,11 +35,11 @@ from collections import Counter
 # 配置区（Configuration）
 # ============================================================
 INPUT_PATHS = [
-    r"G:\lung_xlm\results",
+    os.environ.get("LOG_INPUT_PATH", "results/delta_habitat_pipeline"),
 ]
 
-OUTPUT_CSV = r"G:\lung_xlm\QC\lung_xlm_summary.csv"
-OUTPUT_ERR_CSV = r"G:\lung_xlm\QC\lung_xlm_err.csv"
+OUTPUT_CSV = os.environ.get("LOG_OUTPUT_CSV", "out/lung_xlm_summary.csv")
+OUTPUT_ERR_CSV = os.environ.get("LOG_OUTPUT_ERR_CSV", "out/lung_xlm_err.csv")
 GENERATE_ERR_CSV = True
 
 LOG_ENCODING = "utf-8"
