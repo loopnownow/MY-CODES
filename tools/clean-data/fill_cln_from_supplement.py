@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
-from tidy_paths import DEL_ROOT  # 临时区与 tidy_* 同一处（D:\0del）
+from tidy_paths import DEL_ROOT  # 临时区与 tidy_* 同一处（D:\MyProjects\.Del）
 from pypinyin import lazy_pinyin
 import re
 
