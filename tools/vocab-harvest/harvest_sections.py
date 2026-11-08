@@ -36,7 +36,7 @@ BANKS_REL = Path("banks") / "paras.jsonl"
 # SKILLS_ROOT: env naming the MY-SKILLS checkout; the machine ban list lives there.
 SKILLS_ROOT_ENV = "SKILLS_ROOT"
 BANS_REL = Path("05_manuscript") / "base" / "vocab" / "L1" / "ban-terms.yaml"
-# DEL_ROOT: scratch root for the --execute default; D:\MyProjects\.Del is the local {DEL} drive, not a lab path.
+# DEL_ROOT: scratch root for the --execute default; {DEL} = <lab_root>\.Del is the local scratch drive, not a lab path.
 DEL_ROOT_ENV = "DEL_ROOT"
 DEL_ROOT_DEFAULT = Path(os.environ.get(DEL_ROOT_ENV) or "D:/MyProjects/.Del")
 OUT_SUBDIR = Path("_by-function") / "vocab-harvest-20261027"

@@ -67,7 +67,7 @@ def _resolve_grok_root(orad: Path) -> Path:
 
 
 GROK_ROOT: Path = _resolve_grok_root(ORAD_ROOT)
-#: 全子工程共用的临时/删除区（2026-11-08 t1794u 起与 `{DEL}` 对齐为 `D:\MyProjects\.Del`；旧名 `D:\0del`；环境变量 DEL_ROOT 可覆盖）
+#: 全子工程共用的临时/删除区（2026-11-08 t1794u 起与 `{DEL}` 对齐为 `<lab_root>\.Del`；旧名 `0del`；环境变量 DEL_ROOT 可覆盖）
 DEL_ROOT: Path = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del")
 
 # ── 子工程根目录 ────────────────────────────────────────────────
