@@ -11,6 +11,7 @@ Run: python lab-reference/scanner_registry_build.py
 """
 from __future__ import annotations
 
+import argparse
 import os
 import re
 from pathlib import Path
@@ -92,7 +93,10 @@ def dedupe(data, keys):
     return list(seen.values())
 
 
-def build():
+def build(argv: list[str] | None = None):
+    ap = argparse.ArgumentParser(
+        description="Build the imaging-scanner registry workbook (scanner-parameter-registry.xlsx)")
+    ap.parse_args(argv)
     data = parse_rows()
     wb = Workbook()
     wb.remove(wb.active)

@@ -10,8 +10,8 @@ import time
 from pathlib import Path
 
 # ==================== 配置区（软编码，置顶） ====================
-SRC_DIR = r"F:\data\input"          # 源目录
-DST_DIR = r"F:\data\output"         # 目标目录
+SRC_DIR = os.environ.get("SRC_DIR", "data/input")          # 源目录
+DST_DIR = os.environ.get("DST_DIR", "data/output")         # 目标目录
 KEYWORD = "bold"                    # 文件匹配关键词
 DRY_RUN = True                      # dry run 模式（True=只打印不执行）
 SKIP_EXIST = True                   # 跳过已处理文件（断点续传）

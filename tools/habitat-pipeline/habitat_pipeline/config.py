@@ -14,13 +14,14 @@ import os
 # 输入数据表（CSV / TSV，长表格式：每行 = 一个患者的一个序列）
 # 必须包含列：patient_id, sequence, modality, image_path, roi_path, is_reference
 # 详见 data_loader.py 顶部说明
-DATA_TABLE_PATH = r"G:\lung_xlm\habitat_pipeline\combined.csv"
+# 2026-11 t1823u: 公开仓不留本机数据盘符；用 env 覆盖，默认相对当前工作目录。
+DATA_TABLE_PATH = os.environ.get("HABITAT_DATA_TABLE", "data/habitat_pipeline/combined.csv")
 
 # 可选：因变量标签表（患者级，用于有监督特征筛选），列：patient_id, label
-LABELS_TABLE_PATH = DATA_TABLE_PATH # r"G:\EC_ybc\habitat_pipeline\combined.csv"
+LABELS_TABLE_PATH = os.environ.get("HABITAT_LABELS_TABLE", DATA_TABLE_PATH)
 
-# 所有中间结果 & 最终结果的根目录（可改为任意本地路径）
-OUTPUT_ROOT = r"G:\lung_xlm\results"
+# 所有中间结果 & 最终结果的根目录（env 覆盖；默认相对当前工作目录）
+OUTPUT_ROOT = os.environ.get("HABITAT_OUTPUT_ROOT", "results/habitat_pipeline")
 
 # 各阶段输出子目录（由 pipeline.py 的 _setup_dirs() 自动创建）
 # 键名即阶段标识，与断点标志文件名对应

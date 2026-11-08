@@ -20,10 +20,12 @@ import os
 # ═══════════════════════════════════════════════════════════════════
 
 # 输入数据表（CSV / TSV，必须包含 image_path 和 roi_path 两列）
-DATA_TABLE_PATH = r"E:\lxf\delta_habitat_pipeline\combind.csv"
+# 2026-11 t1823u: 公开仓不留本机数据盘符；用 env 覆盖，默认相对当前工作目录。
+# 注：delta_ 是历史分叉（与 habitat_pipeline/ 同名模块不合并），见 ../README.md。
+DATA_TABLE_PATH = os.environ.get("HABITAT_DELTA_DATA_TABLE", "data/delta_habitat_pipeline/combind.csv")
 
-# 所有中间结果 & 最终结果的根目录（可改为任意本地路径）
-OUTPUT_ROOT = r"E:\lxf\results_js"
+# 所有中间结果 & 最终结果的根目录（env 覆盖；默认相对当前工作目录）
+OUTPUT_ROOT = os.environ.get("HABITAT_DELTA_OUTPUT_ROOT", "results/delta_habitat_pipeline")
 
 # 各阶段输出子目录（由 pipeline.py 的 _setup_dirs() 自动创建）
 # 键名即阶段标识，与断点标志文件名对应

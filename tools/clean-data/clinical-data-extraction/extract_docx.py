@@ -6,13 +6,15 @@
 """
 
 import csv
+import os
 import re
 from pathlib import Path
 from docx import Document
 
 # ==================== 配置区（软编码，置顶） ====================
-DOCX_DIR = r"E:\lxf\cln\one"         # 源目录（含 .docx）
-OUTPUT_CSV = r"E:\lxf\docx_extract.csv"  # 输出 CSV
+# 2026-11 t1823u: 公开仓不留本机盘符；env 可覆盖，默认相对当前工作目录。
+DOCX_DIR = os.environ.get("CLN_DOCX_DIR", "data/cln/docx")  # 源目录（含 .docx）
+OUTPUT_CSV = os.environ.get("CLN_DOCX_OUTPUT", "out/docx_extract.csv")  # 输出 CSV
 RECURSIVE = True                       # 是否递归子文件夹
 # ================================================================
 

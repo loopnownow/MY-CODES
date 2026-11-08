@@ -28,15 +28,17 @@ from typing import Optional, Union
 _REPO_ROOT = Path(__file__).resolve().parents[2]  # tools/clean-data -> 仓根
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-from modules.console.paths import DEFAULT_GROK_ROOT  # C1: 唯一文档化 lab 默认
+from modules.console.paths import (  # C1: 唯一文档化 lab 默认
+    DEFAULT_GROK_ROOT,
+    STAGE_ROOT_NAMES,
+    stage_root_dirs,
+)
 GROK_DEFAULT = Path(os.environ.get("GROK_ROOT") or DEFAULT_GROK_ROOT)
 
 #: 准备中课题根目录名（<grok>\drafting）
 ORAD_DIRNAME = "drafting"  # was preparing
-#: 课题所在的阶段目录（同 MY-CODES/modules/console/paths.py）
-STAGE_NAMES = (
-    "drafting", "pre-submit", "in-review", "accepted",
-)
+#: 课题所在的阶段目录（canonical 来自 modules/console/paths.py；旧 in-review 仅读侧兼容）
+STAGE_NAMES = (ORAD_DIRNAME, *STAGE_ROOT_NAMES)
 
 
 def get_orad_root() -> Path:
@@ -107,7 +109,11 @@ def project_root(profile: str) -> Path:
     if profile not in PROFILE_DIRNAME:
         raise KeyError(f"unknown profile: {profile!r} (known: {sorted(PROFILE_DIRNAME)})")
     name = PROFILE_DIRNAME[profile]
-    roots = [ORAD_ROOT] if _ORAD_FROM_ENV else [GROK_ROOT / s for s in STAGE_NAMES]
+    if _ORAD_FROM_ENV:
+        roots = [ORAD_ROOT]
+    else:
+        # canonical stages + legacy in-review dirs still on disk (read compat, t1817u)
+        roots = stage_root_dirs(GROK_ROOT, include_drafting=True)
     hits = [r / name for r in roots if (r / name).is_dir()]
     if not hits:
         raise FileNotFoundError(f"课题目录不存在: {name}（已查 {', '.join(str(r) for r in roots)}）")
