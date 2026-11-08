@@ -37,7 +37,9 @@ import sys
 from pathlib import Path
 
 CONFIG = {
-    "STAGE_ORDER": ("drafting", "pre-submit", "in-review", "accepted"),
+    # Canonical stage order (t1817u: `in-review` -> `reviewing`). Writers only
+    # create canonical folders; legacy `in-review` is accepted on input.
+    "STAGE_ORDER": ("drafting", "pre-submit", "reviewing", "accepted"),
 }
 STAGE_ORDER = CONFIG["STAGE_ORDER"]
 
@@ -47,6 +49,11 @@ if str(_IMPORT_ROOT) not in sys.path:
 
 from modules.console import const as console_const  # noqa: E402
 from modules.console import registry  # noqa: E402
+from modules.console.paths import (  # noqa: E402
+    LEGACY_STAGE_ALIASES,
+    normalize_stage_name,
+    stage_root_dirs,
+)
 
 GROK_ROOT = Path(console_const.GROK_ROOT)
 META_TOKEN_RE = r'(<meta\s+name="console-token"\s+content=")([^"]*)(")'
@@ -77,11 +84,16 @@ def _locked_files(root: Path) -> list[str]:
 
 
 def _find_source(project: str, src_stage: str) -> tuple[str, Path]:
-    stages = [src_stage] if src_stage else list(STAGE_ORDER)
-    hits = [(s, GROK_ROOT / s / project) for s in stages]
+    if src_stage:
+        stage = normalize_stage_name(src_stage)
+        roots = [(stage, GROK_ROOT / stage)]
+    else:
+        # canonical stages + legacy in-review dirs still on disk (read compat, t1817u)
+        roots = [(p.name, p) for p in stage_root_dirs(GROK_ROOT, include_drafting=True)]
+    hits = [(s, root / project) for s, root in roots]
     hits = [(s, p) for s, p in hits if p.is_dir()]
     if not hits:
-        _die(f"找不到项目夹：{project}（已查 {', '.join(stages)}）")
+        _die(f"找不到项目夹：{project}（已查 {', '.join(s for s, _ in roots)}）")
     if len(hits) > 1:
         _die(f"项目夹重复，先定归属：{', '.join(str(p) for _, p in hits)}")
     return hits[0]
@@ -105,8 +117,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--project", required=True, help="课题夹名，如 lya_CTA")
     ap.add_argument("--to", required=True, choices=list(STAGE_ORDER), help="目标阶段夹")
-    ap.add_argument("--from", dest="src_stage", default="", choices=("", *STAGE_ORDER),
-                    help="源阶段夹；空=自动在四个阶段夹里找唯一一个")
+    ap.add_argument("--from", dest="src_stage", default="",
+                    choices=("", *STAGE_ORDER, *LEGACY_STAGE_ALIASES),
+                    help="源阶段夹（可写旧名 in-review）；空=自动在阶段夹里找唯一一个")
     ap.add_argument("--execute", action="store_true", help="真搬（默认只干跑）")
     ap.add_argument("--register-new", action="store_true",
                     help="未登记的项目顺手登记并写 token 到起始页")

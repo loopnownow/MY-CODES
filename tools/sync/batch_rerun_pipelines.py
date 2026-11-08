@@ -23,15 +23,16 @@ from pathlib import Path
 STATS_ROOT = Path(os.environ.get("STATS_ROOT") or Path(__file__).resolve().parents[2])  # 算法库根 = 仓根（tools/sync/ 上两级）
 if str(STATS_ROOT) not in sys.path:
     sys.path.insert(0, str(STATS_ROOT))
-from modules.console.paths import grok_root  # GROK_ROOT env -> frozen lab default (C1)
+from modules.console.paths import grok_root, stage_root_dirs  # GROK_ROOT env -> frozen lab default (C1)
 GROK_ROOT = grok_root(STATS_ROOT / "modules")  # 阶段根父目录
 _IMPORT = STATS_ROOT  # import root of the modules package
-# Same stage names as MY-CODES/modules/console/paths.py.
+# Canonical stage folders from MY-CODES/modules/console/paths.py; legacy
+# in-review dirs remain readable (t1817u).
 STAGE_NAMES = (
-    "drafting", "pre-submit", "in-review", "accepted",
+    "drafting", "pre-submit", "reviewing", "accepted",
 )
 _rad = os.environ.get("ZERAD_ROOT") or os.environ.get("ORAD_ROOT")
-STAGE_ROOTS = [Path(_rad)] if _rad else [GROK_ROOT / n for n in STAGE_NAMES if (GROK_ROOT / n).is_dir()]
+STAGE_ROOTS = [Path(_rad)] if _rad else stage_root_dirs(GROK_ROOT, include_drafting=True)
 _DEL_ROOT = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del")  # 与 {DEL} / tidy_paths.DEL_ROOT 对齐（t1794u）
 STATUS_PATH = _DEL_ROOT / "harvested" / "batch_rerun_status.json"  # t1490u
 BATCH_LOG = _DEL_ROOT / "harvested" / "batch_rerun.log"  # t1490u

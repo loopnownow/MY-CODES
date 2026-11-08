@@ -8,7 +8,7 @@ r"""
     (--enable-lung-constraint) 时才需要，此时自动配对查找：
       * legacy 同目录布局：与原行为一致，在 seg 同目录按关键词配对；
       * v2 分离目录布局（--img-root 指定影像根目录）：按患者键精确配对，
-        如 H:\baoceng\seg\ba chun ping seg.nrrd ↔ H:\baoceng\main\ba chun ping main.nrrd
+        如 data/seg/patient_a_seg.nrrd ↔ data/main/patient_a_main.nrrd
   - roi/seg 原文件（含关键词 SEG_KEYWORD）：只读，绝不覆盖，原样保留
   - 扩张后的新文件（含关键词 ROI_KEYWORD）：另存为新文件名，写入 OUTPUT_DIR（默认与
     原 seg 同目录）
@@ -26,23 +26,22 @@ r"""
 python expand_roi_5mm.py
 
 # 指定其他目录
-python expand_roi_5mm.py --path "L:\0habitat\lung_xlm\g"
+python expand_roi_5mm.py --path "data/lung_xlm/g"
 
 # 需要肺组织约束时
-python expand_roi_5mm.py --path "L:\0habitat\lung_xlm" --enable-lung-constraint
+python expand_roi_5mm.py --path "data/lung_xlm" --enable-lung-constraint
 
 # 使用 GPU (CuPy) 加速形态学扩张（推荐在 A100 等 CUDA 设备上处理大体积数据）
-python expand_roi_5mm.py --path "L:\0habitat\lung_xlm" --use-gpu
+python expand_roi_5mm.py --path "data/lung_xlm" --use-gpu
 
 # 同时开启肺组织约束 + GPU
-python expand_roi_5mm.py --path "L:\0habitat\lung_xlm" --enable-lung-constraint --use-gpu
+python expand_roi_5mm.py --path "data/lung_xlm" --enable-lung-constraint --use-gpu
 
 # (v2) img 与 seg 分离目录布局：--img-root 指定影像根目录，按患者键配对
-python expand_roi_5mm.py --path "H:\baoceng\seg" --img-root "H:\baoceng\main" --use-gpu
-python expand_roi_5mm.py --path "H:\thin\seg"    --img-root "H:\thin\main"    --use-gpu
+python expand_roi_5mm.py --path "data/seg" --img-root "data/main" --use-gpu
 
 # (v3) CSV 驱动模式：按 csv 的 img_path / roi_path 列逐条扩张（与 --path 二选一）
-python expand_roi_5mm.py --csv "G:\lung_xlm\habitat_pipeline\combined_2.csv" --use-gpu
+python expand_roi_5mm.py --csv "data/habitat_pipeline/combined.csv" --use-gpu
 """
 
 import argparse
@@ -77,7 +76,7 @@ def _fix_cuda_env():
 
     # 2) 标准 NVIDIA 安装目录（优先高版本）
     if os.name == "nt":
-        toolkit_root = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
+        toolkit_root = os.environ.get("CUDA_TOOLKIT_ROOT", r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA")
         if os.path.isdir(toolkit_root):
             try:
                 versions = sorted(
@@ -186,7 +185,7 @@ from scipy import ndimage
 
 # ==================== 软编码配置（全部置顶，便于修改） ====================
 # 路径与基础设置
-DEFAULT_PATH = r"L:\0habitat"          # 默认扫描目录
+DEFAULT_PATH = os.environ.get("EXPAND_ROI_DEFAULT_PATH", "data/habitat")          # 默认扫描目录
 SEARCH_RECURSIVE = True                # 是否递归扫描子目录
 RADIUS_MM = 5.0                        # 扩张半径（mm）
 
@@ -211,10 +210,10 @@ LUNG_HU_HIGH = -100
 ENABLE_CLOSING = True
 ENABLE_LARGEST_LUNG = True
 
-# 系统路径配置（日志与断点）
+# 系统路径配置（日志与断点）；公开仓不留本机盘符，env 可覆盖（默认相对当前工作目录）
 DEFAULT_OUTPUT_DIR = None              # 默认 None：输出到原 seg 同目录
-LOG_DIR = r"G:\lung_xlm\utility\logs"  # 日志保存目录（置于 utility 下）
-CHECKPOINT_DIR = r"G:\lung_xlm\utility\checkpoints\expand_roi" # 断点标记目录
+LOG_DIR = os.environ.get("EXPAND_ROI_LOG_DIR", "logs/expand_roi")  # 日志保存目录
+CHECKPOINT_DIR = os.environ.get("EXPAND_ROI_CHECKPOINT_DIR", "checkpoints/expand_roi")  # 断点标记目录
 
 # 数据类型映射配置（软编码，按需扩展）
 NRRD_TYPE_MAP = {
