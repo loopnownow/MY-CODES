@@ -29,8 +29,8 @@ LAB_ABS = re.compile(
     r"[A-Za-z]:\\{1,2}(?:0Grok|Users\\{1,2}[^\\]+\\{1,2}(?:0Grok|Documents\\{1,2}GitHub))",
     re.I,
 )
-# `{RAW}` / `{DEL}` 根：仅当同一行点明环境变量名（可覆盖的默认值）才放行。
-ROOT_ABS = re.compile(r"[A-Za-z]:[\\/]{1,2}(?:00db|0del)", re.I)
+# `{RAW}` / `{DEL}` / lab root (`MyProjects`)：仅当同一行点明环境变量名（可覆盖的默认值）才放行。
+ROOT_ABS = re.compile(r"[A-Za-z]:[\\/]{1,2}(?:00db|0del|MyProjects)", re.I)
 ENV_GUARD = re.compile(
     r"environ|DEL_ROOT|ODOC_WORD|GROK_ROOT|STATS_ROOT|SKILLS_ROOT|MY_SKILLS|GLOSSARY_ROOT",
     re.I,
