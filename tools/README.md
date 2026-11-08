@@ -39,7 +39,7 @@
 |---|---|---|
 | `STATS_ROOT` | 本仓根（`modules/` 所在） | `Path(__file__).resolve().parents[2]`（脚本在 `tools/<tool>/`） |
 | `GROK_ROOT` | 课题阶段根父目录 | `modules.console.paths.grok_root()` → 冻结 lab 默认（C1 唯一文档例外） |
-| `DEL_ROOT` | 临时/删除区 | `D:\MyProjects\.Del`（不属于 lab 盘符，可留默认） |
+| `DEL_ROOT` | 临时/删除区 | `{DEL}`（`<lab_root>\.Del`；默认已设，可留） |
 | `ZERAD_ROOT` / `ORAD_ROOT` | 单个阶段根（只扫该阶段） | 未设则扫 `GROK_ROOT` 下所有阶段目录 |
 
 `tools/sync/project-shim/console.html`、`strobe.html` 里的示例路径同样写作 `%GROK_ROOT%\…`。

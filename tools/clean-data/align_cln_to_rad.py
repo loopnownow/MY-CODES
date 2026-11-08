@@ -22,13 +22,13 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from tidy_paths import DEL_ROOT  # 临时区与 tidy_* 同一处（D:\MyProjects\.Del）
+from tidy_paths import DEL_ROOT  # 临时区与 tidy_* 同一处（{DEL} = <lab_root>\.Del）
 
 _LAB_ROOT = Path(__file__).resolve().parents[5]  # tools/<tool>/ -> lab root（公开仓不留绝对盘符）
 ROOT = Path(os.environ.get("CLN_PROJECT_ROOT") or _LAB_ROOT / "pre-submit" / "xlm_LG")
 XLSX = ROOT / "xlm_LG.xlsx"
 REF = ROOT / "ref"
-DEL = DEL_ROOT  # 备份/中间产物统一落 D:\MyProjects\.Del（{DEL}；DEL_ROOT 环境变量可覆盖）
+DEL = DEL_ROOT  # 备份/中间产物统一落 {DEL}（<lab_root>\.Del；DEL_ROOT 环境变量可覆盖）
 
 COLS = [
     "Patient_ID", "Growth", "Gender", "Age", "Diameter", "Max_diameter",
