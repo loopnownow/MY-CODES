@@ -44,7 +44,7 @@ _rad = os.environ.get("ZERAD_ROOT") or os.environ.get("ORAD_ROOT")
 
 STAGE_ROOTS = [Path(_rad)] if _rad else [GROK_ROOT / n for n in STAGE_NAMES if (GROK_ROOT / n).is_dir()]
 
-TMP_DIR = Path(os.environ.get("DEL_ROOT") or r"D:\0del") / "harvested" / "smoke"  # 临时输出落 {DEL} 的 harvested 档（0del 根保持只有三档；见 My rule.md §5.3）
+TMP_DIR = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del") / "harvested" / "smoke"  # 临时输出落 {DEL} 的 harvested 档（.Del 根保持只有三档；见 My rule.md §5.3）
 
 # Projects that must carry INPUT and DO_EXCLUDE_SAMPLES in ref/settings.ini.
 

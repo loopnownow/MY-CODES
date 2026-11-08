@@ -2,7 +2,7 @@
 """yt_RDL 课题路径与 cln 读表辅助（扁平，非子工程包）。
 
 路径唯一出处：本模块 + ``tidy_paths``（profile ``yt_RDL``）。
-临时文件 → ``0del/harvested/yt_RDL``；说明/CSV → ``<project>/ref``；主表在课题根。
+临时文件 → ``.Del/harvested/yt_RDL``；说明/CSV → ``<project>/ref``；主表在课题根。
 """
 from __future__ import annotations
 

@@ -2,11 +2,11 @@
 """
 顺序重跑各阶段目录（drafting/pre-submit/…）下课题的 pipeline（ref/settings.ini，--no-overlay）。
 
-  python 0doc/_code/02-data-processing/_shared/sync/batch_rerun_pipelines.py
-  python 0doc/_code/02-data-processing/_shared/sync/batch_rerun_pipelines.py --only lya_CTA,dll_OV
-  python 0doc/_code/02-data-processing/_shared/sync/batch_rerun_pipelines.py --resume
+  python _Docs/GitHub/MY-CODES/tools/sync/batch_rerun_pipelines.py
+  python _Docs/GitHub/MY-CODES/tools/sync/batch_rerun_pipelines.py --only lya_CTA,dll_OV
+  python _Docs/GitHub/MY-CODES/tools/sync/batch_rerun_pipelines.py --resume
 
-断点：0del/harvested/batch_rerun_status.json 里 status=ok 的课题 --resume 会跳过。
+断点：.Del/harvested/batch_rerun_status.json 里 status=ok 的课题 --resume 会跳过。
 算法库由各课题 ref/settings.ini 的 MODULES_DIR 决定（modules/__init__.py 读取）。
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ STAGE_NAMES = (
 )
 _rad = os.environ.get("ZERAD_ROOT") or os.environ.get("ORAD_ROOT")
 STAGE_ROOTS = [Path(_rad)] if _rad else [GROK_ROOT / n for n in STAGE_NAMES if (GROK_ROOT / n).is_dir()]
-_DEL_ROOT = Path(os.environ.get("DEL_ROOT") or r"D:\0del")  # 与 {DEL} / tidy_paths.DEL_ROOT 对齐
+_DEL_ROOT = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del")  # 与 {DEL} / tidy_paths.DEL_ROOT 对齐（t1794u）
 STATUS_PATH = _DEL_ROOT / "harvested" / "batch_rerun_status.json"  # t1490u
 BATCH_LOG = _DEL_ROOT / "harvested" / "batch_rerun.log"  # t1490u
 

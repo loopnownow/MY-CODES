@@ -33,9 +33,9 @@ from docx_extract import extract_text  # noqa: E402
 
 # --- configuration -----------------------------------------------------------
 TIERS = {
-    "01": os.path.join(os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word",
+    "01": os.path.join(os.environ.get("ODOC_WORD") or r"D:\MyProjects\_DataBase\_lab\doc-word",
                        "05-manuscript", "thesis"),
-    "02": os.path.join(os.environ.get("ODOC_WORD") or r"D:\00db\_lab\doc-word",
+    "02": os.path.join(os.environ.get("ODOC_WORD") or r"D:\MyProjects\_DataBase\_lab\doc-word",
                        "05-manuscript", "manuscripts"),
 }
 DOC_EXT = {".docx", ".doc"}

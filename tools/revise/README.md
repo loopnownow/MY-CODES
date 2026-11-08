@@ -9,6 +9,6 @@
 共用的打包入口是 `pack_docx.py`。
 
 ```text
-python %GROK_ROOT%\0doc\_code\07-response/revise\pack_docx.py --unpacked <解包目录> --original <原docx> --dest <修订稿.docx>
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\revise\pack_docx.py --unpacked <解包目录> --original <原docx> --dest <修订稿.docx>
 ```
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-sync_glossary_index.py -- rebuild `<0doc>\\_library\\glossary\\index.csv` from the four md layers.
+sync_glossary_index.py -- rebuild `<GROK_ROOT>\\_Docs\\_library\\glossary\\index.csv` from the four md layers.
 
 The md files are the SSOT for glossary entries; `index.csv` is the machine index.
 This script parses `### <entry>` blocks plus the `- 用法/证据/频次/判断/bucket/节/规则：` fields,
@@ -11,7 +11,7 @@ Offline, stdlib only, read-only except with `--apply`.
 
 Run (PowerShell, Python 3.13.9):
 
-    $env:GLOSSARY_ROOT = "<0doc>\\_library\\glossary"
+    $env:GLOSSARY_ROOT = "<GROK_ROOT>\\_Docs\\_library\\glossary"
     python .\\sync_glossary_index.py            # dry-run: print rows
     python .\\sync_glossary_index.py --apply    # rewrite index.csv
 
@@ -50,7 +50,7 @@ TRIM = " `（(，,；;"
 def glossary_root() -> Path:
     value = (os.environ.get(GLOSSARY_ROOT_ENV) or "").strip()
     if not value:
-        raise SystemExit("set %s to the 0doc glossary seat (<0doc>\\_library\\glossary)" % GLOSSARY_ROOT_ENV)
+        raise SystemExit("set %s to the 0doc glossary seat (<GROK_ROOT>\\_Docs\\_library\\glossary)" % GLOSSARY_ROOT_ENV)
     return Path(value)
 
 

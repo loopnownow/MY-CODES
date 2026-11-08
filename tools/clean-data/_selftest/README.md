@@ -26,9 +26,9 @@
 ```bat
 set PYTHONDONTWRITEBYTECODE=1
 set LXJ_AN_ROOT=<scratch>\new
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_merge.py    --profile lxj_AN
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_complete.py --profile lxj_AN
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_verify.py   --profile lxj_AN
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_merge.py    --profile lxj_AN
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_complete.py --profile lxj_AN
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_verify.py   --profile lxj_AN
 
 python _selftest\xlsx_diff.py <scratch>\old\lxj_AN.xlsx          <scratch>\new\lxj_AN.xlsx
 python _selftest\xlsx_diff.py <scratch>\old\lxj_AN_complete.xlsx <scratch>\new\lxj_AN_complete.xlsx
@@ -45,9 +45,9 @@ xcopy /E /I <scratch>\ssd_old <scratch>\ssd_new
 :: 新链
 set ORAD_ROOT=<scratch>\ssd_new
 set SSD_ROOT=<scratch>\ssd_new
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_merge.py    --profile ssd
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_complete.py --profile ssd --strategy paper_fill
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_verify.py   --profile ssd
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_merge.py    --profile ssd
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_complete.py --profile ssd --strategy paper_fill
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_verify.py   --profile ssd
 
 python _selftest\xlsx_diff.py <scratch>\ssd_old\clinical_recovery\clinical_real_merged.xlsx ^
                               <scratch>\ssd_new\clinical_recovery\clinical_real_merged.xlsx
@@ -72,4 +72,4 @@ python _selftest\make_nat_case.py <scratch>\ssd_old
 
 > 把 `ORAD_ROOT` 指到夹具目录是为了让 `GROK_ROOT\0del`（插补备份）落在工作区内；
 > 真实运行时 `ORAD_ROOT` 指向 `%GROK_ROOT%\drafting` 即可，`modules` 由 `PYTHONPATH`
-> 或 `%GROK_ROOT%\0doc\GitHub\stats-analysis\modules` 提供。
+> 或 `%GROK_ROOT%\_Docs\GitHub\MY-CODES\modules` 提供。
