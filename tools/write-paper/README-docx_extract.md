@@ -16,7 +16,7 @@ Rehomed 2026-10-23 from `_code\_infra\manuscript-body\docx_extract.py`.
 
 
 
-Tests: `%GROK_ROOT%\0doc\GitHub\stats-analysis\modules\tests\test_docx_extract.py`
+Tests: `%GROK_ROOT%\_Docs\GitHub\MY-CODES\modules\tests\test_docx_extract.py`
 
 (path updated 2026-10-23 to this folder).
 

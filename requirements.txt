@@ -1,4 +1,4 @@
-# 0doc\_code helper scripts — third-party dependencies（2026-10-23 由 0script 迁入）
+# _Docs\GitHub\MY-CODES（原 0doc\_code）helper scripts — third-party dependencies（2026-10-23 由 0script 迁入）
 # Pins below are from this lab machine (python 3.13.9 / anaconda3 base) via
 # importlib.metadata / conda list where installed; otherwise unpinned names.
 # Local/lab-only packages are commented with install hints — do not treat as PyPI pins.

@@ -1,7 +1,7 @@
 """Build the imaging-scanner registry workbook.
 
 Input : scanner_registry_rows.py (hand-curated rows, evidence quoted from 0doc)
-Output: <GROK_ROOT>\\0doc\\_library\\scanner-registry\\scanner-parameter-registry.xlsx  (restored t1553u; was briefly under templates)
+Output: <GROK_ROOT>\\_Docs\\_library\\scanner-registry\\scanner-parameter-registry.xlsx  (restored t1553u; was briefly under templates)
 
 Every row is one sequence of one device at one centre of one study. Values are
 copied from the source sentence named in the row; nothing is inferred. Missing

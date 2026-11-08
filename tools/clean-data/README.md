@@ -4,7 +4,7 @@
 **扁平布局**：脚本按**作用**命名，直接放在 `data-processing\clean-data\` 下；不建课题子工程目录。  
 课题差异用 `--profile` / 环境变量 / 文件顶部 CONFIG，不靠文件夹分叉。
 
-临时文件 → `D:\0del\`（`{DEL}`；`tidy_paths.DEL_ROOT`，可用环境变量 `DEL_ROOT` 覆盖）；要留下的说明和表 → 课题 `ref/`。
+临时文件 → `D:\MyProjects\.Del\`（`{DEL}`；`tidy_paths.DEL_ROOT`，可用环境变量 `DEL_ROOT` 覆盖）；要留下的说明和表 → 课题 `ref/`。
 
 ## 布局（现用）
 
@@ -31,7 +31,7 @@
 | `setup_cln_only.py` | clin-only ID + settings.ini（默认 wkl_UGIB） |
 | `_selftest/` | 旧→新等价性夹具（测试用，非课题子工程） |
 
-统计/验证 CLI 在算法库主库 **`%GROK_ROOT%\0doc\GitHub\stats-analysis\model-validation\`**（`compare_val_modes.py`、`downsample_train.py`），见该目录 `README.md`。算法包本体 `%GROK_ROOT%\0doc\GitHub\stats-analysis\modules\`（2026-10-25 起 `_code` 副本退役）。
+统计/验证 CLI 在算法库主库 **`%GROK_ROOT%\_Docs\GitHub\MY-CODES\model-validation\`**（`compare_val_modes.py`、`downsample_train.py`），见该目录 `README.md`。算法包本体 `%GROK_ROOT%\_Docs\GitHub\MY-CODES\modules\`（2026-10-25 起 `_code` 副本退役）。
 
 病历 / HIS 抽取脚本在 `..\clinical-data-extraction\`。
 
@@ -41,29 +41,29 @@
 
 ```bat
 set PYTHONDONTWRITEBYTECODE=1
-set PYTHONPATH=%GROK_ROOT%\0doc\_code\02-data-processing/clean-data
+set PYTHONPATH=%GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data
 
 :: ── lxj_AN / SSD 主链 ──
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_merge.py    --profile lxj_AN
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_complete.py --profile lxj_AN
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_verify.py   --profile lxj_AN
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_complete.py --profile lxj_AN --layout cln-rad-qc
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_merge.py    --profile lxj_AN
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_complete.py --profile lxj_AN
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_verify.py   --profile lxj_AN
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_complete.py --profile lxj_AN --layout cln-rad-qc
 
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_merge.py    --profile ssd
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_complete.py --profile ssd --strategy paper_fill
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_verify.py   --profile ssd
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_complete.py --profile ssd --strategy impute
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\tidy_split.py
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_merge.py    --profile ssd
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_complete.py --profile ssd --strategy paper_fill
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_verify.py   --profile ssd
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_complete.py --profile ssd --strategy impute
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\tidy_split.py
 
 :: ── yt_RDL（路径：YT_RDL_ROOT / tidy_yt_rdl）──
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\extract_discharge.py
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\screen_liposarcoma.py
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\screen_liposarcoma.py --audit
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\enrich_candidate_clinical.py
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\followup_recurrence.py
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\fill_cln_followup.py --out <副本.xlsx>
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\fill_cln_followup.py --mrn
-python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\fill_cln_from_discharge.py --validate
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\extract_discharge.py
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\screen_liposarcoma.py
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\screen_liposarcoma.py --audit
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\enrich_candidate_clinical.py
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\followup_recurrence.py
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\fill_cln_followup.py --out <副本.xlsx>
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\fill_cln_followup.py --mrn
+python %GROK_ROOT%\_Docs\GitHub\MY-CODES\tools\clean-data\fill_cln_from_discharge.py --validate
 ```
 
 每个脚本 `--help` 可看全部参数。路径类参数优先环境变量，其次文件顶部 CONFIG。
@@ -104,7 +104,7 @@ python %GROK_ROOT%\0doc\_code\02-data-processing/clean-data\fill_cln_from_discha
 ```
 子工程根 = <PROFILE_ENV> → 设了 ORAD_ROOT 类变量时 <ORAD_ROOT>\<目录名> → 否则 %GROK_ROOT%\<阶段>\<目录名>（找不到或重名即报错）
 ORAD_ROOT = ZERAD_ROOT → ORAD_ROOT → MS_ORAD_ROOT → %GROK_ROOT%\drafting（不存在即报错）
-0del      = D:\0del（DEL_ROOT 可覆盖；与脚本备份同址）
+.Del      = D:\MyProjects\.Del（DEL_ROOT 可覆盖；与脚本备份同址）
 ```
 
 | profile | 环境变量 | 目录名（在阶段目录下查找） |
@@ -128,4 +128,4 @@ ORAD_ROOT = ZERAD_ROOT → ORAD_ROOT → MS_ORAD_ROOT → %GROK_ROOT%\drafting�
 ## 已知注意
 
 * `tidy_verify --profile lxj_AN` 默认始终返回 0；加 `--fail-on-diff` 才在失败时返回 1。
-* 统计脚本不在本目录：见 `%GROK_ROOT%\0doc\GitHub\stats-analysis\model-validation\`。
+* 统计脚本不在本目录：见 `%GROK_ROOT%\_Docs\GitHub\MY-CODES\model-validation\`。
