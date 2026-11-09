@@ -7,9 +7,14 @@
   python -B tools/db-library/merge_tables.py --project OC --build
   python -B tools/db-library/merge_tables.py --project PCOS/zar_PCOS3D --build
   python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --apply   # 需点名授权
+  python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --apply --into "...\\SCH\\_db\\SCHdb"
 
---build 只生成到 <batch>/out/；--apply 生成 + 原件移入 <batch>/originals/ + 写台账 + 合并表进叶根。
-不带 --build/--apply 为 dry-run（只打印计划）。
+口径（2026-11-16family 起）：
+- 默认输出 <batch>/staging/，**不再默认落家族根 / 叶根**；--out 可改输出目录。
+- 输出目录若在 _DataBase 内，必须显式 --in-db（写回叶根）或 --into <db>（入库）才允许。
+- --build 只生成；--apply 生成 + 原件移入 <batch>/originals/<key>/ + 写台账；
+  合并表按 --in-db（复制回叶根）/ --into（增量入库）/ 缺省（留在输出目录）处置。
+- 不带 --build/--apply 为 dry-run（只打印计划）。
 """
 from __future__ import annotations
 
@@ -22,6 +27,7 @@ import openpyxl
 import xlrd
 
 from common import ledger_write, sha256_12, write_workbook
+import db_core as core
 
 DEFAULT_DB_ROOT = Path(r"D:\MyProjects\_DataBase")
 DEFAULT_BATCH = "2026-11-db-root-merge"
@@ -519,66 +525,116 @@ def iter_projects(selected, db_root, explicit):
         yield key, cfg, src
 
 
+def is_under(path, root):
+    try:
+        Path(path).resolve().relative_to(Path(root).resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def ingest_merged(db_path, merged, key):
+    """--into：把合并簿增量入库（rel=<FAM>/<leaf>/<合并簿名>）。"""
+    db_path = Path(db_path)
+    if not db_path.is_file():
+        raise SystemExit(f"--into 库不存在: {db_path}（先跑 build_code_db.py 建库）")
+    family = core.family_of_db(db_path)
+    con = core.open_db(db_path)
+    code = core.get_meta(con).get("short_code", "ly")
+    fam = key.split("/")[0]
+    slug = key.split("/")[-1] if "/" in key else key
+    leaf = f"{fam}/{slug}"
+    ing = core.Ingestor(con, code)
+    did, n = ing.ingest(merged, f"{leaf}/{merged.name}", fam, slug, leaf, incremental=True)
+    counts = dict(
+        n_doc=con.execute("SELECT count(*) FROM doc").fetchone()[0],
+        n_sheet=con.execute("SELECT count(*) FROM sheet").fetchone()[0],
+        n_fact=con.execute("SELECT count(*) FROM fact").fetchone()[0],
+        n_entity=con.execute("SELECT count(*) FROM entity").fetchone()[0],
+    )
+    core.set_meta(con, **counts)
+    con.commit()
+    con.close()
+    print(f"  已入库: {db_path}（doc_id={did}，sheet +{n}）")
+
+
 def run(args):
-    db_root = args.db_root
+    db_root = Path(args.db_root)
     batch = DEL_ROOT / args.batch
-    out_dir = batch / "out"
+    out_dir = Path(args.out) if args.out else (batch / "staging")
+    if is_under(out_dir, db_root) and not (args.in_db or args.into):
+        raise SystemExit(f"输出目录在 _DataBase 内（{out_dir}），需显式 --in-db 或 --into <db>")
     selected = select_projects(args.project)
     explicit = args.project is not None
 
     if args.build:
         out_dir.mkdir(parents=True, exist_ok=True)
         for key, cfg, src in iter_projects(selected, db_root, explicit):
+            if not source_files(src):
+                if explicit:
+                    raise SystemExit(f"源无可归并散表（可能已收口，原件在 {DEL_ROOT}）：{src}")
+                print(f"[skip] 源无可归并散表：{src}")
+                continue
             p = build_one(key, db_root, out_dir)
             print(f"[built] {p}  {p.stat().st_size:,} B")
         return
 
-    if not args.apply:
-        print("dry-run：将执行下列动作（加 --apply 落盘；--build 只生成到 out/）")
-        for key, cfg, src in iter_projects(selected, db_root, explicit):
-            files = source_files(src)
-            if not files:
-                if explicit:
-                    raise SystemExit(f"源只剩已有合并表，拒绝 --apply：{src}")
-                print(f"[skip] 源无表格（只剩合并表）：{src}")
-                continue
-            print(f"\n[{key}] 原件 {len(files)} -> {batch / 'originals' / key}")
-            for p in files:
-                print(f"    {p.name}  {p.stat().st_size:,} B")
-            print(f"  合并表 -> {src / (cfg['name'] + '_merged_' + STAMP + '.xlsx')}")
-        return
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log = []
+    plan = []
     for key, cfg, src in iter_projects(selected, db_root, explicit):
-        print(f"\n===== {key} =====")
         files = source_files(src)
         if not files:
             if explicit:
                 raise SystemExit(f"源只剩已有合并表，拒绝 --apply：{src}")
             print(f"[skip] 源无表格（只剩合并表）：{src}")
             continue
+        plan.append((key, cfg, src, files))
+
+    if not args.apply:
+        print("dry-run：将执行下列动作（加 --apply 落盘；--build 只生成到输出目录）")
+        for key, cfg, src, files in plan:
+            print(f"\n[{key}] 原件 {len(files)} -> {batch / 'originals' / key}")
+            for p in files:
+                print(f"    {p.name}  {p.stat().st_size:,} B")
+            name = cfg['name'] + '_merged_' + STAMP + '.xlsx'
+            if args.in_db:
+                print(f"  合并表 -> 叶根（--in-db）{src / name}")
+            elif args.into:
+                print(f"  合并表 -> 入库（--into）{args.into}")
+            else:
+                print(f"  合并表 -> {out_dir / name}")
+        return
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log = []
+    for key, cfg, src, files in plan:
+        print(f"\n===== {key} =====")
         produced = build_one(key, db_root, out_dir)
         print("  已生成:", produced, f"{produced.stat().st_size:,} B")
-        dest = src / produced.name
-        if dest.exists():
-            raise SystemExit(f"目标已存在，停止：{dest}")
         odir = batch / "originals" / key
         odir.mkdir(parents=True, exist_ok=True)
         for p in files:
             tgt = odir / p.name
             if tgt.exists():
                 raise SystemExit(f"原件目标已存在，停止：{tgt}")
-            log.append([key.split("/")[0], f"{src.name}\\{p.name}", key.split("/")[-1] if "/" in key else ".",
+            log.append([key.split("/")[0], f"{src.name}" + "\\" + f"{p.name}",
+                        key.split("/")[-1] if "/" in key else ".",
                         (Path("originals") / key / p.name).as_posix(),
                         p.stat().st_size, sha256_12(p), ts])
             shutil.move(str(p), str(tgt))
-        shutil.copy2(produced, dest)
-        print(f"  合并表已进 DB：{dest}")
+        if args.in_db:
+            dest = src / produced.name
+            if dest.exists():
+                raise SystemExit(f"目标已存在，停止：{dest}")
+            shutil.copy2(produced, dest)
+            print(f"  合并表已进叶根（--in-db）：{dest}")
+        elif args.into:
+            ingest_merged(args.into, produced, key)
+        else:
+            print(f"  合并表留在输出目录（未写 _DataBase）：{produced}")
         print(f"  原件 {len(files)} 个已移入 .Del：{odir}")
         left = [p.name for p in src.iterdir()]
-        print("  DB 剩余：", left)
+        print("  叶根剩余：", left)
 
     man = batch / f"MERGE-MOVED-{STAMP}.tsv"
     ledger_write(man, ("fam", "src", "rel", "dst", "size_B", "sha256_12", "moved_at"), log)
@@ -586,10 +642,18 @@ def run(args):
 
 
 def parse_args(argv=None):
-    ap = argparse.ArgumentParser(description="散表归并：按项目生成合并工作簿")
+    ap = argparse.ArgumentParser(
+        description="散表归并：按项目生成合并工作簿（默认落 {DEL} staging，不写 _DataBase）",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=("默认输出 <batch>/staging/，不复制回 _DataBase；\n"
+                "--in-db 允许写回叶根（旧行为，需点名授权）；\n"
+                "--into <db> 生成后直接增量入库（rel=<FAM>/<leaf>/<合并簿名>）。"))
     g = ap.add_mutually_exclusive_group()
-    g.add_argument("--build", action="store_true", help="只生成到 <batch>/out/")
-    g.add_argument("--apply", action="store_true", help="生成 + 移原件 + 写台账 + 合并表进叶根")
+    g.add_argument("--build", action="store_true",
+                   help="只生成到输出目录（默认 <batch>/staging/）")
+    g.add_argument("--apply", action="store_true",
+                   help="生成 + 原件移入 <batch>/originals/<key>/ + 写台账；"
+                        "合并表按 --in-db/--into 处置")
     ap.add_argument("--project", metavar="LEAF",
                     help="项目名，如 SCH/ly_SCH、ly_SCH、OC、zar_PCOS3D；缺省=全部已注册")
     ap.add_argument("--db-root", type=Path, default=DEFAULT_DB_ROOT,
@@ -597,7 +661,17 @@ def parse_args(argv=None):
     ap.add_argument("--batch", default=DEFAULT_BATCH,
                     help=f"{{DEL}}/_by-function 下的批次目录（默认 {DEFAULT_BATCH}）")
     ap.add_argument("--stamp", default=None, help="输出日期戳 YYYYMMDD（默认今天）")
+    ap.add_argument("--out", type=Path, default=None,
+                    help="输出目录（默认 <batch>/staging/；落在 _DataBase 内需 --in-db/--into）")
+    ap.add_argument("--in-db", action="store_true",
+                    help="允许写回 _DataBase：合并表复制回叶根（需点名授权）")
+    ap.add_argument("--into", type=Path, metavar="DB", default=None,
+                    help="合并表增量入库到指定库（如 ...\\MHE_AN\\_db\\MHE_ANdb），不写回叶根")
     args = ap.parse_args(argv)
+    if args.in_db and args.into:
+        ap.error("--in-db 与 --into 不能同时使用")
+    if args.build and (args.in_db or args.into):
+        ap.error("--build 不落 _DataBase，不能配 --in-db/--into")
     global STAMP
     if args.stamp:
         STAMP = args.stamp
