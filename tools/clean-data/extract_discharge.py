@@ -1,6 +1,6 @@
 """出院小结 .txt → 宽表 CSV（金山格式）。
 
-默认路径走 ``tidy_yt_rdl``（Results 解包目录 / 0del CSV）。
+默认路径走 ``tidy_yt_rdl``（Results 解包目录 / `{DEL}` 临时 CSV）。
 可用 ``--input-dir`` / ``--output`` 或环境变量覆盖。
 
 用法::

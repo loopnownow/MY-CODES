@@ -6,6 +6,8 @@
 | 目录 | 作用 | 入口 / 备注 |
 |---|---|---|
 | `clean-data/` | Excel 清洗主链（tidy 合并/拆分/校验、插补、随访补齐、`_selftest` 夹具） | `setup_cln_only.py`、`tidy_complete.py`；`_selftest/README.md` 说夹具怎么造 |
+| `db-library/` | `_DataBase` 家族库建库 / 归档入库 / 散表归并 / 校验（`<family>\_db\<family>db`，`_share` 归档解入，三层去重 + sha256 台账） | `build_code_db.py`、`merge_tables.py`、`verify_db.py`；契约见 `{SKILLS}\…\db-library` |
+| `habitat-pipeline/` | Habitat 影像/表型流水线（多序列 + delta 双时点；`modules/` 之外，不与统计引擎合并） | `habitat_pipeline/`、`delta_habitat_pipeline/`、`utility/`；见 `INTAKE-t1727u.md` |
 | `sync/` | 课题侧同步与巡检：`settings.ini` 对齐、多课题批量重跑、smoke | `sync_modules.py`、`batch_rerun_pipelines.py`、`smoke_test.py`、`project-shim/` |
 | `preprocess-imaging/` | 影像预处理（`fmri/` MATLAB、`t1vbm/` CAT12 流水线 + 测试） | `t1vbm/run_all.m`；MATLAB 侧按 `t1vbm_config.m` 配 |
 | `fill-protocol/` | 伦理/方案模板的 Word 批量填充 | `docx_cell_replace.py`、`word_find_replace.py` |

@@ -270,7 +270,7 @@ def build_alias_map(cand: pd.DataFrame) -> tuple[dict[str, str], dict[str, str]]
 
 
 def ensure_inputs() -> None:
-    """临时文件（0del）缺失时自动重建：解包 Results.7z + 抽取出院小结宽表。"""
+    """临时文件（{DEL}）缺失时自动重建：解包 Results.7z + 抽取出院小结宽表。"""
     PATHS.ensure_dirs()
     if not RESULT_DIR.exists() or not any(RESULT_DIR.glob("*.txt")):
         if not PATHS.RESULTS_7Z.exists():

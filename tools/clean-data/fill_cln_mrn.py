@@ -19,7 +19,7 @@
 
 运行：
     python yt_rdl_add_mrn_col.py --check    # 只核对
-    python yt_rdl_add_mrn_col.py            # 写回（先备份到 0del）
+    python yt_rdl_add_mrn_col.py            # 写回（先备份到 {DEL}）
 """
 from __future__ import annotations
 
