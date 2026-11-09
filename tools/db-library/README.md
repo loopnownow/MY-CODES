@@ -58,10 +58,12 @@ python -B tools/db-library/verify_db.py --db "D:/MyProjects/_DataBase/MHE/_db/MH
 ### build_code_db.py
 
 - 叶缺省发现：`<db-root>/<family>/<slug>` 中 `slug == code` 或以 `code_` 开头，按完整
-  `FAM/slug` 排序；`--leaf` 接受 `FAM/slug` 或裸 slug。
+  `FAM/slug` 排序；`--from-originals` 改从 `<batch>/originals/<code>/<family>/<slug>`
+  反推（源叶可能已移走），`--leaf` 优先。没有任何可用叶时直接退出，不删旧库。
 - 建库时**先删旧库再重建**（原脚本行为）；库文件为 `<family>db`，无扩展名。
-- 去重三层：L1 文件 sha；L2 整表（表头 + 行哈希集合：全等 = `dup`，真子集 = `subset`，
-  只记 `sheet_dup` 边、不存第二份 blob）；L3 行级仅在可识别表头且 `ncol ≤ 40` 时展开 fact。
+- 去重：整表级（表头 + 行哈希集合：全等 = `dup`，真子集 = `subset`，只记
+  `sheet_dup` 边、不存第二份 blob）；`doc` 层 sha 只记录，不合并同 sha 文件。
+  可识别表头且 `ncol ≤ 40` 时展开 fact / entity。
 - 宽表：表头数字占比 > 0.6（谱图 / 积分矩阵）→ `is_wide=1`，只存 zlib(TSV) blob。
 - 表头白名单 `IDCOL`：`医技号|样本编号|样本号|编号|case no.|mid|谱图编号|patient(_id)?|id`。
 - `--move` 的原件落点：`{DEL}/_by-function/<batch>/originals/<code>/<leaf>/<相对路径>`；

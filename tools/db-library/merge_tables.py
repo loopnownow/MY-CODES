@@ -30,6 +30,11 @@ STAMP = datetime.now().strftime("%Y%m%d")
 LETTERS = "ABCDEFGH"
 
 
+def stamp_dash():
+    """20261109 -> 2026-11-09（仅用于工作簿说明文字）。"""
+    return f"{STAMP[:4]}-{STAMP[4:6]}-{STAMP[6:]}" if len(STAMP) == 8 and STAMP.isdigit() else STAMP
+
+
 # ---------------------------------------------------------------- 通用
 def num(v):
     """xlrd 单元格 -> python 值：整数值 float 转 int，其余保留文本。"""
@@ -129,7 +134,7 @@ def build_sch(src: Path, out_path: Path):
         "name": "00_说明",
         "rows": [[x] for x in [
             "SCH/ly_SCH 散表 → 单工作簿",
-            f"生成 {STAMP}；源 {src}（12 个表格文件）",
+            f"生成 {stamp_dash()}；源 {src}（12 个表格文件）",
             "",
             "一、合并范围与结果",
             f"  01_合并_影像报告2004-2011：8 个年度文件主表（表头 9 列一致）纵向合并，{len(allrows):,} 行 × 11 列。",
@@ -303,7 +308,7 @@ def build_oc(src: Path, out_path: Path):
         "name": "00_说明",
         "rows": [[x] for x in [
             "OC 家族根散表 → 单工作簿",
-            f"生成 {STAMP}；源 {src}（13 个表格文件）",
+            f"生成 {stamp_dash()}；源 {src}（13 个表格文件）",
             "",
             "一、三个来源族群",
             f"  01_合并_酶标逐孔：10 个 MULTISKAN EX 酶标仪导出（.XLS），逐孔展开为长表，{len(rows_all):,} 行。",
@@ -396,7 +401,7 @@ def build_pcos(src: Path, out_path: Path):
         "name": "00_说明",
         "rows": [[x] for x in [
             "PCOS/zar_PCOS3D 散表 → 单工作簿",
-            f"生成 {STAMP}；源 {src}（5 个表格文件）",
+            f"生成 {stamp_dash()}；源 {src}（5 个表格文件）",
             "",
             "一、文件关系（实测）",
             "  1) PCOSdata.xlsx 与 PCOSdata (2).xlsx 为字节级完全相同（sha 相同）⇒ 只收一份，另一个在 99_清单 标注『未收录·字节重复』。",
@@ -473,6 +478,15 @@ for _key, _cfg in ADAPTERS.items():
     ALIASES.setdefault(_key.split("/")[0], _key)
 
 
+def source_files(src: Path):
+    """源表格件：排除已产出的 *_merged_*.xlsx（产物，不作原件，防 --apply 自噬）。"""
+    files = [p for p in src.iterdir() if p.is_file() and is_tab(p)]
+    merged = [p for p in files if "_merged_" in p.name]
+    for p in merged:
+        print(f"  [warn] 跳过已有合并表（产物，不当原件）: {p.name}")
+    return [p for p in files if p not in merged]
+
+
 def select_projects(name):
     if name is None:
         return list(ADAPTERS)
@@ -522,7 +536,12 @@ def run(args):
     if not args.apply:
         print("dry-run：将执行下列动作（加 --apply 落盘；--build 只生成到 out/）")
         for key, cfg, src in iter_projects(selected, db_root, explicit):
-            files = sorted(p for p in src.iterdir() if p.is_file() and is_tab(p))
+            files = source_files(src)
+            if not files:
+                if explicit:
+                    raise SystemExit(f"源只剩已有合并表，拒绝 --apply：{src}")
+                print(f"[skip] 源无表格（只剩合并表）：{src}")
+                continue
             print(f"\n[{key}] 原件 {len(files)} -> {batch / 'originals' / key}")
             for p in files:
                 print(f"    {p.name}  {p.stat().st_size:,} B")
@@ -534,6 +553,12 @@ def run(args):
     log = []
     for key, cfg, src in iter_projects(selected, db_root, explicit):
         print(f"\n===== {key} =====")
+        files = source_files(src)
+        if not files:
+            if explicit:
+                raise SystemExit(f"源只剩已有合并表，拒绝 --apply：{src}")
+            print(f"[skip] 源无表格（只剩合并表）：{src}")
+            continue
         produced = build_one(key, db_root, out_dir)
         print("  已生成:", produced, f"{produced.stat().st_size:,} B")
         dest = src / produced.name
@@ -541,7 +566,6 @@ def run(args):
             raise SystemExit(f"目标已存在，停止：{dest}")
         odir = batch / "originals" / key
         odir.mkdir(parents=True, exist_ok=True)
-        files = sorted(p for p in src.iterdir() if p.is_file() and is_tab(p))
         for p in files:
             tgt = odir / p.name
             if tgt.exists():
