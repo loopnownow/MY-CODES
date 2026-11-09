@@ -17,7 +17,7 @@
     无复发生存时间(月) 复发状态 复发_6月 复发_6月_含转移 复发_1年 复发_1年_含转移
     复发_2年 复发_2年_含转移 复发_3年 复发_3年_含转移
 
-安全措施：写回前把 `yt_RDL.xlsx` 备份到 `0del`；只改 `cln` 表，`rad`/`qc`/`icc` 原样保留。
+安全措施：写回前把 `yt_RDL.xlsx` 备份到 `{DEL}`（`tidy_paths.backup_to_del`）；只改 `cln` 表，`rad`/`qc`/`icc` 原样保留。
 
 运行：
     python yt_rdl_fill_yt_cln.py --out <测试副本.xlsx>   # 先写副本核对

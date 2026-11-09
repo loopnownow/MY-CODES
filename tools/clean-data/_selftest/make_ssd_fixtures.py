@@ -10,6 +10,11 @@ Creates (under the given root):
     DTI_IVIM_SRC/jfl_SSD_DTI_IVIM.xlsx   cln / rad              （供 impute 测试）
 
 Row/column layout mirrors the real files as documented in tidy_profiles.
+
+NOTE: the `0del/` sub-tree is the retired (2026-11) legacy layout, reproduced here only
+so old-vs-new equivalence checks can be replayed; it is NOT a live data source. The
+production scripts resolve legacy sources through `tidy_paths.legacy_src()` /
+`LEGACY_SRC_ROOT`.
 """
 from __future__ import annotations
 

@@ -36,6 +36,7 @@ from openpyxl.styles import Alignment
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from tidy_paths import legacy_src  # noqa: E402
 from tidy_io import (  # noqa: E402
     KEY_FILL,
     is_blank,
@@ -514,8 +515,8 @@ def phase0_inventory(main: pd.DataFrame, src: pd.DataFrame,
     lines.append("\n## 1. 材料清单\n")
     lines.append("| 文件 | 说明 |\n|------|------|\n")
     lines.append(f"| `{profile.main_file}` | 主临床库 shape={main.shape} |\n")
-    lines.append("| `0del/0list.xlsx` | SSD/HC/wen_clin 名单 |\n")
-    lines.append("| `0del/SSD患者数据合并结果.xlsx` | dyf/wxt/HC 中文源 |\n")
+    lines.append(f"| `{legacy_src('0list.xlsx')}` | SSD/HC/wen_clin 名单（历史 0del 位） |\n")
+    lines.append(f"| `{legacy_src('SSD患者数据合并结果.xlsx')}` | dyf/wxt/HC 中文源（历史 0del 位） |\n")
     lines.append("| `SSD.xlsx` | 多模态 ROI + clinical sheet（本次只登记临床） |\n")
     lines.append("| 两篇论文 docx | 临床靶表 mean±SD |\n")
 

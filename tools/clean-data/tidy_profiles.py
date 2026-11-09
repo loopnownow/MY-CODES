@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple, Union
 
-from tidy_paths import project_root, source_dir
+from tidy_paths import legacy_src, project_root, source_dir
 
 # ═════════════════════════════════════════════════════════════════
 # 通用小数据结构
@@ -251,7 +251,7 @@ class SsdProfile:
     )
     source_specs: Tuple[SourceSpec, ...] = (
         SourceSpec(
-            path="0del/0list.xlsx", sheet="SSD", source="0list_SSD", cohort="SSD",
+            path=legacy_src("0list.xlsx"), sheet="SSD", source="0list_SSD", cohort="SSD",
             name_en="n", name_cn="name", subject_id="num", sex="sex",
             numeric=(("age", "age"), ("education_years", "受教育年限"),
                      ("mmse", "MMSE"), ("phq15", "PHQ-15"), ("sss", "SSS"),
@@ -260,7 +260,7 @@ class SsdProfile:
                   ("image_quality", "图像质量"), ("followup", "随访备注")),
         ),
         SourceSpec(
-            path="0del/0list.xlsx", sheet="HC", source="0list_HC", cohort="HC",
+            path=legacy_src("0list.xlsx"), sheet="HC", source="0list_HC", cohort="HC",
             name_en="n", name_cn="name", subject_id="num", sex="sex",
             numeric=(("age", "age"), ("education_years", "受教育年限"),
                      ("mmse", "MMSE"), ("phq15", "PHQ-15"), ("sss", "SSS"),
@@ -269,7 +269,7 @@ class SsdProfile:
                   ("image_quality", "图像质量"), ("followup", "随访备注")),
         ),
         SourceSpec(
-            path="0del/0list.xlsx", sheet="wen_clin", source="0list_wen_clin",
+            path=legacy_src("0list.xlsx"), sheet="wen_clin", source="0list_wen_clin",
             cohort="SSD", name_en="name", name_cn="姓名", subject_id="序号", sex="性别",
             numeric=(("age", "年龄"), ("education_years", "受教育年限"),
                      ("bmi", "BMI"), ("phq15", "PHQ-15"), ("sss", "SSS"),
@@ -285,7 +285,7 @@ class SsdProfile:
                   ("exam_date", "时间")),
         ),
         SourceSpec(
-            path="0del/SSD患者数据合并结果.xlsx", sheet="dyf", source="ssd_merge_dyf",
+            path=legacy_src("SSD患者数据合并结果.xlsx"), sheet="dyf", source="ssd_merge_dyf",
             cohort="SSD", name_en="姓名", name_cn="name", subject_id="NUM", sex="sex",
             numeric=(("age", "age"), ("education_years", "受教育年限"),
                      ("mmse", "MMSE"), ("phq15", "PHQ-15"), ("sss", "SSS"),
@@ -293,7 +293,7 @@ class SsdProfile:
             text=(("exam_date", "日期"), ("chief_complaint", "主诉症状")),
         ),
         SourceSpec(
-            path="0del/SSD患者数据合并结果.xlsx", sheet="wxt", source="ssd_merge_wxt",
+            path=legacy_src("SSD患者数据合并结果.xlsx"), sheet="wxt", source="ssd_merge_wxt",
             cohort="SSD", name_en="姓名", name_cn="name", subject_id="序号", sex="性别",
             numeric=(("age", "年龄"), ("education_years", "受教育年限"),
                      ("mmse", "MMSE__wxt_HC"), ("phq15", "PHQ-15"), ("sss", "SSS"),
@@ -302,7 +302,7 @@ class SsdProfile:
             text=_SSD_WXT_TEXT,
         ),
         SourceSpec(
-            path="0del/SSD患者数据合并结果.xlsx", sheet="HC", source="ssd_merge_HC",
+            path=legacy_src("SSD患者数据合并结果.xlsx"), sheet="HC", source="ssd_merge_HC",
             cohort="HC", name_en="姓名", name_cn="name", subject_id="序号", sex="性别",
             numeric=(("age", "年龄"), ("education_years", "受教育年限"),
                      ("mmse", "MMSE__wxt_HC"), ("phq15", "PHQ-15"), ("sss", "SSS"),
@@ -416,7 +416,7 @@ class SsdProfile:
     impute_backup_name: str = "SSD_DTI_IVIM_pre_impute.xlsx"
 
     # ── 拆分（split_ssd_imputed） ──
-    split_src_names: Tuple[str, ...] = ("0del/SSD_imputed.xlsx", "SSD_imputed.xlsx")
+    split_src_names: Tuple[str, ...] = (legacy_src("SSD_imputed.xlsx"), "SSD_imputed.xlsx")
     #: 盘点报告 §6 的登记顺序（与原实现一致；tidy_split 按名字显式取表，与此无关）
     split_sheets: Tuple[str, ...] = ("perfusion", "DTI", "DKI", "IVIM")
     split_img_sep: str = "__"

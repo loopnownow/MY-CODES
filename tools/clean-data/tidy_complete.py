@@ -8,7 +8,7 @@
                原 `lxj_AN/build_complete.py`（profile ``lxj_AN``）。
                可加 ``--layout cln-rad-qc`` 额外产出 cln/rad/qc 三表（下游 RAD console 约定）。
 ``impute``     分组独立缺失插补（mice/median/iterative/missForest）+ 小数位对齐 + QC 表，
-               插补前原件备份到 0del。原 `ssd/impute_ssd_dti_ivim.py`。
+               插补前原件备份到 `{DEL}`（`tidy_paths.backup_to_del`）。原 `ssd/impute_ssd_dti_ivim.py`。
 ``paper_fill`` 真实值 + 按论文 mean±SD 补缺（带 is_synthetic_* 标记）+ 纯合成队列。
                原 `ssd/clinical_recover.py` 的 Phase 2/3（profile ``ssd``）。
 
@@ -249,7 +249,7 @@ def impute_workbook(
 ) -> Dict[str, Any]:
     """按 Group 分组插补 cln 表并写回，rad 原样保留，附 impute_qc。
 
-    等价于 `ssd/impute_ssd_dti_ivim.py`（含备份到 0del、观测值不变校验）。
+    等价于 `ssd/impute_ssd_dti_ivim.py`（含备份到 `{DEL}`、观测值不变校验）。
     """
     p = profile
     cln_sheet = cln_sheet or p.impute_cln_sheet
