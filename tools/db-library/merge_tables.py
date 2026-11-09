@@ -30,6 +30,11 @@ STAMP = datetime.now().strftime("%Y%m%d")
 LETTERS = "ABCDEFGH"
 
 
+def stamp_dash():
+    """20261109 -> 2026-11-09（仅用于工作簿说明文字）。"""
+    return f"{STAMP[:4]}-{STAMP[4:6]}-{STAMP[6:]}" if len(STAMP) == 8 and STAMP.isdigit() else STAMP
+
+
 # ---------------------------------------------------------------- 通用
 def num(v):
     """xlrd 单元格 -> python 值：整数值 float 转 int，其余保留文本。"""
@@ -129,7 +134,7 @@ def build_sch(src: Path, out_path: Path):
         "name": "00_说明",
         "rows": [[x] for x in [
             "SCH/ly_SCH 散表 → 单工作簿",
-            f"生成 {STAMP}；源 {src}（12 个表格文件）",
+            f"生成 {stamp_dash()}；源 {src}（12 个表格文件）",
             "",
             "一、合并范围与结果",
             f"  01_合并_影像报告2004-2011：8 个年度文件主表（表头 9 列一致）纵向合并，{len(allrows):,} 行 × 11 列。",
@@ -303,7 +308,7 @@ def build_oc(src: Path, out_path: Path):
         "name": "00_说明",
         "rows": [[x] for x in [
             "OC 家族根散表 → 单工作簿",
-            f"生成 {STAMP}；源 {src}（13 个表格文件）",
+            f"生成 {stamp_dash()}；源 {src}（13 个表格文件）",
             "",
             "一、三个来源族群",
             f"  01_合并_酶标逐孔：10 个 MULTISKAN EX 酶标仪导出（.XLS），逐孔展开为长表，{len(rows_all):,} 行。",
@@ -396,7 +401,7 @@ def build_pcos(src: Path, out_path: Path):
         "name": "00_说明",
         "rows": [[x] for x in [
             "PCOS/zar_PCOS3D 散表 → 单工作簿",
-            f"生成 {STAMP}；源 {src}（5 个表格文件）",
+            f"生成 {stamp_dash()}；源 {src}（5 个表格文件）",
             "",
             "一、文件关系（实测）",
             "  1) PCOSdata.xlsx 与 PCOSdata (2).xlsx 为字节级完全相同（sha 相同）⇒ 只收一份，另一个在 99_清单 标注『未收录·字节重复』。",
