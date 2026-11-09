@@ -94,7 +94,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     rep = Report()
-    db = args.db
+    db = args.db.expanduser().resolve()
     print(f"== db ==\n{db}")
     if not db.is_file():
         rep.fail(f"库文件不存在: {db}")
@@ -125,6 +125,7 @@ def main(argv=None):
         extra = tables - CORE_TABLES
         if missing:
             rep.fail(f"缺表: {', '.join(sorted(missing))}")
+            return _finish(rep)
         else:
             rep.ok(f"核心表齐: {', '.join(sorted(CORE_TABLES))}")
         if extra:

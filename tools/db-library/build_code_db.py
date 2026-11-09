@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """按家族 + 短码建 SQLite 库：<db-root>\\<family>\\_db\\<family>db
 
-- 深度去重：L1 文件 sha；L2 整表（同表头+行集相同/子集）；L3 行级完全重复
+- 去重：整表级（同表头 + 行哈希集合：全等/子集，只记 sheet_dup 边）
 - 不收入：压缩档（.7z/.zip/.rar/.tar.zst/.gz）
 - 保真：每张 sheet 以 zlib(TSV) 存 blob；整洁表（表头可识别、列数≤40）另入 fact 长表
 - 溯源：doc 记录源相对路径/sha/行数；去重关系进 sheet_dup
@@ -117,6 +117,22 @@ def main(args):
         leaves = discover_originals_leaves(batch_dir / "originals" / args.code, args.code)
     else:
         leaves = discover_leaves(db_root, args.code)
+    if not leaves:
+        raise SystemExit(f"未发现叶（family={args.family} code={args.code}），未改动现有库")
+
+    def base_of(leaf):
+        return (batch_dir / "originals" / args.code / leaf) if args.from_originals else (db_root / leaf)
+
+    missing = [x for x in leaves if not base_of(x).is_dir()]
+    if missing:
+        if args.leaf:
+            for x in missing:
+                print(f"! 跳过（不存在）: {base_of(x)}")
+        leaves = [x for x in leaves if x not in missing]
+    if not leaves:
+        raise SystemExit("所有叶路径均不存在，未改动现有库")
+    if args.from_originals and args.move:
+        raise SystemExit("--from-originals 与 --move 不能同时使用（源已在 originals/）")
 
     out.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
@@ -146,10 +162,8 @@ def main(args):
     movelog = []
     for leaf in leaves:
         fam = leaf.split("/")[0]
-        base = (batch_dir / "originals" / args.code / leaf) if args.from_originals else (db_root / leaf)
+        base = base_of(leaf)
         if not base.is_dir():
-            if args.leaf:
-                print(f"! 跳过（不存在）: {base}")
             continue
         files = sorted(p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in TAB)
         cur = con.execute("INSERT INTO project(family,slug,leaf,short_code) VALUES(?,?,?,?)",

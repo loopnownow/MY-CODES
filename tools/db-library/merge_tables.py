@@ -478,6 +478,15 @@ for _key, _cfg in ADAPTERS.items():
     ALIASES.setdefault(_key.split("/")[0], _key)
 
 
+def source_files(src: Path):
+    """源表格件：排除已产出的 *_merged_*.xlsx（产物，不作原件，防 --apply 自噬）。"""
+    files = [p for p in src.iterdir() if p.is_file() and is_tab(p)]
+    merged = [p for p in files if "_merged_" in p.name]
+    for p in merged:
+        print(f"  [warn] 跳过已有合并表（产物，不当原件）: {p.name}")
+    return [p for p in files if p not in merged]
+
+
 def select_projects(name):
     if name is None:
         return list(ADAPTERS)
@@ -527,7 +536,12 @@ def run(args):
     if not args.apply:
         print("dry-run：将执行下列动作（加 --apply 落盘；--build 只生成到 out/）")
         for key, cfg, src in iter_projects(selected, db_root, explicit):
-            files = sorted(p for p in src.iterdir() if p.is_file() and is_tab(p))
+            files = source_files(src)
+            if not files:
+                if explicit:
+                    raise SystemExit(f"源只剩已有合并表，拒绝 --apply：{src}")
+                print(f"[skip] 源无表格（只剩合并表）：{src}")
+                continue
             print(f"\n[{key}] 原件 {len(files)} -> {batch / 'originals' / key}")
             for p in files:
                 print(f"    {p.name}  {p.stat().st_size:,} B")
@@ -539,6 +553,12 @@ def run(args):
     log = []
     for key, cfg, src in iter_projects(selected, db_root, explicit):
         print(f"\n===== {key} =====")
+        files = source_files(src)
+        if not files:
+            if explicit:
+                raise SystemExit(f"源只剩已有合并表，拒绝 --apply：{src}")
+            print(f"[skip] 源无表格（只剩合并表）：{src}")
+            continue
         produced = build_one(key, db_root, out_dir)
         print("  已生成:", produced, f"{produced.stat().st_size:,} B")
         dest = src / produced.name
@@ -546,7 +566,6 @@ def run(args):
             raise SystemExit(f"目标已存在，停止：{dest}")
         odir = batch / "originals" / key
         odir.mkdir(parents=True, exist_ok=True)
-        files = sorted(p for p in src.iterdir() if p.is_file() and is_tab(p))
         for p in files:
             tgt = odir / p.name
             if tgt.exists():
