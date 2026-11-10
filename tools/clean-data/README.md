@@ -116,7 +116,7 @@ ORAD_ROOT = ZERAD_ROOT → ORAD_ROOT → MS_ORAD_ROOT → %GROK_ROOT%\drafting�
 | `yt_RDL` | `YT_RDL_ROOT` | `yt_RDL` |
 | `lxf_PP` | `LXF_PP_ROOT` | `lxf_RP`（源表 `lxf_LG.xlsx`） |
 | `lya_WML` | `LYA_WML_ROOT` | `lya_WML` |
-| `wkl_UGIB` | `WKL_UGIB_ROOT` | 脚本默认 `%GROK_ROOT%\in-review\wkl_UGIB` |
+| `wkl_UGIB` | `WKL_UGIB_ROOT` | 脚本默认 `%GROK_ROOT%\reviewing\wkl_UGIB` |
 | `zyp_OV` | `ZYP_OV_ROOT` | `zyp_OV` |
 
 请带 `PYTHONDONTWRITEBYTECODE=1` 运行。
