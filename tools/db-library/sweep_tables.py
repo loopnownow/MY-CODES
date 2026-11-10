@@ -62,7 +62,7 @@ def main(args):
         print(f"FAIL 库不存在: {db}（先跑 build_code_db.py）", file=sys.stderr)
         return 1
     code = args.code or core.read_code(db_root, args.family) or args.family
-    batch = core.DEL_ROOT / args.batch
+    batch = core.batch_dir(args.batch)
     tables = plan_tables(fam_dir)
     arcs = find_leaf_archives(fam_dir)
     for a in arcs:

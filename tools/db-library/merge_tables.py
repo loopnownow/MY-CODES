@@ -31,7 +31,6 @@ import db_core as core
 
 DEFAULT_DB_ROOT = Path(r"D:\MyProjects\_DataBase")
 DEFAULT_BATCH = "2026-11-db-root-merge"
-DEL_ROOT = Path(r"D:\MyProjects\.Del") / "_by-function"
 STAMP = datetime.now().strftime("%Y%m%d")
 LETTERS = "ABCDEFGH"
 
@@ -560,7 +559,7 @@ def ingest_merged(db_path, merged, key):
 
 def run(args):
     db_root = Path(args.db_root)
-    batch = DEL_ROOT / args.batch
+    batch = core.batch_dir(args.batch)
     out_dir = Path(args.out) if args.out else (batch / "staging")
     if is_under(out_dir, db_root) and not (args.in_db or args.into):
         raise SystemExit(f"输出目录在 _DataBase 内（{out_dir}），需显式 --in-db 或 --into <db>")
@@ -572,7 +571,7 @@ def run(args):
         for key, cfg, src in iter_projects(selected, db_root, explicit):
             if not source_files(src):
                 if explicit:
-                    raise SystemExit(f"源无可归并散表（可能已收口，原件在 {DEL_ROOT}）：{src}")
+                    raise SystemExit(f"源无可归并散表（可能已收口，原件在 {core.batch_dir(args.batch)}）：{src}")
                 print(f"[skip] 源无可归并散表：{src}")
                 continue
             p = build_one(key, db_root, out_dir)

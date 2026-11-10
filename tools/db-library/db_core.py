@@ -26,7 +26,44 @@ from pathlib import Path
 from common import ledger_write, norm, read_any, sha256
 
 DEFAULT_DB_ROOT = Path(r"D:\MyProjects\_DataBase")
-DEL_ROOT = Path(r"D:\MyProjects\.Del") / "_by-function"
+DEL = Path(r"D:\MyProjects\.Del")
+DEL_ROOT = DEL / "harvested"      # 台账/历史：批次搬进终弃档后 verify_db 仍能找到
+WORK_ROOT = DEL / "_by-function"  # 新批次写入位（不写终弃档）
+
+
+def batch_dir(name: str, root: Path | None = None) -> Path:
+    """返回批次目录（缺省落 WORK_ROOT，新批次不写终弃档）。
+
+    Args:
+        name: 批次名，如 ``2026-11-db-share``。
+        root: 可选根目录覆盖，用于回放历史批次。
+
+    Returns:
+        批次目录路径，不保证存在。
+    """
+    return Path(root or WORK_ROOT) / name
+
+
+def find_batch(name: str) -> Path:
+    """按 工作区 → 终弃档 → ``<name>__bulk-*`` 返回第一个存在的批次目录。
+
+    Args:
+        name: 批次名。
+
+    Returns:
+        存在的批次目录；都不存在时返回 ``WORK_ROOT/name`` 供调用方报错。
+    """
+    for cand in (WORK_ROOT / name, DEL_ROOT / name):
+        if cand.is_dir():
+            return cand
+    for cand in sorted(p for p in DEL_ROOT.glob(f"{name}__bulk-*") if p.is_dir()):
+        return cand
+    return WORK_ROOT / name
+
+
+def ledger_roots() -> list[Path]:
+    """返回台账根目录列表（终弃档在前，活动工作区在后）。"""
+    return [DEL_ROOT, WORK_ROOT]
 TAB = (".xls", ".xlsx", ".csv")
 # 长后缀在前，避免 .tar.zst 被当成 .zst 以外的误判
 ARC_EXTS = (".tar.zst", ".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".7z",

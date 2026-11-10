@@ -49,7 +49,7 @@ def main(args):
     if not fam_dir.is_dir():
         print(f"FAIL 家族目录不存在: {fam_dir}", file=sys.stderr)
         return 1
-    batch = core.DEL_ROOT / args.batch
+    batch = core.batch_dir(args.batch)
     items = find_archives(fam_dir)
     if not items:
         print("无需归位：叶内与家族根没有压缩档")

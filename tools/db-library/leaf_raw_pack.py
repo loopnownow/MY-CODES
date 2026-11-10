@@ -51,7 +51,7 @@ def main(args):
         print(f"FAIL 家族目录不存在: {fam_dir}", file=sys.stderr)
         return 1
     code = args.code or core.read_code(db_root, args.family) or args.family
-    batch = core.DEL_ROOT / args.batch
+    batch = core.batch_dir(args.batch)
     stamp = args.stamp or f"{datetime.now():%Y-%m-%d}"
     plans = []
     for leaf in core.leaf_dirs(fam_dir):

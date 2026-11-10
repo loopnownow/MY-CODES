@@ -34,6 +34,11 @@
 - 叶内只留 `目录说明.md`；唯一例外 `MHE_PA/lx_MHE_1` 的 PHI 表（见 `LEAF_EXCEPTIONS`）。
 - 原件移 `{DEL}\_by-function\<batch>\originals\<code>\<family>\<leaf>\<叶内相对路径>`，
   台账逐行 sha256 + kind。
+- **三根约定（2026-11-11，A1）**：`db_core.DEL` = `D:\MyProjects\.Del`；`DEL_ROOT` = `{DEL}\harvested`
+  （**台账 / 历史**，批次搬进终弃档后 `verify_db` 仍能找到）；`WORK_ROOT` = `{DEL}\_by-function`
+  （**新批次写入位**，避免把在途工作写进终弃档）。取批次目录用 `core.batch_dir(name)`；
+  回放历史批次用 `core.find_batch(name)`（依次找 `WORK_ROOT` → `DEL_ROOT` → `<name>__bulk-*`）。
+  `verify_db` 缺省同时扫 `DEL_ROOT` 与 `WORK_ROOT`；`--del-root` 仍可只指定一个。
 - 叶内 raw 按单元（叶下第一层路径名；直属文件 = `loose`）打包到
   `_share\<leaf>\<code>__<leaf>__<unit>-raw-<YYYY-MM-DD>.tar.zst`。
 
@@ -75,7 +80,7 @@ python -B tools/db-library/verify_db.py --db "D:/MyProjects/_DataBase/MHE_AN/_db
 ```
 
 公共参数：`--db-root`（默认 `D:\MyProjects\_DataBase`）、`--batch`
-（`{DEL}\_by-function` 下的批次目录）、`--family` / `--code`。`merge_tables.py`
+（批次名；新批次落 `{DEL}\_by-function`，回放历史走 `{DEL}\harvested`）、`--family` / `--code`。`merge_tables.py`
 另有 `--stamp YYYYMMDD`。
 
 ### build_code_db.py
