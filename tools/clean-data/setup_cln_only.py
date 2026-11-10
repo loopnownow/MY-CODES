@@ -17,8 +17,8 @@ if str(_TIDY) not in sys.path:
     sys.path.insert(0, str(_TIDY))
 
 # ==================== CONFIG ====================
-# 历史落点在 done\；可用 WKL_UGIB_ROOT 覆盖（t1817u: 阶段夹 in-review -> reviewing；
-# reviewing 不存在时回退到旧 in-review 目录，仅读侧兼容）
+# 历史落点在 done\；可用 WKL_UGIB_ROOT 覆盖（t1817u: 阶段夹 in-review -> reviewing）。
+# 活路径不存在时明确报错，不静默回退到已退役的 in-review（写脚本；无静默 fallback）。
 _LAB_ROOT = Path(__file__).resolve().parents[5]
 _env_proj = os.environ.get("WKL_UGIB_ROOT")
 if _env_proj:
@@ -26,7 +26,16 @@ if _env_proj:
 else:
     _live = _LAB_ROOT / "reviewing" / "wkl_UGIB"
     _legacy = _LAB_ROOT / "in-review" / "wkl_UGIB"
-    PROJ = _live if _live.is_dir() else _legacy
+    if _live.is_dir():
+        PROJ = _live
+    elif _legacy.is_dir():
+        raise SystemExit(
+            f"live path missing: {_live}; leftover {_legacy} exists. "
+            "Move the project to reviewing or set WKL_UGIB_ROOT. "
+            "No silent fallback to in-review."
+        )
+    else:
+        raise SystemExit(f"project not found: {_live} (set WKL_UGIB_ROOT)")
 XLSX = PROJ / "wkl_UGIB.xlsx"
 INI = PROJ / "ref" / "settings.ini"
 MODULES_DIR = Path(os.environ.get("MODULES_DIR", str(STATS_ROOT / "modules")))
