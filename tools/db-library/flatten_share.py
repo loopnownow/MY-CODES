@@ -64,7 +64,7 @@ def main(args):
         print(f"FAIL 家族目录不存在: {fam_dir}", file=sys.stderr)
         return 1
     code = args.code or core.read_code(db_root, args.family) or args.family
-    batch = core.DEL_ROOT / args.batch
+    batch = core.batch_dir(args.batch)
     moves = plan_moves(fam_dir)
     if not moves:
         print("无需打平：_share/thesis|ethics 下没有子目录")

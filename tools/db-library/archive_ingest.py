@@ -45,7 +45,7 @@ def main(args):
         print(f"FAIL 家族目录不存在: {fam_dir}", file=sys.stderr)
         return 1
     code = args.code or core.read_code(args.db_root, args.family) or args.family
-    batch = core.DEL_ROOT / args.batch
+    batch = core.batch_dir(args.batch)
     arcs = core.share_archives(fam_dir)
     src_arcs = [a for a in arcs if not core.is_raw_pack(a.name)]
     for a in arcs:

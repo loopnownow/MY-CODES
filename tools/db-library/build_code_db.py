@@ -32,7 +32,6 @@ import db_core as core
 
 DEFAULT_DB_ROOT = core.DEFAULT_DB_ROOT
 DEFAULT_BATCH = "2026-11-db-sqlite"
-DEL_ROOT = core.DEL_ROOT
 
 
 def discover_leaves(db_root, code, family=None):
@@ -156,7 +155,7 @@ def main(args):
     fam_dir = db_root / args.family
     out = fam_dir / "_db"
     db_path = out / f"{args.family}db"
-    batch_dir = DEL_ROOT / args.batch
+    batch_dir = core.find_batch(args.batch)
     if args.leaf:
         leaves = [resolve_leaf(db_root, x) for x in args.leaf]
     elif args.from_originals:

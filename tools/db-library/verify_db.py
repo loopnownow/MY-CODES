@@ -29,7 +29,7 @@ from common import sha256
 import db_core as core
 
 DEFAULT_DB_ROOT = core.DEFAULT_DB_ROOT
-DEFAULT_DEL_ROOT = core.DEL_ROOT
+DEFAULT_DEL_ROOT = None
 CORE_TABLES = {"meta", "project", "doc", "sheet", "fact", "entity", "sheet_dup"}
 CORE_INDEXES = {"ix_fact_sheet", "ix_fact_item", "ix_entity"}
 REQUIRED_META = ("short_code", "built_at", "rule")
@@ -81,16 +81,25 @@ def _rel_candidates(row, code):
 
 
 def discover_ledgers(del_root, code, family):
-    """返回 (ledgers, rows)：只保留归属 <code>+<family> 的台账及其行。"""
-    del_root = Path(del_root)
+    """返回 (ledgers, rows)：只保留归属 <code>+<family> 的台账及其行。
+
+    Args:
+        del_root: 单个根目录，或根目录列表（默认见 ``core.ledger_roots()``）。
+        code: 短码。
+        family: 家族名。
+
+    Returns:
+        (台账路径列表, 台账行列表)。
+    """
+    roots = [Path(p) for p in (del_root if isinstance(del_root, (list, tuple)) else [del_root])]
     fam = family.upper()
     cod = code.upper()
-    if not del_root.is_dir():
+    if not any(r.is_dir() for r in roots):
         return [], []
     ledgers, all_rows = [], []
     pats = ("*/*MOVED*.tsv", "*/*SWEEP-TABLES*.tsv", "*/*ARCHIVE-TO-SHARE*.tsv",
             "*/*ARCHIVE-INGEST*.tsv", "*/*FLATTEN*.tsv", "*/*RAW-PACK*.tsv")
-    paths = sorted({p for pat in pats for p in del_root.glob(pat)})
+    paths = sorted({p for r in roots if r.is_dir() for pat in pats for p in r.glob(pat)})
     for p in paths:
         if p.stat().st_size > 20 * 1024 * 1024:
             print(f"! 跳过超大台账（>20MiB）{p}", file=sys.stderr)
@@ -396,10 +405,12 @@ def main(args):
             report.info(f"entity 分布（前 3 项目）: {dist}")
 
         # 8 台账覆盖
-        ledgers, rows = discover_ledgers(args.del_root, code.upper(), family)
+        ledgers, rows = discover_ledgers(args.del_root or core.ledger_roots(),
+                                         code.upper(), family)
         report.info(f"台账归属 {family}/{code}: {len(ledgers)} 个，{len(rows)} 行")
         if not rows:
-            report.fail(f"未发现归属 {family}/{code} 的台账（{args.del_root}）")
+            report.fail(f"未发现归属 {family}/{code} 的台账"
+                        f"（{args.del_root or core.ledger_roots()}）")
         else:
             uncovered, matched_rel, matched_sha, dst_missing = [], 0, 0, []
             for did, rel, sha in con.execute("SELECT id, rel_path, sha256 FROM doc"):
@@ -445,14 +456,14 @@ def parse_args(argv=None):
     ap = argparse.ArgumentParser(
         description="校验短码库（结构/计数/引用/台账/新口径）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=("台账按 <code>+<family> 精确归属：扫 {DEL}/_by-function 下 MOVED/新 CLI 台账，\n"
+        epilog=("台账按 <code>+<family> 精确归属：默认扫 {DEL}/harvested 与 {DEL}/_by-function 下 MOVED/新 CLI 台账，\n"
                 "按文件名 token 与行内路径证据筛，再以 rel 精确或 sha256 命中做覆盖。\n"
                 "新口径：叶内只留 目录说明.md（PHI 例外 warn）、归档只在 _share、\n"
                 "_share 层级 ≤2 无子目录、meta.rule 现行口径、archive→member 映射存在。"))
     ap.add_argument("--db", required=True, type=Path, help="库文件，如 ...\\MHE_AN\\_db\\MHE_ANdb")
     ap.add_argument("--code", default=None, help="短码（缺省读 meta.short_code）")
     ap.add_argument("--del-root", type=Path, default=DEFAULT_DEL_ROOT,
-                    help=f"{{DEL}}/_by-function（默认 {DEFAULT_DEL_ROOT}）")
+                    help="台账根目录（缺省同时扫 {DEL}/harvested 与 {DEL}/_by-function）")
     ap.add_argument("--quiet", action="store_true", help="只打印 WARN/FAIL 与结果行")
     return ap.parse_args(argv)
 
