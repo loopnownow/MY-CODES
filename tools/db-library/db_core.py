@@ -272,6 +272,7 @@ class Ingestor:
         self.code = code
         self.sig = build_sig(con)
         self.projects = {}
+        self._ent_cache = {}
         self.stat = dict(files=0, dup_files=0, sheets=0, dup_sheets=0, subset_sheets=0,
                          facts=0, entities=0, blob_bytes=0)
 
@@ -379,7 +380,8 @@ class Ingestor:
         is_matrix = hdr and (hdr_num / max(1, len(hdr) - 1)) > 0.6
         if hdr and ncol <= 40 and nrow > 0 and not is_matrix:
             idcol = next((i for i, h2 in enumerate(hdr) if IDCOL.match(h2 or "")), None)
-            ent_cache = {}
+            # 个体键去重按 (project, key_norm) 跨 sheet：同一样本分散在多表时应归一个 entity
+            ent_cache = self._ent_cache.setdefault(pid, {})
             for rix, r in enumerate(data):
                 if not any(r):
                     continue
