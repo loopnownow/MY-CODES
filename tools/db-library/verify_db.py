@@ -360,9 +360,32 @@ def check_ethics_material(report, con):
         report.ok("D19", "库内未收纳伦理材料（doc.rel_path/project.slug/project.leaf/sheet.name）")
 
 
-def _norm_header_row(cells):
-    """表头行归一：去掉 header_of 的重复后缀 `#n`（逐单元格）。"""
-    return "\x1f".join(re.sub(r"#\d+$", "", str(c or "")) for c in cells)
+HEADER_STORE_LIMIT = 4000  # db_core 入库时 sheet.header = hkey[:4000]
+
+
+def _norm_cells(cells):
+    """单元格级归一：去掉 header_of 的重复后缀 `#n`。"""
+    return [re.sub(r"#\d+$", "", str(c or "")) for c in cells]
+
+
+def _header_matches(h, rows):
+    """stored header 是否取自候选行；容忍 db_core 的 4000 字符截断。
+
+    截断时末尾单元格可能被切半，只比最后一个完整单元格之前的整段前缀。
+    """
+    h_str = str(h or "")
+    h_norm = _norm_cells(h_str.split("\x1f"))
+    exact = "\x1f".join(h_norm)
+    prefix = None
+    if len(h_str) >= HEADER_STORE_LIMIT and len(h_norm) > 1:
+        prefix = "\x1f".join(h_norm[:-1])
+    for r in rows:
+        r_norm = "\x1f".join(_norm_cells(r))
+        if r_norm == exact:
+            return True
+        if prefix is not None and r_norm.startswith(prefix):
+            return True
+    return False
 
 
 def check_header_consistency(report, con):
@@ -394,11 +417,11 @@ def check_header_consistency(report, con):
                     zlib.decompress(blob).decode("utf-8", "replace").splitlines()]
         except Exception:
             continue
-        cands = {_norm_header_row(r) for r in rows[:6]}
+        cands = list(rows[:6])
         ln = hline.get(sid)
         if ln and 1 <= ln <= len(rows):
-            cands.add(_norm_header_row(rows[ln - 1]))
-        if _norm_header_row(h.split("")) in cands:
+            cands.append(rows[ln - 1])
+        if _header_matches(h, cands):
             continue
         bad.append((sid, name))
     if bad:
