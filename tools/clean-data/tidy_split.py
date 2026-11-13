@@ -6,7 +6,7 @@
     2. `jfl_SSD_DTI_IVIM.xlsx`   ← DTI + IVIM 按 Name 外连接（主表 DTI_IVIM + merge_qc）
     3. `jfl_SSD_DKI.xlsx`        ← sheet DKI
 
-源优先历史 `0del` 归档位（`LEGACY_SRC_ROOT`，`0del` 已退役并入 `{DEL}`），否则子工程根目录 `SSD_imputed.xlsx`；**不修改源文件**。
+源优先历史 `0del` 归档位（`LEGACY_SRC_ROOT`；2026-11-13 起指向 `drafting\lxj_ACN\ref\data\_legacy-src-20261108`，原 `{DEL}` 暂存位已归位），否则子工程根目录 `SSD_imputed.xlsx`；**不修改源文件**。
 合并复用 `tidy_merge.outer_merge_modalities`（原 `ssd/split_ssd_imputed.py`）。
 
 用法::

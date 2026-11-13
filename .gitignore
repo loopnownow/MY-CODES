@@ -19,3 +19,6 @@ modules/console/console.override.json
 modules/console/console.port.json
 # old in-repo registry path (harmless keep); live registry is <GROK_ROOT>/_Docs/console.projects.json
 modules/console/console.projects.json
+
+# rollback snapshots (durable originals, keep out of git)
+_rollback/

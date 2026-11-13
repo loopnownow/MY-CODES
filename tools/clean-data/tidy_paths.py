@@ -71,11 +71,13 @@ def _resolve_grok_root(orad: Path) -> Path:
 GROK_ROOT: Path = _resolve_grok_root(ORAD_ROOT)
 #: 全子工程共用的临时/删除区（2026-11-08 t1794u 起与 `{DEL}` 对齐为 `<lab_root>\.Del`；旧名 `0del`；环境变量 DEL_ROOT 可覆盖）
 DEL_ROOT: Path = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del")
-#: 历史 `0del` 源表根。`0del` 已于 2026-11 全部并入 `{DEL}` 并退役；脚本不再写死旧布局，
-#: 默认指向本机遗留归档位，可用环境变量 `LEGACY_SRC_ROOT` 覆盖为任意存放旧源表的目录。
+#: 历史 `0del` 源表根。`0del` 已于 2026-11 全部并入 `{DEL}` 并退役；脚本不再写死旧布局。
+#: 2026-11-13 t20261113l：原默认落在 `{DEL}\_by-project\downloads-ssd-20261108`（暂存区，
+#: 会被清理），已把该批 14 件旧源表归位到消费方子工程 `drafting\lxj_ACN\ref\data\_legacy-src-20261108`；
+#: 默认改指此处，仍可用环境变量 `LEGACY_SRC_ROOT` 覆盖为任意存放旧源表的目录。
 LEGACY_SRC_ROOT: Path = Path(
     os.environ.get("LEGACY_SRC_ROOT")
-    or (DEL_ROOT / "_by-project" / "downloads-ssd-20261108" / "data")
+    or (GROK_ROOT / "drafting" / "lxj_ACN" / "ref" / "data" / "_legacy-src-20261108" / "data")
 )
 
 
