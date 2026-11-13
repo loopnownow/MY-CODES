@@ -82,7 +82,12 @@ def main(args):
         return 0
 
     con = core.open_db(db)
-    ing = core.Ingestor(con, code)
+    try:
+        ing = core.Ingestor(con, code, mask_phi=args.mask_phi)
+    except ValueError as e:
+        con.close()
+        print(f"FAIL {e}", file=sys.stderr)
+        return 1
     ledger = []
     ns = 0
     try:
@@ -124,6 +129,8 @@ def parse_args(argv=None):
     ap.add_argument("--batch", default=DEFAULT_BATCH,
                     help=f"{{DEL}}/_by-function 下的批次目录（默认 {DEFAULT_BATCH}）")
     ap.add_argument("--apply", action="store_true", help="落盘（缺省 dry-run）")
+    ap.add_argument("--mask-phi", action="store_true",
+                    help="fact 层 身份证|电话|手机|邮箱|地址 值假名化（RDL 等家族口径）")
     ap.add_argument("--ledger", type=Path, default=None,
                     help="台账路径（缺省 <batch>/SWEEP-TABLES-<FAM>-<date>.tsv）")
     return ap.parse_args(argv)

@@ -45,6 +45,31 @@
 > **禁止**在未获用户当轮点名时写入 `D:\MyProjects\_DataBase`（建库、移原件、
 > `--apply` 均属写盘）。所有 `--apply` / `--move` 均须点名；缺省 dry-run。
 
+## 库布局：legacy 7 表 vs core-6t（2026-11-13 起两套并存）
+
+家族库在 2026-11-13 由 `db-qc-20261113/step5` 迁成 **core-6t** 骨架，代码两套都写：
+
+| 布局 | 实表 | 兼容视图 | 写入路径 |
+|---|---|---|---|
+| legacy（`DDL`） | meta / project / doc / sheet / fact / entity / sheet_dup | — | 旧路径 |
+| core-6t（现役） | meta / project / **src** / **item** / **val** / **person** / **person_key** | doc / sheet / sheet_dup / entity / fact | `Ingestor` 自动探测后直写实表 |
+
+- `core.is_core6t(con)`：`doc` 为视图且 6 张实表齐全即判 6t；`Ingestor` 构造时自动调用。
+- 6t 下 `doc` 是 `src` 按 `doc_id` 的聚合视图：不写 doc 行，`doc_id = MAX(doc_id)+1`；
+  一行 src 就是一张 sheet（`src_id == sheet_id`），列 `family/project_id/project_slug/leaf/
+  short_code/doc_id/doc_status/rel_path/file_size/sha256/mtime/sheet_name/nrow/ncol/header/
+  is_wide/role/status/dup_of/dup_reason/kept_bytes/kind/n_fact/blob`。
+- 6t 下 `val(src_id,row_ix,person_id,item_id,num,text)`；列名 → `item` 字典（缺则建）；
+  实体键 → `person` + `person_key`（主键 `(id_type,id_value)` 全局唯一，跨 project 复用同一人；
+  `priority` 见 `core.ID_PRIO`：全院号 10 > 影像号 20 > 门诊号 30 > 住院号 40 > 病理号 50 >
+  医技号 60 > patient 65 > id 70 > 样本编号 80 > 编号 85 > 其它 90）。
+- PHI：缺省明文入库（DB-QC v1.5 放行 fact 层明文，D21 仅 P2）；`Ingestor(..., mask_phi=True)`
+  或 `sweep_tables.py --mask-phi` 把 `身份证|电话|手机|邮箱|地址` 值写成 `P+sha256(salt+值)[:12]`
+  （salt 缺省 `{DEL}\_by-function\db-qc-20261113\phi-salt.txt`，见 `core.phi_salt`）；
+  按家族口径选用（RDL 等），姓名 / 住院号 / 门诊号 / 影像号仍明文。
+- 自测：`python -B tools/db-library/test_core6t.py`（6t 直写 + legacy 回归；本机无 6t 库时该段 SKIP，全部落 `%TEMP%`）。
+- 新增家族库仍可走 `core.create_db`（legacy DDL）；旧库迁移由 db-qc 批次脚本负责，不在本模块。
+
 ## 用法
 
 ```bash

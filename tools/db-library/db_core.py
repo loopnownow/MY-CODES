@@ -82,6 +82,58 @@ NUM = re.compile(r"^[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$")
 IDCOL = re.compile(
     r"^(医技号|样本编号|样本号|编号|case\s*no\.?|mid|谱图编号|patient(?:_?id)?|id)$", re.I)
 
+# --- core-6t（2026-11-13 起家族库现役布局）---------------------------------
+# 实表：meta/project/src/item/val/person/person_key；doc/sheet/sheet_dup/entity/fact 为兼容视图。
+# 写路径必须直写实表，任何 INSERT/UPDATE 视图都会报 "cannot modify ... because it is a view"。
+SIXT_TABLES = ("meta", "project", "src", "item", "val", "person", "person_key")
+PHI_COL = re.compile(r"身份证|电话|手机|邮箱|地址")
+# 实体归并优先级（口径见各家族 _db/目录说明.md）：值小者优先
+ID_PRIO = ((r"全院号|empi", 10), (r"影像号", 20), (r"门诊号", 30), (r"住院号", 40),
+           (r"病理号", 50), (r"医技号", 60), (r"patient", 65), (r"^id$", 70),
+           (r"样本编号", 80), (r"编号|case\s*no\.?", 85))
+DEFAULT_PHI_SALT = WORK_ROOT / "db-qc-20261113" / "phi-salt.txt"
+
+
+def is_core6t(con):
+    """判断连接是否指向 core-6t 布局的家族库。
+
+    Args:
+        con: sqlite3 连接（只读亦可）。
+
+    Returns:
+        True 表示 doc 为视图且 src/item/val/person/person_key 为实表。
+    """
+    try:
+        rows = dict(con.execute(
+            "SELECT name, type FROM sqlite_master WHERE type IN ('table','view')"))
+    except sqlite3.Error:
+        return False
+    return (rows.get("doc") == "view"
+            and all(rows.get(t) == "table" for t in SIXT_TABLES))
+
+
+def id_prio(kind):
+    """实体键优先级：全院号 10 最优，未登记 90。"""
+    k = (kind or "").strip().lower()
+    for pat, prio in ID_PRIO:
+        if re.search(pat, k):
+            return prio
+    return 90
+
+
+def phi_salt(path=None):
+    """读取 PHI 假名盐（缺省 {DEL}/_by-function/db-qc-20261113/phi-salt.txt）。"""
+    p = Path(path) if path else DEFAULT_PHI_SALT
+    return p.read_text(encoding="utf-8").strip() if p.is_file() else ""
+
+
+def mask_phi_value(value, salt):
+    """PHI 值假名化：P + sha256(salt+值)[:12]；无盐时原样返回。"""
+    if not salt:
+        return value
+    return "P" + hashlib.sha256((salt + value).encode("utf-8")).hexdigest()[:12]
+
+
 DDL = """
 CREATE TABLE meta(k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE project(id INTEGER PRIMARY KEY, family TEXT, slug TEXT, leaf TEXT, short_code TEXT);
@@ -267,14 +319,28 @@ def header_of(rows, hi):
 
 
 class Ingestor:
-    """增量入库器：与 build_code_db 旧逻辑逐字同源的整表去重 + blob + fact/entity。"""
+    """增量入库器：整表去重 + blob + fact/entity。
 
-    def __init__(self, con, code):
+    库布局自动探测（`is_core6t`）：legacy 7 表写 doc/sheet/fact/entity；
+    core-6t 布局直写实表 src/item/val/person/person_key。
+    `mask_phi=True` 时 fact 层的 身份证|电话|手机|邮箱|地址 值假名化为
+    ``P+sha256(salt+值)[:12]``（salt 见 `phi_salt`）；缺省保持明文（DB-QC v1.5 放行）。
+    """
+
+    def __init__(self, con, code, mask_phi=False, salt=None):
         self.con = con
         self.code = code
+        self.mask_phi = bool(mask_phi)
+        self.salt = (salt if salt is not None else phi_salt()) if self.mask_phi else ""
+        if self.mask_phi and not self.salt:
+            raise ValueError(f"mask_phi=True 但读不到 PHI 假名盐: {DEFAULT_PHI_SALT}")
+        self.six = is_core6t(con)
         self.sig = build_sig(con)
         self.projects = {}
         self._ent_cache = {}
+        self._pk_cache = {}
+        self._item_map = None
+        self._item_next = None
         self.stat = dict(files=0, dup_files=0, sheets=0, dup_sheets=0, subset_sheets=0,
                          facts=0, entities=0, blob_bytes=0)
 
@@ -318,25 +384,33 @@ class Ingestor:
                 return did, 0
         pid = self.ensure_project(family, slug, leaf)
         st = p.stat()
-        did = self.con.execute(
-            "INSERT INTO doc(project_id,rel_path,size,sha256,mtime,n_sheets,status)"
-            " VALUES(?,?,?,?,?,0,'ingested')",
-            (pid, rel, st.st_size, h,
-             datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds"))).lastrowid
+        mtime = datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")
+        if self.six:
+            # 6t：doc 是视图（src 按 doc_id 聚合），不写 doc 行；doc_id 取现值 +1
+            did = self.con.execute(
+                "SELECT COALESCE(MAX(doc_id),0)+1 FROM src").fetchone()[0]
+        else:
+            did = self.con.execute(
+                "INSERT INTO doc(project_id,rel_path,size,sha256,mtime,n_sheets,status)"
+                " VALUES(?,?,?,?,?,0,'ingested')",
+                (pid, rel, st.st_size, h, mtime)).lastrowid
         self.stat["files"] += 1
         try:
             sheets = read_any(p)
         except Exception as e:  # 读取失败仍留 doc 记录
             print(f"! 读取失败 {rel}: {e.__class__.__name__}: {e}"[:160])
             sheets = []
-        self.con.execute("UPDATE doc SET n_sheets=? WHERE id=?", (len(sheets), did))
+        if not self.six:
+            self.con.execute("UPDATE doc SET n_sheets=? WHERE id=?", (len(sheets), did))
+        docinfo = dict(family=family, project_id=pid, slug=slug, leaf=leaf, rel=rel,
+                       size=st.st_size, sha=h, mtime=mtime, doc_id=did)
         added = 0
         for name, rows in sheets:
-            self._ingest_sheet(did, pid, name, rows, st.st_size)
+            self._ingest_sheet(did, pid, name, rows, st.st_size, docinfo)
             added += 1
         return did, added
 
-    def _ingest_sheet(self, did, pid, name, rows, kept_bytes=0):
+    def _ingest_sheet(self, did, pid, name, rows, kept_bytes=0, docinfo=None):
         con = self.con
         stat = self.stat
         stat["sheets"] += 1
@@ -365,6 +439,26 @@ class Ingestor:
             txt = "\n".join("\t".join(r) for r in rows)
             blob = zlib.compress(txt.encode("utf-8"), 9)
             stat["blob_bytes"] += len(blob)
+        hdr_num = sum(1 for h2 in hdr[1:] if h2 and as_num(h2) is not None)
+        is_matrix = bool(hdr) and ncol > 0 and (hdr_num / max(1, len(hdr) - 1)) > 0.6
+        if self.six:
+            facts = []
+            if status == "ingested" and hdr and ncol <= 40 and nrow > 0 and not is_matrix:
+                facts = self._prep_facts_6t(hdr, data, pid)
+            if docinfo is None:  # 直接调用 _ingest_sheet 时补最小 docinfo
+                docinfo = dict(family="", project_id=pid, slug="", leaf="", rel="",
+                               size=kept_bytes, sha="", mtime="", doc_id=did)
+            sid = self._insert_src_6t(docinfo, name, hkey, nrow, ncol, blob, status,
+                                      dup_of, kept_bytes, len(facts))
+            prev.append(dict(id=sid, rows=rh, n=nrow))
+            if status != "ingested":
+                stat["dup_sheets" if status == "dup" else "subset_sheets"] += 1
+            if facts:
+                con.executemany(
+                    "INSERT INTO val(src_id,row_ix,person_id,item_id,num,text)"
+                    " VALUES(?,?,?,?,?,?)", [(sid,) + f for f in facts])
+                stat["facts"] += len(facts)
+            return
         sid = con.execute(
             "INSERT INTO sheet(doc_id,name,nrow,ncol,header,blob,is_wide,status,dup_of)"
             " VALUES(?,?,?,?,?,?,?,?,?)",
@@ -405,6 +499,91 @@ class Ingestor:
                         " VALUES(?,?,?,?,?,?)",
                         (sid, eid, rix, hdr[ci][:120], as_num(v), v[:500]))
                     stat["facts"] += 1
+
+    # -- core-6t 直写 ------------------------------------------------------
+    def _item_6t(self, name):
+        """列名 → item_id（不存在则建，item 表是全族共享的列名字典）。"""
+        if self._item_map is None:
+            self._item_map = {n: i for i, n in self.con.execute("SELECT item_id,name FROM item")}
+            self._item_next = self.con.execute(
+                "SELECT COALESCE(MAX(item_id),0) FROM item").fetchone()[0]
+        nm = norm(name)[:120]
+        iid = self._item_map.get(nm)
+        if iid is None:
+            self._item_next += 1
+            iid = self._item_next
+            self.con.execute("INSERT INTO item(item_id,name) VALUES(?,?)", (iid, nm))
+            self._item_map[nm] = iid
+        return iid
+
+    def _person_6t(self, pid, kind, raw, name=None):
+        """实体键 → person_id；person_key 主键是 (id_type, id_value)，跨 project 复用同一人。"""
+        kind_n = norm(kind)[:60]
+        kn = re.sub(r"\s+", "", norm(raw)).lower()
+        ck = (kind_n, kn)
+        eid = self._pk_cache.get(ck)
+        if eid is not None:
+            return eid
+        row = self.con.execute(
+            "SELECT person_id FROM person_key WHERE id_type=? AND id_value=?",
+            (kind_n, kn)).fetchone()
+        if row:
+            self._pk_cache[ck] = row[0]
+            return row[0]
+        nm = norm(name)[:200] if name else None
+        eid = self.con.execute("INSERT INTO person(name,name_norm) VALUES(?,?)",
+                               (nm, nm.lower() if nm else None)).lastrowid
+        self.con.execute(
+            "INSERT INTO person_key(id_type,id_value,key_raw,person_id,project_id,priority)"
+            " VALUES(?,?,?,?,?,?)",
+            (kind_n, kn, norm(raw)[:200], eid, pid, id_prio(kind)))
+        self._pk_cache[ck] = eid
+        self.stat["entities"] += 1
+        return eid
+
+    def _prep_facts_6t(self, hdr, data, pid):
+        """整洁表 → [(row_ix, person_id, item_id, num, text)]，供批量写 val。"""
+        idcol = next((i for i, h2 in enumerate(hdr) if IDCOL.match(h2 or "")), None)
+        namecol = next((i for i, h2 in enumerate(hdr)
+                        if norm(h2) in ("姓名", "患者姓名", "name")), None)
+        phi_cols = {i for i, h2 in enumerate(hdr) if PHI_COL.search(h2 or "")}
+        iids = [self._item_6t(h2) if h2 else None for h2 in hdr]
+        out = []
+        for rix, r in enumerate(data):
+            if not any(r):
+                continue
+            eid = None
+            if idcol is not None and idcol < len(r) and norm(r[idcol]):
+                nm = r[namecol] if namecol is not None and namecol < len(r) else None
+                eid = self._person_6t(pid, hdr[idcol], r[idcol], nm)
+            for ci, v in enumerate(r):
+                if ci >= len(hdr) or not hdr[ci]:
+                    continue
+                v = norm(v)
+                if v == "":
+                    continue
+                if ci in phi_cols:
+                    v = mask_phi_value(v, self.salt)
+                out.append((rix, eid, iids[ci], as_num(v), v[:500]))
+        return out
+
+    def _insert_src_6t(self, docinfo, name, hkey, nrow, ncol, blob, status, dup_of,
+                       kept_bytes, n_fact):
+        """写一行 src（src_id == sheet_id），返回 src_id。"""
+        con = self.con
+        sid = con.execute("SELECT COALESCE(MAX(src_id),0)+1 FROM src").fetchone()[0]
+        con.execute(
+            "INSERT INTO src(src_id,family,project_id,project_slug,leaf,short_code,doc_id,"
+            "doc_status,doc_dup_of,rel_path,file_size,sha256,mtime,sheet_id,sheet_name,nrow,"
+            "ncol,header,is_wide,role,status,dup_of,dup_reason,kept_bytes,derived_of,kind,"
+            "n_fact,blob) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (sid, docinfo["family"], docinfo["project_id"], docinfo["slug"], docinfo["leaf"],
+             self.code, docinfo["doc_id"], "ingested", None, docinfo["rel"],
+             docinfo["size"], docinfo["sha"], docinfo["mtime"], sid, name, nrow, ncol,
+             hkey[:4000], int(ncol > 40), "raw", status, dup_of,
+             "整表重复" if status == "dup" else "整表子集" if status == "subset" else None,
+             (kept_bytes if status != "ingested" else 0), None, "clinical", n_fact, blob))
+        return sid
 
 
 # ---------------------------------------------------------------------------
@@ -709,7 +888,7 @@ def readme_path(d):
 
 
 def append_readme_note(d, note):
-    """向 目录说明.md 追加一行说明（不存在则创建）。"""
+    """向 目录说明.md 追加一行说明（不存在则创建；父目录缺失时一并建）。"""
     p = readme_path(d)
     if p.is_file():
         txt = p.read_text(encoding="utf-8")
@@ -719,6 +898,7 @@ def append_readme_note(d, note):
             txt += "\n"
         p.write_text(txt + note + "\n", encoding="utf-8")
     else:
+        make_dirs(p.parent)
         p.write_text("# 说明\n\n" + note + "\n", encoding="utf-8")
     return p
 
