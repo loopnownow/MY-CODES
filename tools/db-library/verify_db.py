@@ -16,6 +16,7 @@
   D19 库内不收纳伦理材料：扫 doc.rel_path / project.slug / project.leaf / sheet.name，
       命中 伦理|ethics|知情同意|批件|审查申请 即 P0；不扫 fact.item（P0）
   D20 sheet.header 必须取自 blob 前 6 个候选行（防「表头取错行」→ item 全错）（P1）
+  D22 sheet.role 语义：role ∈ raw|curated|derived；derived 表不得有 fact 行（P2）
   D21 fact 层明文 PHI 信号：11 位手机号 / 18 位身份证（P2 提示，本地库放行，不拦）
 
 每条发现输出 `[P级][FAIL|WARN|INFO][D号] ...`；
@@ -437,6 +438,20 @@ PHI_SIGNALS = (
 )
 
 
+def check_sheet_role(report, con):
+    """D22（P2）：sheet.role 语义自洽；derived 表不得有 fact 行（schema 迁移后生效）。"""
+    cols = [r[1] for r in con.execute("PRAGMA table_info(sheet)")]
+    if "role" not in cols:
+        report.info("D22 未迁移：sheet 无 role 列（存量库可略）")
+        return
+    bad = con.execute("SELECT count(*) FROM sheet WHERE role IS NOT NULL AND role NOT IN ('raw','curated','derived')").fetchone()[0]
+    leak = con.execute("SELECT count(*) FROM fact f JOIN sheet s ON s.id=f.sheet_id WHERE s.role='derived'").fetchone()[0]
+    if bad or leak:
+        report.info_finding("D22", 2, f"role 非法 {bad} 张；derived 表残留 fact {leak} 行")
+    else:
+        report.ok("D22", "sheet.role 合法且 derived 表无 fact")
+
+
 def check_phi_plaintext(report, con):
     """D21（P2 提示）：fact 层明文 PHI 信号（11 位手机号 / 18 位身份证）。
 
@@ -646,6 +661,7 @@ def main(args):
         # D20 表头与 blob 一致性（P1）；D21 fact 层明文 PHI 信号（P2 提示，放行）
         check_header_consistency(report, con)
         check_phi_plaintext(report, con)
+        check_sheet_role(report, con)
     finally:
         con.close()
 
