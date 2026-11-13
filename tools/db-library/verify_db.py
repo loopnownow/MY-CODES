@@ -16,7 +16,7 @@
   D19 库内不收纳伦理材料：扫 doc.rel_path / project.slug / project.leaf / sheet.name，
       命中 伦理|ethics|知情同意|批件|审查申请 即 P0；不扫 fact.item（P0）
   D20 sheet.header 必须取自 blob 前 6 个候选行（防「表头取错行」→ item 全错）（P1）
-  D21 fact 层明文 PHI 信号：11 位手机号 / 18 位身份证（P1，去重计数）
+  D21 fact 层明文 PHI 信号：11 位手机号 / 18 位身份证（P2 提示，本地库放行，不拦）
 
 每条发现输出 `[P级][FAIL|WARN|INFO][D号] ...`；
 汇总行给出 P0/P1/P2 与 fail/warn/info 计数；exit 1 仅当 P0>0。
@@ -438,7 +438,11 @@ PHI_SIGNALS = (
 
 
 def check_phi_plaintext(report, con):
-    """D21（P1）：fact 层明文 PHI 信号（11 位手机号 / 18 位身份证，去重计数）。"""
+    """D21（P2 提示）：fact 层明文 PHI 信号（11 位手机号 / 18 位身份证）。
+
+    本地单机库放行明文（owner 2026-11-13 决定）：只做计数提示，不计 fail/warn，
+    不影响退出码；外发/共享前再按标准 §3.7-D 做假名化。
+    """
     for label, width, pat in PHI_SIGNALS:
         rows = con.execute(
             "SELECT value_text, count(*) FROM fact"
@@ -448,7 +452,7 @@ def check_phi_plaintext(report, con):
         total = sum(c for _, c in hits)
         if hits:
             sample = "、".join(v[:3] + "***" + v[-2:] for v, _ in hits[:3])
-            report.warn("D21", 1, f"fact 层明文{label} {len(hits)} 个值 / {total} 行，如 {sample}")
+            report.info_finding("D21", 2, f"fact 层明文{label} {len(hits)} 个值 / {total} 行（本地库放行，仅提示），如 {sample}")
         else:
             report.ok("D21", f"fact 层无明文{label}")
 
@@ -639,7 +643,7 @@ def main(args):
 
         # D19 库内不收纳伦理材料（P0）
         check_ethics_material(report, con)
-        # D20 表头与 blob 一致性（P1）；D21 fact 层明文 PHI 信号（P1）
+        # D20 表头与 blob 一致性（P1）；D21 fact 层明文 PHI 信号（P2 提示，放行）
         check_header_consistency(report, con)
         check_phi_plaintext(report, con)
     finally:
