@@ -1,7 +1,7 @@
 # MY-CODES\tools — 运维 / 加工脚本（02 席位脚本半的非算法部分）
 
 算法库是 `modules/`；建模/验证 CLI 在 `model-validation/`；本层放**能直接跑的数据加工与写稿辅助脚本**。
-2026-11-01 由 `0doc\_code` 迁入（MOVE 台账见 `{DEL}\_by-function\t1521u-mycodes-rename\removed\MOVED-tools.tsv`）。
+2026-11-01 由 `0doc\_code` 迁入（MOVE 台账见本目录 `MOVED-tools-20261101.tsv`；`{DEL}` 原批已于 2026-11-13 移出）。
 
 | 目录 | 作用 | 入口 / 备注 |
 |---|---|---|
