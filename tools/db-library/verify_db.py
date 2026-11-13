@@ -495,19 +495,41 @@ def main(args):
         else:
             report.ok("D1", "integrity_check")
 
-        # 2 schema（P0）
+        # 2 schema（P0）；两种合法布局：
+        #   A legacy-7t：project/doc/sheet/sheet_dup/entity/fact 为实表（存量家族库）
+        #   B core-6t  ：src/item/val/person/person_key 为实表，旧 6 表改由视图提供
+        #                （owner 2026-11-13 定：统一结构 + 兼容视图，旧工具/机器门不必改查询）
         tabs = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        miss_t = sorted(CORE_TABLES - tabs)
-        extra_t = sorted(tabs - CORE_TABLES - {"sqlite_sequence"})
+        views = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='view'")}
         idx = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='index'")}
-        miss_i = sorted(CORE_INDEXES - idx)
-        if miss_t or miss_i:
-            report.fail("D2", 0, f"schema 缺表 {miss_t} 缺索引 {miss_i}")
+        legacy_tabs = CORE_TABLES - {"meta"}
+        legacy_soft = legacy_tabs - {"project"}   # project 可为实表或视图
+        core6_tabs = {"src", "item", "val", "person", "person_key"}
+        profile = "core-6t" if (core6_tabs <= tabs and not legacy_tabs <= tabs) else "legacy-7t"
+        if profile == "core-6t":
+            miss_t = sorted((CORE_TABLES & {"meta"}) - tabs)
+            miss_v = sorted(legacy_soft - tabs - views)
+            extra_t = sorted(tabs - CORE_TABLES - core6_tabs - {"sqlite_sequence"})
+            if miss_t or miss_v:
+                report.fail("D2", 0, f"schema(6 表骨架) 缺表 {miss_t} 缺兼容视图 {miss_v}")
+            else:
+                report.ok("D2", f"schema 6 表骨架 + 兼容视图（{len(legacy_soft)} 视图）")
+            if extra_t:
+                report.warn("D2", 2, f"schema 额外表: {extra_t}")
         else:
-            report.ok("D2", f"schema 核心表 {len(CORE_TABLES)} + 索引 {len(CORE_INDEXES)}")
-        if extra_t:
-            # 额外表不属 D2 的「齐」判定；只提示，按 P2 计（不改变 exit）
-            report.warn("D2", 2, f"schema 额外表: {extra_t}")
+            miss_t = sorted(CORE_TABLES - tabs)
+            extra_t = sorted(tabs - CORE_TABLES - {"sqlite_sequence"})
+            if miss_t:
+                report.fail("D2", 0, f"schema 缺表 {miss_t}")
+            else:
+                report.ok("D2", f"schema 核心表 {len(CORE_TABLES)}（legacy-7t）")
+            if extra_t:
+                report.warn("D2", 2, f"schema 额外表: {extra_t}")
+        miss_i = sorted(CORE_INDEXES - idx)
+        if miss_i:
+            report.fail("D2", 0, f"schema 缺索引 {miss_i}")
+        elif profile == "legacy-7t":
+            report.ok("D2", f"索引 {len(CORE_INDEXES)} 齐")
 
         # 3 计数（P0）
         q = lambda s: con.execute(s).fetchone()[0]  # noqa: E731
