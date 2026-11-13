@@ -88,7 +88,9 @@ CREATE TABLE project(id INTEGER PRIMARY KEY, family TEXT, slug TEXT, leaf TEXT, 
 CREATE TABLE doc(id INTEGER PRIMARY KEY, project_id INTEGER, rel_path TEXT, size INTEGER,
                  sha256 TEXT, mtime TEXT, n_sheets INTEGER, status TEXT, dup_of INTEGER);
 CREATE TABLE sheet(id INTEGER PRIMARY KEY, doc_id INTEGER, name TEXT, nrow INTEGER, ncol INTEGER,
-                   header TEXT, blob BLOB, is_wide INTEGER, status TEXT, dup_of INTEGER);
+                   header TEXT, blob BLOB, is_wide INTEGER, status TEXT, dup_of INTEGER,
+                   role TEXT DEFAULT 'raw',          -- raw | curated | derived
+                   derived_of INTEGER REFERENCES sheet(id));
 CREATE TABLE fact(id INTEGER PRIMARY KEY, sheet_id INTEGER, entity_id INTEGER, row_ix INTEGER,
                   item TEXT, value_num REAL, value_text TEXT);
 CREATE TABLE entity(id INTEGER PRIMARY KEY, project_id INTEGER, key_kind TEXT, key_norm TEXT,
