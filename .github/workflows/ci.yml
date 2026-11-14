@@ -27,4 +27,6 @@ jobs:
       - name: lint
         run: python -m ruff check .
       - name: pytest
+        env:
+          SKILLS_ROOT: ${{ runner.workspace }}/MY-SKILLS
         run: python -m pytest -q -p no:cacheprovider
