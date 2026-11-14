@@ -12,9 +12,10 @@ in two layers, so each swap commit can be judged without a socket:
   * L1 normalisation - canned API payloads (or a library-shaped record) fed
     straight into the script's mapping functions. Survives a client swap
     because no HTTP is involved.
-  * L2 request layer - `requests.Session.request` and
-    `urllib.request.urlopen` are intercepted, so a fixture body is served
-    instead of a real response and an unrouted URL fails the test.
+  * L2 request layer - `requests.Session.request`,
+    `urllib.request.urlopen`, and `httpx` / `httpx2` `get` are intercepted,
+    so a fixture body is served instead of a real response and an unrouted
+    URL fails the test.
 
 Every payload under `fixtures/refs/` is synthetic: no patient data, no copied
 publisher record, no real request captured.
@@ -202,14 +203,15 @@ def offline(routes: dict[str, tuple]):
         stack.enter_context(mock.patch.object(requests.Session, "request", fake_request))
         stack.enter_context(mock.patch.object(urllib.request, "urlopen", fake_urlopen))
         stack.enter_context(mock.patch("time.sleep", lambda *_a, **_k: None))
-        # habanero talks httpx, not requests: intercept it too, so a client swap
-        # can never turn an offline shape test into a real request.
-        try:
-            import httpx
-        except ImportError:
-            pass
-        else:
-            stack.enter_context(mock.patch.object(httpx, "get", fake_httpx_get))
+        # habanero 2.5+ moved from `httpx` to `httpx2` (a renamed httpx fork).
+        # Patch every client generation, so a client swap can never turn an
+        # offline shape test into a real request.
+        for name in ("httpx", "httpx2"):
+            try:
+                mod = importlib.import_module(name)
+            except ImportError:
+                continue
+            stack.enter_context(mock.patch.object(mod, "get", fake_httpx_get))
         yield router
 
 
