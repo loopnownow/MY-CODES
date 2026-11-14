@@ -23,7 +23,7 @@ dependencies = [
 shap = ["shap>=0.44"]
 swap-stats = ["tableone>=0.9", "dcurves>=1.1", "lifelines>=0.27"]
 partial = ["pingouin>=0.5"]
-swap-refs = ["pyalex>=0.21", "habanero>=2.4", "arxiv>=3.0", "bibtexparser>=2.1"]
+swap-refs = ["pyalex>=0.21", "habanero>=2.4", "arxiv>=3.0", "bibtexparser>=2.1", "pypdf>=3.0"]
 # miceforest 6.0.5 (still the latest release) calls Booster.__inner_predict(0);
 # lightgbm 4.7 dropped that argument, so the pair only works below 4.7.
 # Upstream bug, open at https://github.com/AnotherSamWilson/miceforest/issues/104

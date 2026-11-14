@@ -250,8 +250,14 @@ def _joint_group_test(model, group: str) -> tuple[float, float, float, float]:
 def _marginal_mean(model, data: pd.DataFrame, group: str, level: str) -> tuple[float, float, float]:
     newdata = data.copy()
     newdata[group] = level
-    design = model.model.data.design_info
-    mat = patsy.build_design_matrices([design], newdata, return_type="dataframe")[0]
+    data_obj = model.model.data
+    design = getattr(data_obj, "design_info", None) or getattr(data_obj, "model_spec", None)
+    if design is None:
+        raise AttributeError("model has no design info")
+    if isinstance(design, patsy.DesignInfo):
+        mat = patsy.build_design_matrices([design], newdata, return_type="dataframe")[0]
+    else:  # formulaic ModelSpec
+        mat = design.get_model_matrix(newdata)
     xbar = np.asarray(mat, dtype=float).mean(axis=0)
     beta = np.asarray(model.params, dtype=float)
     cov = np.asarray(model.cov_params(), dtype=float)
