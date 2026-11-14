@@ -14,7 +14,9 @@ MODULES_ROOT = CONSOLE_DIR.parent
 
 STAGE_ROOT_NAMES = _paths.STAGE_ROOT_NAMES
 
-GROK_ROOT, RAD_ROOT = _paths.grok_and_drafting(MODULES_ROOT)
+GROK_ROOT = _paths.grok_root(MODULES_ROOT)
+RAD_ROOT = GROK_ROOT / _paths.DRAFTING_DIRNAME
+
 # Canonical stage folders only (t1817u: `reviewing`, not the legacy `in-review`).
 EXTRA_PROJECT_ROOTS = tuple(GROK_ROOT / n for n in STAGE_ROOT_NAMES)
 HTML_PATH = CONSOLE_DIR / "console.html"

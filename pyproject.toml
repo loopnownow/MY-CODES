@@ -23,12 +23,23 @@ dependencies = [
 shap = ["shap>=0.44"]
 swap-stats = ["tableone>=0.9", "dcurves>=1.1", "lifelines>=0.27"]
 partial = ["pingouin>=0.5"]
-swap-refs = ["pyalex>=0.21", "habanero>=2.4", "arxiv>=3.0", "bibtexparser>=2.1"]
+swap-refs = ["pyalex>=0.21", "habanero>=2.4", "arxiv>=3.0", "bibtexparser>=2.1", "pypdf>=3.0"]
 # miceforest 6.0.5 (still the latest release) calls Booster.__inner_predict(0);
 # lightgbm 4.7 dropped that argument, so the pair only works below 4.7.
 # Upstream bug, open at https://github.com/AnotherSamWilson/miceforest/issues/104
 mi-forest = ["miceforest>=6.0.5", "lightgbm>=4.6,<4.7"]
-dev = ["pytest>=7.4", "ruff>=0.12", 'tomli>=2.0; python_version < "3.11"', "pyyaml>=6.0"]
+dev = [
+  "pytest>=7.4",
+  "ruff>=0.12",
+  'tomli>=2.0; python_version < "3.11"',
+  "pyyaml>=6.0",
+  # CI / modules/tests collection: packages not covered by swap-stats / partial.
+  "networkx>=3.0",
+  "python-docx>=1.0",
+  "requests>=2.31",
+  "Pillow>=10.0",
+  "httpx>=0.27",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["modules/tests"]

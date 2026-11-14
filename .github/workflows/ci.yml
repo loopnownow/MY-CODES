@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # modules/tests/test_style_lint_dash.py reads the MY-SKILLS checkout at
+      # <repo parent>/MY-SKILLS (no silent fallback). On Actions the repo parent
+      # is RUNNER_WORKSPACE, so clone it as a sibling; cloning inside the tree
+      # would be scanned by the public-path test.
+      - name: checkout MY-SKILLS sibling
+        run: git clone --depth 1 https://github.com/loopnownow/MY-SKILLS.git "$env:RUNNER_WORKSPACE\MY-SKILLS"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,swap-stats,partial,swap-refs]"
+      - name: lint
+        run: python -m ruff check .
+      - name: pytest
+        env:
+          SKILLS_ROOT: ${{ runner.workspace }}/MY-SKILLS
+        run: python -m pytest -q -p no:cacheprovider
