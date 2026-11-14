@@ -51,7 +51,6 @@ Bug 修复（相比原版）
 """
 
 import os
-import sys
 import json
 import logging
 import argparse

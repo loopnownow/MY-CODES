@@ -34,7 +34,7 @@
 - 叶内只留 `目录说明.md`；唯一例外 `MHE_PA/lx_MHE_1` 的 PHI 表（见 `LEAF_EXCEPTIONS`）。
 - 原件移 `{DEL}\_by-function\<batch>\originals\<code>\<family>\<leaf>\<叶内相对路径>`，
   台账逐行 sha256 + kind。
-- **三根约定（2026-11-11，A1）**：`db_core.DEL` = `D:\MyProjects\.Del`；`DEL_ROOT` = `{DEL}\harvested`
+- **三根约定（2026-11-11，A1）**：`db_core.DEL` = `{DEL}`；`DEL_ROOT` = `{DEL}\harvested`
   （**台账 / 历史**，批次搬进终弃档后 `verify_db` 仍能找到）；`WORK_ROOT` = `{DEL}\_by-function`
   （**新批次写入位**，避免把在途工作写进终弃档）。取批次目录用 `core.batch_dir(name)`；
   回放历史批次用 `core.find_batch(name)`（依次找 `WORK_ROOT` → `DEL_ROOT` → `<name>__bulk-*`）。
@@ -42,7 +42,7 @@
 - 叶内 raw 按单元（叶下第一层路径名；直属文件 = `loose`）打包到
   `_share\<leaf>\<code>__<leaf>__<unit>-raw-<YYYY-MM-DD>.tar.zst`。
 
-> **禁止**在未获用户当轮点名时写入 `D:\MyProjects\_DataBase`（建库、移原件、
+> **禁止**在未获用户当轮点名时写入 `{RAW}`（建库、移原件、
 > `--apply` 均属写盘）。所有 `--apply` / `--move` 均须点名；缺省 dry-run。
 
 ## 库布局：legacy 7 表 vs core-6t（2026-11-13 起两套并存）
@@ -91,7 +91,7 @@ python -B tools/db-library/merge_tables.py --project OC --build
 python -B tools/db-library/merge_tables.py --project PCOS/zar_PCOS3D --build
 python -B tools/db-library/merge_tables.py --build                        # 全部已注册
 python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --apply   # 原件移 {DEL}，须点名
-python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --into "D:/MyProjects/_DataBase/SCH/_db/SCHdb"
+python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --into "{RAW}/SCH/_db/SCHdb"
 
 # 3) 新口径五个 CLI（均默认 dry-run，--apply 落盘，--ledger 指台账）
 python -B tools/db-library/flatten_share.py    --family MHE_AN
@@ -101,10 +101,10 @@ python -B tools/db-library/sweep_tables.py     --family MHE_AN
 python -B tools/db-library/leaf_raw_pack.py    --family MHE_AN
 
 # 4) 只读校验
-python -B tools/db-library/verify_db.py --db "D:/MyProjects/_DataBase/MHE_AN/_db/MHE_ANdb"
+python -B tools/db-library/verify_db.py --db "{RAW}/MHE_AN/_db/MHE_ANdb"
 ```
 
-公共参数：`--db-root`（默认 `D:\MyProjects\_DataBase`）、`--batch`
+公共参数：`--db-root`（默认 `{RAW}`）、`--batch`
 （批次名；新批次落 `{DEL}\_by-function`，回放历史走 `{DEL}\harvested`）、`--family` / `--code`。`merge_tables.py`
 另有 `--stamp YYYYMMDD`。
 

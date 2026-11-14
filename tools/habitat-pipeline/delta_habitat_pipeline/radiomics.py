@@ -29,14 +29,12 @@ import logging
 import numpy as np
 import pandas as pd
 import SimpleITK as sitk
-from pathlib import Path
 
 from pictologics import RadiomicsPipeline
 from pictologics.loader import Image as PicImage
 
 from sklearn.feature_selection import SelectFromModel
 from sklearn.linear_model import LassoCV
-from sklearn.preprocessing import StandardScaler
 
 from config import RADIOMICS, DELTA, FEATURE_SELECTION, HABITAT, DIRS
 

@@ -52,7 +52,6 @@ from typing import Optional, List, Dict, Any, Tuple
 import numpy as np
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 from matplotlib.colors import ListedColormap
 
 # delta_habitat_pipeline 目录加入 sys.path，供 .nii 彩色导出中懒加载

@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import sqlite3
@@ -25,8 +26,9 @@ from pathlib import Path
 
 from common import ledger_write, norm, read_any, sha256
 
-DEFAULT_DB_ROOT = Path(r"D:\MyProjects\_DataBase")
-DEL = Path(r"D:\MyProjects\.Del")
+# C1 公网路径门：本机默认值必须能被环境变量覆盖（DB_ROOT / DEL_ROOT），公开仓不写死盘符。
+DEFAULT_DB_ROOT = Path(os.environ.get("DB_ROOT") or r"D:\MyProjects\_DataBase")
+DEL = Path(os.environ.get("DEL_ROOT") or r"D:\MyProjects\.Del")
 DEL_ROOT = DEL / "harvested"      # 台账/历史：批次搬进终弃档后 verify_db 仍能找到
 WORK_ROOT = DEL / "_by-function"  # 新批次写入位（不写终弃档）
 

@@ -23,7 +23,7 @@
 汇总行给出 P0/P1/P2 与 fail/warn/info 计数；exit 1 仅当 P0>0。
 
 用法：
-  python -B tools/db-library/verify_db.py --db "D:\\MyProjects\\_DataBase\\MHE_AN\\_db\\MHE_ANdb"
+  python -B tools/db-library/verify_db.py --db "{RAW}\\MHE_AN\\_db\\MHE_ANdb"
 退出码：P0>0 → 1（P1/P2 不影响退出码）。
 """
 from __future__ import annotations
@@ -35,7 +35,6 @@ import sys
 import zlib
 from pathlib import Path
 
-from common import sha256
 import db_core as core
 
 DEFAULT_DB_ROOT = core.DEFAULT_DB_ROOT

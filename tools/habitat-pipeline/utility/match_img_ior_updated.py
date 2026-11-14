@@ -444,7 +444,7 @@ def main():
     
     global logger
     logger = setup_logger(CONFIG["log_dir"], name="match_img")
-    cp_mgr = CheckpointManager(CONFIG["checkpoint_dir"])
+    CheckpointManager(CONFIG["checkpoint_dir"])
 
     # 任务名唯一性检查（避免统计/报告混淆）
     names = [t.get("name", "task") for t in CONFIG["tasks"]]

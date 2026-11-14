@@ -47,7 +47,7 @@ import matplotlib
 matplotlib.use('Agg')   # 非交互式后端，适合服务器环境（无显示器）
 import matplotlib.pyplot as plt
 
-from config import VOXEL_FEATURES, HABITAT, DIRS
+from config import VOXEL_FEATURES, HABITAT
 
 logger = logging.getLogger(__name__)
 

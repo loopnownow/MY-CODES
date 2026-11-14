@@ -64,3 +64,7 @@ ignore = ["E501"]
 "tools/clean-data/extract_discharge.py" = ["E701"]
 # F401: 模板脚手架预置 import 供使用者填写
 "tools/templates/soft_code_template.py" = ["F401"]
+# E402: 遗留 habitat 脚本先 sys.path.append 再 import workflow_utils / 本地模块
+"tools/habitat-pipeline/utility/expand_roi_5mm.py" = ["E402"]
+"tools/habitat-pipeline/utility/generate_global_habitat.py" = ["E402"]
+"tools/habitat-pipeline/utility/plot_global.py" = ["E402"]
