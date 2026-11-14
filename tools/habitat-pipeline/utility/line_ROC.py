@@ -210,7 +210,7 @@ def main():
     ppv = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     npv = tn / (tn + fn) if (tn + fn) > 0 else 0.0
 
-    logger.info(f"在最佳截断值下的性能指标:")
+    logger.info("在最佳截断值下的性能指标:")
     logger.info(f"  准确率 (ACC) : {acc:.4f}")
     logger.info(f"  敏感度 (SEN) : {sens:.4f}")
     logger.info(f"  特异度 (SPE) : {spec:.4f}")

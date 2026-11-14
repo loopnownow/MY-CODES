@@ -629,14 +629,18 @@ def _plot_k_optimization(k_range, inertias, sil_scores, consensus,
 
     axes[0].plot(ks, inertias, 'b-o', markersize=5)
     axes[0].axvline(optimal_k, color='red', linestyle='--', label=f'K={optimal_k}')
-    axes[0].set_title('Elbow（惯性）'); axes[0].set_xlabel('K'); axes[0].set_ylabel('Inertia')
+    axes[0].set_title('Elbow（惯性）')
+    axes[0].set_xlabel('K')
+    axes[0].set_ylabel('Inertia')
     axes[0].legend()
 
     sil_ks = list(sil_scores.keys())
     sil_vals = [sil_scores[k] for k in sil_ks]
     axes[1].plot(sil_ks, sil_vals, 'g-o', markersize=5)
     axes[1].axvline(optimal_k, color='red', linestyle='--', label=f'K={optimal_k}')
-    axes[1].set_title('Silhouette（轮廓系数）'); axes[1].set_xlabel('K'); axes[1].set_ylabel('Score')
+    axes[1].set_title('Silhouette（轮廓系数）')
+    axes[1].set_xlabel('K')
+    axes[1].set_ylabel('Score')
     axes[1].legend()
 
     ari_means = [consensus[k]['mean_ari'] for k in ks]
@@ -645,7 +649,9 @@ def _plot_k_optimization(k_range, inertias, sil_scores, consensus,
     axes[2].axhline(HABITAT["ari_threshold"], color='gray', linestyle=':',
                      label=f'阈值={HABITAT["ari_threshold"]}')
     axes[2].axvline(optimal_k, color='red', linestyle='--', label=f'K={optimal_k}')
-    axes[2].set_title('共识 ARI（稳定性）'); axes[2].set_xlabel('K'); axes[2].set_ylabel('ARI')
+    axes[2].set_title('共识 ARI（稳定性）')
+    axes[2].set_xlabel('K')
+    axes[2].set_ylabel('ARI')
     axes[2].legend()
 
     plt.tight_layout()

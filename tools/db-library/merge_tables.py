@@ -132,9 +132,6 @@ def build_sch(src: Path, out_path: Path):
             tongji.append((sn, rows))
     bk.release_resources()
 
-    note = ("SCH/ly_SCH 散表归并：8 个年度汇总（2004–2011）+ 2 个 OHO 导出 + 病例清单/统计表 → 单工作簿。"
-            f"合并表 01 为年度汇总纵向合并（{len(allrows):,} 行），02 为 OHO 导出（{len(oho_rows):,} 行）。"
-            "只读源、原件已移入 _DEL；未改动任何数据值。")
     sheets = [{
         "name": "00_说明",
         "rows": [[x] for x in [
@@ -293,7 +290,6 @@ def build_oc(src: Path, out_path: Path):
             continue
         mrows.append([cstr(r[0])] + r[1:] + ["QC" if cstr(r[0]).upper().startswith("QC") else "样本", "metal ion.xls::S001-44"])
     sh2 = bk.sheet_by_name("Sheet2")
-    sh2h = ["样本"] + [f"列{j+1}" for j in range(1, 8)]
     sh2rows = []
     for i in range(sh2.nrows):
         r = [num(sh2.cell_value(i, j)) for j in range(sh2.ncols)]
@@ -381,7 +377,6 @@ def build_pcos(src: Path, out_path: Path):
     wb.close()
     wb = openpyxl.load_workbook(src / "PCOSdata.xlsx", read_only=True, data_only=True)
     ana = [list(r) for r in wb["Sheet1"].iter_rows(values_only=True)]
-    nm = [list(r) for r in wb["Sheet3"].iter_rows(values_only=True)]
     tab = [list(r) for r in wb["tab"].iter_rows(values_only=True)]
     wb.close()
     wb = openpyxl.load_workbook(src / "收集病例表.xlsx", read_only=True, data_only=True)
@@ -537,7 +532,6 @@ def ingest_merged(db_path, merged, key):
     db_path = Path(db_path)
     if not db_path.is_file():
         raise SystemExit(f"--into 库不存在: {db_path}（先跑 build_code_db.py 建库）")
-    family = core.family_of_db(db_path)
     con = core.open_db(db_path)
     code = core.get_meta(con).get("short_code", "ly")
     fam = key.split("/")[0]

@@ -63,7 +63,6 @@ def main(args):
     if not fam_dir.is_dir():
         print(f"FAIL 家族目录不存在: {fam_dir}", file=sys.stderr)
         return 1
-    code = args.code or core.read_code(db_root, args.family) or args.family
     batch = core.batch_dir(args.batch)
     moves = plan_moves(fam_dir)
     if not moves:

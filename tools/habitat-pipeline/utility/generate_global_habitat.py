@@ -21,7 +21,6 @@ from typing import Optional, List, Tuple
 import numpy as np
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
-import joblib
 
 # 处理 habitat.py 在其他文件夹的情况
 habitat_module_path = os.environ.get("HABITAT_MODULE_PATH", "delta_habitat_pipeline")

@@ -35,7 +35,6 @@ import sys
 import zlib
 from pathlib import Path
 
-from common import sha256
 import db_core as core
 
 DEFAULT_DB_ROOT = core.DEFAULT_DB_ROOT

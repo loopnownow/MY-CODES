@@ -69,7 +69,6 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import SimpleITK as sitk
 import joblib
@@ -78,10 +77,10 @@ from sklearn.preprocessing import StandardScaler
 # ── 从原始代码库导入复用模块 ────────────────────────────────────────
 # 注意：validate 脚本与训练代码放在同一目录下；若不在同一目录，请调整 sys.path
 try:
-    from config import DIRS, OUTPUT_ROOT, HABITAT, REGISTRATION
+    from config import HABITAT
     from data_loader import load_patient_pairs
     from preprocessing import preprocess
-    from registration import register_images, propagate_masks
+    from registration import register_images
     from habitat import (CohortHabitatModel, build_habitat_masks,
                          compute_voxel_feature_maps)
     from radiomics import (extract_features_all_habitats,

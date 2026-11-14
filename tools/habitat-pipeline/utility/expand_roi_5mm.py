@@ -771,7 +771,7 @@ def main():
 
     logger.info("=== 任务启动 ===")
     logger.info(f"扫描路径: {args.path}")
-    logger.info(f"影像根目录: {args.img_root if args.img_root else "(同目录配对)"}")
+    logger.info(f"影像根目录: {args.img_root if args.img_root else '(同目录配对)'}")
     logger.info(f"递归模式: {args.recursive}")
     logger.info(f"扩张半径: {args.radius_mm}mm")
     logger.info(f"肺约束  : {args.enable_lung_constraint}")
