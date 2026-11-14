@@ -10,6 +10,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      # modules/tests/test_style_lint_dash.py reads the MY-SKILLS checkout at
+      # <repo parent>/MY-SKILLS (no silent fallback). On Actions the repo parent
+      # is RUNNER_WORKSPACE, so clone it as a sibling; cloning inside the tree
+      # would be scanned by the public-path test.
+      - name: checkout MY-SKILLS sibling
+        run: git clone --depth 1 https://github.com/loopnownow/MY-SKILLS.git "$env:RUNNER_WORKSPACE\MY-SKILLS"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
