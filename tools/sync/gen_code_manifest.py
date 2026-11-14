@@ -72,6 +72,11 @@ def parse_manifest(path: Path) -> list[tuple[str, str, str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows runners default stdout to cp1252; the messages below are Chinese,
+    # and a CI print must not be able to fail the check.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description="生成 MY-CODES/CODE-MANIFEST.tsv")
     ap.add_argument("--check", action="store_true", help="只校验现有清单，不写盘")
     args = ap.parse_args(argv)

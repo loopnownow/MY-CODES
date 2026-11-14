@@ -26,6 +26,10 @@ jobs:
           python -m pip install -e ".[dev,swap-stats,partial,swap-refs]"
       - name: lint
         run: python -m ruff check .
+      # CODE-MANIFEST.tsv is generated, so a stale copy is silent unless it is
+      # checked here; the file itself is rebuilt by tools/sync/gen_code_manifest.py.
+      - name: manifest
+        run: python -B tools/sync/gen_code_manifest.py --check
       - name: pytest
         env:
           SKILLS_ROOT: ${{ runner.workspace }}/MY-SKILLS
