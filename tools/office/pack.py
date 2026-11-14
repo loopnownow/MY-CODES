@@ -76,7 +76,7 @@ def _run_validation(
     output_lines = []
     validators = []
 
-    author = "A"  # lab author field; see MY-RULES My rule.md 5.1
+    author = "A"  # lab author field; see MY-RULES My rule.md §3 交付与清理 (Word 版式)
     if infer_author_func:
         try:
             author = infer_author_func(unpacked_dir, original_file)
