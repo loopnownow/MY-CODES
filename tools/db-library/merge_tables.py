@@ -29,7 +29,7 @@ import xlrd
 from common import ledger_write, sha256_12, write_workbook
 import db_core as core
 
-DEFAULT_DB_ROOT = Path(r"D:\MyProjects\_DataBase")
+DEFAULT_DB_ROOT = core.DEFAULT_DB_ROOT
 DEFAULT_BATCH = "2026-11-db-root-merge"
 STAMP = datetime.now().strftime("%Y%m%d")
 LETTERS = "ABCDEFGH"

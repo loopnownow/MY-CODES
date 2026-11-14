@@ -73,7 +73,7 @@ cd <this-repo>
 PYTHONDONTWRITEBYTECODE=1 python -B -m pytest -q -p no:cacheprovider
 ```
 
-2026-11-08 实测基线：**720 passed / 2 skipped / 0 failed**（`pytest modules/tests`，本机 66 秒；statsmodels / sklearn 的告警不算失败）。
+2026-11-14 实测基线：**723 passed / 2 skipped / 0 failed**（`pytest modules/tests`，本机 66 秒；statsmodels / sklearn 的告警不算失败）。
 装齐 optional 组后本机实测 37–45 秒跑完；数字基线另由 `test/run_golden.py` 端到端对拍（FAIL 0 / WARN 0）。
 
 版本号只有两个位置：`modules/__init__.py` 的 `__version__`（运行时，课题看到的就是它）与

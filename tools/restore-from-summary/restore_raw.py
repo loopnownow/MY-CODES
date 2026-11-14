@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import math
+import os
 from pathlib import Path
 
 import numpy as np
@@ -34,8 +35,10 @@ from scipy import optimize, stats
 # ══════════════════════════════════════════════════════════════════
 # 配置区（仅此处可改；逻辑区不写死路径/参数）
 # ══════════════════════════════════════════════════════════════════
-SRC_XLSX = Path(r"C:\Users\loopn\Downloads\re.xlsx")          # 输入汇总表（只读）
-OUT_XLSX = Path(r"C:\Users\loopn\Downloads\re_restored_raw_V4.xlsx")  # 交付（城城点名 Downloads；V4=表内位数落盘）
+# 输入 / 交付默认落本机 Downloads（RESTORE_SRC / RESTORE_OUT 可覆盖）；公开仓不写死用户名。
+_DOWNLOADS = Path.home() / "Downloads"
+SRC_XLSX = Path(os.environ.get("RESTORE_SRC") or _DOWNLOADS / "re.xlsx")          # 输入汇总表（只读）
+OUT_XLSX = Path(os.environ.get("RESTORE_OUT") or _DOWNLOADS / "re_restored_raw_V4.xlsx")  # 交付（V4=表内位数落盘）
 SEED = 20261111          # 固定种子，全程可复现
 TOL = 0.05               # mean/SD 显示舍入窗口（表内 1 位小数 → ±半个显示单位）
 GRID_STEP = 0.01         # 窗口网格步长
