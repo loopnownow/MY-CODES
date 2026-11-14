@@ -33,10 +33,7 @@ dev = [
   "ruff>=0.12",
   'tomli>=2.0; python_version < "3.11"',
   "pyyaml>=6.0",
-  # CI / modules/tests collection also needs these (some already live in swap-stats / partial).
-  "dcurves>=1.1",
-  "lifelines>=0.27",
-  "pingouin>=0.5",
+  # CI / modules/tests collection: packages not covered by swap-stats / partial.
   "networkx>=3.0",
   "python-docx>=1.0",
   "requests>=2.31",

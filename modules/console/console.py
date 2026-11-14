@@ -495,6 +495,8 @@ def cmd_registry(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # CLI must fail loud if the drafting root is missing; importing const must not.
+    _paths.grok_and_drafting(MODULES_ROOT)
     raw = list(sys.argv[1:] if argv is None else argv)
     if raw and str(raw[0]).startswith("radconsole:"):
         u = urlparse(raw[0])
