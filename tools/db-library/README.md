@@ -117,7 +117,7 @@ python -B tools/db-library/verify_db.py --db "{RAW}/MHE_AN/_db/MHE_ANdb"
   只记 `sheet_dup` 边，不存第二份 blob）→ 行级；每张 ingested sheet 以 zlib(TSV) 存 blob。
   可识别表头且 `ncol ≤ 40` 时展开 fact / entity。
 - 宽表：表头数字占比 > 0.6（谱图 / 积分矩阵）→ `is_wide=1`，只存 blob。
-- 口径（`RULE_TEXT`）：行名一致按列合并、列名一致按行合并，均以较新数据为主；每项目至多长表与宽表各一，只收原始行列数据。
+- 口径（`RULE_TEXT`）：行名一致按列合并、列名一致按行合并，均以较新数据为主；每叶只留一份现行源文件，内含长表与宽表，每表最多 5 个工作单；每项目至多长表与宽表各一，只收原始行列数据。
 - 表头白名单 `IDCOL`：`医技号|样本编号|样本号|编号|case no.|mid|谱图编号|patient(_id)?|id`。
 - `--share-archives`：枚举 `<family>/_share/` 下归档（层级 ≤2），解到
   `<batch>/staging/share-unpack/<FAM>/<share 相对目录>/` 后按同一 `Ingestor` 增量入库；
