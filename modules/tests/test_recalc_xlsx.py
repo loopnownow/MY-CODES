@@ -1,4 +1,4 @@
-"""model-validation/recalc_xlsx.py: the scan half, which runs without LibreOffice.
+"""model-validation/recalc_xlsx.py: the scan half, which runs without WPS.
 
 The whole point of the scan is to refuse a false pass. A formula cell openpyxl wrote
 has no cached value until a real engine calculates it, so "no error literals" is not
@@ -8,11 +8,12 @@ containing `=1/0`.
 from __future__ import annotations
 
 import importlib.util
-import shutil
 from pathlib import Path
 
 import pytest
 from openpyxl import Workbook
+
+from modules.utils.wps_et import wps_et_available
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI = REPO_ROOT / "model-validation" / "recalc_xlsx.py"
@@ -80,7 +81,7 @@ def test_cli_exit_codes(tmp_path, book, capsys):
     assert cli.main([str(tmp_path / "absent.xlsx")]) == 1
 
 
-@pytest.mark.skipif(shutil.which("soffice") is None, reason="LibreOffice not installed")
+@pytest.mark.skipif(not wps_et_available(), reason="WPS Spreadsheets (ET) not installed")
 def test_recalculation_fills_cached_values(book):
     cli = _load_cli()
     assert cli.main([str(book), "--json"]) == 0
@@ -88,11 +89,11 @@ def test_recalculation_fills_cached_values(book):
     assert report["total_uncached"] == 0
 
 
-def test_missing_libreoffice_fails_loudly(tmp_path, book, capsys, monkeypatch):
-    """No soffice: exit 1 with a message, not a traceback and not exit 0."""
+def test_missing_wps_fails_loudly(tmp_path, book, capsys, monkeypatch):
+    """No WPS: exit 1 with a message, not a traceback and not exit 0."""
     cli = _load_cli()
-    monkeypatch.setattr(cli.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(cli, "wps_et_available", lambda: False)
     assert cli.main([str(book)]) == 1
     err = capsys.readouterr().err
-    assert "LibreOffice" in err
+    assert "WPS" in err
     assert "--check-only" in err

@@ -17,7 +17,7 @@
 | `split_leakage_check.py` | 检查 patient ID 是否跨 train/val/test 泄漏 | 命令行传入 CSV |
 | `radiology_audit.py` | 放射 AI 研究卡 Markdown 快速审计 | 命令行 / JSON 模板 |
 | `impute_excel.py` | 分组分层缺失值插补 CLI（备份 / QC 表 / 小数位对齐）；库函数 `modules/utils/u_impute.py` | 命令行传入 xlsx |
-| `recalc_xlsx.py` | 用 LibreOffice 重算公式 + 扫描 `#REF!`/`#DIV/0!` 等错误；`--check-only` 只扫描 | 命令行传入 xlsx |
+| `recalc_xlsx.py` | 用 WPS 表格（ET）重算公式 + 扫描 `#REF!`/`#DIV/0!` 等错误；`--check-only` 只扫描 | 命令行传入 xlsx |
 | `mi_impute.py` | 多重插补：`draw` 出 m 个完成数据集，`pool` 按 Rubin 规则合并（含 Barnard–Rubin 自由度、FMI） | 命令行传入 xlsx / 估计表 |
 
 ## 运行

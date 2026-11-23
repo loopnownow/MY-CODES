@@ -1,9 +1,9 @@
-"""Recalculate every formula in an .xlsx with headless LibreOffice.
+"""Recalculate every formula in an .xlsx with WPS Spreadsheets (ET).
 
 openpyxl writes formulas as strings and leaves no cached value, so a workbook the
-lab hands to Excel opens with blanks until Excel recalculates. This runs the real
-engine and then scans every cell for Excel error literals, so a broken reference is
-reported here instead of by the user.
+lab hands to Excel or WPS opens with blanks until the spreadsheet engine
+recalculates. This runs WPS (KET.Application) and then scans every cell for Excel
+error literals, so a broken reference is reported here instead of by the user.
 
 Only useful when the workbook actually contains formulas. The lab's analysis writers
 (`modules/stats/*`, `modules/utils/u_impute.py`) emit values, not formulas, so this is
@@ -15,13 +15,13 @@ Usage
     python model-validation/recalc_xlsx.py book.xlsx
     python model-validation/recalc_xlsx.py book.xlsx --timeout 30 --json
 
-Requires LibreOffice (`soffice`) on PATH. Fails loudly if it is missing.
+Requires WPS Spreadsheets (`et.exe` / KET.Application). Fails loudly if it is missing.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -32,44 +32,47 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from modules.utils.soffice_env import run_soffice  # noqa: E402
+from modules.utils.wps_et import wps_et_available  # noqa: E402
 
 ERROR_LITERALS = ("#REF!", "#DIV/0!", "#VALUE!", "#N/A", "#NAME?", "#NULL!", "#NUM!")
 FORMULA_PREFIX = "="
 
 
 def _recalculate(path: Path, timeout: int) -> int:
-    if shutil.which("soffice") is None and shutil.which("libreoffice") is None:
+    if not wps_et_available():
         print(
-            "ERROR: LibreOffice (soffice) is not installed, so formulas cannot be "
+            "ERROR: WPS Spreadsheets (ET) is not installed, so formulas cannot be "
             "recalculated. Use --check-only to scan the existing cached values, or "
-            "install LibreOffice.",
+            "install WPS Office.",
             file=sys.stderr,
         )
         return 1
 
+    cmd = [
+        sys.executable,
+        "-c",
+        "from pathlib import Path; "
+        "from modules.utils.wps_et import recalculate_xlsx; "
+        f"recalculate_xlsx(Path(r'{path}'))",
+    ]
     try:
-        result = run_soffice(
-            [
-                "--headless",
-                "--calc",
-                "--convert-to",
-                "xlsx",
-                "--outdir",
-                str(path.parent),
-                str(path),
-            ]
+        result = subprocess.run(
+            cmd,
+            cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
         )
+    except subprocess.TimeoutExpired:
+        print(f"ERROR: WPS recalc timed out after {timeout}s: {path}", file=sys.stderr)
+        return 1
     except OSError as exc:
-        print(f"ERROR: could not start LibreOffice: {exc}", file=sys.stderr)
+        print(f"ERROR: could not start WPS recalc: {exc}", file=sys.stderr)
         return 1
 
     if result.returncode != 0:
-        print(
-            f"ERROR: LibreOffice exited {result.returncode}: "
-            f"{(result.stderr or result.stdout or '').strip()[:300]}",
-            file=sys.stderr,
-        )
+        err = (result.stderr or result.stdout or "").strip()[:300]
+        print(f"ERROR: WPS recalc exited {result.returncode}: {err}", file=sys.stderr)
     return result.returncode
 
 
@@ -128,9 +131,9 @@ def _scan(path: Path) -> dict:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="Recalculate an .xlsx with LibreOffice and scan for errors")
+    parser = argparse.ArgumentParser(description="Recalculate an .xlsx with WPS Spreadsheets and scan for errors")
     parser.add_argument("xlsx", help="workbook to recalculate (rewritten in place)")
-    parser.add_argument("--timeout", type=int, default=60, help="LibreOffice timeout in seconds")
+    parser.add_argument("--timeout", type=int, default=60, help="WPS recalc timeout in seconds")
     parser.add_argument("--json", action="store_true", help="print the JSON report only")
     parser.add_argument("--check-only", action="store_true", help="scan without recalculating")
     args = parser.parse_args(argv)
@@ -154,7 +157,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         if report["total_uncached"]:
             print(
                 f"  {report['total_uncached']} formula cell(s) have no cached value - "
-                "run without --check-only so LibreOffice computes them"
+                "run without --check-only so WPS computes them"
             )
         for literal, detail in report["error_summary"].items():
             print(f"  {literal} x{detail['count']}: {', '.join(detail['locations'][:5])}")
