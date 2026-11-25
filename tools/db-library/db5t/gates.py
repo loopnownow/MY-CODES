@@ -1428,6 +1428,68 @@ def d79_idnum_registry(fam_db, fam, proj):
     return out, bad, checked, unreg
 
 
+_PHI_COMPOSITE = re.compile(
+    r'^\s*(?P<lab>[^\d\s()（）]{2,24})\s*[（(]\s*(?P<num>\d{4,})\s*[)）]\s*$')
+
+
+def d80_phi_composite(path):
+    """D80（P1）：值列里出现「姓名(号码)」这种拼接串。
+
+    起因（2026-11-25 MHE_PA）：`lx_MHE_2.clin.id` 有 503 格形如 `姓名(1200…)`，
+    姓名与住院号都在里面，而 D54 只做「整格等于某个 id_number 值」的比对，拼接串永远比不中，
+    于是 503 格 PHI 在子库里躺了很久没人发现。
+    判据只认形态不认值：括号前是 2–24 个非数字字符、括号内 ≥4 位数字、整格 ≤ 60 字。
+    形态命中即 P1（这类列一律整列出库、身份回 id 表）；括号内号码能在 id_number 里找到，
+    则额外标注「值可比中」，用来区分「真的是 PHI」与「实验室编号写法」。
+    """
+    if not path.exists():
+        return [], 0
+    try:
+        c = sqlite3.connect('file:%s?mode=ro' % path, uri=True)
+    except sqlite3.Error:
+        return [], 0
+    nums = set()
+    out, bad = [], 0
+    try:
+        for (t,) in c.execute("select name from sqlite_master where type='table'").fetchall():
+            if not (t == 'clin' or (t.startswith('modal_') and not t.endswith('_val'))):
+                continue
+            cols = [(r[1], (r[2] or '').upper()) for r in c.execute('pragma table_info("%s")' % t)]
+            for cn, typ in cols:
+                if typ and not any(x in typ for x in ('TEXT', 'CHAR', 'CLOB')):
+                    continue
+                try:
+                    rows = c.execute(
+                        'select "%s" from "%s" where "%s" like %s and length("%s")<=60'
+                        % (cn, t, cn, "'%(%'", cn)).fetchall()
+                except sqlite3.Error:
+                    continue
+                if not rows:
+                    continue
+                hit, matched_num = 0, 0
+                for (v,) in rows:
+                    if v is None:
+                        continue
+                    m = _PHI_COMPOSITE.match(str(v))
+                    if not m:
+                        continue
+                    lab = m.group('lab').strip()
+                    if not lab or lab.isdigit():
+                        continue
+                    hit += 1
+                    if m.group('num') in nums:
+                        matched_num += 1
+                if hit:
+                    bad += hit
+                    out.append('  !! P1 %s.%s：%d 格是「姓名(号码)」拼接串%s'
+                               % (t, cn, hit,
+                                  '（其中 %d 格号码能在 id_number 找到）' % matched_num
+                                  if matched_num else ''))
+    finally:
+        c.close()
+    return out, bad
+
+
 def main():
     out = [f'# gate.log  built={datetime.datetime.now():%Y-%m-%d %H:%M:%S}  python={sys.version.split()[0]}']
     phis = phi_values()
@@ -1586,6 +1648,15 @@ def main():
     out.extend(_l78[:20])
     if _n78:
         all_rows.append((f'family:{FAM}', 'dict', 'D78', _n78))
+    _l80, _n80 = d80_phi_composite(FAM_DB)
+    for _slug, _p in PROJ:
+        _a, _b = d80_phi_composite(_p)
+        _l80.extend(_a)
+        _n80 += _b
+    out.append(f'\n== D80 「姓名(号码)」拼接串（P1）：{_n80} 格')
+    out.extend(_l80[:20])
+    if _n80:
+        all_rows.append((f'family:{FAM}', 'clin', 'D80', _n80))
     _l79, _n79, _c79, _u79 = d79_idnum_registry(FAM_DB, FAM, PROJ)
     out.append(f'\n== D79 号码表账实相符（P1）：检查 {_c79} 个项目，违规 {_n79} 个'
                + (f'；另有 {_u79} 个项目未登记 id_number_n（只报数）' if _u79 else ''))
