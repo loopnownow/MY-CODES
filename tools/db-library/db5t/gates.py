@@ -1327,10 +1327,17 @@ def d78_dict_provenance(fam_db):
             if not p.exists():
                 continue
             reg = {}
-            for cn, src in f.execute(
-                    "select column_name, coalesce(source,'') from dict where scope=?",
-                    ('proj:%s' % slug,)):
-                reg[cn] = src
+            # 按 (表名, 列名) 双键登记：`status`/`note`/`kind` 这类列名在 src/qc/clin 里
+            # 同时存在，只按列名登记会让后读到的 `src.status`（无 source）覆盖
+            # `clin.status`（有 source），把 1 个值列误判成缺溯源（2026-11-25 MHE_PA 实测）。
+            # 没有表名的老 dict 行进 byname 兜底。
+            byname = {}
+            for tn, cn, src in f.execute(
+                    "select coalesce(table_name,''), column_name, coalesce(source,'') "
+                    "from dict where scope=?", ('proj:%s' % slug,)):
+                reg[(tn, cn)] = src
+                if not tn:
+                    byname[cn] = src
             try:
                 c = sqlite3.connect('file:%s?mode=ro' % p, uri=True)
             except sqlite3.Error:
@@ -1342,7 +1349,8 @@ def d78_dict_provenance(fam_db):
                 for t in tables:
                     cols = [r[1] for r in c.execute('pragma table_info("%s")' % t)]
                     miss = [col for col in cols
-                            if col not in SYS and not (reg.get(col) or '').strip()]
+                            if col not in SYS
+                            and not (reg.get((t, col)) or byname.get(col) or '').strip()]
                     if miss:
                         bad += len(miss)
                         out.append('  !! P1 %s.%s：%d 个值列缺 dict.source（例 %s）'
@@ -1488,6 +1496,43 @@ def d80_phi_composite(path):
     finally:
         c.close()
     return out, bad
+
+
+def d81_empty_modals(projs):
+    """D81（只报数）：`modal_<mod>` 存在但 0 行，且没有 `qc(MODAL_ABSENT)`。
+
+    空表本身可以是对的（「这家没做这种影像」），但**空与没记在库里长得一样**：
+    下游 `select count(*) from modal_radi` 得到 0，无法区分「没有影像」和「建库时漏了」。
+    这条不判红，只把「该记账而没记」的点出来——与 D73/D74 同属「先让它可见」那一类。
+    """
+    out = []
+    for slug, p in projs:
+        if not p.exists():
+            continue
+        try:
+            c = sqlite3.connect('file:%s?mode=ro' % p, uri=True)
+        except sqlite3.Error:
+            continue
+        try:
+            tabs = [r[0] for r in c.execute(
+                "select name from sqlite_master where type='table' "
+                "and name like 'modal\\_%' escape '\\'")]
+            if not tabs:
+                continue
+            codes = {r[0] for r in c.execute('select code from qc')}
+        except sqlite3.Error:
+            c.close()
+            continue
+        for t in tabs:
+            try:
+                n = c.execute('select count(*) from "%s"' % t).fetchone()[0]
+            except sqlite3.Error:
+                continue
+            if n == 0:
+                mark = '已记 qc(MODAL_ABSENT)' if 'MODAL_ABSENT' in codes else '未记 MODAL_ABSENT'
+                out.append('  · %s.%s 0 行（%s）' % (slug, t, mark))
+        c.close()
+    return out
 
 
 def main():
@@ -1663,6 +1708,11 @@ def main():
     out.extend(_l79[:20])
     if _n79:
         all_rows.append((f'family:{FAM}', 'id_number', 'D79', _n79))
+    # D81 只报数：空模态表可能是「这家本来没有这种影像」的正常留痕，
+    # 但空表必须留下 `qc(MODAL_ABSENT)`——空与「没记」在库里长得一样。
+    _l81 = d81_empty_modals(PROJ)
+    out.append(f'\n== D81 空模态表是否记账（只报数）：{len(_l81)} 处')
+    out.extend(_l81[:20])
     # 只报数：零引用行可能是「数据只在 excluded_sheets 里」的正常留痕，判级交人工定性。
     d63, b63 = d63_uid_segments()
     out.append(f'\n== D63 三段 uid 映射（0 human / 8 animal / 9 占位）：{b63} 条')
