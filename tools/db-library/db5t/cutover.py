@@ -33,6 +33,8 @@ import paths  # noqa: E402
 STAGE = pathlib.Path(os.environ.get("DB5T_BATCH") or paths.BATCH) / "stage"
 ROOT = pathlib.Path(os.environ.get("DB5T_ROOT") or r"D:\MyProjects\_DataBase")
 LEDGER = STAGE / "cutover_ledger.md"
+# --recut 模式下被替换掉的「上一版新库」备份处（不是旧 6t 库，旧 6t 库永不覆盖）
+BACKUP = STAGE.parent / "_replaced"
 
 
 def sha(p: pathlib.Path) -> str:
@@ -82,6 +84,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("family")
     ap.add_argument("--go", action="store_true")
+    ap.add_argument("--recut", action="store_true",
+                    help="允许替换已存在的目标库（仅当 <fam>db_6t 已存在，即旧库早已冻结）；"
+                         "被替换的上一版先备份到 _replaced/ 再删")
     a = ap.parse_args()
     fam = STAGE / a.family
     if not fam.exists():
@@ -125,8 +130,20 @@ def main() -> int:
         checkpoint(s)
         d.parent.mkdir(parents=True, exist_ok=True)
         if d.exists():
-            print(f"    !! 目标已存在，拒绝覆盖：{d}")
-            return 3
+            fam6t = ROOT / a.family / "_db" / (a.family + "db_6t")
+            if not (a.recut and fam6t.exists()):
+                print(f"    !! 目标已存在，拒绝覆盖：{d}")
+                if not a.recut:
+                    print("    这是重切（旧库已冻结过）改用 --recut；"
+                          "旧 6t 库不存在时不许重切，先人工确认哪一份是原档。")
+                return 3
+            import datetime
+            stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            bak = BACKUP / a.family / f"{d.name}.{stamp}"
+            bak.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(d, bak)
+            d.unlink()
+            print(f"    recut：上一版已备份 {bak.relative_to(BACKUP.parent)}")
         shutil.copy2(s, d)
         journal_delete(d)
         print(f"    换入 {d.relative_to(ROOT)}  sha={sha(d)[:12]}")
