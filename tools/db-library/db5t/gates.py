@@ -1311,7 +1311,10 @@ def d78_dict_provenance(fam_db):
     SYS = {'family_uid', 'period_month', 'month_ix', 'period_source', 'period_origin',
            'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort',
            'exam_uid', 'sequence', 'batch_id', 'lesion_ix', 'specimen_ix',
-           'entity', 'feature', 'value', 'unit'}
+           'entity', 'feature', 'value', 'unit',
+           # SCHEMA §2 的 modal_<mod> 结构列：它们描述「这次检查怎么来的」，不是源表的变量，
+           # 没有源列可溯源。漏登记的代价是把 27 家都判红（2026-11-25 MCI 的 device 等）。
+           'device', 'site', 'roi_n', 'note'}
     if not fam_db.exists():
         return [], 0
     try:
@@ -1349,6 +1352,80 @@ def d78_dict_provenance(fam_db):
     finally:
         f.close()
     return out, bad
+
+
+def d79_idnum_registry(fam_db, fam, proj):
+    """D79（P1）：家族库某 issuer 的号码行数，必须等于该项目声明的应有行数。
+
+    起因（2026-11-25 OC）：建 `llj_OV_2` 时 `new_db(FAM_DB, force=True)` 把整个 OC 家族库
+    重建，`xyy_OEM` 的 195 行号码（139 住院号 + 10 酶标板 + 46 金属样本）被静默清空，
+    而 `id` 行与 `person` 行都还在。更糟的是 `llj_OV_2` 从 `OC-000001` 重新起号，
+    顶掉了 xyy_OEM 的 0 段 uid，凭空造出 139 个「同一人」（无任何连接键）。
+    「行还在、号码没了、号段被复用」这三件事，D63/D75/D76/D78 一条都抓不到。
+
+    期望值来源（二者其一）：
+      1. 项目库 `meta.id_number_n`（整数，最准）；
+      2. 家族库 `meta.id_number_n_note`（JSON：{"<slug>":{"<kind>":N,...,"issuer":[...]}}，
+         用于 issuer 不含 slug 的老命名空间，如 `OC|住院号`）。
+
+    登记与实收不符 → P1。两侧都没登记 → 只报数「未登记」，不判级（不许用缺席冒充通过，
+    也不许用「没登记」扣基础设施的帽子）。
+    """
+    if not fam_db.exists():
+        return [], 0, 0
+    note = {}
+    try:
+        f = sqlite3.connect('file:%s?mode=ro' % fam_db, uri=True)
+    except sqlite3.Error:
+        return [], 0, 0
+    try:
+        row = f.execute("select v from meta where k='id_number_n_note'").fetchone()
+        if row and row[0]:
+            try:
+                note = json.loads(row[0])
+            except (ValueError, TypeError):
+                note = {}
+        fam_n = dict(f.execute('select issuer, count(*) from id_number group by 1').fetchall())
+    except sqlite3.Error:
+        return [], 0, 0
+    finally:
+        f.close()
+    out, bad, checked, unreg = [], 0, 0, 0
+    for slug, p in proj:
+        if not p.exists():
+            continue
+        exp, issuers = None, None
+        try:
+            c = sqlite3.connect('file:%s?mode=ro' % p, uri=True)
+            try:
+                r = c.execute("select v from meta where k='id_number_n'").fetchone()
+                if r and str(r[0]).strip().isdigit():
+                    exp = int(str(r[0]).strip())
+            finally:
+                c.close()
+        except sqlite3.Error:
+            pass
+        ent = note.get(slug) if isinstance(note, dict) else None
+        if isinstance(ent, dict):
+            if exp is None:
+                exp = sum(v for k, v in ent.items() if k != 'issuer' and isinstance(v, int))
+            if isinstance(ent.get('issuer'), list):
+                issuers = [str(x) for x in ent['issuer']]
+        if issuers:
+            actual = sum(fam_n.get(i, 0) for i in issuers)
+        else:
+            actual = sum(v for i, v in fam_n.items() if i and i.split('|')[0] == fam
+                         and (len(i.split('|')) > 1 and i.split('|')[1] == slug))
+        if exp is None:
+            unreg += 1
+            continue
+        checked += 1
+        if actual != exp:
+            bad += 1
+            out.append('  !! P1 %s：id_number 实收 %d 行 ≠ 声明 %d 行（差 %+d，issuer=%s）'
+                       % (slug, actual, exp, actual - exp,
+                          ','.join(issuers) if issuers else '%s|%s|*' % (fam, slug)))
+    return out, bad, checked, unreg
 
 
 def main():
@@ -1509,6 +1586,12 @@ def main():
     out.extend(_l78[:20])
     if _n78:
         all_rows.append((f'family:{FAM}', 'dict', 'D78', _n78))
+    _l79, _n79, _c79, _u79 = d79_idnum_registry(FAM_DB, FAM, PROJ)
+    out.append(f'\n== D79 号码表账实相符（P1）：检查 {_c79} 个项目，违规 {_n79} 个'
+               + (f'；另有 {_u79} 个项目未登记 id_number_n（只报数）' if _u79 else ''))
+    out.extend(_l79[:20])
+    if _n79:
+        all_rows.append((f'family:{FAM}', 'id_number', 'D79', _n79))
     # 只报数：零引用行可能是「数据只在 excluded_sheets 里」的正常留痕，判级交人工定性。
     d63, b63 = d63_uid_segments()
     out.append(f'\n== D63 三段 uid 映射（0 human / 8 animal / 9 占位）：{b63} 条')
