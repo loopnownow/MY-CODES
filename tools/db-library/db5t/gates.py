@@ -1218,6 +1218,139 @@ def d74_meta_keys(path):
     return [f'meta 缺必备键：{", ".join(miss)}（补齐后重跑 fix_sha）'], len(miss)
 
 
+
+def d76_named_seg0(fam_db):
+    """D76（P1）：0 段且 id_status='label_only' 却 id.name 为空 → P1。
+
+    label_only 的字面意思是「身份由姓名承载」。没有姓名还留 0 段，等于让
+    「没认出身份」冒充「已识别的匿名者」，报告里就分不清「这 N 例里 m 例身份不明」。
+    既无名也无号属 9 段占位（第七轮口径）。
+    """
+    if not fam_db.exists():
+        return [], 0
+    f = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+    try:
+        mk = dict(f.execute('select k,v from meta').fetchall())
+    except sqlite3.OperationalError:
+        f.close()
+        return [], 0
+    if mk.get('no_data') == '1':
+        f.close()
+        return [], 0
+    # 只判「一个身份标签都没有」的：name 空 且 subject_label 空或等于自身 uid。
+    # EC 的拉丁名在 subject_label、MHE_PA 的 `ly_HERAD:1` 行标签也都是合法的标签载体，
+    # 判它们等于要求把「有标签但没中文名」的人赶进占位段。
+    rows = f.execute("""select family_uid, coalesce(subject_label,'') from id
+        where cast(substr(family_uid, instr(family_uid,'-')+1) as integer) < 800000
+          and id_status = 'label_only' and coalesce(trim(name),'') = ''
+          and (coalesce(trim(subject_label),'') = '' or trim(subject_label) = family_uid)""").fetchall()
+    f.close()
+    out = [f'0 段无名标签身份 {u}（subject_label={sl or "-"}）' for u, sl in rows]
+    return out, len(rows)
+
+
+
+def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
+    """D77（P1，只报数）：家族库里未被任何项目 person/clin/modal_* 引用的 id 行。
+
+    没有任何门在查「id 里这行到底有没有人」，所以零引用身份可以一直躺着。
+    这里只报数并出 csv（stage/_work/orphan_ids_<FAM>.csv），留/删由人按两条判据定性：
+    数据只在 excluded_sheets 里 -> 留行 + qc(IDENTITY_WITHOUT_DATA)；任何表都找不到 -> 删行。
+    """
+    if not fam_db.exists():
+        return [], 0
+    f = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+    try:
+        ids = {r[0]: r for r in f.execute(
+            'select family_uid, id_status, coalesce(name,\'\'), coalesce(subject_label,\'\'), coalesce(note,\'\') '
+            'from id').fetchall()}
+    except sqlite3.OperationalError:
+        f.close()
+        return [], 0
+    f.close()
+    used = set()
+    for sub in sorted(fam_dir.iterdir()) if fam_dir.exists() else []:
+        db = sub / (sub.name + 'db')
+        if not (sub.is_dir() and db.exists()):
+            continue
+        try:
+            c = sqlite3.connect(f'file:{db}?mode=ro', uri=True)
+        except sqlite3.OperationalError:
+            continue
+        for (t,) in c.execute("select name from sqlite_master where type='table'"):
+            if t in ('person', 'clin') or t.startswith('modal_'):
+                try:
+                    used.update(r[0] for r in c.execute(f'select distinct family_uid from "{t}" '
+                                                        'where family_uid is not null'))
+                except sqlite3.OperationalError:
+                    pass
+        c.close()
+    orphans = [u for u in ids if u not in used]
+    out = []
+    if write_csv and orphans:
+        import csv
+        p = fam_db.parent.parent.parent / '_work' / f'orphan_ids_{fam_db.parent.parent.name}.csv'
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open('w', encoding='utf-8-sig', newline='') as fh:
+            w = csv.writer(fh)
+            w.writerow(['family_uid', 'seg', 'id_status', 'name', 'subject_label', 'note'])
+            for u in sorted(orphans):
+                st, nm, sl, nt = ids[u][1], ids[u][2], ids[u][3], ids[u][4]
+                w.writerow([u, u.split('-')[1][0], st, nm, sl, nt])
+        out.append(f'明细：{p.name}')
+    return out, len(orphans)
+
+def d78_dict_provenance(fam_db):
+    """D78（P1）：`clin` / `modal_<mod>` 的每个值列，在家族库 dict 里必须有行且 `source` 非空。
+
+    这条是被「第五次说了没落盘」逼出来的：OC `llj_OV_2` 把三张表的同名变量并成 45 列，
+    报告写「aliases 记了三个源列名」，库里 `select count(*) from dict where aliases<>''` = 0、
+    `source` 全 NULL。合并列没有 `source`，下一个读库的人无法回答「这列从哪张表来、覆盖了哪几个
+    源列」，只能回去读 build 脚本——而 build 脚本不随库走。
+    """
+    SYS = {'family_uid', 'period_month', 'month_ix', 'period_source', 'period_origin',
+           'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort',
+           'exam_uid', 'sequence', 'batch_id', 'lesion_ix', 'specimen_ix',
+           'entity', 'feature', 'value', 'unit'}
+    if not fam_db.exists():
+        return [], 0
+    try:
+        f = sqlite3.connect('file:%s?mode=ro' % fam_db, uri=True)
+    except sqlite3.Error:
+        return [], 0
+    out, bad = [], 0
+    try:
+        for slug, p in PROJ:
+            if not p.exists():
+                continue
+            reg = {}
+            for cn, src in f.execute(
+                    "select column_name, coalesce(source,'') from dict where scope=?",
+                    ('proj:%s' % slug,)):
+                reg[cn] = src
+            try:
+                c = sqlite3.connect('file:%s?mode=ro' % p, uri=True)
+            except sqlite3.Error:
+                continue
+            try:
+                tables = [r[0] for r in c.execute(
+                    "select name from sqlite_master where type='table' and (name='clin' "
+                    "or (name like 'modal%' and name not like '%val'))")]
+                for t in tables:
+                    cols = [r[1] for r in c.execute('pragma table_info("%s")' % t)]
+                    miss = [col for col in cols
+                            if col not in SYS and not (reg.get(col) or '').strip()]
+                    if miss:
+                        bad += len(miss)
+                        out.append('  !! P1 %s.%s：%d 个值列缺 dict.source（例 %s）'
+                                   % (slug, t, len(miss), miss[0]))
+            finally:
+                c.close()
+    finally:
+        f.close()
+    return out, bad
+
+
 def main():
     out = [f'# gate.log  built={datetime.datetime.now():%Y-%m-%d %H:%M:%S}  python={sys.version.split()[0]}']
     phis = phi_values()
@@ -1364,6 +1497,19 @@ def main():
         _n73_checked = 0
     out.append(f'\n== D73 姓名是否合成标签：检查 {_n73_checked} 个 id.name，违规 0 个（命中 {_n73} 条，只报数）')
     out.extend('  ' + x for x in _l73)
+    _l76, _n76 = d76_named_seg0(FAM_DB)
+    out.append(f'\n== D76 0 段无名标签身份（P1）：检查 {_n76} 条')
+    out.extend('  !! P1 ' + x for x in _l76[:20])
+    all_rows.append((f'family:{FAM}', 'id', 'D76', _n76))
+    _l77, _n77 = d77_orphan_ids(STAGE / FAM, FAM_DB)
+    out.append(f'\n== D77 零引用身份行（P1，只报数）：检查 {_n77} 行')
+    out.extend('  ' + x for x in _l77)
+    _l78, _n78 = d78_dict_provenance(FAM_DB)
+    out.append(f'\n== D78 值列溯源（dict.source）：{_n78} 个值列缺 source（P1）')
+    out.extend(_l78[:20])
+    if _n78:
+        all_rows.append((f'family:{FAM}', 'dict', 'D78', _n78))
+    # 只报数：零引用行可能是「数据只在 excluded_sheets 里」的正常留痕，判级交人工定性。
     d63, b63 = d63_uid_segments()
     out.append(f'\n== D63 三段 uid 映射（0 human / 8 animal / 9 占位）：{b63} 条')
     for ln in d63:
@@ -1456,4 +1602,3 @@ def d67_value_conflict(path):
 
 if __name__ == '__main__':
     main()
-
