@@ -43,7 +43,9 @@ CREATE TABLE id(
   phone      TEXT,
   address    TEXT,
   id_status  TEXT NOT NULL,             -- keyed_full | keyed_partial | keyed_animal | label_only | label_only_omics
-  subject_label TEXT,                   -- 原始院号/样本号占位
+  subject_label TEXT,                   -- 源表受试者标签原文（`HC|Sub001`/`PAT-000001`/文件名 stem）；无则 NULL。
+                                        -- **不是 uid 回显、不是查询键、不保证唯一**；join 一律用 family_uid。
+                                        -- 姓名在 name、号码在 id_number，不许只靠本列承载。
   created_on TEXT NOT NULL,
   updated_on TEXT,
   note       TEXT,
