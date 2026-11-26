@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""按家族 + 短码建 SQLite 库：<db-root>\\<family>\\_db\\<family>db
+"""按家族 + 短码建 SQLite 库：<db-root>\\<family>\\_PHI\\<family>db
 
 新口径（2026-11-16family 起，见 _Docs\\GitHub\\MY-RULES\\db-library 专题）：
-- 表格入 <family>/_db/<family>db；_db 内只放库 + 目录说明.md
-- 压缩档只在 <family>/_share/（层级 ≤2，ethics/thesis 打平为 <slug>__<name>）
+- 表格入 <family>/_PHI/<family>db；_PHI 内只放库 + 目录说明.md
+- 压缩档只在 <family>/__zip/（层级 ≤2，ethics/thesis 打平为 <slug>__<name>）
 - 档内表格：`--share-archives` 解到 staging 后入库，
-  doc.rel_path = <FAM>/_share[/<类>]/<档名>/<成员>，台账另记 archive/member
+  doc.rel_path = <FAM>/__zip[/<类>]/<档名>/<成员>，台账另记 archive/member
 - 叶内只留 目录说明.md；`--strict-leaf` 入库后校验残留
 - 原件移 {DEL}/_by-function/<batch>/originals/<code>/<family>/<leaf>/
 - 去重三层：sha → 整表（重复/子集）→ 行级；保真：每张 sheet zlib(TSV) 存 blob；
@@ -98,7 +98,7 @@ def check_strict_leaf(db_root, leaves):
 
 
 def ingest_share_archives(con, ing, args, fam_dir, batch_dir, movelog):
-    """解 _share 归档 → 档内表格入库；--move 时解包树移 {DEL} 并写 archive-member 台账。"""
+    """解 __zip 归档 → 档内表格入库；--move 时解包树移 {DEL} 并写 archive-member 台账。"""
     stat = dict(archives=0, members=0, tables=0, skipped=0, unpack_moved=0)
     for arc in core.share_archives(fam_dir):
         if core.is_raw_pack(arc.name):
@@ -106,7 +106,7 @@ def ingest_share_archives(con, ing, args, fam_dir, batch_dir, movelog):
             print(f"[skip] raw 打包产物（不是源归档）: {arc.name}")
             continue
         leaf, slug = core.share_arc_leaf(fam_dir, arc)
-        share_rel = arc.relative_to(fam_dir)          # _share/thesis/xxx.7z
+        share_rel = arc.relative_to(fam_dir)          # __zip/thesis/xxx.7z
         stage = batch_dir / "staging" / "share-unpack" / args.family / share_rel
         if stage.exists():
             # staging 是临时区：上一次的非 --move 残留改名留档，不删
@@ -153,7 +153,7 @@ def ingest_share_archives(con, ing, args, fam_dir, batch_dir, movelog):
 def main(args):
     db_root = Path(args.db_root)
     fam_dir = db_root / args.family
-    out = fam_dir / "_db"
+    out = fam_dir / "_PHI"
     db_path = out / f"{args.family}db"
     batch_dir = core.find_batch(args.batch)
     if args.leaf:
@@ -233,7 +233,7 @@ def main(args):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
-        description="按家族 + 短码建 SQLite 库（<db-root>/<family>/_db/<family>db）",
+        description="按家族 + 短码建 SQLite 库（<db-root>/<family>/_PHI/<family>db）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=("台账：<batch>/<CODE>-MOVED-<FAM>-<YYYYMMDD>.tsv\n"
                 "列：kind rel_path dst size sha256 archive member\n"
@@ -251,7 +251,7 @@ def parse_args(argv=None):
     ap.add_argument("--from-originals", action="store_true",
                     help="从批次 originals/<code>/ 重建（不读 _DataBase 叶）")
     ap.add_argument("--share-archives", action="store_true",
-                    help="解 <family>/_share/ 下压缩档，档内表格入库（原档留 _share；"
+                    help="解 <family>/__zip/ 下压缩档，档内表格入库（原档留 __zip；"
                          "配 --move 时解包树移批次 unpack/）")
     ap.add_argument("--strict-leaf", action="store_true",
                     help=f"入库后校验叶内除 {core.LEAF_README} 外无残留（有则退出码 2）")

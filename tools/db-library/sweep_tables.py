@@ -109,7 +109,7 @@ def main(args):
     man = Path(args.ledger) if args.ledger else (
         batch / f"SWEEP-TABLES-{args.family}-{datetime.now():%Y%m%d}.tsv")
     core.write_ledger(man, ("kind", "rel_path", "dst", "size", "sha256", "item"), ledger)
-    core.append_readme_note(fam_dir / "_share",
+    core.append_readme_note(fam_dir / "__zip",
                             f"- {datetime.now():%Y-%m-%d} sweep_tables：入库 {len(tables)} 张散表、"
                             f"新增 {ns} 张 sheet，台账 {man.name}")
     print(f"完成：{len(ledger)} 行 → {man}")
@@ -122,7 +122,7 @@ def parse_args(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="默认 dry-run；--apply 入库并移原件、写台账。档内表请用 --share-archives/archive_ingest。")
     ap.add_argument("--family", required=True, help="家族名，如 MHE_AN")
-    ap.add_argument("--db", type=Path, default=None, help="库路径（缺省 <root>/<family>/_db/<family>db）")
+    ap.add_argument("--db", type=Path, default=None, help="库路径（缺省 <root>/<family>/_PHI/<family>db）")
     ap.add_argument("--code", default=None, help="短码（缺省读库 meta.short_code）")
     ap.add_argument("--db-root", type=Path, default=core.DEFAULT_DB_ROOT,
                     help=f"_DataBase 根（默认 {core.DEFAULT_DB_ROOT}）")

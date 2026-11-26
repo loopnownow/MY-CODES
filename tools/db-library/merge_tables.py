@@ -7,7 +7,7 @@
   python -B tools/db-library/merge_tables.py --project OC --build
   python -B tools/db-library/merge_tables.py --project PCOS/zar_PCOS3D --build
   python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --apply   # 需点名授权
-  python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --apply --into "...\\SCH\\_db\\SCHdb"
+  python -B tools/db-library/merge_tables.py --project SCH/ly_SCH --apply --into "...\\SCH\\_PHI\\SCHdb"
 
 口径（2026-11-16family 起）：
 - 默认输出 <batch>/staging/，**不再默认落家族根 / 叶根**；--out 可改输出目录。
@@ -659,7 +659,7 @@ def parse_args(argv=None):
     ap.add_argument("--in-db", action="store_true",
                     help="允许写回 _DataBase：合并表复制回叶根（需点名授权）")
     ap.add_argument("--into", type=Path, metavar="DB", default=None,
-                    help="合并表增量入库到指定库（如 ...\\MHE_AN\\_db\\MHE_ANdb），不写回叶根")
+                    help="合并表增量入库到指定库（如 ...\\MHE_AN\\_PHI\\MHE_ANdb），不写回叶根")
     args = ap.parse_args(argv)
     if args.in_db and args.into:
         ap.error("--in-db 与 --into 不能同时使用")

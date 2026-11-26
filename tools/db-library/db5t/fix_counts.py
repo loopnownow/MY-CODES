@@ -47,7 +47,7 @@ def one(conn: sqlite3.Connection, sql: str) -> int:
 
 
 def plan(fam: str) -> list[tuple[str, dict, dict]]:
-    fam_db = P.ROOT / fam / "_db" / f"{fam}db"
+    fam_db = P.ROOT / fam / "_PHI" / f"{fam}db"
     if not fam_db.exists():
         return []
     out = []
@@ -68,7 +68,7 @@ def plan(fam: str) -> list[tuple[str, dict, dict]]:
 
 
 def apply(fam: str, changes: list[tuple[str, dict, dict]]) -> None:
-    fam_db = P.ROOT / fam / "_db" / f"{fam}db"
+    fam_db = P.ROOT / fam / "_PHI" / f"{fam}db"
     conn = sqlite3.connect(fam_db.as_posix())
     try:
         for slug, _, new in changes:
@@ -86,7 +86,7 @@ def apply(fam: str, changes: list[tuple[str, dict, dict]]) -> None:
 def main(argv: list[str]) -> int:
     go = "--go" in argv
     args = [a for a in argv if a != "--go"]
-    fams = ([d.name for d in P.ROOT.iterdir() if (d / "_db").is_dir()]
+    fams = ([d.name for d in P.ROOT.iterdir() if (d / "_PHI").is_dir()]
             if not args or "--all" in args else args)
     total = 0
     for fam in fams:

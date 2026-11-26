@@ -83,7 +83,7 @@ def check_db(path, expect):
     for tname, ecols in expect.items():
         tmpl = tname in ('__modal__', '__val__')
         if tmpl:
-            cand = [t for t in have if (t.startswith('modal_') and tname == '__modal__')
+            cand = [t for t in have if (t.startswith('_modules_') and tname == '__modal__')
                     or (t.endswith('_val') and tname == '__val__')]
         else:
             cand = [tname] if tname in have else []
@@ -108,7 +108,7 @@ def main():
     exp = expected_sets()
     total = 0
     for fam in FAMS:
-        famdb = STAGE / fam / '_db' / f'{fam}db'
+        famdb = STAGE / fam / '_PHI' / f'{fam}db'
         if not famdb.exists():
             print(f'[skip] {fam}: 无家族库')
             continue

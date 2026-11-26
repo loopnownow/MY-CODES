@@ -6,7 +6,7 @@
 
     named     有 id.name                —— 按现行口径该在 0 段（人级实体）
     numbered  有 id_number 行            —— 有号码却不发 keyed 段，也要看
-    specimen  被 modal_* 表的 exam 行引用 —— 标本/检查级身份（SCC 的病理号行）
+    specimen  被 _modules_* 表的 exam 行引用 —— 标本/检查级身份（SCC 的病理号行）
     omics     id_status='label_only_omics'
     empty     其余，真占位
 
@@ -30,7 +30,7 @@ def tables(c, kind):
 
 
 def audit_family(fam):
-    fam_db = STAGE / fam / '_db' / f'{fam}db'
+    fam_db = STAGE / fam / '_PHI' / f'{fam}db'
     if not fam_db.exists():
         return []
     with sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True) as f:
@@ -47,7 +47,7 @@ def audit_family(fam):
         if not dbs:
             continue
         with sqlite3.connect(f'file:{dbs[0]}?mode=ro', uri=True) as c:
-            for t in tables(c, 'modal_*') or []:
+            for t in tables(c, '_modules_*') or []:
                 for (u,) in c.execute(f'select distinct family_uid from "{t}" where family_uid is not null'):
                     referenced.add(u)
             for (u,) in c.execute('select distinct family_uid from person'):

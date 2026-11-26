@@ -23,7 +23,7 @@ def sha(p):
 
 
 def one(fam):
-    fam_db = STAGE / fam / '_db' / f'{fam}db'
+    fam_db = STAGE / fam / '_PHI' / f'{fam}db'
     if not fam_db.exists():
         print(f'{fam}: 家族库不存在 {fam_db}')
         return

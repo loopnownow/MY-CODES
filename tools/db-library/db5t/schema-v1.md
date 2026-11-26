@@ -4,19 +4,19 @@
 
 v1.3 修正（据 21 库日期普查，census\CENSUS-REPORT.md）：① clin 主键加 `unk_seq`——UNK 行不能按 `(family_uid,'UNK')` 聚合，否则同一人多条无日期记录会被压成一条；② 见 §7，普查推翻了「多时点普遍存在」这个前提。
 
-v1.2 修正（据 Aitor 草案复核）：① 组学长表改名，消掉 `modal_radiomics_exam` 未定义的自引用；② 补旧库与新家族库**同名撞车**的并存方案；③ 记明 verify_db 实际只实现 D1–D9 / D19–D22，D10–D18 是人工注记码，新码从 D23 起编。
+v1.2 修正（据 Aitor 草案复核）：① 组学长表改名，消掉 `_modules_radiomics_exam` 未定义的自引用；② 补旧库与新家族库**同名撞车**的并存方案；③ 记明 verify_db 实际只实现 D1–D9 / D19–D22，D10–D18 是人工注记码，新码从 D23 起编。
 
-v1.4 增补（影像库 AITEE，据用户「按设备切库 + 考虑 ComBat + 组学在范围内」）：① 家族库加 `ref_study`（研究目的与结局状态，D58）与 `ref_batch`（批次 = 设备 + 重建参数集，D59–D61）；② `modal_<mod>` 加 `batch_id`，影像模态必填，扫描参数只落 `ref_batch` 不落子库；③ `qc.code` 补影像专有码；④ 组学 `radi_val.entity` 用 ROI 名、无 ROI 轴填 `'global'`。**建库前必须重读本节：v1.3 的 DDL 不含这三张影像表。**
+v1.4 增补（影像库 AITEE，据用户「按设备切库 + 考虑 ComBat + 组学在范围内」）：① 家族库加 `ref_study`（研究目的与结局状态，D58）与 `ref_batch`（批次 = 设备 + 重建参数集，D59–D61）；② `_modules_<mod>` 加 `batch_id`，影像模态必填，扫描参数只落 `ref_batch` 不落子库；③ `qc.code` 补影像专有码；④ 组学 `radi_val.entity` 用 ROI 名、无 ROI 轴填 `'global'`。**建库前必须重读本节：v1.3 的 DDL 不含这三张影像表。**
 
 ## 0. 文件布局
 
 ```text
 _DataBase\<family>\
-  _db\<family>db                 家族库：meta / id / id_number / dict / ref_project   ← 唯一 PHI 落点
-  _db\<family>db.raw6t           迁移期旧库（core-6t 冻结只读），验收后移走
-  <slug>\<slug>db                子工程库：meta / src / person / clin / modal_<mod> / qc  ← 零 PHI
+  _PHI\<family>db                 家族库：meta / id / id_number / dict / ref_project   ← 唯一 PHI 落点
+  _PHI\<family>db.raw6t           迁移期旧库（core-6t 冻结只读），验收后移走
+  <slug>\<slug>db                子工程库：meta / src / person / clin / _modules_<mod> / qc  ← 零 PHI
   <slug>\目录说明.md
-  _share\                        原始档（不动）
+  __zip\                        原始档（不动）
 ```
 
 - 库文件无扩展名，与现行 `<family>db` 同风格。
@@ -140,7 +140,7 @@ CREATE TABLE meta(k TEXT PRIMARY KEY, v TEXT NOT NULL);
 -- schema_version=5t/1, kind=project, family=ACN, slug=lxj_ACN, built_at, rule=...,
 -- period_unit=6（整数语义；k/v 里只能落文本，读侧一律 int() 后比较）,
 --   无时间轴的项目 **不写该键**（v 是 NOT NULL，写不进 NULL）→ 缺键即 NULL，
---   同时写 period_unit_missing_reason 说明理由，见 §3, dict_owner=..\_db\ACNdb, dict_sha256=..., source_db=旧库, source_sha256=...
+--   同时写 period_unit_missing_reason 说明理由，见 §3, dict_owner=..\_PHI\ACNdb, dict_sha256=..., source_db=旧库, source_sha256=...
 
 CREATE TABLE src(                    -- 溯源
   src_id   INTEGER PRIMARY KEY,
@@ -192,7 +192,7 @@ CREATE TABLE clin(                   -- 一人一时点一行；同月多次采�
 CREATE UNIQUE INDEX ux_clin_month ON clin(family_uid, period_month) WHERE period_month<>'UNK';
 CREATE INDEX ix_clin_month ON clin(month_ix);
 
-CREATE TABLE modal_<mod>(            -- 检查级：mod = radiomics | us | mri | ct | pet | path | report
+CREATE TABLE _modules_<mod>(            -- 检查级：mod = radiomics | us | mri | ct | pet | path | report
   exam_uid     TEXT PRIMARY KEY,     -- <MOD>-<YYYYMMDD>-<n>；无日期时 <MOD>-UNK-<n>
   family_uid   TEXT NOT NULL REFERENCES person(family_uid) ON DELETE CASCADE,
   period_month TEXT, month_ix INTEGER,
@@ -203,10 +203,10 @@ CREATE TABLE modal_<mod>(            -- 检查级：mod = radiomics | us | mri |
   src_row INTEGER,
   note TEXT
 );
-CREATE INDEX ix_modal_month ON modal_<mod>(family_uid, month_ix);
+CREATE INDEX ix_modal_month ON _modules_<mod>(family_uid, month_ix);
 
 CREATE TABLE <mod>_val(              -- 通用组学长表：不建 1300 列宽表
-  exam_uid TEXT NOT NULL REFERENCES modal_<mod>(exam_uid) ON DELETE CASCADE,
+  exam_uid TEXT NOT NULL REFERENCES _modules_<mod>(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
   value    REAL,
@@ -218,9 +218,9 @@ CREATE TABLE <mod>_val(              -- 通用组学长表：不建 1300 列宽�
 --   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
 --   metab_val      entity='global'；feature=代谢物名（59 列）
 --   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（modal_radiomics ↔ radiomics_val），不重名。
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
 
--- 一张模态一张 val 表，不共用：每个模态必须有自己的一对 modal_<mod> + <mod>_val，
+-- 一张模态一张 val 表，不共用：每个模态必须有自己的一对 _modules_<mod> + <mod>_val，
 -- entity 的语义与 feature 的含义逐模态写进 dict。
 -- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
@@ -254,7 +254,7 @@ CREATE TABLE qc(
 - 落盘编码：`ref_project.period_unit` 是 **INTEGER**，不放文本；子库 `meta` 是 k/v 且 `v NOT NULL`，**无时间轴 = 不写该键**（缺键即 NULL），另写 `period_unit_missing_reason` 记理由。镜像门一律 `int(float(v))` 后比较——试点实测三家曾全部存成文本 `'6'`，`'6' != 6` 会让镜像门假失败。
 - 第三种情形：**库里确有日期，但逐人归组未定**（LC `qrx_LUNG_his`：808 行中 253 行有日期，`identity_state='unresolved'`，每人只剩 1 行，连不成序列）。此时 `period_unit` 照常声明（LC 写 6 = 「将来恢复纵向时的粒度政策」），同时必须写 qc `LONGITUDINAL_UNAVAILABLE`(P2) 并保持 `identity_state='unresolved'`。理由：`NULL` 只能表示「库里没有时间」；拿它表示「有时间但连不成序列」，会让下游把数据缺失与待人工裁决混为一谈——前者无解，后者有 `identity_candidates.csv` 这条可回滚路径。
 - `observed_on` 保留精确日期；`period_month` 由它截断到月，不一致由 D30 报错。
-- **同月多次采集**：`clin` 只留一行，`PRIMARY KEY (family_uid, period_month)`；迁移期按来源时间序合并——后到的非空值覆盖先到的空值，两个非空值不同则保留先到值、冲突写 `qc(code='CONFLICT')`，`merged_n` 记合并条数，`observed_on` 取当月最早。`modal_*` 不聚合，保留 `exam_uid` 级明细。
+- **同月多次采集**：`clin` 只留一行，`PRIMARY KEY (family_uid, period_month)`；迁移期按来源时间序合并——后到的非空值覆盖先到的空值，两个非空值不同则保留先到值、冲突写 `qc(code='CONFLICT')`，`merged_n` 记合并条数，`observed_on` 取当月最早。`_modules_*` 不聚合，保留 `exam_uid` 级明细。
 - **无日期**：`period_month='UNK'`、`month_ix=NULL`、`period_source='unknown'`；排序用 `COALESCE(month_ix, 999999)`。`UNK` 行不参与时间序列统计，只能进横断面分析，且必须能在 `qc` 里查到原因。
 - **`period_source` 与 `period_origin` 分工**（v1.4 增列，起因：BT 的日期本质是「影像检查时间」，写进 `period_source='exact'` 就只能靠 `meta` 猜）：`period_source` 答**这个月有多准**（`exact|approx|unknown`），`period_origin` 答**这个月是哪件事的**（`exam_date|surgery_date|admission_date|report_date|derived|unknown`，UNK 行可为 NULL）。两者不许合并成一个枚举——「影像检查的准确日期」与「手术的准确日期」对 `生存起点` 的意义完全不同，合并后 `period_source='exact'` 这一格在 BT 与 EC 里指两件事，下游按它算随访间隔必然混。已知取值：BT/`ybc_EC_img`=`exam_date`；EC `S` 队列=`surgery_date`、`A` 队列=`admission_date`；STWZ=`surgery_date`；相对随访月换算=`derived`。
 - clin 有行 = 该时点采集过；列 NULL = 采了但缺；无行 = 未采集。三者不可混。
@@ -276,19 +276,19 @@ CREATE TABLE qc(
 **源优先级：原文件 > `src.blob` 快照 > curated 表。** 旧库 `src.blob` 不是缩略图，而是每张 sheet 的 zlib+TSV 全量快照（含表头行），连 `is_wide=1`、EAV 跳过的宽表都在。也就是说 curated 表丢失的、loader 跳过的宽表，都能从 blob 逐格重建——curated 只在原始 sheet 也无法还原时才作为最后手段，且必须逐格核对重叠部分。凡内容仅存于 blob 的表，在 `src` 登记 `kind='old_db_blob'`（附 blob 的 sha256），并在 `qc` 留 `SOURCE_BLOB_ONLY`(P2) 一条说明：原文件不可再取，重建来源是旧库内的快照。
 
 1. 家族库先建（在 `{DEL}` 批次目录 stage）：`id` + `id_number` 从旧 `person/person_key` 与行级 PHI 项（姓名/身份证/电话/地址/各种号）抽取。
-2. 子库逐个建：先 `person` 占位（family_uid 关联），再 `clin`，再 `modal_*`。
+2. 子库逐个建：先 `person` 占位（family_uid 关联），再 `clin`，再 `_modules_*`。
 3. 门禁全 PASS 后切换日：旧库改名 `<family>db.raw6t`，staged 库换入 `<family>db`；旧库 attrib +R 冻结，`meta.source_sha256` 记录其 sha256；`ATTACH` 对账 6 项。
 4. 对账通过后才允许把 `.raw6t` 移入 `{DEL}`（用户口径：冻结并存，验收后再谈 10 年归档）。
 
 ## 6. 阻塞项（落 RULES 或动库之前必须解决）
 
-- [ ] **S28 会崩**：`structure_check.py:1187-1191` 查 `doc/project/sheet`，5t 家族库没有这些表 → 可能整条检查抛 `no such table` 而非单条 fail；S31（`:1351`）只统计 `_db\<family>db`，子库不可见。必须与建库同批改。
+- [ ] **S28 会崩**：`structure_check.py:1187-1191` 查 `doc/project/sheet`，5t 家族库没有这些表 → 可能整条检查抛 `no such table` 而非单条 fail；S31（`:1351`）只统计 `_PHI\<family>db`，子库不可见。必须与建库同批改。
 - [ ] **D21 与 D28 判级冲突**：D21 现为「明文 PHI 仅 P2」，子库零 PHI 需 P0；执行时容易被 D21 当免死金牌。
 - [ ] verify_db 实际只有 D1–D9 / D19–D22，D10–D18 是人工注记码；新码从 D23 起编，不与旧号复用。
 - [ ] 子库是否需要自己的 `dict` 只读副本（外发自描述）。
 - [ ] `exam_uid` 生成规则：同一人同一天两次检查的 `n` 如何稳定分配（按扫描时间还是按来源行序）。
 - [ ] `person` 表为空的 4 个库（OC / RDL / PHT / SSD）如何从「姓名存疑 / 姓名(crosswalk)」多版本列定人。
-- [ ] `_share` 是否收子库归档（现在 `_share` 只收原始件，收库会打乱「原始件池」语义）。
+- [ ] `__zip` 是否收子库归档（现在 `__zip` 只收原始件，收库会打乱「原始件池」语义）。
 
 ## 7. 普查结论对设计的修订（21 库全量日期普查，2,744,042 行）
 

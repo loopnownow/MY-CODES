@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""打平 _share 的 ethics/thesis 子目录：<slug>/<文件> → <slug>__<文件>。
+"""打平 __zip 的 ethics/thesis 子目录：<slug>/<文件> → <slug>__<文件>。
 
-口径：《_DataBase》_share 层级 ≤2，ethics/thesis 不打子目录，档名用
+口径：《_DataBase》__zip 层级 ≤2，ethics/thesis 不打子目录，档名用
 `<slug>__<原文件名>`（嵌套目录用 `__` 连接）。已打平的（直接位于 thesis/ethics 下）
 不再处理；目标同名同 sha 视为重复件，移 {DEL} dups；同名不同 sha 报错停下。
 
@@ -26,7 +26,7 @@ DEFAULT_BATCH = "2026-11-db-share"
 
 def plan_moves(fam_dir):
     """返回 [(class_dir, slug_dir, src, target)]。"""
-    share = Path(fam_dir) / "_share"
+    share = Path(fam_dir) / "__zip"
     moves = []
     if not share.is_dir():
         return moves
@@ -42,8 +42,8 @@ def plan_moves(fam_dir):
 
 
 def cleanup_empty_dirs(fam_dir):
-    """只 rmdir _share/{thesis,ethics} 下的空子目录（不删文件）。"""
-    share = Path(fam_dir) / "_share"
+    """只 rmdir __zip/{thesis,ethics} 下的空子目录（不删文件）。"""
+    share = Path(fam_dir) / "__zip"
     for cls in core.SHARE_CLASSES:
         cdir = share / cls
         if not cdir.is_dir():
@@ -66,7 +66,7 @@ def main(args):
     batch = core.batch_dir(args.batch)
     moves = plan_moves(fam_dir)
     if not moves:
-        print("无需打平：_share/thesis|ethics 下没有子目录")
+        print("无需打平：__zip/thesis|ethics 下没有子目录")
         return 0
 
     conflicts, dups = [], []
@@ -105,7 +105,7 @@ def main(args):
     man = Path(args.ledger) if args.ledger else (
         batch / f"FLATTEN-{args.family}-{datetime.now():%Y%m%d}.tsv")
     core.write_ledger(man, ("kind", "rel_path", "dst", "size", "sha256", "item"), ledger)
-    core.append_readme_note(fam_dir / "_share",
+    core.append_readme_note(fam_dir / "__zip",
                             f"- {datetime.now():%Y-%m-%d} flatten_share：ethics/thesis 打平 {len(moves)} 个文件，台账 {man.name}")
     print(f"完成：{len(ledger)} 行 → {man}")
     return 0
@@ -113,7 +113,7 @@ def main(args):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
-        description="_share/ethics|thesis 打平（<slug>/<文件> → <slug>__<文件>）",
+        description="__zip/ethics|thesis 打平（<slug>/<文件> → <slug>__<文件>）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="默认 dry-run；--apply 落盘并写台账；目标同名同 sha 的源移 {DEL} dups。")
     ap.add_argument("--family", required=True, help="家族名，如 MHE_AN")

@@ -15,7 +15,7 @@ import paths as B  # 路径解析集中在这里；DB5T_ROOT 可指向 _DataBase
 
 STAGE = pathlib.Path(os.environ.get('DB5T_ROOT') or B.STAGE)
 FAM = sys.argv[1] if len(sys.argv) > 1 else 'MCI'      # MCI | LC | SSD
-FAM_DB = STAGE / FAM / '_db' / f'{FAM}db'
+FAM_DB = STAGE / FAM / '_PHI' / f'{FAM}db'
 LOG = STAGE / 'gate.log'
 # 子库清单从家族库 ref_project 读（不再硬编码），保持门禁对新家族通用
 PROJ = []
@@ -176,7 +176,7 @@ def dict_cov(path, scope, fam_db):
         missing = missing + [f'{t}.feature:{x}' for x in miss_f]
         extra = extra + [f'{t}.feature:{x}' for x in extra_f]
     for t in sorted(tabs):
-        if not t.startswith('modal_'):
+        if not t.startswith('_modules_'):
             continue
         mcols = [r[1] for r in c.execute(f'pragma table_info("{t}")')]
         missing = missing + [f'{t}.{x}' for x in mcols if (t, x) not in rows]
@@ -188,17 +188,17 @@ def dict_cov(path, scope, fam_db):
                    and x[1] not in ('exam_uid', 'entity', 'feature', 'value', 'unit')]
         missing = missing + [f'radiomics_val.feature:{x}' for x in miss_f]
         extra = extra + [f'radiomics_val.feature:{x}' for x in extra_f]
-    if 'modal_radiomics' in tabs:
-        mcols = [r[1] for r in c.execute('pragma table_info(modal_radiomics)')]
-        missing = missing + [f'modal_radiomics.{x}' for x in mcols if ('modal_radiomics', x) not in rows]
-        extra = extra + [f'modal_radiomics.{x}' for x in rows if x[0] == 'modal_radiomics' and x[1] not in mcols]
+    if '_modules_radiomics' in tabs:
+        mcols = [r[1] for r in c.execute('pragma table_info(_modules_radiomics)')]
+        missing = missing + [f'_modules_radiomics.{x}' for x in mcols if ('_modules_radiomics', x) not in rows]
+        extra = extra + [f'_modules_radiomics.{x}' for x in rows if x[0] == '_modules_radiomics' and x[1] not in mcols]
     c.close(); f.close()
     return missing, extra
 
 
 def parent_gates(path):
-    """§2 顺序门：<mod>_val 有行但 modal_<mod> 里没有对应 exam，说明重建顺序错了
-    （典型：先删 modal_cells 再插 cells_val → 裸 FOREIGN KEY constraint failed）。
+    """§2 顺序门：<mod>_val 有行但 _modules_<mod> 里没有对应 exam，说明重建顺序错了
+    （典型：先删 _modules_cells 再插 cells_val → 裸 FOREIGN KEY constraint failed）。
     明确报「父表 exam 缺失，按 §2 顺序重建」，不要让人对着 FK 报错猜。"""
     c = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
     bad = []
@@ -207,7 +207,7 @@ def parent_gates(path):
         if not t.endswith('_val'):
             continue
         mod = t[:-4]
-        parent = f'modal_{mod}'
+        parent = f'_modules_{mod}'
         if parent not in tabs:
             bad.append(('P0', f'{t} 存在但缺少父表 {parent}（§2 应按模态成对建表）', 1))
             continue
@@ -219,7 +219,7 @@ def parent_gates(path):
         if orphan:
             bad.append(('P0', f'{t} 有 {orphan} 行的 exam_uid 在 {parent} 里不存在'
                               f'（父表 exam 缺失，按 §2 顺序重建：先删 *_val 与非 cells modal → '
-                              f'build him/proj 重建 modal_cells → 再跑 omics）', orphan))
+                              f'build him/proj 重建 _modules_cells → 再跑 omics）', orphan))
     c.close()
     return bad
 
@@ -794,7 +794,7 @@ def _fam_of(path):
 def _old_container(fam):
     """切库后旧 core-6t 库叫 <fam>db_6t；未切库时叫 <fam>db。取带 src 表且 src 有 blob 列的那个。"""
     for name in (f'{fam}db_6t', f'{fam}db'):
-        p = DBROOT / fam / '_db' / name
+        p = DBROOT / fam / '_PHI' / name
         if not p.exists():
             continue
         try:
@@ -890,7 +890,7 @@ def d62_blob_ptr(path):
             out.append(f'src {sid} 指针不合法：{rel[:80]}'); bad += 1; continue
         cont, old = m.group('cont'), int(m.group('sid'))
         cfam = cont[:-2] if cont.endswith('db') else cont
-        cpath = DBROOT / cfam / '_db' / cont
+        cpath = DBROOT / cfam / '_PHI' / cont
         # 切库后 `<fam>db` 已换成 5t 家族库（无 src 表），旧容器是 `<fam>db_6t`。
         # 两段式指针若指向同名旧容器，必须回落到 _6t，否则「容器在但查不到」会被误判成缺表崩溃。
         if cpath.exists() and not _has_src(cpath):
@@ -924,7 +924,7 @@ def _registered_id_collisions():
     """
     reg = set()
     base = FAM_DB.parent
-    if base.name == '_db':          # 家族库在 <fam>/_db/<fam>db，项目库在 <fam>/<slug>/ 下
+    if base.name == '_PHI':          # 家族库在 <fam>/_PHI/<fam>db，项目库在 <fam>/<slug>/ 下
         base = base.parent
     if not base.exists():
         return reg
@@ -1053,7 +1053,7 @@ def d34_registry(fam, fam_db):
         'select slug, db_rel_path from ref_project')}
     on_disk = {}
     for d in sorted(base.iterdir()):
-        if not d.is_dir() or d.name == '_db':
+        if not d.is_dir() or d.name == '_PHI':
             continue
         f = d / (d.name + 'db')
         if f.exists():
@@ -1111,10 +1111,10 @@ def d71_seg9_idnum():
 
 
 def _fam_db_of(proj_db):
-    """项目库 -> 同家族 `_db/<fam>db`（gates 里两种根都认）。"""
+    """项目库 -> 同家族 `_PHI/<fam>db`（gates 里两种根都认）。"""
     p = pathlib.Path(proj_db)
     fam = p.parent.parent.name
-    return p.parent.parent / '_db' / (fam + 'db')
+    return p.parent.parent / '_PHI' / (fam + 'db')
 
 
 def d72_identity_grain():
@@ -1251,7 +1251,7 @@ def d76_named_seg0(fam_db):
 
 
 def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
-    """D77（P1，只报数）：家族库里未被任何项目 person/clin/modal_* 引用的 id 行。
+    """D77（P1，只报数）：家族库里未被任何项目 person/clin/_modules_* 引用的 id 行。
 
     没有任何门在查「id 里这行到底有没有人」，所以零引用身份可以一直躺着。
     这里只报数并出 csv（stage/_work/orphan_ids_<FAM>.csv），留/删由人按两条判据定性：
@@ -1278,7 +1278,7 @@ def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
         except sqlite3.OperationalError:
             continue
         for (t,) in c.execute("select name from sqlite_master where type='table'"):
-            if t in ('person', 'clin') or t.startswith('modal_'):
+            if t in ('person', 'clin') or t.startswith('_modules_'):
                 try:
                     used.update(r[0] for r in c.execute(f'select distinct family_uid from "{t}" '
                                                         'where family_uid is not null'))
@@ -1301,7 +1301,7 @@ def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
     return out, len(orphans)
 
 def d78_dict_provenance(fam_db):
-    """D78（P1）：`clin` / `modal_<mod>` 的每个值列，在家族库 dict 里必须有行且 `source` 非空。
+    """D78（P1）：`clin` / `_modules_<mod>` 的每个值列，在家族库 dict 里必须有行且 `source` 非空。
 
     这条是被「第五次说了没落盘」逼出来的：OC `llj_OV_2` 把三张表的同名变量并成 45 列，
     报告写「aliases 记了三个源列名」，库里 `select count(*) from dict where aliases<>''` = 0、
@@ -1312,7 +1312,7 @@ def d78_dict_provenance(fam_db):
            'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort',
            'exam_uid', 'sequence', 'batch_id', 'lesion_ix', 'specimen_ix',
            'entity', 'feature', 'value', 'unit',
-           # SCHEMA §2 的 modal_<mod> 结构列：它们描述「这次检查怎么来的」，不是源表的变量，
+           # SCHEMA §2 的 _modules_<mod> 结构列：它们描述「这次检查怎么来的」，不是源表的变量，
            # 没有源列可溯源。漏登记的代价是把 27 家都判红（2026-11-25 MCI 的 device 等）。
            'device', 'site', 'roi_n', 'note'}
     if not fam_db.exists():
@@ -1460,7 +1460,7 @@ def d80_phi_composite(path):
     out, bad = [], 0
     try:
         for (t,) in c.execute("select name from sqlite_master where type='table'").fetchall():
-            if not (t == 'clin' or (t.startswith('modal_') and not t.endswith('_val'))):
+            if not (t == 'clin' or (t.startswith('_modules_') and not t.endswith('_val'))):
                 continue
             cols = [(r[1], (r[2] or '').upper()) for r in c.execute('pragma table_info("%s")' % t)]
             for cn, typ in cols:
@@ -1499,10 +1499,10 @@ def d80_phi_composite(path):
 
 
 def d81_empty_modals(projs):
-    """D81（只报数）：`modal_<mod>` 存在但 0 行，且没有 `qc(MODAL_ABSENT)`。
+    """D81（只报数）：`_modules_<mod>` 存在但 0 行，且没有 `qc(MODAL_ABSENT)`。
 
     空表本身可以是对的（「这家没做这种影像」），但**空与没记在库里长得一样**：
-    下游 `select count(*) from modal_radi` 得到 0，无法区分「没有影像」和「建库时漏了」。
+    下游 `select count(*) from _modules_radi` 得到 0，无法区分「没有影像」和「建库时漏了」。
     这条不判红，只把「该记账而没记」的点出来——与 D73/D74 同属「先让它可见」那一类。
     """
     out = []
@@ -1536,6 +1536,11 @@ def d81_empty_modals(projs):
 
 
 def main():
+    if not FAM_DB.exists():
+        # 家族库不在 = 桶名没切或库没搬。直接说清楚，别让 sqlite 抛 traceback 掩盖原因。
+        print(f'FAIL {FAM}：缺家族库 {FAM_DB}')
+        print(f'     家族库桶只认 _PHI，子工程库在 <family>/<slug>/<slug>db；先跑迁移再验。')
+        sys.exit(2)
     out = [f'# gate.log  built={datetime.datetime.now():%Y-%m-%d %H:%M:%S}  python={sys.version.split()[0]}']
     phis = phi_values()
     out.append(f'PHI 值集合（家族库 id 的 name/id_card/phone/address）= {len(phis)} 个')

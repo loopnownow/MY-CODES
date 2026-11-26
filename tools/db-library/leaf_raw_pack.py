@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""叶内 raw（非表、非归档）按单元压档上收到 `_share/<leaf>/`。
+"""叶内 raw（非表、非归档）按单元压档上收到 `__zip/<leaf>/`。
 
 口径：叶内只留 `目录说明.md`；零散原始件（图片、原始导出、文档等）按「单元」打包：
 单元 = 叶下第一层子目录名，直属松散文件归 `loose`。档名
-`<code>__<leaf>__<unit>-raw-<YYYY-MM-DD>.tar.zst`，落 `_share/<leaf>/`；
+`<code>__<leaf>__<unit>-raw-<YYYY-MM-DD>.tar.zst`，落 `__zip/<leaf>/`；
 逐件 sha256 记台账，原件移 {DEL} originals 备查，叶内 目录说明.md 记 raw→档 映射。
 
 用法：
@@ -62,9 +62,9 @@ def main(args):
         return 0
 
     total = sum(len(items) for _l, _u, items in plans)
-    print(f"计划: {len(plans)} 个单元 / {total} 个 raw 文件 → _share/<leaf>/")
+    print(f"计划: {len(plans)} 个单元 / {total} 个 raw 文件 → __zip/<leaf>/")
     for leaf, unit, items in plans:
-        arc = fam_dir / "_share" / leaf.name / pack_name(code, leaf.name, unit, stamp)
+        arc = fam_dir / "__zip" / leaf.name / pack_name(code, leaf.name, unit, stamp)
         print(f"  [{leaf.name}/{unit}] {len(items)} 文件 -> "
               f"{arc.relative_to(fam_dir).as_posix()}")
     if not args.apply:
@@ -73,7 +73,7 @@ def main(args):
 
     ledger = []
     for leaf, unit, items in plans:
-        arc = fam_dir / "_share" / leaf.name / pack_name(code, leaf.name, unit, stamp)
+        arc = fam_dir / "__zip" / leaf.name / pack_name(code, leaf.name, unit, stamp)
         entries = [rel for rel, p in items]
         if arc.exists():
             if set(core.tar_list(arc)) != set(entries):
@@ -92,7 +92,7 @@ def main(args):
             ledger.append((unit, arc.relative_to(fam_dir).as_posix(), rel, size, h, arc_sha))
         core.append_readme_note(
             leaf,
-            f"- {stamp} raw 单元 `{unit}`（{len(items)} 件）→ `_share/{leaf.name}/{arc.name}`")
+            f"- {stamp} raw 单元 `{unit}`（{len(items)} 件）→ `__zip/{leaf.name}/{arc.name}`")
         print(f"  + {arc.name}: {len(items)} 件，档 sha256 {arc_sha[:12]}")
     for leaf in {leaf for leaf, _u, _i in plans}:
         for d in sorted((p for p in leaf.rglob("*") if p.is_dir()),
@@ -105,7 +105,7 @@ def main(args):
     man = Path(args.ledger) if args.ledger else (
         batch / f"RAW-PACK-{args.family}-{datetime.now():%Y%m%d}.tsv")
     core.write_ledger(man, ("unit", "arc", "rel_path", "size", "sha256", "arc_sha256"), ledger)
-    core.append_readme_note(fam_dir / "_share",
+    core.append_readme_note(fam_dir / "__zip",
                             f"- {datetime.now():%Y-%m-%d} leaf_raw_pack：打包 {len(plans)} 个 raw 单元，台账 {man.name}")
     print(f"完成：{len(ledger)} 行 → {man}")
     return 0
@@ -113,7 +113,7 @@ def main(args):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
-        description="叶内 raw 按单元压档（tar.zst）上收到 _share/<leaf>/",
+        description="叶内 raw 按单元压档（tar.zst）上收到 __zip/<leaf>/",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="默认 dry-run；--apply 打包、逐件 sha256 记台账、原件移 {DEL}。")
     ap.add_argument("--family", required=True, help="家族名，如 MHE_AN")
