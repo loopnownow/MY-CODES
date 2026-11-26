@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""db-library 公共核心：DDL / 去重入库 / 解档 / _share 归档 / 台账 / 移动校验。
+"""db-library 公共核心：DDL / 去重入库 / 解档 / __zip 归档 / 台账 / 移动校验。
 
 口径（2026-11-16family 起）：
-- 库：<db-root>/<family>/_db/<family>db；_db 内只放库 + 目录说明.md
-- 归档：只在 <family>/_share/（层级 ≤2，ethics/thesis 打平为 <slug>__<name>）
-- 档内表格：解出入库，doc.rel_path = <FAM>/_share[/<类>]/<档名>/<成员>
+- 库：<db-root>/<family>/_PHI/<family>db；_PHI 内只放库 + 目录说明.md
+- 归档：只在 <family>/__zip/（层级 ≤2，ethics/thesis 打平为 <slug>__<name>）
+- 档内表格：解出入库，doc.rel_path = <FAM>/__zip[/<类>]/<档名>/<成员>
 - 叶内：只留 目录说明.md（未入库 PHI/模板例外，见 LEAF_EXCEPTIONS）
 - 原件：入 {DEL}/_by-function/<batch>/originals/<code>/<family>/<leaf>/
 - 台账：kind=table|archive|archive-member，sha256 全记
@@ -76,12 +76,12 @@ SHARE_CLASSES = ("ethics", "thesis")
 LEAF_EXCEPTIONS = {"MHE_PA/lx_MHE_1"}
 
 # 现行口径（meta.rule 逐字；verify 按关键字校验）
-RULE_TEXT = ("深度去重：sha→整表(重复/子集)→行级；压缩档不入库（原档留 _share，"
+RULE_TEXT = ("深度去重：sha→整表(重复/子集)→行级；压缩档不入库（原档留 __zip，"
              "档内表解出入库）；叶内只留说明；原件移 _DEL；"
              "行名一致按列合并、列名一致按行合并，均以较新数据为主；"
              "每叶只留一份现行源文件，内含长表与宽表，每表最多 5 个工作单；"
              "每项目至多长表与宽表各一，只收原始行列数据")
-RULE_KEYWORDS = ("_share", "叶内只留说明")
+RULE_KEYWORDS = ("__zip", "叶内只留说明")
 
 NUM = re.compile(r"^[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$")
 IDCOL = re.compile(
@@ -92,7 +92,7 @@ IDCOL = re.compile(
 # 写路径必须直写实表，任何 INSERT/UPDATE 视图都会报 "cannot modify ... because it is a view"。
 SIXT_TABLES = ("meta", "project", "src", "item", "val", "person", "person_key")
 PHI_COL = re.compile(r"身份证|电话|手机|邮箱|地址")
-# 实体归并优先级（口径见各家族 _db/目录说明.md）：值小者优先
+# 实体归并优先级（口径见各家族 _PHI/目录说明.md）：值小者优先
 ID_PRIO = ((r"全院号|empi", 10), (r"影像号", 20), (r"门诊号", 30), (r"住院号", 40),
            (r"病理号", 50), (r"医技号", 60), (r"patient", 65), (r"^id$", 70),
            (r"样本编号", 80), (r"编号|case\s*no\.?", 85))
@@ -189,19 +189,19 @@ def family_dir(db_root, family):
 
 
 def family_db(db_root, family):
-    return Path(db_root) / family / "_db" / f"{family}db"
+    return Path(db_root) / family / "_PHI" / f"{family}db"
 
 
 def family_of_db(db_path):
-    """<root>/<family>/_db/<family>db → family。"""
+    """<root>/<family>/_PHI/<family>db → family。"""
     p = Path(db_path)
-    if p.parent.name == "_db":
+    if p.parent.name == "_PHI":
         return p.parent.parent.name
     return p.parent.name
 
 
 def leaf_dirs(fam_dir):
-    """家族下的叶目录（跳过 _db/_share 等下划线目录）。"""
+    """家族下的叶目录（跳过 _PHI/__zip 等下划线目录）。"""
     fam = Path(fam_dir)
     if not fam.is_dir():
         return []
@@ -696,8 +696,8 @@ def is_raw_pack(name):
 
 
 def share_archives(fam_dir):
-    """<family>/_share 下（层级 ≤2）全部归档文件。"""
-    share = Path(fam_dir) / "_share"
+    """<family>/__zip 下（层级 ≤2）全部归档文件。"""
+    share = Path(fam_dir) / "__zip"
     out = []
     if not share.is_dir():
         return out
@@ -710,20 +710,20 @@ def share_archives(fam_dir):
 
 
 def share_rel_dir(fam_dir, arc):
-    """归档相对家族目录的目录部分，含 `_share`，如 `_share/thesis`。"""
+    """归档相对家族目录的目录部分，含 `__zip`，如 `__zip/thesis`。"""
     rel = Path(arc).relative_to(Path(fam_dir))
     return rel.parent.as_posix()
 
 
 def share_arc_leaf(fam_dir, arc):
-    """由 _share 归档反推 (leaf, project_slug)。
+    """由 __zip 归档反推 (leaf, project_slug)。
 
-    - `_share/<leaf>/<arc>`          → (leaf, leaf)
-    - `_share/thesis|ethics/<arc>`   → 打平名 `<slug>__<文件>` 的 slug
-    - `_share/<arc>`（家族根档）      → 家族名
+    - `__zip/<leaf>/<arc>`          → (leaf, leaf)
+    - `__zip/thesis|ethics/<arc>`   → 打平名 `<slug>__<文件>` 的 slug
+    - `__zip/<arc>`（家族根档）      → 家族名
     """
     fam = Path(fam_dir)
-    rel = Path(arc).relative_to(fam / "_share")
+    rel = Path(arc).relative_to(fam / "__zip")
     parent = rel.parts[0] if len(rel.parts) > 1 else fam.name
     base = strip_arc_ext(Path(arc).name)
     prefix = base.split("__", 1)[0] if "__" in base else ""
@@ -737,7 +737,7 @@ def share_arc_leaf(fam_dir, arc):
 
 
 def rel_for_archive_member(fam_dir, arc, member):
-    """档内成员的 doc.rel_path = <FAM>/_share[/<类>]/<档名>/<成员>。"""
+    """档内成员的 doc.rel_path = <FAM>/__zip[/<类>]/<档名>/<成员>。"""
     fam = Path(fam_dir).name
     return f"{fam}/{share_rel_dir(fam_dir, arc)}/{Path(arc).name}/{member}".replace("\\", "/")
 

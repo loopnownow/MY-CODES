@@ -70,10 +70,10 @@ def gate(env: dict) -> tuple[int, str]:
 def plan(fam: pathlib.Path) -> list[tuple[pathlib.Path, pathlib.Path]]:
     """(src_db, dst_db) 列表：家族库 + 各子项目库。"""
     pairs = []
-    fam_db = fam / "_db" / (fam.name + "db")
+    fam_db = fam / "_PHI" / (fam.name + "db")
     if fam_db.exists():
-        pairs.append((fam_db, ROOT / fam.name / "_db" / fam_db.name))
-    for leaf in sorted(p for p in fam.iterdir() if p.is_dir() and p.name != "_db"):
+        pairs.append((fam_db, ROOT / fam.name / "_PHI" / fam_db.name))
+    for leaf in sorted(p for p in fam.iterdir() if p.is_dir() and p.name != "_PHI"):
         db = leaf / (leaf.name + "db")
         if db.exists():
             pairs.append((db, ROOT / fam.name / leaf.name / db.name))
@@ -110,7 +110,7 @@ def main() -> int:
     print(f"[2] 计划换入 {len(pairs)} 个库")
     for s, d in pairs:
         print(f"    {s.relative_to(STAGE)}  {s.stat().st_size:>10,} B  →  {d.relative_to(ROOT)}")
-    old = ROOT / a.family / "_db" / (a.family + "db")
+    old = ROOT / a.family / "_PHI" / (a.family + "db")
     if old.exists():
         print(f"[3] 旧库冻结：{old.name} → {old.name}_6t"
               f"{'（目标已存在，跳过改名）' if pathlib.Path(str(old) + '_6t').exists() else ''}")
@@ -130,7 +130,7 @@ def main() -> int:
         checkpoint(s)
         d.parent.mkdir(parents=True, exist_ok=True)
         if d.exists():
-            fam6t = ROOT / a.family / "_db" / (a.family + "db_6t")
+            fam6t = ROOT / a.family / "_PHI" / (a.family + "db_6t")
             if not (a.recut and fam6t.exists()):
                 print(f"    !! 目标已存在，拒绝覆盖：{d}")
                 if not a.recut:

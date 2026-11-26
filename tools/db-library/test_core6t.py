@@ -43,7 +43,7 @@ def find_6t_db():
     if not root.is_dir():
         return None
     for fam in sorted(p for p in root.iterdir() if p.is_dir()):
-        db = fam / "_db" / f"{fam.name}db"
+        db = fam / "_PHI" / f"{fam.name}db"
         if not db.is_file():
             continue
         try:
@@ -60,9 +60,9 @@ def find_6t_db():
 
 def test_6t(tmp, src_db):
     fam = tmp / "dbt6" / "SCH"
-    (fam / "_db").mkdir(parents=True)
-    shutil.copy2(src_db, fam / "_db" / "SCHdb")
-    db = fam / "_db" / "SCHdb"
+    (fam / "_PHI").mkdir(parents=True)
+    shutil.copy2(src_db, fam / "_PHI" / "SCHdb")
+    db = fam / "_PHI" / "SCHdb"
     leaf = fam / "lx_TEST6T"
     leaf.mkdir()
     make_xlsx(leaf / "t.xlsx", [
@@ -106,8 +106,8 @@ def test_6t(tmp, src_db):
 
 def test_legacy(tmp):
     fam = tmp / "db7" / "SCH"
-    (fam / "_db").mkdir(parents=True)
-    db = fam / "_db" / "SCHdb"
+    (fam / "_PHI").mkdir(parents=True)
+    db = fam / "_PHI" / "SCHdb"
     con = core.create_db(db)
     assert not core.is_core6t(con), "legacy 库不应判为 6t"
     leaf = fam / "lx_LEGACY"

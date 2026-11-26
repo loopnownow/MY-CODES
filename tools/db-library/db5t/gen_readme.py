@@ -69,7 +69,7 @@ def gate_section(path):
 
 
 def write_family(fam):
-    dbfile = STAGE / fam / '_db' / f'{fam}db'
+    dbfile = STAGE / fam / '_PHI' / f'{fam}db'
     if not dbfile.exists():
         return None
     m = kv(dbfile)
@@ -103,8 +103,8 @@ def write_family(fam):
               '- 子库（`<slug>/<slug>db`）任何列与单元格都不得出现上述值。',
               '', '## 说明', '',
               '- 本文件由 `stage/_work/gen_readme.py` 生成，勿手改；重跑 build 会刷新。']
-    (STAGE / fam / '_db' / '目录说明.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    return f'{fam}/_db'
+    (STAGE / fam / '_PHI' / '目录说明.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    return f'{fam}/_PHI'
 
 
 def write_leaf(fam, slug):
@@ -118,7 +118,7 @@ def write_leaf(fam, slug):
         f'# {slug} 项目库（`{slug}db`）',
         '',
         '## 库角色',
-        '- 项目子库：分析用窄表（`person`/`clin`/`modal_*`/`*_val`/`qc`），**不含 PHI**。',
+        '- 项目子库：分析用窄表（`person`/`clin`/`_modules_*`/`*_val`/`qc`），**不含 PHI**。',
         f'- 建库时间 {m.get("built_at", "未记录")}；源库 `{m.get("source_db", "未记录")}`。',
     ]
     if m.get('period_unit'):
@@ -144,7 +144,7 @@ def write_for_db(path):
     p = pathlib.Path(path)
     slug = p.parent.name
     fam = p.parent.parent.name
-    if p.parent.name == '_db':
+    if p.parent.name == '_PHI':
         return write_family(fam)
     return write_leaf(fam, slug)
 
@@ -157,7 +157,7 @@ def main():
         return
     fam = arg
     print('wrote', write_family(fam))
-    dbfile = STAGE / fam / '_db' / f'{fam}db'
+    dbfile = STAGE / fam / '_PHI' / f'{fam}db'
     if dbfile.exists():
         for (slug,) in q(dbfile, 'select slug from ref_project order by slug'):
             print('wrote', write_leaf(fam, slug))

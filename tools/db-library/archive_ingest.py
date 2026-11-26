@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
-"""把 `_share` 下压缩档里的表格解出入库（原档留 `_share`，解包树校验后移 {DEL}）。
+"""把 `__zip` 下压缩档里的表格解出入库（原档留 `__zip`，解包树校验后移 {DEL}）。
 
-口径：压缩档留在 `<family>\\_share\\<leaf>\\`；档内表格解包后按同一建库函数入库，
-doc.rel_path = `<FAM>/_share/<leaf>/<档名>/<成员>`；解包树在 {DEL} 留档备查，
+口径：压缩档留在 `<family>\\__zip\\<leaf>\\`；档内表格解包后按同一建库函数入库，
+doc.rel_path = `<FAM>/__zip/<leaf>/<档名>/<成员>`；解包树在 {DEL} 留档备查，
 台账写 archive→member 映射（kind=archive-member）。
 
 用法：
   python -B tools/db-library/archive_ingest.py --family MHE_AN                    # dry-run
   python -B tools/db-library/archive_ingest.py --family MHE_AN --apply            # 入库
-  python -B tools/db-library/archive_ingest.py --db "...\\MHE_AN\\_db\\MHE_ANdb" --apply
+  python -B tools/db-library/archive_ingest.py --db "...\\MHE_AN\\_PHI\\MHE_ANdb" --apply
   python -B tools/db-library/archive_ingest.py --family ACN --archive 217 --apply  # 只处理含 217 的档
 退出码：0 正常；1 失败。
 """
@@ -55,7 +55,7 @@ def main(args):
     if args.archive:
         arcs = [a for a in arcs if args.archive in a.name]
     if not arcs:
-        print("无需处理：_share 下没有匹配的压缩档")
+        print("无需处理：__zip 下没有匹配的压缩档")
         return 0
 
     plans = []
@@ -121,7 +121,7 @@ def main(args):
     man = Path(args.ledger) if args.ledger else (
         batch / f"ARCHIVE-INGEST-{args.family}-{datetime.now():%Y%m%d}.tsv")
     core.write_ledger(man, ("kind", "rel_path", "archive", "size", "sha256", "member"), ledger)
-    core.append_readme_note(fam_dir / "_share",
+    core.append_readme_note(fam_dir / "__zip",
                             f"- {datetime.now():%Y-%m-%d} archive_ingest：入库 {len(plans)} 个档、"
                             f"新增 {ns} 张表，台账 {man.name}")
     print(f"完成：{len(plans)} 个档，新增 {ns} 张表，台账 {len(ledger)} 行 → {man}")
@@ -130,11 +130,11 @@ def main(args):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
-        description="_share 压缩档内的表格解出入库（原档留 _share，解包树移 {DEL}）",
+        description="__zip 压缩档内的表格解出入库（原档留 __zip，解包树移 {DEL}）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="默认 dry-run；--apply 解包入库并写 archive→member 台账。")
     ap.add_argument("--family", required=True, help="家族名，如 MHE_AN")
-    ap.add_argument("--db", type=Path, default=None, help="库路径（缺省 <root>/<family>/_db/<family>db）")
+    ap.add_argument("--db", type=Path, default=None, help="库路径（缺省 <root>/<family>/_PHI/<family>db）")
     ap.add_argument("--archive", default=None, help="只处理档名含该子串的归档")
     ap.add_argument("--code", default=None, help="短码（缺省读库 meta.short_code）")
     ap.add_argument("--db-root", type=Path, default=core.DEFAULT_DB_ROOT,

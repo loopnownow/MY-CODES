@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""校验短码库：结构 / 计数 / 引用 / 台账 / 新口径（_share + 叶内只留说明）。
+"""校验短码库：结构 / 计数 / 引用 / 台账 / 新口径（__zip + 叶内只留说明）。
 
 分级：P0 阻断（exit 1）；P1 应修；P2 提示（其中台账门输出降为 info 级）。
 校验项（括号内为分级）：
@@ -11,8 +11,8 @@
   D6  doc.n_sheets 与实际 sheet 数一致（P1）
   D7  entity 分布 / 空键 / 同项目同键重复（P1；重复键覆盖 fact >5% 时升 P0）
   D8  台账覆盖（按 <code>+<family> 精确归属台账；rel 或 sha256 命中）与 dst 存在（P2，info 级）
-  D9  新口径：叶内只留 目录说明.md（PHI 例外白名单 warn）、归档只在 _share、
-      _share 层级 ≤2 且无子目录、archive→member 映射存在（P2）
+  D9  新口径：叶内只留 目录说明.md（PHI 例外白名单 warn）、归档只在 __zip、
+      __zip 层级 ≤2 且无子目录、archive→member 映射存在（P2）
   D19 库内不收纳伦理材料：扫 doc.rel_path / project.slug / project.leaf / sheet.name，
       命中 伦理|ethics|知情同意|批件|审查申请 即 P0；不扫 fact.item（P0）
   D20 sheet.header 必须取自 blob 前 6 个候选行（防「表头取错行」→ item 全错）（P1）
@@ -23,7 +23,7 @@
 汇总行给出 P0/P1/P2 与 fail/warn/info 计数；exit 1 仅当 P0>0。
 
 用法：
-  python -B tools/db-library/verify_db.py --db "{RAW}\\MHE_AN\\_db\\MHE_ANdb"
+  python -B tools/db-library/verify_db.py --db "{RAW}\\MHE_AN\\_PHI\\MHE_ANdb"
 退出码：P0>0 → 1（P1/P2 不影响退出码）。
 """
 from __future__ import annotations
@@ -210,7 +210,7 @@ def coverage_match(doc_rel, doc_sha, rows, code):
 def check_leaf_clean(report, fam_dir, family):
     leaves = core.leaf_dirs(fam_dir)
     if not leaves:
-        report.info("叶目录：无（家族下只剩 _db/_share）", "D9")
+        report.info("叶目录：无（家族下只剩 _PHI/__zip）", "D9")
         return
     bad = 0
     for leaf in leaves:
@@ -231,7 +231,7 @@ def check_leaf_clean(report, fam_dir, family):
 
 
 def check_archives(report, fam_dir):
-    share = fam_dir / "_share"
+    share = fam_dir / "__zip"
     outside = []
     if fam_dir.is_dir():
         for p in fam_dir.rglob("*"):
@@ -245,15 +245,15 @@ def check_archives(report, fam_dir):
                 outside.append(p.relative_to(fam_dir).as_posix())
     if outside:
         report.fail("D9", 2,
-                    f"归档不在 _share：{len(outside)} 个，如 " + ", ".join(outside[:5]))
+                    f"归档不在 __zip：{len(outside)} 个，如 " + ", ".join(outside[:5]))
     else:
-        report.ok("D9", "归档全部位于 _share")
+        report.ok("D9", "归档全部位于 __zip")
 
 
 def check_share_depth(report, fam_dir):
-    share = fam_dir / "_share"
+    share = fam_dir / "__zip"
     if not share.is_dir():
-        report.warn("D9", 2, "_share 目录不存在")
+        report.warn("D9", 2, "__zip 目录不存在")
         return
     deep_files, deep_dirs = [], []
     for p in share.rglob("*"):
@@ -266,17 +266,17 @@ def check_share_depth(report, fam_dir):
             deep_files.append(rel)
     if deep_dirs:
         report.fail("D9", 2,
-                    f"_share 有子目录（应打平，层级 ≤2）：{len(deep_dirs)} 个，如 "
+                    f"__zip 有子目录（应打平，层级 ≤2）：{len(deep_dirs)} 个，如 "
                     + ", ".join(deep_dirs[:5]))
     if deep_files:
         report.fail("D9", 2,
-                    f"_share 文件层级 >2：{len(deep_files)} 个，如 " + ", ".join(deep_files[:5]))
+                    f"__zip 文件层级 >2：{len(deep_files)} 个，如 " + ", ".join(deep_files[:5]))
     if not deep_dirs and not deep_files:
-        report.ok("D9", f"_share 层级 ≤2（{sum(1 for p in share.rglob('*') if p.is_file())} 文件）")
+        report.ok("D9", f"__zip 层级 ≤2（{sum(1 for p in share.rglob('*') if p.is_file())} 文件）")
 
 
 def share_archive_names(fam_dir):
-    share = fam_dir / "_share"
+    share = fam_dir / "__zip"
     names = set()
     if share.is_dir():
         for p in share.rglob("*"):
@@ -286,18 +286,18 @@ def share_archive_names(fam_dir):
 
 
 def check_archive_mapping(report, con, fam_dir):
-    """doc.rel_path 中 `.../<档名>/<成员>`：档名须在 _share 下真实存在。
+    """doc.rel_path 中 `.../<档名>/<成员>`：档名须在 __zip 下真实存在。
 
     旧解包树（无档名段）用打平名 `a__b` 启发式映射，映射不上只 warn。
     """
     names = share_archive_names(fam_dir)
     strict_miss, legacy_miss, legacy_ok, matched = [], [], 0, 0
-    for (rel,) in con.execute("SELECT rel_path FROM doc WHERE rel_path LIKE '%_share/%'"):
+    for (rel,) in con.execute("SELECT rel_path FROM doc WHERE rel_path LIKE '%__zip/%'"):
         rel = norm_rel(rel)
         parts = [p for p in rel.split("/") if p]
         arc_seg = next((p for p in parts if core.is_archive(p)), None)
         if arc_seg is None and core.is_table(parts[-1]):
-            # _share 下的松散共享表（非档内成员），无需映射归档
+            # __zip 下的松散共享表（非档内成员），无需映射归档
             matched += 1
             continue
         if arc_seg:
@@ -306,7 +306,7 @@ def check_archive_mapping(report, con, fam_dir):
             else:
                 strict_miss.append(rel)
             continue
-        # 旧解包树：找相邻对 (a, b) → _share 下 a__b.* 是否存在
+        # 旧解包树：找相邻对 (a, b) → __zip 下 a__b.* 是否存在
         ok = False
         for i in range(len(parts) - 1):
             a, b = parts[i], parts[i + 1]
@@ -319,7 +319,7 @@ def check_archive_mapping(report, con, fam_dir):
             legacy_miss.append(rel)
     if strict_miss:
         report.fail("D9", 2,
-                    f"archive→member 映射缺失（档名不在 _share）：{len(strict_miss)} 条，如 "
+                    f"archive→member 映射缺失（档名不在 __zip）：{len(strict_miss)} 条，如 "
                     + ", ".join(strict_miss[:3]))
     if legacy_ok:
         report.ok("D9", f"archive→member 映射（旧解包树启发式命中）：{legacy_ok} 条")
@@ -697,9 +697,9 @@ def parse_args(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=("台账按 <code>+<family> 精确归属：默认扫 {DEL}/harvested 与 {DEL}/_by-function 下 MOVED/新 CLI 台账，\n"
                 "按文件名 token 与行内路径证据筛，再以 rel 精确或 sha256 命中做覆盖。\n"
-                "新口径：叶内只留 目录说明.md（PHI 例外 warn）、归档只在 _share、\n"
-                "_share 层级 ≤2 无子目录、meta.rule 现行口径、archive→member 映射存在。"))
-    ap.add_argument("--db", required=True, type=Path, help="库文件，如 ...\\MHE_AN\\_db\\MHE_ANdb")
+                "新口径：叶内只留 目录说明.md（PHI 例外 warn）、归档只在 __zip、\n"
+                "__zip 层级 ≤2 无子目录、meta.rule 现行口径、archive→member 映射存在。"))
+    ap.add_argument("--db", required=True, type=Path, help="库文件，如 ...\\MHE_AN\\_PHI\\MHE_ANdb")
     ap.add_argument("--code", default=None, help="短码（缺省读 meta.short_code）")
     ap.add_argument("--del-root", type=Path, default=DEFAULT_DEL_ROOT,
                     help="台账根目录（缺省同时扫 {DEL}/harvested 与 {DEL}/_by-function）")

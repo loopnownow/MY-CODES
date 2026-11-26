@@ -34,7 +34,7 @@ def one(c, sql, args=(), default=None):
 
 def audit_family(fam_dir, tag):
     fam = fam_dir.name
-    fam_db = fam_dir / '_db' / f'{fam}db'
+    fam_db = fam_dir / '_PHI' / f'{fam}db'
     row = {'family': fam, 'tag': tag, 'db_bytes': fam_db.stat().st_size if fam_db.exists() else 0,
            'registered': 0, 'dirs': 0, 'id': 0, 'id_number': 0, 'dict': 0,
            'person': 0, 'clin': 0, 'clin_person': 0, 'longi': 0, 'multi': 0,
@@ -56,7 +56,7 @@ def audit_family(fam_dir, tag):
     row['registered'] = len(projs)
     c.close()
     on_disk = sorted(p.name for p in fam_dir.iterdir()
-                     if p.is_dir() and p.name not in ('_db', '_share') and not p.name.startswith(('_', '.'))
+                     if p.is_dir() and p.name not in ('_PHI', '__zip') and not p.name.startswith(('_', '.'))
                      and (p / f'{p.name}db').exists())
     row['dirs'] = len(on_disk)
     for s in on_disk:
@@ -85,9 +85,9 @@ def audit_family(fam_dir, tag):
                                             (sev,), default=0)
         c.close()
     row['sidecar'] = sum(1 for p in fam_dir.rglob('*-wal')) + sum(1 for p in fam_dir.rglob('*-shm'))
-    row['readme'] = int((fam_dir / '_db' / '目录说明.md').exists())
+    row['readme'] = int((fam_dir / '_PHI' / '目录说明.md').exists())
     if not row['readme']:
-        row['problems'].append('缺 _db/目录说明.md')
+        row['problems'].append('缺 _PHI/目录说明.md')
     if row['journal'] != 'delete':
         row['problems'].append(f'journal={row["journal"]}')
     return row
@@ -98,14 +98,14 @@ def main():
     for d in sorted(STAGE.iterdir()):
         if not d.is_dir() or d.name.startswith(('_', '.')):
             continue
-        if not (d / '_db').is_dir():
+        if not (d / '_PHI').is_dir():
             continue
         rows.append(audit_family(d, 'stage'))
     if '--data' in sys.argv:
         for d in sorted(DBROOT.iterdir()):
             if not d.is_dir() or d.name.startswith(('_', '.')):
                 continue
-            fam_db = d / '_db' / (d.name + 'db')
+            fam_db = d / '_PHI' / (d.name + 'db')
             if not fam_db.exists():
                 continue
             try:

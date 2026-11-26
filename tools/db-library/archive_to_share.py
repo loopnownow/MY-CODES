@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""把叶内 / 家族根的压缩档归位到 `<family>\\_share\\<leaf>\\`。
+"""把叶内 / 家族根的压缩档归位到 `<family>\\__zip\\<leaf>\\`。
 
-口径：压缩档只放 `_share`；叶内只留 `目录说明.md`。本 CLI 把错位的归档
+口径：压缩档只放 `__zip`；叶内只留 `目录说明.md`。本 CLI 把错位的归档
 （叶内 `<leaf>/**/*.7z|zip|rar|tar.zst|…`、家族根直属归档）移到
-`_share/<leaf>/<档名>`（家族根直属 → `_share/<档名>`）。已存在同 sha 目标视为重复件，
+`__zip/<leaf>/<档名>`（家族根直属 → `__zip/<档名>`）。已存在同 sha 目标视为重复件，
 源移 {DEL} dups；同名不同 sha 则报错停下（不落盘）。
 
 用法：
@@ -39,8 +39,8 @@ def find_archives(fam_dir):
 
 def target_of(fam_dir, arc, leaf_name):
     if leaf_name is None:
-        return fam_dir / "_share" / arc.name
-    return fam_dir / "_share" / leaf_name / arc.name
+        return fam_dir / "__zip" / arc.name
+    return fam_dir / "__zip" / leaf_name / arc.name
 
 
 def main(args):
@@ -95,7 +95,7 @@ def main(args):
     man = Path(args.ledger) if args.ledger else (
         batch / f"ARCHIVE-TO-SHARE-{args.family}-{datetime.now():%Y%m%d}.tsv")
     core.write_ledger(man, ("kind", "rel_path", "dst", "size", "sha256", "leaf"), ledger)
-    core.append_readme_note(fam_dir / "_share",
+    core.append_readme_note(fam_dir / "__zip",
                             f"- {datetime.now():%Y-%m-%d} archive_to_share：归位归档 {len(todo)} 个，台账 {man.name}")
     print(f"完成：{len(ledger)} 行 → {man}")
     return 0
@@ -103,7 +103,7 @@ def main(args):
 
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(
-        description="族内错位压缩档归位到 _share（叶内/家族根 → _share/<leaf>/）",
+        description="族内错位压缩档归位到 __zip（叶内/家族根 → __zip/<leaf>/）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="默认 dry-run；--apply 落盘并写台账；同名同 sha 的源移 {DEL} dups。")
     ap.add_argument("--family", required=True, help="家族名，如 MHE_AN")
