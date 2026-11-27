@@ -918,9 +918,12 @@ def d62_blob_ptr(path):
 
 
 def _registered_id_collisions():
-    """读各子库 qc 表里已登记的 ID_COLLISION（scope='id_number' 且 column_name=具体值）。
+    """读各子库 qc 表里已登记的 ID_COLLISION（scope='id_number'）。
 
     豁免必须「逐值」登记：写一条泛泛的 qc 就放行全部共享，等于把门禁关掉。
+    值有两种写法：
+      · `sha256:<16 hex>`（推荐）——登记处不出现原始号码，PHI 值级扫描不会把自己的登记当成泄漏；
+      · 原始号码（旧写法，兼容保留）——会被 `idnum_leak` 判 IDNUM_LEAK，因为它确实是一次裸号复制。
     """
     reg = set()
     base = FAM_DB.parent
@@ -966,7 +969,8 @@ def d75_id_triple_unique():
         checked += 1
         real = [u for u in uniq if not ph(u)]
         if real:
-            if str(val) in REG:
+            h = 'sha256:' + hashlib.sha256(str(val).strip().encode('utf-8')).hexdigest()[:16]
+            if str(val) in REG or h in REG:
                 reg_hit.append((kind, iss, val, len(real)))
                 continue
             bad += 1
@@ -1355,11 +1359,72 @@ def d78_dict_provenance(fam_db):
                         bad += len(miss)
                         out.append('  !! P1 %s.%s：%d 个值列缺 dict.source（例 %s）'
                                    % (slug, t, len(miss), miss[0]))
+                # 长表：`<mod>_val` 的每一行是一个 feature，它不是「列」而是「行」，
+                # 所以 `pragma table_info` 永远看不到它——但 `feature` 才是真正承载变量的那一维。
+                # 不查它，等于「列都有溯源、唯独数值从哪来没人知道」（LC lipid 781 行实测）。
+                for (vt,) in c.execute(
+                        "select name from sqlite_master where type='table' and name glob '*_val'"):
+                    try:
+                        feats = {str(x[0]) for x in c.execute('select distinct feature from "%s"' % vt)
+                                 if x[0] is not None}
+                    except sqlite3.Error:
+                        continue
+                    miss = [ft for ft in feats
+                            if ft not in SYS
+                            and not (reg.get((vt, ft)) or byname.get(ft) or '').strip()]
+                    if miss:
+                        bad += len(miss)
+                        out.append('  !! P1 %s.%s：%d 个 feature 行缺 dict.source（例 %s）'
+                                   % (slug, vt, len(miss), sorted(miss)[0]))
             finally:
                 c.close()
     finally:
         f.close()
     return out, bad
+
+
+def d82_source_format(fam_db):
+    """D82（只报数）：`dict.source` 必须是「可追的形态」，不能是占位词。
+
+    起因（2026-11-25）：D78 只要求 `source` 非空，于是 `old_db_blob`（那是 `src.kind`，
+    不是来源）能把 3,261 行占位词判成「有溯源」。真库因此一路绿，而库内其实没记来源。
+
+    合法形态（三种，见 WORKER-BRIEF §source）：
+      1. `<path>#<sheet>:<源列名>`      —— 源表有同名列
+      2. `<path>#<sheet>:#<N>`          —— 列名被重命名，位置即证据（1 基）
+      3. `<path>#txt:<字段标签>`         —— 从文本块解析出的字段
+    另允许两类非「源列」的自述：
+      `派生：<可执行规则>`、`SCHEMA §2 <table>：结构列…`
+    其余（含 `old_db_blob` 这种 kind 名、`-`、`见上`）一律计入本项。
+    """
+    if not fam_db.exists():
+        return [], 0, 0
+    try:
+        f = sqlite3.connect('file:%s?mode=ro' % fam_db, uri=True)
+    except sqlite3.Error:
+        return [], 0, 0
+    pat_ok = re.compile(r'^(派生[:：]|SCHEMA |blob:.*#.*:|.*#.*:(#\d+|.*\S))')
+    bad, total, ex = {}, 0, []
+    try:
+        for cn, src in f.execute("select column_name, coalesce(source,'') from dict"):
+            total += 1
+            v = src.strip()
+            if v and pat_ok.match(v):
+                continue
+            bad[v or '<空>'] = bad.get(v or '<空>', 0) + 1
+            if len(ex) < 5:
+                ex.append('%s=%r' % (cn, v))
+    except sqlite3.Error:
+        pass
+    finally:
+        f.close()
+    n = sum(bad.values())
+    out = []
+    if n:
+        top = sorted(bad.items(), key=lambda kv: -kv[1])[:4]
+        out.append('  · %d/%d 行 source 不是可追形态（例 %s；占位词 %s）'
+                   % (n, total, ', '.join(ex), ', '.join('%s×%d' % (k if k != '<空>' else '空', v2) for k, v2 in top)))
+    return out, n, total
 
 
 def d79_idnum_registry(fam_db, fam, proj):
@@ -1515,8 +1580,7 @@ def d81_empty_modals(projs):
             continue
         try:
             tabs = [r[0] for r in c.execute(
-                "select name from sqlite_master where type='table' "
-                "and name glob '_modules_*'")]
+                "select name from sqlite_master where type='table' and name glob '_modules_*'")]
             if not tabs:
                 continue
             codes = {r[0] for r in c.execute('select code from qc')}
@@ -1694,6 +1758,9 @@ def main():
     out.append(f'\n== D77 零引用身份行（P1，只报数）：检查 {_n77} 行')
     out.extend('  ' + x for x in _l77)
     _l78, _n78 = d78_dict_provenance(FAM_DB)
+    _l82, _n82, _t82 = d82_source_format(FAM_DB)
+    out.append(f'\n== D82 dict.source 形态（只报数）：检查 {_t82} 行，非可追形态 {_n82} 行')
+    out.extend(_l82)
     out.append(f'\n== D78 值列溯源（dict.source）：{_n78} 个值列缺 source（P1）')
     out.extend(_l78[:20])
     if _n78:
