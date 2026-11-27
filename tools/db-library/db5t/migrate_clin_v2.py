@@ -4,32 +4,40 @@
 - `ALTER TABLE ADD COLUMN` 只能追加到表尾，v2 要求头 11 列逐位对齐，因此只能
   「CREATE TABLE clin__v2 → INSERT … SELECT → DROP/RENAME → 重建索引」。
 - 默认 dry-run：原库只读（`mode=ro`）做体检，并在**副本**上把整套迁移真跑一遍
-  （CREATE/INSERT/索引/meta/提交后体检全走），副本写在 DEL 下、跑完即删，原库
-  一个字节都不动；`--no-rehearse` 只体检不演练。`--apply` 才写原库，写盘前
+  （CREATE/INSERT/清洗/索引/meta/提交后体检全走），副本写在 DEL 下、跑完即删，
+  原库一个字节都不动；`--no-rehearse` 只体检不演练。`--apply` 才写原库，写盘前
   `shutil.copy2` 备份并校验 sha256，落盘后逐列核对，任一项不符则回滚；已提交
   但事后体检不过的，用备份覆盖回去并记 `failed_restored`。
 - 列序：头 11 列（V2_HEAD）→ 旧头里 v2 未收录的 3 个时点列（month_ix /
   period_source / period_origin，原序保留，属「旧列不删」）→ 原有变量列按原顺序
   原名保留（不改名、不合并不删列）→ 表尾 15 个空病理列（只建列不填值）。
-  `group_v` / `subgroup` 留 NULL；`schema_block` 每行写 'clin-v2'。
+- 头列同名并值（v2 修订，2026-11-27 裁定）：旧表变量区若已有 `group_v` /
+  `subgroup` 同名变量列，**把旧列值搬进新头列**（不再阻塞），旧列不再重复保留。
+  头列类型统一 TEXT：数值型旧值显式转换，`0.0` / `1.0` 一类整数值写成 `0` / `1`
+  （不出现 `.0`），转换行数记 meta 与 `qc(VALUE_NORMALIZED)`。`schema_block`
+  例外：仍统一写 `'clin-v2'`；旧表若已有同名列则吞并后丢弃（记 meta 与 warning，
+  不许两列同名）。现有 80 库只有 4 库属 group_v 并值，无 schema_block/subgroup 冲突。
 - `period_origin` 处理：**保留为列**（信息保真优先），并在 meta 记
-  `clin_v2_legacy_cols` 说明它不在 v2 头内。选择保留而不是「记 meta 后丢弃」的
-  理由：① 80 库中 5052 行的值（'0'）不在枚举内，丢弃等于消掉唯一证据；
-  ② `month_ix` 是 `ix_clin_month` 索引与被 D29 判读的列，丢弃会连带删索引；
-  ③ 规则本轮明确「不删列」。
-- 约束：头列 NOT NULL 按 v2 口径（family_uid / period_month / merged_n /
-  unk_seq）；变量列与 legacy 列沿用原 NOT NULL / DEFAULT。v1 的 CHECK 只在该库
-  全部行都通过时才重建（逐库实测），否则跳过并记 warning —— 这样既不把脏数据
-  洗白，也不因旧约束把可迁移库判死。
+  `clin_v2_legacy_cols` 说明它不在 v2 头内。理由：① `period_origin` 的占位值
+  是唯一证据，清洗前不能丢；② `month_ix` 是 `ix_clin_month` 索引与被 D29 判读的
+  列，丢弃会连带删索引；③ 规则本轮明确「不删列」。
+- CHECK 约束**全保留**（v2 修订：不再「违例就丢约束」）。旧 v1 CHECK 若在库里有
+  违例行，必须 `--clean` 清洗后再迁：`period_origin` 的 `'0'` 占位值 → NULL
+  （逐行记 `qc(VALUE_DIRTY)`），`period_month<>'UNK'` 而 `month_ix` 空的行 →
+  由 `period_month` 推算 `year*12+month-1` 回填（逐行记 `qc(VALUE_NORMALIZED)`，
+  可逆零损失）。`--clean` 缺省关闭：dry-run 只**算**不改；`--apply` 遇违例库而
+  未给 `--clean` 时直接拒迁，绝不静默丢约束。
 - 索引：迁移前从 `sqlite_master` 全量 dump `type='index' and sql is not null` 的
-  DDL，换名后原样执行；`sqlite_autoindex_*`（PK 自建）不重建。触发器按同样方式
-  dump/重建；视图只记录（DROP TABLE 后同名重建即可让视图重新可解析）。
+  DDL，换名后原样执行（先按名字 `DROP INDEX IF EXISTS`）；`sqlite_autoindex_*`
+  （PK 自建）不重建。触发器按同样方式 dump/重建；视图只记录（DROP TABLE 后同名
+  重建即可让视图重新可解析）。
 
 用法
-  python -B migrate_clin_v2.py                     # dry-run，全库
+  python -B migrate_clin_v2.py                     # dry-run，全库（含副本演练）
+  python -B migrate_clin_v2.py --clean             # dry-run，按清洗口径算行数并演练
   python -B migrate_clin_v2.py --family EC         # 只体检 EC
   python -B migrate_clin_v2.py --json out.json     # dry-run 明细
-  python -B migrate_clin_v2.py --apply             # 真的写盘（本轮不要跑）
+  python -B migrate_clin_v2.py --apply --clean     # 真的写盘（本轮不要跑）
 """
 import argparse
 import hashlib
@@ -49,12 +57,17 @@ V1_HEAD = ['family_uid', 'period_month', 'month_ix', 'period_source', 'period_or
 V1_H10 = [c for c in V1_HEAD if c != 'period_origin']
 # v2 头未收录、但本轮保留在头之后的旧时点列（原列序）
 LEGACY = ['month_ix', 'period_source', 'period_origin']
+# 旧表若已有同名变量列：并值进新头列（不再重复保留）
+MERGABLE = ['group_v', 'subgroup']
+# 旧表若已有同名列：吞并后丢弃旧值（新表统一写 'clin-v2'）
+ABSORB = ['schema_block']
 # 本轮只建列不填值；类型按规则：path_on=DATE，计数列 INTEGER，其余 TEXT
 PATH_COLS = [('path_kind', 'TEXT'), ('path_on', 'DATE'), ('path_histology', 'TEXT'),
              ('path_grade', 'TEXT'), ('path_mi', 'TEXT'), ('path_mi_mm', 'INTEGER'),
              ('path_lvsi', 'TEXT'), ('path_csi', 'TEXT'), ('path_ln_pos', 'INTEGER'),
              ('path_ln_total', 'INTEGER'), ('path_lnm', 'TEXT'), ('path_eu', 'TEXT'),
              ('path_figo', 'TEXT'), ('path_dx', 'TEXT'), ('path_other', 'TEXT')]
+PATH_NAMES = [c for c, _ in PATH_COLS]
 HEAD_DEF = {
     'family_uid': 'TEXT NOT NULL',
     'observed_on': 'TEXT',
@@ -68,9 +81,7 @@ HEAD_DEF = {
     'unk_seq': 'INTEGER NOT NULL DEFAULT 0',
     'schema_block': "TEXT NOT NULL DEFAULT 'clin-v2'",
 }
-# 只有新列：插入时不从源表取
-NEW_ONLY = {'group_v', 'subgroup'}
-# 旧 v1 的 CHECK 语义（逐条实测，通过的才重建）
+# 旧 v1 的 CHECK 语义：全保留；违例行只能靠 --clean 清掉
 CHECKS = [
     ('pm_fmt', "period_month='UNK' OR period_month GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'"),
     ('ps_enum', "period_source IN ('exact','approx','unknown')"),
@@ -81,11 +92,26 @@ CHECKS = [
     ('unk_seq_ge0', "period_month<>'UNK' OR unk_seq>=0"),
     ('dated_unk_seq0', "period_month='UNK' OR unk_seq=0"),
 ]
+HEAD_CHECK = ('schema_block', "schema_block='clin-v2'")
+# CHECK 违例 → 清洗规则
+CLEAN_RULES = {'origin_enum': 'origin_placeholder',
+               'dated_has_month_ix': 'month_ix_backfill'}
+# period_origin 占位值（'0'；也容忍被存成整数 0）
+ORIGIN_PH = "(period_origin='0' OR (typeof(period_origin)<>'text' AND period_origin=0))"
 
 
 def _qi(name):
     """SQL 标识符加引号：中文 / 大写 / 空格列名不加引号会被当成表达式。"""
     return '"%s"' % str(name).replace('"', '""')
+
+
+def cast_text_expr(col):
+    """把任意存储类别的旧列值转成 TEXT，整数值去掉 `.0`（0.0→'0'）。"""
+    q = _qi(col)
+    return ("CASE WHEN %s IS NULL THEN NULL "
+            "WHEN typeof(%s)<>'text' AND %s=CAST(%s AS INTEGER) "
+            "THEN CAST(CAST(%s AS INTEGER) AS TEXT) "
+            "ELSE CAST(%s AS TEXT) END" % (q, q, q, q, q, q))
 
 
 def default_root():
@@ -154,26 +180,24 @@ def coldef(name, typ, notnull, dflt):
     return s
 
 
-def build_ddl(info, legacy, vars_, checks_pass, fks):
-    lines = []
-    for c in V2_HEAD:
-        lines.append('  ' + _qi(c) + ' ' + HEAD_DEF[c])
+def build_ddl(info, fks):
+    """新表 DDL：v2 头 + legacy + 变量列 + 空病理列 + PK + 全部 CHECK + FK。"""
+    lines = ['  ' + _qi(c) + ' ' + HEAD_DEF[c] for c in V2_HEAD]
     ti = info['type'], info['notnull'], info['dflt']
-    for c in legacy + vars_:
+    for c in info['legacy'] + info['vars']:
         i = info['order'].index(c)
         lines.append('  ' + coldef(c, ti[0][i], ti[1][i], ti[2][i]))
-    for c, t in PATH_COLS:
-        lines.append('  ' + _qi(c) + ' ' + t)
-    lines.append('  PRIMARY KEY (%s)' % ', '.join(_qi(c) for c in
-                 ('family_uid', 'period_month', 'unk_seq')))
-    for _n, expr in checks_pass:
+    lines += ['  ' + _qi(c) + ' ' + t for c, t in PATH_COLS]
+    lines.append('  PRIMARY KEY (%s)' % ', '.join(
+        _qi(c) for c in ('family_uid', 'period_month', 'unk_seq')))
+    for _n, expr in CHECKS + [HEAD_CHECK]:
         lines.append('  CHECK (' + expr + ')')
-    lines.extend('  ' + f for f in fks)
+    lines += ['  ' + f for f in fks]
     return 'CREATE TABLE clin__v2 (\n' + ',\n'.join(lines) + '\n)'
 
 
 def inspect(path):
-    """只读体检。返回 (state, info, blockers, warnings)。state ∈ v2 / v1 / other。"""
+    """只读体检。返回 (state, info, blockers, warnings)。state ∈ v2 / v1 / v1-h10 / other。"""
     con = sqlite3.connect('file:%s?mode=ro' % path.as_posix(), uri=True)
     blocks, warns = [], []
     try:
@@ -183,10 +207,8 @@ def inspect(path):
         ti = table_info(con, 'clin')
         cols = [r[1] for r in ti]
         info = {
-            'has_clin': True,
-            'cols': cols,
+            'has_clin': True, 'cols': cols, 'order': cols,
             'rows': con.execute('SELECT count(*) FROM clin').fetchone()[0],
-            'order': cols,
             'type': [(r[2] or '') for r in ti],
             'notnull': [bool(r[3]) for r in ti],
             'dflt': [r[4] for r in ti],
@@ -196,26 +218,38 @@ def inspect(path):
                 "SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='clin'")],
             'trg': [(r[0], r[1]) for r in con.execute(
                 "SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='clin'")],
-            'views': [r[0] for r in con.execute(
-                "SELECT name FROM sqlite_master WHERE type='view'")],
-            'meta': 'meta' in tabs,
+            'views': [r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='view'")],
+            'meta': 'meta' in tabs, 'qc': 'qc' in tabs,
         }
         info['views'] = [n for n in info['views']
                          if re.search(r'\bclin\b', con.execute(
                              "SELECT sql FROM sqlite_master WHERE name=?", (n,)
                          ).fetchone()[0] or '')]
-        old_low = [c.lower() for c in cols]
         info['legacy'] = [c for c in LEGACY if c in cols]
-        info['vars'] = [c for c in cols if c not in V1_HEAD and c not in LEGACY]
-        info['carry'] = len(cols)  # 本轮不丢任何旧列
-        info['target'] = V2_HEAD + info['legacy'] + info['vars'] + [c for c, _ in PATH_COLS]
+        info['merge'] = [c for c in MERGABLE if c in cols]      # 头列并值（旧列随后不保留）
+        info['absorb'] = [c for c in ABSORB if c in cols]       # 吞并后丢弃旧值
+        skip = set(V1_HEAD) | set(LEGACY) | set(info['merge']) | set(info['absorb'])
+        info['vars'] = [c for c in cols if c not in skip]
+        info['carry'] = len(cols) - len(info['absorb'])         # 实际搬过去的旧列数
+        info['target'] = V2_HEAD + info['legacy'] + info['vars'] + PATH_NAMES
         info['n_new'] = len(info['target'])
+        info['cast'] = {}                                       # 并值列里数值型行数
+        for c in info['merge']:
+            t = info['type'][cols.index(c)].lower()
+            if t not in ('text', ''):
+                info['cast'][c] = con.execute(
+                    'SELECT count(*) FROM clin WHERE %s IS NOT NULL '
+                    "AND typeof(%s)<>'text'" % (_qi(c), _qi(c))).fetchone()[0]
         info['head_kind'] = ('v2' if cols[:11] == V2_HEAD else
                              'v1' if cols[:11] == V1_HEAD else
                              'v1-h10' if cols[:10] == V1_H10 else 'other')
         info['has_clin_v2'] = 'clin__v2' in tabs
-        # 冲突：本轮新加的列（group_v/subgroup/schema_block/path_*）若已被旧表占用，无解
-        for n in list(NEW_ONLY) + ['schema_block'] + [c for c, _ in PATH_COLS]:
+        old_low = [c.lower() for c in cols]
+        src_names = (set(info['merge']) | set(info['absorb']) | set(info['legacy'])
+                     | set(info['vars']) | (set(V2_HEAD) & set(cols)))
+        for n in info['target']:
+            if n in src_names:
+                continue                 # 这列有旧数据来源（含并值/legacy/变量）
             if n.lower() in old_low:
                 blocks.append('列名冲突：新列 %s 已被旧表占用' % n)
         dup = sorted({c for c in old_low if old_low.count(c) > 1})
@@ -227,18 +261,21 @@ def inspect(path):
             blocks.append('旧头 11 列非 v1/v1-h10：%s' % cols[:11])
         if not info['meta']:
             blocks.append('缺 meta 表')
+        if info['merge']:
+            warns.append('旧列 %s 并值到 v2 头列' % ','.join(info['merge']))
+        if info['absorb']:
+            warns.append('旧列 %s 吞并丢弃（统一写 clin-v2）' % ','.join(info['absorb']))
     finally:
         con.close()
     return info.get('head_kind', 'other'), info, blocks, warns
 
 
 def precheck(path, info):
-    """迁移前置数据体检；返回 (blockers, warnings, checks_pass)。"""
+    """迁移前置数据体检 + 清洗计划（只读）。返回 dict。"""
     con = sqlite3.connect('file:%s?mode=ro' % path.as_posix(), uri=True)
-    blocks, warns, checks_pass = [], [], []
+    blocks, warns, fails = [], [], {}
     try:
         cols = set(info['cols'])
-        # 1) 新表 NOT NULL 列现有的空值数
         req = ['family_uid', 'period_month', 'merged_n', 'unk_seq']
         req += [c for c in info['legacy'] + info['vars']
                 if info['notnull'][info['order'].index(c)]]
@@ -246,12 +283,10 @@ def precheck(path, info):
             n = con.execute('SELECT count(*) FROM clin WHERE %s IS NULL' % _qi(c)).fetchone()[0]
             if n:
                 blocks.append('%s 空值 %d 行（新表 NOT NULL）' % (c, n))
-        # 2) PK 唯一（不要用别名做 having：旧表可能真有一列叫 c/n）
         dup = con.execute('SELECT count(*) FROM (SELECT family_uid, period_month, unk_seq '
                           'FROM clin GROUP BY 1,2,3 HAVING count(*)>1)').fetchone()[0]
         if dup:
             blocks.append('(family_uid, period_month, unk_seq) 重复 %d 组' % dup)
-        # 3) 外键孤儿
         if info['integrity'] != 'ok':
             blocks.append('当前 integrity_check=%s' % info['integrity'])
         tabs = table_names(con)
@@ -267,38 +302,49 @@ def precheck(path, info):
                             'WHERE c.src_id IS NOT NULL AND s.src_id IS NULL').fetchone()[0]
             if n:
                 blocks.append('src_id 孤儿：%d 行' % n)
-        # 4) v1 CHECK 语义：通过的重建，不通过的跳过并记 warning
+        # CHECK 违例：全保留，违例只能清洗
         for name, expr in CHECKS:
-            if name.startswith(('pm_', 'ps_')) and not {'period_month', 'period_source'} <= cols:
-                continue
-            if name.startswith('origin') and 'period_origin' not in cols:
-                continue
-            if 'month_ix' in expr and 'month_ix' not in cols:
-                continue
             n = con.execute('SELECT count(*) FROM clin WHERE NOT (%s)' % expr).fetchone()[0]
             if n:
-                warns.append('v1 CHECK %s 未通过 %d 行 → 不重建该约束' % (name, n))
-            else:
-                checks_pass.append((name, expr))
-        checks_pass.append(('schema_block', "schema_block='clin-v2'"))
-        # 5) 辅助：旧头列是否全在
-        miss = [c for c in V1_H10 if c not in cols]
-        if miss:
-            blocks.append('旧头缺列 %s' % miss)
+                fails[name] = n
+        # 清洗计划（dry-run 只算）
+        clean_counts = {}
+        clean_counts['origin_placeholder'] = con.execute(
+            'SELECT count(*) FROM clin WHERE ' + ORIGIN_PH).fetchone()[0]
+        clean_counts['month_ix_backfill'] = con.execute(
+            "SELECT count(*) FROM clin WHERE period_month<>'UNK' AND month_ix IS NULL"
+        ).fetchone()[0]
+        for name, n in fails.items():
+            if name not in CLEAN_RULES:
+                blocks.append('旧 CHECK %s 违例 %d 行，无清洗规则' % (name, n))
+            elif name == 'origin_enum':
+                r = con.execute('SELECT count(*) FROM clin WHERE NOT (%s) AND NOT (%s)'
+                                % (dict(CHECKS)[name], ORIGIN_PH)).fetchone()[0]
+                if r:
+                    blocks.append('origin_enum 清洗后仍违例 %d 行（非 "0" 占位值）' % r)
+        cleanable = sorted(CLEAN_RULES[n] for n in fails if n in CLEAN_RULES)
+        for r in cleanable:
+            if not clean_counts.get(r):
+                blocks.append('CHECK 违例但清洗规则 %s 命中 0 行' % r)
+        if fails:
+            warns.append('旧 CHECK 违例 %d 类，需 --clean：%s'
+                         % (len(fails), ','.join('%s=%d' % kv for kv in fails.items())))
     finally:
         con.close()
-    return blocks, warns, checks_pass
+    return {'blocks': blocks, 'warns': warns, 'fails': fails,
+            'clean_counts': clean_counts}
 
 
-def rehearse(path, info, checks_pass, base, tmpdir):
-    """在副本上真跑一遍迁移（DDL/INSERT/索引/meta/体检全走），原库只读不改。"""
+def rehearse(path, info, pre, base, tmpdir, clean):
+    """在副本上真跑一遍迁移（DDL/INSERT/清洗/索引/meta/体检全走），原库只读不改。"""
     tmpdir.mkdir(parents=True, exist_ok=True)
     tmp = tmpdir / (base['family'] + '__' + base['slug'] + '.db')
     try:
         shutil.copy2(path, tmp)
         b = dict(base)
         b['warnings'] = list(base.get('warnings') or [])
-        r = do_migrate(tmp, info, checks_pass, tmpdir, b, make_backup=False, quiet=True)
+        r = do_migrate(tmp, info, pre, tmpdir, b, clean=clean,
+                       make_backup=False, quiet=True)
         r['rehearsal'] = True
         if r.get('action') != 'migrated':
             r['action'] = 'rehearsal-failed'
@@ -310,7 +356,7 @@ def rehearse(path, info, checks_pass, base, tmpdir):
                 p.unlink()
 
 
-def run_one(path, backup_dir, apply_, rehearse_dir=None):
+def run_one(path, backup_dir, apply_, rehearse_dir=None, clean=False):
     fam, slug = path.parent.parent.name, path.parent.name
     tag = '%s/%s' % (fam, slug)
     state, info, blocks, warns = inspect(path)
@@ -320,31 +366,37 @@ def run_one(path, backup_dir, apply_, rehearse_dir=None):
     if state == 'v2':
         return {'family': fam, 'slug': slug, 'path': str(path), 'action': 'skip',
                 'note': '已是 clin v2 头', 'rows': info.get('rows')}
-    if state == 'other':
-        return {'family': fam, 'slug': slug, 'path': str(path), 'action': 'blocked',
-                'blockers': blocks, 'warnings': warns}
-    b2, w2, checks_pass = precheck(path, info)
-    blocks += b2
-    warns += w2
+    pre = precheck(path, info)
+    blocks += pre['blocks']
+    warns += pre['warns']
     base = {'family': fam, 'slug': slug, 'path': str(path), 'rows': info['rows'],
             'cols_old': len(info['cols']), 'cols_new': info['n_new'],
             'carry_cols': info['carry'], 'head_kind': info['head_kind'],
             'integrity': info['integrity'], 'legacy': info['legacy'],
-            'n_vars': len(info['vars']), 'indexes': len([1 for _n, s in info['idx'] if s]),
+            'merged_cols': info['merge'], 'absorbed_cols': info['absorb'],
+            'type_cast': info['cast'],
+            'check_fails': pre['fails'], 'clean_counts': pre['clean_counts'],
+            'needs_clean': bool(pre['fails']),
+            'n_vars': len(info['vars']),
+            'indexes': len([1 for _n, s in info['idx'] if s]),
             'triggers': len(info['trg']), 'views': len(info['views']),
-            'checks_kept': [n for n, _ in checks_pass],
-            'warnings': warns,
-            'target_cols': info['target']}
+            'warnings': warns, 'target_cols': info['target']}
     if blocks:
         base.update(action='blocked', blockers=blocks)
         print('%-34s !! 阻塞 %s' % (tag, '；'.join(blocks)[:160]))
         return base
+    if apply_ and base['needs_clean'] and not clean:
+        base.update(action='blocked',
+                    blockers=['旧 CHECK 违例需 --clean，拒绝静默丢约束'])
+        print('%-34s !! 拒迁：旧 CHECK 违例，需要 --clean' % tag)
+        return base
     if not apply_:
         base['action'] = 'dry-run'
         if rehearse_dir is not None:
-            rr = rehearse(path, info, checks_pass, base, rehearse_dir)
+            # 演练按「apply 将采用的清洗口径」在副本上跑：有违例就模拟 --clean
+            rr = rehearse(path, info, pre, base, rehearse_dir, clean or base['needs_clean'])
             base['rehearsal'] = rr.get('action')
-            base['checks_kept'] = rr.get('checks_kept') or base['checks_kept']
+            base['rehearsal_clean'] = bool(clean or base['needs_clean'])
             base['warnings'] += [w for w in rr.get('warnings') or []
                                  if w not in base['warnings']]
             if rr.get('action') != 'migrated':
@@ -352,15 +404,19 @@ def run_one(path, backup_dir, apply_, rehearse_dir=None):
                 base['blockers'] = ['副本演练失败：%s' % rr.get('error')]
                 print('%-34s !! 演练失败：%s' % (tag, rr.get('error')))
                 return base
-        print('%-34s dry-run OK  %6d 行 %3d→%3d 列 搬 %d 列 头=%s idx=%d trg=%d view=%d%s'
-              % (tag, info['rows'], len(info['cols']), info['n_new'], info['carry'],
-                 info['head_kind'], base['indexes'], base['triggers'], base['views'],
-                 ('  warn=' + ';'.join(base['warnings'])[:80]) if base['warnings'] else ''))
+        print('%-34s dry-run OK  %6d 行 %3d→%3d 列 搬 %d 列 头=%s%s idx=%d%s'
+              % (tag, info['rows'], len(info['cols']), info['n_new'], base['carry_cols'],
+                 info['head_kind'],
+                 (' 并值=' + ','.join(info['merge'])) if info['merge'] else '',
+                 base['indexes'],
+                 (' 需 --clean: ' + ','.join('%s=%d' % kv for kv in pre['fails'].items()))
+                 if pre['fails'] else ''))
         return base
-    return do_migrate(path, info, checks_pass, backup_dir, base)
+    return do_migrate(path, info, pre, backup_dir, base, clean=clean)
 
 
-def do_migrate(path, info, checks_pass, backup_dir, base, make_backup=True, quiet=False):
+def do_migrate(path, info, pre, backup_dir, base, clean=False,
+               make_backup=True, quiet=False):
     tag = '%s/%s' % (base['family'], base['slug'])
     bak, bak_sha = None, None
     if make_backup:
@@ -374,44 +430,94 @@ def do_migrate(path, info, checks_pass, backup_dir, base, make_backup=True, quie
 
     con = sqlite3.connect(str(path), isolation_level=None)
     committed = False
+    clean_counts = dict(pre['clean_counts'])
     try:
         fks, fk_dropped = fk_defs(con, table_names(con))
         if fk_dropped:
             base['warnings'].append('引用表缺失，未重建 FK：%s' % fk_dropped)
-        ddl = build_ddl(info, info['legacy'], info['vars'], checks_pass, fks)
+        ddl = build_ddl(info, fks)
+        has_qc = bool(info.get('qc'))
         con.execute('PRAGMA foreign_keys=OFF')          # 必须在 BEGIN 之前
         con.execute('BEGIN IMMEDIATE')
+        # ---- --clean：先按行记 qc，再改；qc 在收尾前一直可写（clin 还没换名）----
+        if clean:
+            n = con.execute('SELECT count(*) FROM clin WHERE ' + ORIGIN_PH).fetchone()[0]
+            if n and has_qc:
+                con.execute(
+                    "INSERT INTO qc(period_month,scope,table_name,column_name,code,"
+                    "severity,status,detail) SELECT %s,'clin','clin','period_origin',"
+                    "'VALUE_DIRTY','P2','fixed',? FROM clin WHERE %s"
+                    % (_qi('period_month'), ORIGIN_PH),
+                    ('原值 "0" 判为占位值 → NULL（clin v2 迁移 --clean）',))
+            if n:
+                con.execute('UPDATE clin SET period_origin=NULL WHERE ' + ORIGIN_PH)
+                clean_counts['origin_placeholder'] = n
+            n = con.execute("SELECT count(*) FROM clin WHERE period_month<>'UNK' "
+                            'AND month_ix IS NULL').fetchone()[0]
+            if n and has_qc:
+                con.execute(
+                    "INSERT INTO qc(period_month,scope,table_name,column_name,code,"
+                    "severity,status,detail) SELECT %s,'clin','clin','month_ix',"
+                    "'VALUE_NORMALIZED','P2','fixed',? FROM clin WHERE "
+                    "period_month<>'UNK' AND month_ix IS NULL" % _qi('period_month'),
+                    ('由 period_month 推算 year*12+month-1 回填（clin v2 迁移 --clean）',))
+            if n:
+                con.execute("UPDATE clin SET month_ix=CAST(substr(period_month,1,4) AS INTEGER)"
+                            "*12+CAST(substr(period_month,6,2) AS INTEGER)-1 "
+                            "WHERE period_month<>'UNK' AND month_ix IS NULL")
+                clean_counts['month_ix_backfill'] = n
+            for c, cn in info['cast'].items():
+                if cn and has_qc:
+                    con.execute(
+                        "INSERT INTO qc(period_month,scope,table_name,column_name,code,"
+                        "severity,status,detail) VALUES (NULL,'clin','clin',?,"
+                        "'VALUE_NORMALIZED','P2','fixed',?)",
+                        (c, '旧列类型非 TEXT，转为 TEXT %d 行（0.0→0）' % cn))
+        bad = []
+        for name, expr in CHECKS:
+            n = con.execute('SELECT count(*) FROM clin WHERE NOT (%s)' % expr).fetchone()[0]
+            if n:
+                bad.append((name, n))
+        if bad:
+            raise RuntimeError('旧 CHECK 仍未通过（加 --clean？）：%s' % bad)
         con.execute(ddl)
-        carry = [c for c in info['cols']]               # 旧列全搬
-        ins_cols = [c for c in info['target'] if c in set(info['cols'])]
-        sel = ', '.join(_qi(c) for c in ins_cols)
-        lit = ", 'clin-v2'" if 'schema_block' not in ins_cols else ''
+        ins, srcs = [], []
+        for c in info['target']:
+            if c in PATH_NAMES:
+                continue                              # 本轮只建列不填值
+            if c == 'schema_block':
+                ins.append(c)
+                srcs.append("'clin-v2'")
+            elif c in info['merge']:
+                ins.append(c)
+                srcs.append(cast_text_expr(c))
+            elif c in set(info['cols']):
+                ins.append(c)
+                srcs.append(_qi(c))
         n_before = con.execute('SELECT count(*) FROM clin').fetchone()[0]
-        con.execute('INSERT INTO clin__v2 (%s%s) SELECT %s%s FROM clin'
-                    % (', '.join(_qi(c) for c in ins_cols),
-                       ', ' + _qi('schema_block') if 'schema_block' not in ins_cols else '',
-                       sel, lit))
+        con.execute('INSERT INTO clin__v2 (%s) SELECT %s FROM clin'
+                    % (', '.join(_qi(c) for c in ins), ', '.join(srcs)))
         n_after = con.execute('SELECT count(*) FROM clin__v2').fetchone()[0]
         if n_after != n_before:
             raise RuntimeError('行数不符 %d → %d' % (n_before, n_after))
-        # 逐列非空数（搬的全部列）+ 新列必须全空
         bad = []
-        for c in ins_cols:
+        for c in ins:
+            if c == 'schema_block':
+                n = con.execute("SELECT count(*) FROM clin__v2 WHERE schema_block<>"
+                                "'clin-v2'").fetchone()[0]
+                if n:
+                    bad.append((c, n))
+                continue
             a = con.execute('SELECT count(%s) FROM clin' % _qi(c)).fetchone()[0]
             b = con.execute('SELECT count(%s) FROM clin__v2' % _qi(c)).fetchone()[0]
             if a != b:
                 bad.append((c, a, b))
         if bad:
             raise RuntimeError('非空数不符：%s' % bad[:6])
-        for c in ('group_v', 'subgroup') + tuple(c for c, _ in PATH_COLS):
+        for c in [c for c in ('group_v', 'subgroup') if c not in info['merge']] + PATH_NAMES:
             n = con.execute('SELECT count(%s) FROM clin__v2' % _qi(c)).fetchone()[0]
             if n:
                 raise RuntimeError('新列 %s 应为空，实有 %d' % (c, n))
-        sb = con.execute("SELECT count(*) FROM clin__v2 WHERE schema_block<>'clin-v2'"
-                         ).fetchone()[0]
-        if sb:
-            raise RuntimeError('schema_block 非 clin-v2：%d 行' % sb)
-        # 换名 + 索引/触发器
         idxs = [s for _n, s in info['idx'] if s]
         trgs = [s for _n, s in info['trg'] if s]
         con.execute('DROP TABLE clin')
@@ -424,12 +530,17 @@ def do_migrate(path, info, checks_pass, backup_dir, base, make_backup=True, quie
             con.execute(s)
         for s in trgs:
             con.execute(s)
-        # meta
         now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         kv = [('clin_schema', 'v2'), ('clin_v2_migrated_at', now),
               ('clin_v2_legacy_cols', ','.join(info['legacy'])),
+              ('clin_v2_merged_cols', ','.join(info['merge'])),
+              ('clin_v2_absorbed_cols', ','.join(info['absorb'])),
               ('clin_v2_prev_cols_n', str(len(info['cols']))),
-              ('clin_v2_cols_n', str(info['n_new']))]
+              ('clin_v2_cols_n', str(info['n_new'])),
+              ('clin_v2_checks_kept', ','.join(n for n, _ in CHECKS + [HEAD_CHECK])),
+              ('clin_v2_clean_counts', json.dumps(clean_counts, ensure_ascii=False)),
+              ('clin_v2_type_cast', json.dumps(info['cast'], ensure_ascii=False)),
+              ('clin_v2_clean_applied', '1' if clean else '0')]
         for k, v in kv:
             con.execute('INSERT OR REPLACE INTO meta(k, v) VALUES (?, ?)', (k, v))
         if con.execute("SELECT 1 FROM meta WHERE k='clin_cols_n'").fetchone():
@@ -443,15 +554,18 @@ def do_migrate(path, info, checks_pass, backup_dir, base, make_backup=True, quie
         ok = (cur == info['target'] and integ == 'ok' and not fkv and n_fin == n_before)
         base.update(action='migrated' if ok else 'failed', rows=n_fin,
                     cols_new=len(cur), integrity=integ, fk_violation=len(fkv),
-                    backup=str(bak), backup_sha256=bak_sha,
-                    migrated_at=now, checks_kept=[n for n, _ in checks_pass])
+                    backup=str(bak) if bak else None, backup_sha256=bak_sha,
+                    migrated_at=now, clean_applied=clean, clean_counts=clean_counts,
+                    checks_kept=[n for n, _ in CHECKS + [HEAD_CHECK]])
         if not ok:
             raise RuntimeError('事后体检不过：cols=%d/%d integrity=%s fk=%d rows=%d/%d'
                                % (len(cur), len(info['target']), integ, len(fkv),
                                   n_fin, n_before))
         if not quiet:
-            print('%-34s OK  %6d 行 %3d 列，integrity=%s fk=%d，备份 %s'
-                  % (tag, n_fin, len(cur), integ, len(fkv), (bak_sha or '-')[:12]))
+            print('%-34s OK  %6d 行 %3d 列，integrity=%s fk=%d%s，备份 %s'
+                  % (tag, n_fin, len(cur), integ, len(fkv),
+                     '，已清洗 %d 行' % sum(clean_counts.values()) if clean else '',
+                     (bak_sha or '-')[:12]))
         return base
     except Exception as e:
         if not committed:
@@ -463,7 +577,6 @@ def do_migrate(path, info, checks_pass, backup_dir, base, make_backup=True, quie
             if not quiet:
                 print('%-34s !! 失败已回滚：%s' % (tag, e))
             return base
-        # 已提交但事后体检失败：有备份就用备份覆盖回去（副本演练没有备份，直接报错）
         con.close()
         con = None
         if bak is not None:
@@ -492,6 +605,8 @@ def main(argv=None):
     ap.add_argument('--root', default=None)
     ap.add_argument('--family', action='append', default=None)
     ap.add_argument('--apply', action='store_true', help='真的写盘；缺省 dry-run')
+    ap.add_argument('--clean', action='store_true',
+                    help='迁移前按规则清洗旧 CHECK 违例（缺省关闭；--apply 遇违例库需它）')
     ap.add_argument('--backup-dir', default=None)
     ap.add_argument('--rehearse-dir', default=None,
                     help='dry-run 在副本上真跑一遍迁移；副本写到该目录（跑完即删）')
@@ -517,35 +632,46 @@ def main(argv=None):
             Path(r'D:/MyProjects/.Del/_by-function/db5t-clin-v2-20261127')
             / ('rehearse_' + stamp))
 
-    print('== %s == %d 个子库；备份目录 %s；演练副本 %s'
-          % ('写盘' if a.apply else 'dry-run', len(dbs),
+    print('== %s%s == %d 个子库；备份目录 %s；演练副本 %s'
+          % ('写盘' if a.apply else 'dry-run', ' --clean' if a.clean else '', len(dbs),
              bdir if a.apply else '(dry-run 不备份)', rdir or '无'))
-    res = [run_one(p, bdir, a.apply, rdir) for p in dbs]
-    with_clin = [r for r in res if r.get('rows') is not None or r.get('blockers')]
+    res = [run_one(p, bdir, a.apply, rdir, a.clean) for p in dbs]
     migr = [r for r in res if r['action'] == 'dry-run']
     done = [r for r in res if r['action'] == 'migrated']
     blk = [r for r in res if r['action'] in ('blocked', 'error', 'failed_restored')]
     skip = [r for r in res if r['action'] == 'skip']
+    need = [r for r in res if r.get('needs_clean')]
     summary = {
-        'root': str(root),
-        'apply': a.apply,
+        'root': str(root), 'apply': a.apply, 'clean': a.clean,
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
         'dbs_total': len(res),
         'dbs_with_clin': len([r for r in res if 'rows' in r]),
         'rows_total': sum(r.get('rows') or 0 for r in res if 'rows' in r),
         'migratable': len(migr) + len(done),
-        'migrated': len(done),
-        'blocked': len(blk),
-        'skipped': len(skip),
+        'migrated': len(done), 'blocked': len(blk), 'skipped': len(skip),
+        'needs_clean': len(need),
+        'clean_origin_rows': sum((r.get('clean_counts') or {}).get('origin_placeholder', 0)
+                                 for r in res),
+        'clean_monthix_rows': sum((r.get('clean_counts') or {}).get('month_ix_backfill', 0)
+                                  for r in res),
+        'type_cast_rows': sum(sum((r.get('type_cast') or {}).values()) for r in res),
         'max_cols_old': max([r.get('cols_old', 0) for r in res] or [0]),
         'max_cols_new': max([r.get('cols_new', 0) for r in res] or [0]),
         'max_cols_db': (max([r for r in res if 'cols_new' in r],
-                            key=lambda r: r['cols_new'], default={})
-                        .get('slug')),
+                            key=lambda r: r['cols_new'], default={}).get('slug')),
     }
     print('\n合计：可迁移 %d；已迁移 %d；阻塞/异常 %d；跳过 %d；clin 行 %d'
           % (summary['migratable'], summary['migrated'], summary['blocked'],
              summary['skipped'], summary['rows_total']))
+    print('      需 --clean %d 库；清洗预估 origin_placeholder %d 行、'
+          'month_ix_backfill %d 行；group_v/subgroup 类型转换 %d 行'
+          % (summary['needs_clean'], summary['clean_origin_rows'],
+             summary['clean_monthix_rows'], summary['type_cast_rows']))
+    for r in res:
+        if r.get('needs_clean'):
+            print('  ~ 需 --clean %s/%s  %s' % (
+                r['family'], r['slug'],
+                ','.join('%s=%d' % kv for kv in r['check_fails'].items())))
     for r in blk:
         print('  !! %s/%s %s %s' % (r['family'], r['slug'], r['action'],
                                     (r.get('error') or '；'.join(r.get('blockers') or []))[:200]))
