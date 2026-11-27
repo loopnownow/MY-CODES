@@ -484,7 +484,8 @@ def eligible(row) -> bool:
     """
     if row.get('debt') != 1 or row.get('will_accept') != 1 or not row.get('proposal'):
         return False
-    if row.get('cls') == 'HEADER' and int(row.get('n_cand') or 0) > 1:
+    if row.get('cls') == 'HEADER' and int(row.get('n_cand') or 0) > 1 \
+            and not row.get('picked'):
         return False
     return True
 
@@ -535,6 +536,46 @@ def write_rows(db_path: Path, rows) -> int:
     return n
 
 
+def read_picks(path) -> dict:
+    """读人工挑选清单 TSV：fam/table/column/rel_path/sheet/cell → (rel, sheet, cell)。
+
+    由 _work\\gen_d82_pick_html.py 导出；同一 (fam, table, column) 在多个 scope 下共用一次挑选。
+    """
+    picks = {}
+    with open(path, encoding='utf-8-sig', newline='') as f:
+        for row in csv.DictReader(f, delimiter='\t'):
+            base = ((row.get('fam') or '').strip(), (row.get('table') or '').strip(),
+                    (row.get('column') or '').strip())
+            scope = (row.get('scope') or '').strip()
+            rel = (row.get('rel_path') or '').strip()
+            if not all(base) or not rel:
+                continue
+            val = (rel, (row.get('sheet') or '').strip(), (row.get('cell') or '').strip())
+            picks[(base, scope)] = val
+            # 3 元组的兜底：没有 scope 行时，同列的各 scope 共用一次挑选。
+            picks.setdefault(base, val)
+    return picks
+
+
+def apply_picks(res, picks: dict) -> int:
+    """把人工挑选结果盖到 HEADER 多候选行上：source 直接写成 blob:rel#sheet:col。"""
+    n = 0
+    for r in res['rows']:
+        if r['cls'] != 'HEADER' or (r['n_cand'] or 0) <= 1:
+            continue
+        base = (r['family'], r['table_name'], r['column_name'])
+        got = picks.get((base, r['scope'] or '')) or picks.get(base)
+        if not got:
+            continue
+        rel, sheet, cell = got
+        r['proposal'] = TPL['HEADER'].format(rel=rel, sheet=sheet, col=cell)
+        r['will_accept'] = 1
+        r['picked'] = 1
+        r['note'] = '人工挑选：%s#%s' % (rel, sheet)
+        n += 1
+    return n
+
+
 def run_one(db_path, old_db=None, examples=2, verbose=True):
     fam = family_of(db_path)
     conn = open_ro(db_path)
@@ -575,6 +616,7 @@ def main(argv=None) -> int:
     ap.add_argument('--out', help='写 CSV（只允许落在 {DEL}\\_work\\，只取文件名）')
     ap.add_argument('--examples', type=int, default=2, help='每类打印几条例行（默认 2）')
     ap.add_argument('--top', type=int, default=5, help='打印债务最大的几家（默认 5）')
+    ap.add_argument('--picks', help='人工挑选清单 TSV（gen_d82_pick_html.py 导出）')
     ap.add_argument('--go', action='store_true',
                     help='落库：写 dict.source（保守写集；写前逐家备份，写后对账）')
     args = ap.parse_args(argv)
@@ -630,6 +672,11 @@ def main(argv=None) -> int:
                   'SCALE %4d  UNRES %4d'
                   % (r['family'], r['debt'], c['SCHEMA'], c['HEADER'], c['NMR'],
                      c['RADI'], c['OLDBLOB'], c['SCALE'], c['UNRESOLVED']))
+
+    if args.picks:
+        picks = read_picks(args.picks)
+        hit = sum(apply_picks(res, picks) for res in results)
+        print('\n人工挑选 %d 条，命中 %d 行（按 fam/table/column 对齐）' % (len(picks), hit))
 
     if args.go:
         total = 0
