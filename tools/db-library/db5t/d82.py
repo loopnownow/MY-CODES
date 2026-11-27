@@ -5,9 +5,12 @@
 
   clin / src   严格：只认「可追形态」与 `SCHEMA `；`派生：` 也计债——
                宽表/登记表的每一格数值都应能回到源列，派生说法会盖住「哪一格重编码过」。
-  *_val 长表   宽松：可追 / SCHEMA / `派生：` 都合规——
-               NMR 按 ppm 分箱（nmr_val 7,005 行）、PyRadiomics 特征（radi_val 3,640 行）
-               本来就不是某张表的某一列，强求 `blob:` 只会逼出伪造路径。
+  *_val 长表   宽松：`*_val` 是 values 长表（exam_uid / entity / feature / value / unit），
+               与 `_modules_<mod>` 的「一次检查一行」配对，**不是验证子集**（验证组是
+               `clin.group_v` / `cohort` 列）；删它等于删全部模块测量值，禁止。
+               可追 / SCHEMA / `派生：` 都合规——NMR 按 ppm 分箱（回填前 nmr_val 7,000 行）、
+               PyRadiomics 特征（回填前 radi_val 3,640 行）本来就不是某张表的某一列，
+               强求 `blob:` 只会逼出伪造路径。
   其它结构表   同严格：id / id_number / person / qc / meta / ref_project / _modules_*。
 
 结构列（SYS，与 D78 同一份名单）不参与：它们描述「这次检查怎么来的」，不是源表变量，
