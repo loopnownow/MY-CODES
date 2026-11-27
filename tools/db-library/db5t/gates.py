@@ -12,6 +12,7 @@ import re
 import sys
 from pathlib import Path
 import paths as B  # 路径解析集中在这里；DB5T_ROOT 可指向 _DataBase 验切库后的真库
+import d82 as D82  # D82 按表分级与债务基线（cli 与 recorder 共用一份判据）
 
 STAGE = pathlib.Path(os.environ.get('DB5T_ROOT') or B.STAGE)
 FAM = sys.argv[1] if len(sys.argv) > 1 else 'MCI'      # MCI | LC | SSD
@@ -1384,47 +1385,55 @@ def d78_dict_provenance(fam_db):
 
 
 def d82_source_format(fam_db):
-    """D82（只报数）：`dict.source` 必须是「可追的形态」，不能是占位词。
+    """D82（按表分级 + 债务基线）：`dict.source` 不能是占位词，且不可追形态不得超过已记账基线。
 
-    起因（2026-11-25）：D78 只要求 `source` 非空，于是 `old_db_blob`（那是 `src.kind`，
-    不是来源）能把 3,261 行占位词判成「有溯源」。真库因此一路绿，而库内其实没记来源。
-
-    合法形态（三种，见 WORKER-BRIEF §source）：
-      1. `<path>#<sheet>:<源列名>`      —— 源表有同名列
-      2. `<path>#<sheet>:#<N>`          —— 列名被重命名，位置即证据（1 基）
-      3. `<path>#txt:<字段标签>`         —— 从文本块解析出的字段
-    另允许两类非「源列」的自述：
-      `派生：<可执行规则>`、`SCHEMA §2 <table>：结构列…`
-    其余（含 `old_db_blob` 这种 kind 名、`-`、`见上`）一律计入本项。
+    分级与基线口径见 d82.py：clin/src 只认「可追形态」与 `SCHEMA `；`*_val` 长表另允许
+    `派生：`（NMR ppm 分箱、PyRadiomics 特征本就不是源列）；结构列（SYS，同 D78）不参与。
+    债务基线存家族库 `meta.d82_debt_rows`（JSON），高了判 P1（新债），低了只提示刷新（待修）。
+    因此既有 1.5 万行债不阻塞，但库再长出一行不可追 source 会立刻红——这是 C 路线的目的。
     """
     if not fam_db.exists():
-        return [], 0, 0
+        return [], 0, 0, 'ok'
     try:
         f = sqlite3.connect('file:%s?mode=ro' % fam_db, uri=True)
     except sqlite3.Error:
-        return [], 0, 0
-    pat_ok = re.compile(r'^(派生[:：]|SCHEMA |blob:.*#.*:|.*#.*:(#\d+|.*\S))')
-    bad, total, ex = {}, 0, []
+        return [], 0, 0, 'ok'
     try:
-        for cn, src in f.execute("select column_name, coalesce(source,'') from dict"):
-            total += 1
-            v = src.strip()
-            if v and pat_ok.match(v):
-                continue
-            bad[v or '<空>'] = bad.get(v or '<空>', 0) + 1
-            if len(ex) < 5:
-                ex.append('%s=%r' % (cn, v))
-    except sqlite3.Error:
-        pass
+        stats = D82.scan(f)
+        base = D82.load_baseline(f)
     finally:
         f.close()
-    n = sum(bad.values())
-    out = []
-    if n:
-        top = sorted(bad.items(), key=lambda kv: -kv[1])[:4]
-        out.append('  · %d/%d 行 source 不是可追形态（例 %s；占位词 %s）'
-                   % (n, total, ', '.join(ex), ', '.join('%s×%d' % (k if k != '<空>' else '空', v2) for k, v2 in top)))
-    return out, n, total
+    if not stats['total']:
+        return ['  · dict 无数据行'], 0, 0, 'ok'
+    new, status, detail = D82.compare(stats, base)
+    d = stats['debt']
+    out = ['  · 检查 %d 行（结构列除外）：可追 %d / SCHEMA %d / 派生 %d / 债 %d'
+           % (stats['total'], stats['trace'], stats['schema'], stats['derived'],
+              d.get('total', 0)),
+           '  · 债分布：clin %d · src %d · *_val %d · 其它 %d'
+           % (d.get('clin', 0), d.get('src', 0), d.get('val', 0), d.get('other', 0))]
+    top = sorted(stats['tables'].items(), key=lambda kv: -kv[1])[:3]
+    if top:
+        out.append('  · 债最多：' + '，'.join('%s %d' % (t, n) for (t, _g), n in top))
+    fam = fam_db.parent.parent.name
+    if base is None:
+        out.append('  ~~ 未登记基线：跑 d82_debt.py %s --go 落 meta.%s（待修）'
+                   % (fam, D82.KEY))
+        return out, 0, stats['total'], 'no-baseline'
+    tag = base.get('recorded_on') or '日期未记'
+    base_total = base.get('total') or 0
+    if status == 'new':
+        parts = ['%s +%d' % (D82.LABEL[g], n) for g, n in detail.items()]
+        out.append('  !! P1 新增债 %d 行（%s）：现 %d，基线 %d（%s）'
+                   % (new, ' · '.join(parts), d.get('total', 0), base_total, tag))
+        for g in D82.GRADES:
+            out.extend('      %s' % x for x in stats['examples'].get(g, []))
+    elif status == 'stale':
+        out.append('  ~~ 债 %d < 基线 %d（已销 %d，%s）：跑 d82_debt.py %s --go 刷新（待修）'
+                   % (d.get('total', 0), base_total, base_total - d.get('total', 0), tag, fam))
+    else:
+        out.append('  · 基线 %d（%s）一致：既有债不阻塞，新债即红' % (base_total, tag))
+    return out, new, stats['total'], status
 
 
 def d79_idnum_registry(fam_db, fam, proj):
@@ -1758,9 +1767,16 @@ def main():
     out.append(f'\n== D77 零引用身份行（P1，只报数）：检查 {_n77} 行')
     out.extend('  ' + x for x in _l77)
     _l78, _n78 = d78_dict_provenance(FAM_DB)
-    _l82, _n82, _t82 = d82_source_format(FAM_DB)
-    out.append(f'\n== D82 dict.source 形态（只报数）：检查 {_t82} 行，非可追形态 {_n82} 行')
+    _l82, _n82, _t82, _s82 = d82_source_format(FAM_DB)
+    out.append(f'\n== D82 dict.source 按表分级（clin/src 需可追；*_val 允许派生；基线 meta.d82_debt_rows）：'
+               f'检查 {_t82} 行，新债 {_n82} 行')
     out.extend(_l82)
+    if _n82:
+        all_rows.append((f'family:{FAM}', 'dict', 'D82', _n82))
+    if _s82 == 'no-baseline':
+        _pending.append((f'family:{FAM}', 'meta', 'D82-BASELINE'))
+    elif _s82 == 'stale':
+        _pending.append((f'family:{FAM}', 'meta', 'D82-BASELINE-STALE'))
     out.append(f'\n== D78 值列溯源（dict.source）：{_n78} 个值列缺 source（P1）')
     out.extend(_l78[:20])
     if _n78:
