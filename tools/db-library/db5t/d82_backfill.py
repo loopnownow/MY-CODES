@@ -50,6 +50,13 @@ D82 也不把它们计入债务（C 路线），这类行属于顺手修、不�
   DB5T_ROOT=... python -B d82_backfill.py --all          # 只给根、不给 --db-root 时用它
   python -B d82_backfill.py --db <家族库> --old-db <FAM>db_6t   # 手工指旧库
   python -B d82_backfill.py --db D:/MyProjects/_DataBase/MHE_AN --go   # 落库（逐家备份）
+  python -B d82_backfill.py --all --picks <_work>/d82_header_picks.tsv --go  # 人工挑选
+  python -B d82_backfill.py --all --buildonly --go     # 只剩构建产物表头的 *_val 写派生句
+
+`--picks`：人工挑的 HEADER 多候选行，按 (fam, table, column, scope) 盖 `blob:` 指针。
+`--buildonly`：表头只在 `5tables/_merged_/5t` 构建产物里、且该表属 `*_val` 的行，
+写「派生：由 <合并簿>#<sheet> 合并生成（该簿为合并产物、原件已退役；原值存 <FAM>db_6t.val）」；
+clin/src 不受此兜底（规则要求可追原件），一律留债。
 
 只读：所有连接都 `mode=ro`；唯一落盘是 `--out` 的 CSV（强制写在 `{DEL}\\_work\\` 下）。
 `--go`：写 `dict` 前把整库 copy 到 `_work/d82_bf_bak/<FAM>db`（已存在则复用），逐行
@@ -87,6 +94,9 @@ TPL = {
     'RADI': '派生：PyRadiomics 特征提取（类见列名前缀），ROI 见 src.rel_path',
     'OLDBLOB': '派生：旧库合并表 {table}（db_6t.src 无此列，来源链断于此）',
     'SCALE': '派生：{table} 计分项（由原列名重编码）',
+    # 表头只落在构建产物（5tables/_merged_/5t）的 *_val 列：合并产物不是现行源文件，
+    # 但该值确实是合并出来的，且合并簿已退役——写派生并注明证据停在哪里。
+    'BUILDONLY': '派生：由 {rel}#{sheet} 合并生成（该簿为合并产物、原件已退役；原值存 {fam}db_6t.val）',
     'UNRESOLVED': '',
 }
 
@@ -94,6 +104,8 @@ TPL = {
 RE_RADI_TABLE = re.compile(r'(^|_)(radi|rad|radiomics|target)(_val)?$', re.I)
 RE_RADI_COL = re.compile(r'(^|_)(firstorder|glcm|glrlm|glszm|gldm|ngtdm|shape|sobel|logsigma)_', re.I)
 RE_PPM = re.compile(r'^ppm\s*=')
+# 构建产物：5tables / _merged_ / 5t 不是现行源文件（与 gen_d82_pick_screen.py 同口径）。
+RE_BUILD = re.compile(r'(5tables|_merged_|5t\b)', re.I)
 
 
 def norm_text(s) -> str:
@@ -265,6 +277,8 @@ def plan(conn, heads=None, family: str = '', old_db=None, has_src=None) -> dict:
             continue  # 已经可追的行不进计划
 
         n_cand = 0
+        n_build = 0
+        rel = sheet = cell = ''
         note = ''
         if is_struct and sv in ('schema', 'derived', '源表'):
             cls = 'SCHEMA'
@@ -275,6 +289,7 @@ def plan(conn, heads=None, family: str = '', old_db=None, has_src=None) -> dict:
             cls = 'HEADER'
             cands = heads[norm_text(col)]
             n_cand = len(cands)
+            n_build = sum(1 for c in cands if RE_BUILD.search(c[0]))
             rel, sheet, cell = pick_header(cands)
             proposal = TPL['HEADER'].format(rel=rel, sheet=sheet, col=cell)
             if n_cand > 1:
@@ -348,6 +363,13 @@ def plan(conn, heads=None, family: str = '', old_db=None, has_src=None) -> dict:
             'will_accept': will_accept if is_debt else '',
             'note': note,
             'n_cand': n_cand,
+            'n_build': n_build,
+            'cand_rel': rel,
+            'cand_sheet': sheet,
+            'cand_cell': cell,
+            # 只有 *_val 类收 `派生：`；clin/src 即使命中构建产物也不写（规则要求可追原件）。
+            'buildonly': 1 if (cls == 'HEADER' and n_cand and n_build == n_cand
+                               and grade == 'val' and is_debt) else 0,
         })
 
     # 与 d82.scan 对账：本工具逐行算的债必须与门禁口径一致。
@@ -464,7 +486,8 @@ def print_totals(agg, handoff=False):
 def write_csv(path: Path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = ['family', 'scope', 'cls', 'table_name', 'column_name', 'source', 'grade', 'kind',
-              'debt', 'struct', 'proposal', 'will_accept', 'n_cand', 'note']
+              'debt', 'struct', 'proposal', 'will_accept', 'n_cand', 'n_build', 'buildonly',
+              'cand_rel', 'cand_sheet', 'cand_cell', 'note']
     with path.open('w', newline='', encoding='utf-8-sig') as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
@@ -617,6 +640,9 @@ def main(argv=None) -> int:
     ap.add_argument('--examples', type=int, default=2, help='每类打印几条例行（默认 2）')
     ap.add_argument('--top', type=int, default=5, help='打印债务最大的几家（默认 5）')
     ap.add_argument('--picks', help='人工挑选清单 TSV（gen_d82_pick_html.py 导出）')
+    ap.add_argument('--buildonly', action='store_true',
+                    help='构建产物兜底：表头只落在 5tables/_merged_/5t 的 *_val 列写派生句'
+                         '（clin/src 不收，留债）')
     ap.add_argument('--go', action='store_true',
                     help='落库：写 dict.source（保守写集；写前逐家备份，写后对账）')
     args = ap.parse_args(argv)
@@ -677,6 +703,21 @@ def main(argv=None) -> int:
         picks = read_picks(args.picks)
         hit = sum(apply_picks(res, picks) for res in results)
         print('\n人工挑选 %d 条，命中 %d 行（按 fam/table/column 对齐）' % (len(picks), hit))
+
+    if args.buildonly:
+        n = 0
+        for res in results:
+            for r in res['rows']:
+                if not r.get('buildonly'):
+                    continue
+                r['proposal'] = TPL['BUILDONLY'].format(
+                    rel=r['cand_rel'], sheet=r['cand_sheet'], fam=r['family'])
+                r['will_accept'] = 1
+                r['picked'] = 1
+                r['note'] = ((r['note'] + '；') if r['note'] else '') + \
+                    '表头只在构建产物里；合并簿已退役'
+                n += 1
+        print('\n构建产物兜底 %d 行（*_val 写派生句；clin/src 不在内，留债）' % n)
 
     if args.go:
         total = 0
