@@ -175,22 +175,44 @@ CREATE TABLE person(                 -- 无 PHI 占位表
   note         TEXT
 );
 
-CREATE TABLE clin(                   -- 一人一时点一行；同月多次采集在迁移期合并
+CREATE TABLE clin(                   -- v2：一人一时点一行；头 11 列按名按序（D87 指纹校验）
   family_uid    TEXT NOT NULL REFERENCES person(family_uid) ON DELETE CASCADE,
+  observed_on   TEXT,               -- 精确日期；同月多值取最早，全量留 qc 明细
   period_month  TEXT NOT NULL,      -- 'YYYY-MM' 或 'UNK'
+  cohort        TEXT,               -- 多队列项目必填（EC: 'S' 手术/'A' 入院）；单队列留 NULL
+                                    -- 枚举必须登记 dict(role='key')，且 meta.cohort_split 同步写人话
+  group_v       TEXT,               -- 分组变量：0=对照/1=实验，或 DC/PD 等；枚举登记 dict
+  subgroup      TEXT,               -- 亚组；无则 NULL
+  src_id        INTEGER REFERENCES src(src_id),
+  src_row       INTEGER,            -- 原表行号，溯源/改名/重号回溯用
+  merged_n      INTEGER NOT NULL DEFAULT 1,   -- 该行由几条来源记录合并而来
+  unk_seq       INTEGER NOT NULL DEFAULT 0,  -- 仅 UNK 行使用：同一人第 2、3 条无日期记录
+  schema_block  TEXT DEFAULT 'clin-v2',      -- 块标识：本表恒 'clin-v2'
+  -- —— 以下 3 列是 v1 头遗留的时点精度三元组，降为变量列保留（保住 period_origin 这类既有证据）——
+  -- —— 新项目不再写这三列；NULL 即「未记录」——
   month_ix      INTEGER,            -- year*12+month-1；UNK 时为 NULL
-  period_source TEXT NOT NULL,      -- 精度：exact | approx | unknown
+  period_source TEXT,               -- 精度：exact | approx | unknown（v1 头为 NOT NULL，v2 放开）
   period_origin TEXT,               -- 事件来源：exam_date | surgery_date | admission_date | report_date | derived | unknown
                                     -- 与 period_source 分工：source 答「这个月有多准」，origin 答「这个月是哪件事的」
                                     -- 实例：EC 的 S 队列=surgery_date、A 队列=admission_date；BT/影像项目=exam_date
-  unk_seq       INTEGER NOT NULL DEFAULT 0,  -- 仅 UNK 行使用：同一人第 2、3 条无日期记录
-  observed_on   TEXT,               -- 精确日期；同月多值取最早，全量留 qc 明细
-  merged_n      INTEGER NOT NULL DEFAULT 1,   -- 该行由几条来源记录合并而来
-  src_id        INTEGER REFERENCES src(src_id),
-  src_row       INTEGER,            -- 原表行号，溯源/改名/重号回溯用
-  cohort        TEXT,               -- 多队列项目必填（EC: 'S' 手术/'A' 入院）；单队列留 NULL
-                                    -- 枚举必须登记 dict(role='key')，且 meta.cohort_split 同步写人话
-  -- ……项目变量列（由原表表头生成，逐列登记 dict）……
+  -- ……项目变量列（由原表表头生成，逐列登记 dict；变量区小写缩写、按字母序）……
+  -- ……病理段（由病理原文拆分而来；原文与扫描件不入库，靠 src_id+src_row 回溯）……
+  -- ihc_<marker> / ihc_panel_raw 待病理拆列时 ALTER ADD 到表尾（marker 动态，不固定在此）
+  path_kind      TEXT,   -- 病理类型：surgery | curettage | biopsy | consult | other
+  path_on        DATE,   -- 病理报告日期
+  path_histology TEXT,   -- 组织学类型（清洗后标准词）
+  path_grade     TEXT,   -- 病理分级（FIGO grade 1/2/3）
+  path_mi        TEXT,   -- 肌层浸润：none | lt50 | ge50 | full | unk
+  path_mi_mm     INTEGER,-- 肌层浸润深度 mm（原文给出数值时）
+  path_lvsi      TEXT,   -- 脉管癌栓：0 | 1 | unk
+  path_csi       TEXT,   -- 宫颈间质受累：0 | 1 | unk
+  path_ln_pos    INTEGER,-- 阳性淋巴结枚数
+  path_ln_total  INTEGER,-- 检出淋巴结总枚数
+  path_lnm       TEXT,   -- 淋巴结转移：0 | 1 | unk
+  path_eu        TEXT,   -- 宫外/附件受累：0 | 1 | unk
+  path_figo      TEXT,   -- 病理 FIGO 分期（规范化后）
+  path_dx        TEXT,   -- 诊断结论句（≤1000 字；超长截断留 qc）
+  path_other     TEXT,   -- 残余病理要点（≤200 字）
   PRIMARY KEY (family_uid, period_month, unk_seq),
   CHECK (period_month='UNK' OR period_month GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'),
   CHECK (period_source IN ('exact','approx','unknown')),

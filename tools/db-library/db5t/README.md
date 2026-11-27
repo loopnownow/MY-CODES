@@ -13,6 +13,7 @@
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |
 | `migrate_id_v2.py` | `id` 12 列 → 24 列重建迁移（`ALTER` 改不了列序，只能建新表抄数据；缺省 dry-run，`--apply` 才写盘并先备份） |
+| `migrate_clin_v2.py` | `clin` 旧头 → v2 头（11 列头 + legacy 三元组 + 15 空 `path_*`）重建迁移；`group_v`/`subgroup` 同名变量并值进头列、`--clean` 才清违例库；缺省 dry-run，`--apply` 先备份 |
 | `gen_readme.py` | 生成 `<leaf>/目录说明.md`（幂等，由各 build 收尾调用） |
 | `schema-v1.md` | SCHEMA 的兜底副本；权威版本仍在批次目录，`paths.py` 优先用它 |
 
