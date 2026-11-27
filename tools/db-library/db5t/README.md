@@ -12,6 +12,7 @@
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |
+| `migrate_id_v2.py` | `id` 12 列 → 24 列重建迁移（`ALTER` 改不了列序，只能建新表抄数据；缺省 dry-run，`--apply` 才写盘并先备份） |
 | `gen_readme.py` | 生成 `<leaf>/目录说明.md`（幂等，由各 build 收尾调用） |
 | `schema-v1.md` | SCHEMA 的兜底副本；权威版本仍在批次目录，`paths.py` 优先用它 |
 

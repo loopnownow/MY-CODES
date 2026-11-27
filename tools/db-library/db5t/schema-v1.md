@@ -36,16 +36,27 @@ CREATE TABLE meta(k TEXT PRIMARY KEY, v TEXT NOT NULL);
 
 CREATE TABLE id(
   family_uid TEXT PRIMARY KEY,          -- ACN-000137
-  name       TEXT,                      -- 允许 NULL
+  patient_id TEXT,                      -- 项目/流水线编号（如 habitat `1-CAO-YAN`）；缺则 NULL，不含 PHI
+  subject_label TEXT,                   -- 【v2 兼容列】迁移时原值原样留档，**不再写新值**；不是键、不保证唯一。
+                                        -- 姓名在 name、号码在 id_number / *_no 列，不许只靠本列承载。
+  name       TEXT,                      -- 允许 NULL；中文姓名或已脱敏形态
+  name_pinyin TEXT,                     -- 大写、单空格分隔；「序号-姓名」串的序号进 patient_id
   sex        TEXT,                      -- M/F/U
-  birth_date TEXT,                      -- ISO 或 NULL；与年龄互校
-  id_card    TEXT,
-  phone      TEXT,
-  address    TEXT,
+  birth_date TEXT,                      -- ISO 或 YYYY-MM；与年龄互校
+  id_card    TEXT,                      -- 脱敏：前 3 + 11* + 后 4，不存明文
+  phone      TEXT,                      -- 脱敏：前 3 + **** + 后 4
+  address    TEXT,                      -- 只到区/县
+  inpatient_no TEXT,
+  outpatient_no TEXT,
+  mrn        TEXT,
+  imaging_no TEXT,
+  pathology_no TEXT,
+  sample_no  TEXT,
+  study_uid  TEXT,                      -- DICOM StudyInstanceUID 等
+  misc_id    TEXT,                      -- 杂号；更多号进 id_number(kind='other')
   id_status  TEXT NOT NULL,             -- keyed_full | keyed_partial | keyed_animal | label_only | label_only_omics
-  subject_label TEXT,                   -- 源表受试者标签原文（`HC|Sub001`/`PAT-000001`/文件名 stem）；无则 NULL。
-                                        -- **不是 uid 回显、不是查询键、不保证唯一**；join 一律用 family_uid。
-                                        -- 姓名在 name、号码在 id_number，不许只靠本列承载。
+  identity_state TEXT,                  -- resolved | unresolved（逐人；无依据则 NULL）
+  source     TEXT,                      -- 本条身份的来源登记（blob: 或表名 + 日期）
   created_on TEXT NOT NULL,
   updated_on TEXT,
   note       TEXT,
@@ -57,7 +68,7 @@ CREATE UNIQUE INDEX ux_id_phone ON id(phone)    WHERE phone    IS NOT NULL;
 
 CREATE TABLE id_number(
   family_uid TEXT NOT NULL REFERENCES id(family_uid) ON DELETE CASCADE,
-  kind       TEXT NOT NULL,   -- mrn | inpatient | outpatient | imaging | pathology | sample | other
+  kind       TEXT NOT NULL,   -- mrn | inpatient | outpatient | imaging | pathology | sample | study | other
   value      TEXT NOT NULL,
   issuer     TEXT,            -- 医院/科室/系统
   valid_from TEXT, valid_to TEXT,
