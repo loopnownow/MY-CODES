@@ -1617,6 +1617,351 @@ def d81_empty_modals(projs):
     return out
 
 
+# ---------------------------------------------------------------- D87–D92 门禁
+# 规则仓 workspace-layout.md「身份表与病理段（`id` v2 · 病理拆分 · 入表前清洗）」的落点。
+# 六道门初版一律 **report-only**：只出计数，不进 `all_rows`、不写 `!!`，
+# 所以既不改 ok 也不改 rc（`ok` 靠 `all_rows` 与 `'!!' in out` 两条判，两处都不碰）。
+# 跑满一个批次无新债后再按规则表转 P1。
+
+ID_V2 = ('family_uid', 'patient_id', 'subject_label', 'name', 'name_pinyin', 'sex',
+         'birth_date', 'id_card', 'phone', 'address', 'inpatient_no', 'outpatient_no',
+         'mrn', 'imaging_no', 'pathology_no', 'sample_no', 'study_uid', 'misc_id',
+         'id_status', 'identity_state', 'source', 'created_on', 'updated_on', 'note')
+CLIN_V2_HEAD = ('family_uid', 'observed_on', 'period_month', 'cohort', 'group_v',
+                'subgroup', 'src_id', 'src_row', 'merged_n', 'unk_seq', 'schema_block')
+CLIN_V1_HEAD = ('family_uid', 'period_month', 'month_ix', 'period_source', 'period_origin',
+                'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort')
+# 旧 v1 头里 period_origin 是后加的：没有它的 10 列头同属「未迁移」，不是形状事故
+CLIN_V1_H10 = tuple(x for x in CLIN_V1_HEAD if x != 'period_origin')
+CLIN_HEAD = set(CLIN_V2_HEAD) | set(CLIN_V1_HEAD)
+PATH_HINT = ('path_', 'ihc_', '病理', '诊刮', '免疫组化', 'lvsi', 'figo', '肌层浸润')
+PATH_TEXT_PAT = re.compile(r'(path|report).*text', re.I)
+NAME_RE = re.compile(r'^[a-z][a-z0-9_]{1,30}$')
+NUM_RE = re.compile(r'^[-+]?\d+(?:\.\d+)?$')
+
+
+def _qi(name):
+    """SQL 标识符加引号：中文列名（`ct1__ct右髂`）不加引号会被当成表达式。"""
+    return '"%s"' % str(name).replace('"', '""')
+
+
+def _ti(conn, table):
+    """[(列名, 声明类型大写)]：pragma 出错（表不存在）返回 []。"""
+    try:
+        return [(r[1], (r[2] or '').upper()) for r in conn.execute('pragma table_info(%s)' % _qi(table))]
+    except sqlite3.Error:
+        return []
+
+
+def _is_text(typ):
+    return (not typ) or any(k in typ for k in ('TEXT', 'CHAR', 'CLOB'))
+
+
+def _is_path_col(name):
+    """病理族目标列：`path_*` / `ihc_*` 与中文病理/分期列名。"""
+    low = name.lower()
+    return any(k in low or k in name for k in PATH_HINT)
+
+
+def d87_fingerprint(fam_db, projs):
+    """D87（report-only）：`id` 24 列、`clin` 头 11 列按名按序；`schema_block` 须为 `clin-v2`。
+
+    指纹是「列名 + 列序」，不是列名集合：`ADD COLUMN` 只能追加到末尾，靠它加出来的库
+    列名齐全、列序错位，`select *` 与 `insert ... values` 一律错位——而 D70 只比
+    「缺列 / 多列 / 类型」，列序错了它照样绿。
+    旧 v1 头（SCHEMA 现口径）与「形状被改坏」分两个计数报：前者是没迁移（warn），后者是事故。
+    """
+    out, bad = [], 0
+    cols = []
+    if fam_db.exists():
+        c = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+        cols = [r[1] for r in c.execute('pragma table_info(id)')]
+        c.close()
+    if cols == list(ID_V2):
+        out.append('  · id：24 列按名按序通过')
+    else:
+        bad += 1
+        miss = [x for x in ID_V2 if x not in cols]
+        extra = [x for x in cols if x not in ID_V2]
+        out.append('  > id：%d 列，与定稿 24 列不符（缺 %s；多 %s）'
+                   % (len(cols), '、'.join(miss) or '无', '、'.join(extra) or '无'))
+        if not miss and not extra:
+            out.append('    > 列集合相同、列序不同 → 物理序未重建（`ADD COLUMN` 追出来的库）')
+    n_v2 = n_v1 = n_other = n_sb = 0
+    v1, other = [], []
+    for slug, p in projs:
+        if not p.exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        names = [n for n, _t in _ti(c, 'clin')]
+        if not names:
+            c.close()
+            continue
+        head = tuple(names[:11])
+        if head == CLIN_V2_HEAD:
+            n_v2 += 1
+            rows = c.execute("select coalesce(trim(schema_block),'<空>'), count(*) "
+                             "from clin group by 1").fetchall()
+            for v, n in rows:
+                if v != 'clin-v2':
+                    n_sb += n
+                    out.append('    > %s.clin.schema_block=%s：%d 行（应为 clin-v2）' % (slug, v, n))
+        elif head == CLIN_V1_HEAD or tuple(names[:10]) == CLIN_V1_H10:
+            n_v1 += 1
+            v1.append(slug)
+        else:
+            n_other += 1
+            other.append((slug, head))
+        c.close()
+    out.append('  · clin 表 %d 个：v2 指纹 %d；旧 v1 头 %d（未迁移，warn）；其他形状 %d'
+               % (n_v2 + n_v1 + n_other, n_v2, n_v1, n_other))
+    if v1:
+        out.append('    warn 未迁移 %d 个：%s%s'
+                   % (len(v1), '、'.join(v1[:8]), ' 等' if len(v1) > 8 else ''))
+    for slug, head in other[:6]:
+        out.append('    > %s 头 11 列 = %s' % (slug, '、'.join(head)))
+    bad += n_v1 + n_other + n_sb
+    return out, bad
+
+
+def d88_dict_coverage(fam_db, projs):
+    """D88（report-only）：`clin` 变量列（去 v1/v2 头列）每列须在家族库 `dict` 有对应记录。
+
+    按列名匹配（`dict.column_name`），不按 `scope` 分片：同名变量在多个项目里共用一行是常态，
+    按 scope 卡会把已登记的列重复报成缺口。
+    另报 `dict.description` 为空的行：行在、全称没写，等于「登记了但没人知道这列是什么」。
+    """
+    if not fam_db.exists():
+        return ['  · 家族库不存在，跳过'], 0
+    try:
+        c = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+        known, nodesc = set(), 0
+        for cn, desc in c.execute("select column_name, coalesce(trim(description),'') from dict"):
+            if cn:
+                known.add(cn)
+                if not desc:
+                    nodesc += 1
+        c.close()
+    except sqlite3.Error:
+        return ['  · dict 不可读，跳过'], 0
+    miss, ncol = [], 0
+    for slug, p in projs:
+        if not p.exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        for cn, _t in _ti(c, 'clin'):
+            if cn in CLIN_HEAD:
+                continue
+            ncol += 1
+            if cn not in known:
+                miss.append('%s.%s' % (slug, cn))
+        c.close()
+    out = ['  · clin 变量列 %d 个：缺 dict 记录 %d 个（dict 已登记 %d 个列名）'
+           % (ncol, len(miss), len(known))]
+    for x in miss[:10]:
+        out.append('    > %s' % x)
+    if nodesc:
+        out.append('  · dict 行 description 为空：%d 行（登记了但没写全称）' % nodesc)
+    return out, len(miss)
+
+
+def d89_colname(projs):
+    """D89（report-only）：`clin` 变量列名须匹配 `^[a-z][a-z0-9_]{1,30}$`。
+
+    中文列名（`q16__您是否…`）、大写与空格（`FIGO stage`）、超长都计数；
+    `_数字` 后缀（D48）与 SQL 保留字各有专码，这里只报形态。
+    """
+    out, bad = [], 0
+    reason = {'中文': 0, '大写': 0, '空格/标点': 0, '超长': 0, '其他': 0}
+    samples = []
+    for slug, p in projs:
+        if not p.exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        for cn, _t in _ti(c, 'clin'):
+            if cn in CLIN_HEAD or NAME_RE.match(cn):
+                continue
+            bad += 1
+            if any('\u4e00' <= ch <= '\u9fff' for ch in cn):
+                reason['中文'] += 1
+            elif cn != cn.lower():
+                reason['大写'] += 1
+            elif re.search(r'[^a-z0-9_]', cn):
+                reason['空格/标点'] += 1
+            elif len(cn) > 31:
+                reason['超长'] += 1
+            else:
+                reason['其他'] += 1
+            if len(samples) < 8:
+                samples.append('%s.%s' % (slug, cn))
+        c.close()
+    out.append('  · clin 变量列名违规 %d 个（%s）'
+               % (bad, '；'.join('%s %d' % (k, v) for k, v in reason.items() if v) or '无'))
+    for s in samples:
+        out.append('    > %s' % s)
+    return out, bad
+
+
+def d90_empty_shift(fam_db):
+    """D90（report-only）：`subject_label` 只许原样保留；空标签却有姓名而状态仍是旧口径 → 计数。
+
+    `subject_label` 是兼容列不是键空间：v2 起不再写新值，姓名 / 号码一律进 `name` / `patient_id`。
+    「标签空 + name/name_pinyin 有值 + id_status=label_only」三件同时成立，说明状态没随 v2 升级，
+    下游按 label_only 过滤就会把这批人当「只有姓名」处理。**只报数**，判级留 P1 化时再定。
+    """
+    if not fam_db.exists():
+        return ['  · 家族库不存在，跳过'], 0
+    c = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+    cols = [r[1] for r in c.execute('pragma table_info(id)')]
+    if 'subject_label' not in cols:
+        c.close()
+        return ['  · id 无 subject_label 列（v2 之前），跳过'], 0
+    n_all = c.execute('select count(*) from id').fetchone()[0]
+    n = c.execute("select count(*) from id where coalesce(trim(subject_label),'')='' "
+                  "and (coalesce(trim(name),'')<>'' or coalesce(trim(name_pinyin),'')<>'') "
+                  "and id_status='label_only'").fetchone()[0]
+    # 形似手机号 / 证件号的标签：v2 起不该再出现（只报数，不列举值）
+    phone = card = 0
+    for (v,) in c.execute("select subject_label from id where coalesce(trim(subject_label),'')<>''"):
+        s = str(v).strip()
+        if re.fullmatch(r'1\d{10}', s):
+            phone += 1
+        elif re.fullmatch(r'\d{17}[\dXx]', s):
+            card += 1
+    c.close()
+    out = ['  · id %d 行；空标签 + 有姓名 + id_status=label_only：%d 行' % (n_all, n)]
+    if phone or card:
+        out.append('  · subject_label 形似手机号 %d / 证件号 %d（v2 起不应再写新值，只报数）'
+                   % (phone, card))
+    return out, n
+
+
+def d91_path_long(projs):
+    """D91（report-only）：病理族 TEXT 列的长文本报数（>1000 字 / 200–1000 字 / path*text 形）。
+
+    病理结论只许进 `path_dx`（≤1000）与 `path_other`（≤200）；报告原文与扫描件不进库，
+    回溯靠 `clin` 头已有的 `src_id` + `src_row`。现库还没有 `path_dx`，所以按「病理族列名」
+    定位事实上的落点（`path_*` / `ihc_*` / 病理 / 诊刮 / 免疫组化 / figo / 肌层浸润）：
+    先点出长列，再决定拆哪一列——只报数，不动数据。
+    规则表另有「clin 非病理 TEXT 列 max>200 即报」，这里只出信息行（列数 + 最长长度），不计入总数。
+    """
+    out = []
+    n1000 = n200 = npat = npath_col = 0
+    other_cols, details = 0, []
+    for slug, p in projs:
+        if not p.exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        for cn, typ in _ti(c, 'clin'):
+            if not _is_text(typ):
+                continue
+            q = _qi(cn)
+            try:
+                mx, n1, n2 = c.execute(
+                    'select coalesce(max(length(trim(%s))),0), '
+                    'coalesce(sum(case when length(trim(%s))>1000 then 1 else 0 end),0), '
+                    'coalesce(sum(case when length(trim(%s))>200 then 1 else 0 end),0) from clin'
+                    % (q, q, q)).fetchone()
+            except sqlite3.Error:
+                continue
+            if _is_path_col(cn):
+                npath_col += 1
+                n1000 += n1
+                n200 += max(0, n2 - n1)
+                if n2:
+                    details.append((slug, cn, mx, n1, n2 - n1, 'path'))
+            elif PATH_TEXT_PAT.search(cn):
+                npat += n2
+                if n2:
+                    details.append((slug, cn, mx, n1, n2, 'pat'))
+            elif mx > 200:
+                other_cols += 1
+        c.close()
+    out.append('  · 病理族 TEXT 列 %d 个：>1000 字 %d 格；200–1000 字 %d 格；path*text/report*text 形 %d 格'
+               % (npath_col, n1000, n200, npat))
+    for slug, cn, mx, a, b, kind in sorted(details, key=lambda x: -x[2])[:10]:
+        if kind == 'pat':
+            out.append('    > %s.%s maxlen=%d（path*text/report*text 形 >200 字共 %d 格，其中 >1000 字 %d 格）'
+                       % (slug, cn, mx, b, a))
+        else:
+            out.append('    > %s.%s maxlen=%d（>1000 %d 格 / 200–1000 %d 格）' % (slug, cn, mx, a, b))
+    if other_cols:
+        out.append('  · 其他 TEXT 列 max>200：%d 列（规则表全表口径，信息行，不计入）' % other_cols)
+    return out, n1000 + n200 + npat
+
+
+def d92_clean_residue(projs):
+    """D92（report-only）：病理族目标列的入表清洗残留计数。
+
+    规则：值先归位再入库——空写 NULL，不写 `/` / `无` / `0`；公式残值（`#VALUE!` / `#N/A`）
+    与「句子碎片」（>30 字且不含数字，多半是大体 / 镜下描述被塞进定值列）同属未清洗。
+    `0` 只在该列同时存在非数字文本时才计（纯 `0` / `1` 枚举列的 0 是值不是占位）：
+    这条判据会点出 `免疫组化` 里 615 个 `0` 与长报告并存的形态，也会漏掉整列全 `0` 的脏列，
+    所以它是「待看清单」不是「已定罪的错」。
+    """
+    PLACE = {'/', '无', '-', 'NA', 'N/A', '?', '空', 'NULL', 'null'}
+    FORMULA = {'#VALUE!', '#N/A', '####', '#REF!', '#DIV/0!', '#NAME?'}
+    nplace = nform = nzero = nsent = ncol = 0
+    details = []
+    for slug, p in projs:
+        if not p.exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        for cn, typ in _ti(c, 'clin'):
+            if not _is_text(typ) or not _is_path_col(cn):
+                continue
+            q = _qi(cn)
+            try:
+                rows = c.execute('select trim(%s), count(*) from clin where %s is not null group by 1'
+                                 % (q, q)).fetchall()
+            except sqlite3.Error:
+                continue
+            if not rows:
+                continue
+            ncol += 1
+            mixed = any((v or '').strip() and not NUM_RE.match(str(v).strip()) for v, _n in rows)
+            a = b = z = s = 0
+            for v, cnt in rows:
+                t = ('' if v is None else str(v)).strip()
+                if not t:
+                    continue
+                if t in FORMULA:
+                    b += cnt
+                elif t in PLACE:
+                    a += cnt
+                elif t == '0' and mixed:
+                    z += cnt
+                elif len(t) > 30 and not re.search(r'\d', t):
+                    s += cnt
+            if a or b or z or s:
+                details.append((slug, cn, a, z, b, s))
+            nplace += a
+            nzero += z
+            nform += b
+            nsent += s
+        c.close()
+    out = ['  · 病理族目标列 %d 个：占位词 %d 格；`0` 占位 %d 格；公式残值 %d 格；句子碎片 %d 格'
+           % (ncol, nplace, nzero, nform, nsent)]
+    for slug, cn, a, z, b, s in sorted(details, key=lambda x: -(x[2] + x[3] + x[4] + x[5]))[:10]:
+        out.append('    > %s.%s 占位 %d / 0 %d / 公式 %d / 句 %d 格' % (slug, cn, a, z, b, s))
+    return out, nplace + nzero + nform + nsent
+
+
 def main():
     if not FAM_DB.exists():
         # 家族库不在 = 桶名没切或库没搬。直接说清楚，别让 sqlite 抛 traceback 掩盖原因。
@@ -1810,6 +2155,26 @@ def main():
     _l81 = d81_empty_modals(PROJ)
     out.append(f'\n== D81 空模态表是否记账（只报数）：{len(_l81)} 处')
     out.extend(_l81[:20])
+    # ---- D87–D92（规则仓「身份表与病理段」节）：初版一律 report-only ----
+    # 只出计数：不进 all_rows、不写 '!!'，所以不改 ok、不改 rc；转 P1 时再挂到 all_rows。
+    _l87, _n87 = d87_fingerprint(FAM_DB, PROJ)
+    out.append(f'\n== D87 结构指纹（id 24 列 / clin 头 11 列按名按序；report-only）：{_n87} 项不符')
+    out.extend(_l87)
+    _l88, _n88 = d88_dict_coverage(FAM_DB, PROJ)
+    out.append(f'\n== D88 dict 覆盖（clin 变量列按名匹配；report-only）：{_n88} 列缺 dict 记录')
+    out.extend(_l88)
+    _l89, _n89 = d89_colname(PROJ)
+    out.append(f'\n== D89 列名缩写合规（^[a-z][a-z0-9_]{{1,30}}$；report-only）：{_n89} 个违规')
+    out.extend(_l89)
+    _l90, _n90 = d90_empty_shift(FAM_DB)
+    out.append(f'\n== D90 空值不挪位（subject_label 兼容列；report-only）：{_n90} 行')
+    out.extend(_l90)
+    _l91, _n91 = d91_path_long(PROJ)
+    out.append(f'\n== D91 病理长文本（>1000 / 200–1000 字；report-only）：{_n91} 格')
+    out.extend(_l91)
+    _l92, _n92 = d92_clean_residue(PROJ)
+    out.append(f'\n== D92 入表清洗残留（病理族目标列；report-only）：{_n92} 格')
+    out.extend(_l92)
     # 只报数：零引用行可能是「数据只在 excluded_sheets 里」的正常留痕，判级交人工定性。
     d63, b63 = d63_uid_segments()
     out.append(f'\n== D63 三段 uid 映射（0 human / 8 animal / 9 占位）：{b63} 条')
