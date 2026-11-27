@@ -57,6 +57,11 @@ PAT_DERIVED_BASIS = re.compile(
 PAT_DERIVED_OLDDB = re.compile(
     r'派生[:：].*(旧库|快照).*(迁入|迁移).*(@\d{4}-\d{2}-\d{2}|未登记)')
 
+# 2026-11-27 主人裁定（rules workspace-layout「模块表正文列的派生句」）：`_modules_<mod>`
+# 的正文列若由 clin 列整理、或由迁移前旧库 blob 而来，允许 派生： 句，但句内必须点名
+# clin.<列> 或 blob: 地址。只报数，不记债。
+PAT_DERIVED_MODULE = re.compile(r'派生[:：].*(clin\.[A-Za-z_]\w*|blob:|旧库迁移)')
+
 ACCEPT = {
     'clin': frozenset(('TRACE', 'SCHEMA')),
     'src': frozenset(('TRACE', 'SCHEMA')),
@@ -118,6 +123,10 @@ def scan(conn):
         if kind == 'DERIVED' and g == 'clin' and PAT_DERIVED_OLDDB.search(source or ''):
             # clin 旧库迁移列：家族级可追到快照，列级原件未登记，只报数不记债。
             st['clin_olddb'] = st.get('clin_olddb', 0) + 1
+            continue
+        if kind == 'DERIVED' and g == 'other' and PAT_DERIVED_MODULE.search(source or ''):
+            # 模块表正文列：由 clin.<列> 整理或由 blob 迁移，句内点名来源，只报数不记债。
+            st['other_derived'] = st.get('other_derived', 0) + 1
             continue
         st['debt'][g] += 1
         st['debt']['total'] = st['debt'].get('total', 0) + 1

@@ -1418,6 +1418,9 @@ def d82_source_format(fam_db):
     co = stats.get('clin_olddb', 0)
     if co:
         out.append('  · clin 旧库迁移 %d 行（家族级快照可追，列级原件未登记，只报数）' % co)
+    mo = stats.get('other_derived', 0)
+    if mo:
+        out.append('  · 模块正文派生 %d 行（句内点名 clin.<列> 或 blob 地址，只报数）' % mo)
     top = sorted(stats['tables'].items(), key=lambda kv: -kv[1])[:3]
     if top:
         out.append('  · 债最多：' + '，'.join('%s %d' % (t, n) for (t, _g), n in top))
