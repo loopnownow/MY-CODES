@@ -51,6 +51,12 @@ PAT_OK = re.compile(r'^(派生[:：]|SCHEMA |blob:.*#.*:|.*#.*:(#\d+|.*\S))')
 PAT_DERIVED_BASIS = re.compile(
     r'派生[:：].*(源表|源列|源行|原列|原表|行序|行号|条数|计数|归一|重编码|命中行数|合并多来源)')
 
+# 2026-11-27 主人裁定（m01376「认旧库」）：clin 的列若只能定位到迁移前旧库快照
+# （家族级、列级原件未登记），允许写「派生：旧库迁移——家族自 <FAM>db@<日期> 迁入，
+# 列级原件未登记」。句内必须点名快照库与日期；只报数，不记债。
+PAT_DERIVED_OLDDB = re.compile(
+    r'派生[:：].*(旧库|快照).*(迁入|迁移).*(@\d{4}-\d{2}-\d{2}|未登记)')
+
 ACCEPT = {
     'clin': frozenset(('TRACE', 'SCHEMA')),
     'src': frozenset(('TRACE', 'SCHEMA')),
@@ -90,7 +96,7 @@ def grade_of(table_name):
 def scan(conn):
     """只读扫描 dict，返回统计与债务行。conn 必须是家族库只读连接。"""
     st = {'total': 0, 'trace': 0, 'schema': 0, 'derived': 0, 'empty': 0, 'bad': 0,
-          'debt': {g: 0 for g in GRADES}, 'tables': {}, 'examples': {}, 'rows': []}
+          'debt': dict({g: 0 for g in GRADES}, total=0), 'tables': {}, 'examples': {}, 'rows': []}
     try:
         rows = list(conn.execute(
             "select coalesce(table_name,''), column_name, coalesce(source,'') from dict"))
@@ -108,6 +114,10 @@ def scan(conn):
         if kind == 'DERIVED' and g == 'clin' and PAT_DERIVED_BASIS.search(source or ''):
             # clin 结构派生列：句内点名依据即算可追，只报数不记债。
             st['clin_derived'] = st.get('clin_derived', 0) + 1
+            continue
+        if kind == 'DERIVED' and g == 'clin' and PAT_DERIVED_OLDDB.search(source or ''):
+            # clin 旧库迁移列：家族级可追到快照，列级原件未登记，只报数不记债。
+            st['clin_olddb'] = st.get('clin_olddb', 0) + 1
             continue
         st['debt'][g] += 1
         st['debt']['total'] = st['debt'].get('total', 0) + 1
