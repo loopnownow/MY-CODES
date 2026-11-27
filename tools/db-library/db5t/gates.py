@@ -1412,6 +1412,9 @@ def d82_source_format(fam_db):
               d.get('total', 0)),
            '  · 债分布：clin %d · src %d · *_val %d · 其它 %d'
            % (d.get('clin', 0), d.get('src', 0), d.get('val', 0), d.get('other', 0))]
+    cd = stats.get('clin_derived', 0)
+    if cd:
+        out.append('  · clin 结构派生 %d 行（句内点名依据，只报数；rules「clin 可追口径」）' % cd)
     top = sorted(stats['tables'].items(), key=lambda kv: -kv[1])[:3]
     if top:
         out.append('  · 债最多：' + '，'.join('%s %d' % (t, n) for (t, _g), n in top))

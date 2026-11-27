@@ -45,6 +45,12 @@ SYS = frozenset({
 # 与 D82 原判据逐字一致：blob:<rel>#<sheet>:<col> / <path>#<sheet>:#<N> / …#txt:<标签>
 PAT_OK = re.compile(r'^(派生[:：]|SCHEMA |blob:.*#.*:|.*#.*:(#\d+|.*\S))')
 
+# 2026-11-27 主人裁定（rules workspace-layout「clin 可追口径」）：clin 默认不收派生句，
+# 但由行序 / 行号 / 计数 / 归一等得到的结构派生列允许 派生： 句，前提是句内点名依据
+# （源表 / 源列 / 行序 / 条数 / 归一 / 重编码）。泛泛的「派生：见源表」不算，仍按债计。
+PAT_DERIVED_BASIS = re.compile(
+    r'派生[:：].*(源表|源列|源行|原列|原表|行序|行号|条数|计数|归一|重编码|命中行数|合并多来源)')
+
 ACCEPT = {
     'clin': frozenset(('TRACE', 'SCHEMA')),
     'src': frozenset(('TRACE', 'SCHEMA')),
@@ -98,6 +104,10 @@ def scan(conn):
         st[kind.lower()] = st.get(kind.lower(), 0) + 1
         g = grade_of(table)
         if kind in ACCEPT[g]:
+            continue
+        if kind == 'DERIVED' and g == 'clin' and PAT_DERIVED_BASIS.search(source or ''):
+            # clin 结构派生列：句内点名依据即算可追，只报数不记债。
+            st['clin_derived'] = st.get('clin_derived', 0) + 1
             continue
         st['debt'][g] += 1
         st['debt']['total'] = st['debt'].get('total', 0) + 1
