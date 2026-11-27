@@ -8,7 +8,7 @@
 | 文件 | 作用 |
 |---|---|
 | `paths.py` | 路径解析的唯一入口（`DB5T_BATCH` / `DB5T_ROOT` / `DB5T_SCHEMA`） |
-| `gates.py` | 机器门 D35–D70 + `--cutover`（换库前待修清单，现算不落盘） |
+| `gates.py` | 机器门 D35–D92（D87–D92 身份表 / 病理段先 report-only，只报数不改判级）+ `--cutover`（换库前待修清单，现算不落盘） |
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |
