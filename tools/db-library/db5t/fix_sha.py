@@ -1,7 +1,8 @@
 """把 ref_project.sha256 刷新成子库文件的当前 sha256（D35 的 sha 项要求「冻结有据」）。
 
 只改家族库的 `ref_project` 一列，不动子库内容；因此算出的 sha 在写入后仍然准确。
-用法：python fix_sha.py MCI|LC|EC|SSD|EGVB|all
+用法：python fix_sha.py all            # 枚举 DB5T_ROOT 下所有家族桶
+      python fix_sha.py MCI LC EC     # 也可点名若干家族
 """
 import hashlib
 import os
@@ -53,6 +54,8 @@ def one(fam):
 
 
 if __name__ == '__main__':
-    arg = sys.argv[1] if len(sys.argv) > 1 else 'all'
-    for f in (['MCI','LC','EC','SSD','EGVB','OTHERS','ACN','CID','MM','SCH','SCC', 'WML'] if arg == 'all' else [arg]):
+    args = sys.argv[1:] or ['all']
+    for f in (sorted(p.name for p in STAGE.iterdir()
+                     if p.is_dir() and not p.name.startswith(('_', '.')))
+              if 'all' in args else args):
         one(f)

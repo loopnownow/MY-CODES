@@ -1345,7 +1345,7 @@ def d78_dict_provenance(fam_db):
             try:
                 tables = [r[0] for r in c.execute(
                     "select name from sqlite_master where type='table' and (name='clin' "
-                    "or (name like 'modal%' and name not like '%val'))")]
+                    "or (name glob '_modules_*' and name not glob '*_val'))")]
                 for t in tables:
                     cols = [r[1] for r in c.execute('pragma table_info("%s")' % t)]
                     miss = [col for col in cols
@@ -1516,7 +1516,7 @@ def d81_empty_modals(projs):
         try:
             tabs = [r[0] for r in c.execute(
                 "select name from sqlite_master where type='table' "
-                "and name like 'modal\\_%' escape '\\'")]
+                "and name glob '_modules_*'")]
             if not tabs:
                 continue
             codes = {r[0] for r in c.execute('select code from qc')}
