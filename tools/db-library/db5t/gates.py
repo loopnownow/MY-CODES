@@ -1319,11 +1319,23 @@ def d76_named_seg0(fam_db):
 
 
 
+def _csv_out_dir() -> pathlib.Path:
+    """派生物默认落 `{DEL}\\gates\\`（只许在 DEL 内新建；不许在库根造 _work）。
+
+    DEL = 批次根的爷爷目录（`<DEL>\\_by-function\\<批次>` 的爷），可用 DB5T_CSV_DIR 覆盖。
+    """
+    env = os.environ.get('DB5T_CSV_DIR', '').strip()
+    if env:
+        return pathlib.Path(env)
+    return pathlib.Path(B.BATCH).parent.parent / 'gates'
+
+
 def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
     """D77（P1，只报数）：家族库里未被任何项目 person/clin/_modules_* 引用的 id 行。
 
     没有任何门在查「id 里这行到底有没有人」，所以零引用身份可以一直躺着。
-    这里只报数并出 csv（stage/_work/orphan_ids_<FAM>.csv），留/删由人按两条判据定性：
+    这里只报数并出 csv（默认写 `{DEL}\\gates\\orphan_ids_<FAM>.csv`；只许在 DEL 内新建，
+    可用 `--csv-dir` 或环境变量 `DB5T_CSV_DIR` 改落点），留/删由人按两条判据定性：
     数据只在 excluded_sheets 里 -> 留行 + qc(IDENTITY_WITHOUT_DATA)；任何表都找不到 -> 删行。
     """
     if not fam_db.exists():
@@ -1358,7 +1370,7 @@ def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
     out = []
     if write_csv and orphans:
         import csv
-        p = fam_db.parent.parent.parent / '_work' / f'orphan_ids_{fam_db.parent.parent.name}.csv'
+        p = _csv_out_dir() / f'orphan_ids_{fam_db.parent.parent.name}.csv'
         p.parent.mkdir(parents=True, exist_ok=True)
         with p.open('w', encoding='utf-8-sig', newline='') as fh:
             w = csv.writer(fh)
