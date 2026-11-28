@@ -36,7 +36,7 @@ RETIRED_KEYS = {
     "FIG_FONT_FAMILY",
 }
 INI_SECTIONS: list[tuple[str, str, list[str]]] = [
-    # 控制台版本台账（只读）：由 {RULES}\tools\sync_project_page.py --ini 写入，
+    # 控制台版本台账（只读）：由 {RULES}\tools\gen\sync_project_page.py --ini 写入，
     # 用来对照某个课题的起始页是哪一版金版生成的；不入控制台配置卡。
     ("console", "控制台版本（对照用·勿手改）", [
         "CONSOLE_GOLD_COMMIT", "CONSOLE_GOLD_SHA12",
