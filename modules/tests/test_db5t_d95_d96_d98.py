@@ -234,6 +234,25 @@ def test_d98_chinese_name_and_embedded_unit_and_value(tmp_path, gates):
     assert "300d" in joined
 
 
+def test_d98_meta_value_may_be_chinese_but_key_must_be_ascii(tmp_path, gates):
+    """meta 的 value 是给人看的说明（no_data_reason 等）允许中文；key 必须 ASCII。"""
+    dict_db, fam_db, projs = _write_ok_tree(tmp_path)
+    fc = sqlite3.connect(fam_db)
+    fc.execute("INSERT INTO meta VALUES ('no_data_reason', '仅有伦理申请，无数据表')")
+    fc.commit()
+    fc.close()
+    lines, n = gates.d98_ascii_units(fam_db, projs)
+    assert n == 0, lines
+
+    fc = sqlite3.connect(fam_db)
+    fc.execute("INSERT INTO meta VALUES ('备注', 'x')")
+    fc.commit()
+    fc.close()
+    lines, n = gates.d98_ascii_units(fam_db, projs)
+    assert n == 1, lines
+    assert "meta key" in "\n".join(lines)
+
+
 def test_d93_d94_d97_d99_are_report_only(gates):
     # stubs / report-only helpers must not use '!!' and must return a zero fail count
     for fn_name in ("d93_ri_soft", "d94_qc_codes", "d97_col_purity", "d99_enum_domain"):

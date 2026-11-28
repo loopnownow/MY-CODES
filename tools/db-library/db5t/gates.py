@@ -2357,9 +2357,10 @@ def d98_ascii_units(fam_db, projs):
                             _note('ident', f'{prefix}qc.code={code}')
             if 'meta' in {r[0] for r in c.execute("select name from sqlite_master where type='table'")}:
                 for k, v in c.execute('select k, v from meta'):
-                    if not _is_ascii(k) or not _is_ascii(v):
+                    # 键必须 ASCII；值是给人看的说明（no_data_reason / 口径备注），允许中文
+                    if not _is_ascii(k):
                         n_ident += 1
-                        _note('ident', f'{prefix}meta {k}={v}')
+                        _note('ident', f'{prefix}meta key {k}')
         finally:
             c.close()
 
