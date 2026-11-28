@@ -16,6 +16,7 @@
 | `mkphi.py` | 阶段 4（PHI）：把清洗副本里的姓名与号码写进家族库 `id` / `id_number`；身份证/电话/地址默认脱敏（前 3 + `*` + 后 4；地址截到第 3 级行政区）；脱敏后撞唯一索引只丢该字段、不并身份；写 `meta.phi_source` / `phi_sha256` / `phi_imported_at`；`--no-mask` 仅限离机环境 |
 | `fill.py` | 阶段 5：读 13 列 `map.csv`，按物理依赖序 src→person→clin→`_modules_*`→`*_value` 回填；源可 `.xlsx/.xls`（按 sheet + header_row）或 `.db`（按表名）；`transform` 支持 `const:<值>` / `mint:<茎>`（发顺序号，同一源值跨 sheet 复用）；`missing_rule` 按源侧标记判缺（`NA` → `NULL`，D97 的修法）；无 dict 行不 ALTER（契 2）；`--dry-run` 只报不做；重跑先清本 src 旧行 |
 | `preview.py` | 阶段 7：给刚建好的库出一张只读预览（单文件 HTML：KPI + src 登记 + 表清单 + clin 逐列 dict/NULL/样例 + 抽样 + 门禁摘要），默认不跑门禁，`--gates` 才就地跑；`--out` 可省，缺省落 `<root>\<FAM>\<slug>\<slug>-库预览.html` |
+| `qc_codes.tsv` | `qc.code` 词表（`code` / `severity` / `meaning` / `since`）：D94 只认这份；新增任何 qc 码先登记，未登记码 D94 报数但不判级 |
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |

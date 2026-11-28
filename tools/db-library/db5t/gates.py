@@ -8,6 +8,7 @@ import sqlite3
 import hashlib
 import pathlib
 import json
+import csv
 import re
 import sys
 from pathlib import Path
@@ -2169,9 +2170,43 @@ def d93_ri_soft(*_a, **_k):
     return ['  · 本批 report-only，不判级（规则：对 ri_normal 软判 OUT_OF_RI / UNIT_SUSPECT / IMPLAUSIBLE；单侧区间不得判单位）'], 0
 
 
+QC_CODES = Path(__file__).resolve().parent / 'qc_codes.tsv'
+
+
+def _qc_registry():
+    """读本目录 qc_codes.tsv（code/severity/meaning/since）。缺文件返回 None，不判。"""
+    try:
+        with QC_CODES.open(encoding='utf-8', newline='') as f:
+            return {row['code'].strip(): row for row in csv.DictReader(f, delimiter='\t') if row.get('code')}
+    except OSError:
+        return None
+
+
 def d94_qc_codes(*_a, **_k):
-    """D94（report-only）：qc.code 须在 qc_codes.tsv 登记。词表待另文件落盘，本批不判。"""
-    return ['  · 本批 report-only，不判级（qc_codes.tsv 完整词表待另文件落盘）'], 0
+    """D94（report-only）：qc.code 须在 qc_codes.tsv 登记。只报未登记码，不判级。"""
+    reg = _qc_registry()
+    if reg is None:
+        return [f'  · 未找到词表 {QC_CODES.name}，本门跳过'], 0
+    unreg = {}
+    for p in [FAM_DB] + [q for _s, q in PROJ]:
+        if not Path(p).exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+            try:
+                for code, n in c.execute('select code, count(*) from qc group by 1'):
+                    if code not in reg:
+                        unreg[code] = unreg.get(code, 0) + n
+            finally:
+                c.close()
+        except sqlite3.Error:
+            continue
+    if not unreg:
+        return [f'  · 词表 {len(reg)} 码；本家族 qc.code 全部已登记'], 0
+    out = [f'  · 词表 {len(reg)} 码；未登记 {len(unreg)} 个码（qc 行数：{sum(unreg.values())}）']
+    for code, n in sorted(unreg.items(), key=lambda kv: -kv[1])[:10]:
+        out.append(f'  · 未登记 qc.code={code}（{n} 行）')
+    return out, len(unreg)
 
 
 def d95_dict_contract(dict_db, fam_db, projs):
@@ -2645,7 +2680,7 @@ def main():
     out.append('\n== D93 参考区间软门（report-only，不判级）')
     out.extend(_l93)
     _l94, _n94 = d94_qc_codes()
-    out.append('\n== D94 qc.code 受控（report-only，不判级；词表待另文件落盘）')
+    out.append(f'\n== D94 qc.code 受控（词表 qc_codes.tsv；report-only）：{_n94} 个未登记码')
     out.extend(_l94)
     _l95, _n95 = d95_dict_contract(_dict_db_path(), FAM_DB, PROJ)
     out.append(f'\n== D95 dict 覆盖契约（全局 dict.db / DB5T_DICT；{_mode}）：{_n95} 项')

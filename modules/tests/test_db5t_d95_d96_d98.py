@@ -294,3 +294,27 @@ def test_db5t_dict_env_override(tmp_path, monkeypatch):
     text = mod.describe()
     assert "DICT" in text
     assert "DB5T_DICT=set" in text
+
+
+def test_d94_flags_code_missing_from_registry(tmp_path, monkeypatch):
+    """D94：qc.code 必须能在 db5t/qc_codes.tsv 找到；未登记的只报数，不判级。"""
+    fam = "ZZZ"
+    fam_db = tmp_path / fam / "_PHI" / f"{fam}db"
+    fam_db.parent.mkdir(parents=True)
+    c = sqlite3.connect(fam_db)
+    c.execute("CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT)")
+    c.execute("CREATE TABLE ref_project (slug TEXT)")
+    c.execute("CREATE TABLE qc (scope TEXT, table_name TEXT, column_name TEXT, code TEXT, severity TEXT, detail TEXT, status TEXT)")
+    c.execute("INSERT INTO qc VALUES ('proj','clin','-','MODAL_ABSENT','P2','registered code','open')")
+    c.execute("INSERT INTO qc VALUES ('proj','clin','-','NOT_A_REAL_CODE','P2','bogus','open')")
+    c.commit()
+    c.close()
+    monkeypatch.setenv("DB5T_ROOT", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["gates.py", fam])  # gates.py 在导入时取 argv[1] 当家族名
+    mod = _load("db5t_gates_d94", DB5T / "gates.py")
+    lines, n = mod.d94_qc_codes()
+    assert n == 1, lines
+    joined = "\n".join(lines)
+    assert "NOT_A_REAL_CODE" in joined
+    assert "MODAL_ABSENT" not in joined
+    assert not any("!!" in ln for ln in lines), lines

@@ -1,0 +1,43 @@
+code	severity	meaning	since
+CELL_MOVED	P2	单元格内容移到语义正确的列	2026-11-28
+COLS_DROPPED	P2	整列删除（统计量、空列、重复号码列）	2026-11-28
+COLS_MERGED	P2	同指标两列互斥，coalesce 合并	2026-11-28
+COLS_RENAMED	P2	列名按内容改名	2026-11-28
+COLS_SPLIT	P2	一列混两种语义，拆成两列后删除原列	2026-11-28
+COLUMN_EMPTY	P2	源列 100% 空	2026-11-28
+CONFLICT	P1	同一事实两处取值不一致，未合并	2026-11-28
+D98_COL_RENAMED	P2	列名含非 ASCII 或内嵌单位，已按语义改为英文 snake；原名进 dict.aliases	2026-11-28
+D98_ENUM_MAPPED	P2	中文/混合编码枚举值已转 ASCII 码，映射写入 dict.enum_values	2026-11-28
+D98_TEXT_ALLOWED	P2	自由文本列（病理/主诉/病史/备注），dict.role=text，中文允许	2026-11-28
+DATE_SEMANTICS	P2	日期列语义与列名不符，已改名并说明	2026-11-28
+DUP	P1	源中相邻完全复制行（如成对粘贴），未删，待作者核对	2026-11-28
+DUP_BATCH_SUSPECT	P2	同批两表列名重叠 ≥50% 且可匹配	2026-11-28
+ENUM_MAPPED	P2	枚举编码已归一（中英/大小写）	2026-11-28
+ENUM_PARSED	P2	枚举从自由文本解析后归一	2026-11-28
+IDENTITY_REPAIRED	P2	身份由回放修补（补 person 行或改段位）	2026-11-28
+IDENTITY_UNAVAILABLE	P2	id 0 行，身份不可得	2026-11-28
+IDNUM_DUP_CONFLICT	P2	同一 (kind,issuer,value) 在真身份上重复，保留首条、其余删除	2026-11-28
+ID_ATTRIB_UNSURE	P2	身份属性不确定（段位/类型），只记不判	2026-11-28
+ID_COLLISION	P2	键列与院号字面碰撞（非泄漏）	2026-11-28
+IMPLAUSIBLE	P2	值越过硬上限	2026-11-28
+KEY_ABSENT_EQUAL_N	P2	两侧人数相等却无共享键	2026-11-28
+LONGITUDINAL_UNAVAILABLE	P2	有日期但 longitudinal_n=0	2026-11-28
+MODAL_ABSENT	P2	源工作簿没有该模态的数据，check 表 0 行；项目级登记（table_name/column_name 置 NULL）	2026-11-28
+OUT_OF_RI	P2	值越出参考区间	2026-11-28
+PATH_DX_LONG	P2	病理长文本 >1000 字	2026-11-28
+PHI_COLUMN	P2	PHI 列级登记（写前拦截）	2026-11-28
+PHI_LEAK_DROPPED	P1	违规暴露 PHI 的列/值已删除	2026-11-28
+PHI_RELOCATED	P2	PHI 从业务列移入 id.*（姓名/号码/电话），原格置空或改名 *_masked	2026-11-28
+ROWS_DROPPED	P2	源行无法满足目标表约束（如长表 feature 为空），整行丢弃并计数	2026-11-28
+ROW_DROPPED	P2	单行丢弃（与 ROWS_DROPPED 同义，历史码）	2026-11-28
+SNAPSHOT_CONTAINER_LOST	P2	快照容器整体丢失	2026-11-28
+SOURCE_NOTE	P2	源口径说明（停列、未入库表、时间语义待核等）	2026-11-28
+SOURCE_SNAPSHOT_ONLY	P2	原件已不在盘，只留快照指针	2026-11-28
+STAT_NULLED	P2	统计量（均值±SD、p 值）落在患者行，置 NULL	2026-11-28
+SURVIVAL_RECOMPUTED	P2	生存时间按日期重算（月精度取 15 日）	2026-11-28
+TUPLE_PARSED	P2	元组串（错误透视残留）解析取首个非空值	2026-11-28
+UNIT_SUSPECT	P2	单位可疑（按已知因子反算落回）	2026-11-28
+UNK_MULTI_RECORD	P2	同人多条 clin 行但 period_month 全为 UNK；meta.multi_record_reason 说明口径	2026-11-28
+VALUE_CONFLICT	P2	同一病人同一时点两源冲突	2026-11-28
+VALUE_DIRTY	P2	旧库清洗残留脏值（历史码，退役库）	2026-11-28
+VALUE_NULLED	P2	单元格置空（无法判定或统计量）	2026-11-28
