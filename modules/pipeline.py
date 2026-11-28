@@ -26,6 +26,7 @@ import argparse
 import io
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, List, Optional, TextIO
 
@@ -171,6 +172,13 @@ def _token(s: str) -> str:
     return str(s).strip().lower().replace(" ", "").replace("_", "")
 
 
+# Steps whose failure makes the whole run FAILED rather than INCOMPLETE.
+CRITICAL_STEPS = {"external_load", "table2_all", "table2_test"}
+
+# Unknown overlay keys recorded by _apply_console_overlay for run_pipeline to ledger.
+_overlay_unknown_keys: list[str] = []
+
+
 class RunStatus:
     """Fail-closed ledger: requested analyses that raise are marked, not silent."""
 
@@ -182,6 +190,21 @@ class RunStatus:
         self.failures.append({"name": name, "error": msg, "critical": bool(critical)})
         tag = "FAILED" if critical else "INCOMPLETE"
         print(f"  ⚠ [{tag}] {name}: {msg}")
+
+    @contextmanager
+    def guard(self, name: str, *, critical: bool | None = None):
+        """Wrap a degradable step: on exception, ledger + print, do not abort the run.
+
+        Usage::
+
+            with run_status.guard("table2_all"):
+                ...
+        """
+        try:
+            yield
+        except Exception as exc:  # noqa: BLE001  — this is the single swallow point
+            crit = (name in CRITICAL_STEPS) if critical is None else critical
+            self.warn(name, exc, critical=crit)
 
     @property
     def status(self) -> str:
@@ -603,6 +626,12 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
     input_file = input_file or cfg.INPUT
     cfg.ensure_output_dirs()
     run_status = RunStatus()
+    for key in list(_overlay_unknown_keys):
+        run_status.warn(
+            f"overlay:{key}",
+            f"unknown overlay key {key!r} was ignored",
+            critical=False,
+        )
 
     data = data_io.load_data(file=input_file, ratio=cfg.TRAIN_RATIO, seed=cfg.SEED)
 
@@ -721,7 +750,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
     rad_all_applied = _apply_train_radscore(data.all)
     res_all["rad"] = rad_all_applied
     if data.all.rad is not None and not data.all.rad.empty:
-        try:
+        with run_status.guard("table2_all"):
             rad_tr = res_train["rad"]
             method = str(getattr(rad_tr, "method", "") or "lasso")
             if list(getattr(rad_tr, "groups", None) or []):
@@ -750,8 +779,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 res_all["rad"].table2 = t2_all
                 tag = "LASSO-selected" if method != "logistic" else "pool"
                 print(f"  All Table2 (rad, {tag}): {0 if t2_all is None else len(t2_all)} rows")
-        except Exception as e:
-            print(f"  ⚠ All Table2 (rad) failed: {e}")
 
     # ── 内部 hold-out test（可能为空：当 EXTERNAL_TESTS 接管时）──
     res_test = None
@@ -771,7 +798,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         )
         res_test["rad"] = rad_test_formula
         if data.test is not None and data.test.rad is not None and not data.test.rad.empty:
-            try:
+            with run_status.guard("table2_test"):
                 rad_tr = res_train["rad"]
                 method = str(getattr(rad_tr, "method", "") or "lasso")
                 if list(getattr(rad_tr, "groups", None) or []):
@@ -801,8 +828,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     res_test["rad"].table2 = t2_te
                     tag = "LASSO-selected" if method != "logistic" else "pool"
                     print(f"  Test Table2 (rad, {tag}): {0 if t2_te is None else len(t2_te)} rows")
-            except Exception as e:
-                print(f"  ⚠ Test Table2 (rad) failed: {e}")
     else:
         print("\n  (no internal test split)")
 
@@ -815,9 +840,13 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         rs = spec.get("rad_sheet")
         ext_file = spec.get("file") or input_file
         if not cs or not rs:
-            print(f"  ⚠ EXTERNAL_TESTS[{name}] missing clin_sheet/rad_sheet — skip")
+            run_status.warn(
+                "external_load",
+                f"EXTERNAL_TESTS[{name}] missing clin_sheet/rad_sheet",
+                critical=True,
+            )
             continue
-        try:
+        with run_status.guard("external_load"):
             print(f"  load external [{name}]  file={ext_file}  clin={cs}  rad={rs}")
             ext_layer = data_io.load_external_layer(
                 ext_file, clin_sheet=cs, rad_sheet=rs, name=name,
@@ -825,8 +854,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 block_sheets=(spec.get("sheets") or None),
             )
             external_layers.append({"name": name, "data": ext_layer})
-        except Exception as e:
-            print(f"  ⚠ External [{name}] load failed: {e}")
     external_results: list = []
 
     def _merged_roc_models(layer: data_io.DataLayer, radscore, p_clin=None, p_comb=None,
@@ -865,7 +892,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
 
     # ── false_classification：打印宽表 + 写本次结果夹（与 Results*.html 同目录）──
     if getattr(cfg, "DO_FALSE_CLASS", True):
-        try:
+        with run_status.guard("false_classification"):
             fc_details: Dict = {}
             fc_predictors: Dict[str, np.ndarray] = {}
             for _sname, _svec in radiomics.score_map(res_all["rad"]).items():
@@ -914,8 +941,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 data_io.false_classification_xlsx_path(),
                 split_by_id=split_by_id, group_labels=gmap,
             )
-        except Exception as e:
-            print(f"  ⚠ false_classification failed: {e}")
 
     combined_info = None
     _tr_scores = radiomics.score_map(res_train["rad"])
@@ -1122,7 +1147,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         _clin_linear = True
         _clin_ols = None
         if _clin_linear and res_train["clin"].model is not None and len(train_clin_feat):
-            try:
+            with run_status.guard("clinical_ols"):
                 _Xo = data.train.clin[train_clin_feat].apply(pd.to_numeric, errors="coerce")
                 _yo = np.asarray(data.train.label, dtype=float)
                 _oko = _Xo.notna().all(axis=1) & np.isfinite(_yo)
@@ -1142,8 +1167,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                         f"{len(train_clin_feat)} features",
                         flush=True,
                     )
-            except Exception as e:
-                print(f"  ⚠ Clinical OLS failed: {e}", flush=True)
 
         def _apply_clin_model(clin_df):
             if res_train["clin"].model is None or len(train_clin_feat) == 0:
@@ -1164,10 +1187,8 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             return res_train["clin"].model.predict(X[cols], which="linear").to_numpy()
 
         clin_score_tr = None
-        try:
+        with run_status.guard("clinical_score_train"):
             clin_score_tr = _apply_clin_model(data.train.clin)
-        except Exception as e:
-            print(f"  ⚠ ClinicalScore train failed: {e}")
 
         def _expand_to_full(prob_short, df_ref, n_full):
             if prob_short is None or df_ref is None:
@@ -1224,10 +1245,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
 
         def _val_scores(layer, rad_res_layer):
             """验证层 Clinical / RadScore / Combined 概率（train 拟合）。"""
-            try:
+            cs = None
+            with run_status.guard("val_clinical_score"):
                 cs = _apply_clin_model(layer.clin)
-            except Exception:
-                cs = None
             payload = _score_payload(rad_res_layer)
             _, p_c_val = _score_to_prob(clin_score_tr, data.train.label, cs)
             te_map = radiomics.score_map(rad_res_layer) if rad_res_layer is not None else {}
@@ -1264,10 +1284,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     p_c = refit_clinical_prob(layer.clin, layer.label, train_clin_feat)
                     if p_c is None:
                         print("  ⚠ Clinical refit failed — keep train formula")
-                        try:
+                        cs = None
+                        with run_status.guard("val_clinical_score"):
                             cs = _apply_clin_model(layer.clin)
-                        except Exception:
-                            cs = None
                         _, p_c = _score_to_prob(clin_score_tr, data.train.label, cs)
                 p_comb = None
                 if has_rs and scores:
@@ -1306,10 +1325,9 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 p_c = refit_clinical_prob(layer.clin, layer.label, train_clin_feat)
                 if p_c is None:
                     print("  ⚠ Clinical refit failed — keep train formula")
-                    try:
+                    cs = None
+                    with run_status.guard("val_clinical_score"):
                         cs = _apply_clin_model(layer.clin)
-                    except Exception:
-                        cs = None
                     _, p_c = _score_to_prob(clin_score_tr, data.train.label, cs)
             p_comb = None
             if has_rs and rs is not None:
@@ -1645,7 +1663,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         }
 
         # Clinical / Combined 分数 → 全队列（用于 E/F Correlation）
-        try:
+        with run_status.guard("clinical_score_all"):
             if res_train["clin"].model is not None and len(train_clin_feat) > 0:
                 Xa = sm.add_constant(
                     data.all.clin[train_clin_feat].apply(pd.to_numeric, errors="coerce")
@@ -1654,9 +1672,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 combined_info["clin_score_all"] = (
                     res_train["clin"].model.predict(Xa[cols], which="linear").to_numpy()
                 )
-        except Exception as e:
-            print(f"  ⚠ Clinical score on all failed: {e}")
-        try:
+        with run_status.guard("combined_score_all"):
             if nomo is not None and nomo.model is not None:
                 feats = list(nomo.features)
                 Xc = _nomo_frame(data.all)
@@ -1670,8 +1686,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                 combined_info["comb_score_all"] = (
                     nomo.model.predict(Xm[cols], which="linear").to_numpy()
                 )
-        except Exception as e:
-            print(f"  ⚠ Combined score on all failed: {e}")
 
     else:
         # 无联合模型：入选特征 + 可选分数曲线
@@ -1699,7 +1713,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
             return None, None, None, _validation_radscore(layer, rad_res)
 
         if _subgroup_eval_mode():
-            try:
+            with run_status.guard("subgroup"):
                 subgroup_results = _run_subgroup_eval(
                     data=data,
                     res_test=res_test,
@@ -1710,10 +1724,8 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     val_mode=_subgroup_val_mode(),
                     refit_layer=_refit_nc,
                 )
-            except Exception as e:
-                print(f"  ⚠ Subgroup eval failed: {e}")
         if external_layers:
-            try:
+            with run_status.guard("external"):
                 external_results = _run_external_eval(
                     layers=external_layers,
                     apply_radscore=_apply_train_radscore,
@@ -1723,8 +1735,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     val_mode=_external_val_mode(),
                     refit_layer=_refit_nc,
                 )
-            except Exception as e:
-                print(f"  ⚠ External eval failed: {e}")
 
     print("\n" + "━" * 70)
     print("LAYER: COMBINED CORRELATION")
@@ -1869,7 +1879,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
 
     # ── Kaplan–Meier（时间与 IPCW 共用；事件=状态列，空则当前结局）──
     if bool(getattr(cfg, "DO_SURVIVAL", False)):
-        try:
+        with run_status.guard("survival_km"):
             t_all = getattr(data.all, "time", None)
             if t_all is None:
                 print("\n  ⚠ Survival skipped: no time vector (check SURVIVAL_TIME_COL)")
@@ -1883,7 +1893,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                         risk_all = np.asarray(combined_info["comb_score_all"], dtype=float)
                         risk_name = "Combined"
                         if nomo_obj is not None and nomo_obj.model is not None:
-                            try:
+                            with run_status.guard("km_combined_lp_cut"):
                                 Xc = data.train.clin.copy()
                                 smap_tr = radiomics.score_map(res_train["rad"])
                                 for f in list(nomo_obj.features):
@@ -1899,13 +1909,11 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                                 risk_tr = nomo_obj.model.predict(
                                     Xm[cols], which="linear"
                                 ).to_numpy()
-                            except Exception as e:
-                                print(f"  ⚠ train Combined LP for KM cut: {e}")
                     elif combined_info.get("clin_score_all") is not None:
                         risk_all = np.asarray(combined_info["clin_score_all"], dtype=float)
                         risk_name = "Clinical"
                         if res_train["clin"].model is not None and len(train_clin_feat) > 0:
-                            try:
+                            with run_status.guard("km_clinical_lp_cut"):
                                 Xtr = sm.add_constant(
                                     data.train.clin[train_clin_feat].apply(
                                         pd.to_numeric, errors="coerce"
@@ -1918,8 +1926,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                                 risk_tr = res_train["clin"].model.predict(
                                     Xtr[cols], which="linear"
                                 ).to_numpy()
-                            except Exception:
-                                risk_tr = None
                 if risk_all is None and radscore_all is not None:
                     risk_all = np.asarray(radscore_all, dtype=float)
                     risk_name = "RadScore"
@@ -1945,8 +1951,6 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
                     median_cut=cut,
                     do_cox=bool(getattr(cfg, "DO_COX", False)),
                 )
-        except Exception as e:
-            print(f"  ⚠ Survival KM failed: {e}")
 
     # ── VIF / DAG / SHAP / Mediation（train）──
     advanced_info = None
@@ -2523,12 +2527,38 @@ def _resolve_outcomes(outcome_arg: str | None) -> list[str] | None:
     return None
 
 
-def _apply_console_overlay() -> None:
-    """console.html / JSON 覆盖配置优先于 settings.py。"""
+def _declared_overlay_keys() -> set[str]:
+    """Whitelist: DEFAULT_SETTINGS plus already-declared uppercase settings on cfg/S."""
+    from modules.config.defaults import DEFAULT_SETTINGS
+    from modules.config import settings as S
+    keys = set(DEFAULT_SETTINGS)
+    for obj in (cfg, S):
+        for name in dir(obj):
+            if not str(name).isidentifier() or str(name).startswith("_"):
+                continue
+            if not name.isupper():
+                continue
+            try:
+                val = getattr(obj, name)
+            except Exception:
+                continue
+            if callable(val):
+                continue
+            keys.add(name)
+    return keys
+
+
+def _apply_console_overlay() -> list[str]:
+    """console.html / JSON 覆盖配置优先于 settings.py。
+
+    Unknown keys are not setattr'd. They are returned and stored in
+    `_overlay_unknown_keys` so `run_pipeline` can mark RunStatus INCOMPLETE.
+    """
     # 仅当控制台显式设置环境变量时才覆盖；命令行默认只用 settings.py
+    _overlay_unknown_keys.clear()
     path = os.environ.get("RAD_CONSOLE_OVERLAY") or ""
     if not path:
-        return
+        return []
     if not os.path.isfile(path):
         raise FileNotFoundError(
             f"RAD_CONSOLE_OVERLAY points to a missing overlay file: {path}"
@@ -2538,17 +2568,24 @@ def _apply_console_overlay() -> None:
         obj = json.load(f)
     ov = obj.get("overlay") if isinstance(obj, dict) and isinstance(obj.get("overlay"), dict) else obj
     if not isinstance(ov, dict):
-        return
+        return []
     from modules.config import settings as S
+    known = _declared_overlay_keys()
     n = 0
+    unknown: list[str] = []
     for k, v in ov.items():
         if not str(k).isidentifier() or str(k).startswith("_"):
+            continue
+        if k not in known:
+            print(f"  ⚠ unknown overlay key {k!r} ignored (not a declared setting)")
+            unknown.append(str(k))
             continue
         if k in ("DAG_EDGES", "DAG_MEDIATION_HIGHLIGHT") and isinstance(v, list):
             v = [tuple(x) if isinstance(x, list) else x for x in v]
         setattr(cfg, k, v)
         setattr(S, k, v)
         n += 1
+    _overlay_unknown_keys[:] = unknown
     out_dir = getattr(cfg, "OUT_DIR", None)
     if out_dir:
         png = os.path.join(str(out_dir), "PNG")
@@ -2570,6 +2607,7 @@ def _apply_console_overlay() -> None:
             )
     except Exception as e:
         print(f"  ⚠ Fig palette skipped: {e}", flush=True)
+    return unknown
 
 
 def main(argv: list[str] | None = None) -> None:
