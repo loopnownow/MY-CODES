@@ -111,14 +111,14 @@ MMD_ANCHORS = (
     "Lit06",
     "mid-entry",
     "02 exit",
-    "Gate · 05",
-    "Gate · 06",
-    "Gate · 07",
+    "G-05",
+    "G-06",
+    "G-07",
     "Standalone lit",
     "Stats/figures exist",
     "existing manuscript",
     "session_picked_fine_ids",
-    "citation-verify",
+    "verify-refs",
 )
 # Key runtime-flow.mmd tokens that must map into Workflow IR ids / labels.
 # IR remains hand-authored; this is structural consistency, not a Mermaid parser.
@@ -132,18 +132,18 @@ RUNTIME_IR_NODE_MAP = (
 RUNTIME_IR_LABEL_NEEDLES = (
     "mid-entry",
     "G-07",
-    "Gate · 07",
     "no new cites",
     "cites appear",
 )
 # runtime-flow.md must participate in G-VIZ-01 (not a dead read).
 MD_ANCHORS = (
-    "mid-enter",
-    "Gate ·",
+    "mid-entry",
+    "G-05",
     "07",
     "response",
-    "Lit05",
-    "Lit06",
+    "verify-refs",
+    "G-LIT",
+    "design-lock",
 )
 REBUILD = "python3 02_data-processing/advanced/visualization/scripts/gen_visualization.py"
 
@@ -423,7 +423,7 @@ def architecture_ir() -> dict:
         {"id": "c01", "type": "backend", "label": "00 Index", "sublabel": "registry / workflows", **_box(0, 1)},
         {"id": "fine_ids", "type": "backend", "label": "Fine ids", "sublabel": "in-repo registry", **_box(0, 2)},
         {"id": "c02", "type": "backend", "label": "02 Data / Stats", "sublabel": "processing and figures", **_box(1, 0)},
-        {"id": "c03", "type": "backend", "label": "03 Literature", "sublabel": "citation-verify", **_box(1, 1)},
+        {"id": "c03", "type": "backend", "label": "03 Literature", "sublabel": "verify-refs", **_box(1, 1)},
         {"id": "c05", "type": "backend", "label": "05 Writing", "sublabel": "manuscript", **_box(1, 2)},
         {"id": "c06", "type": "backend", "label": "06 Review", "sublabel": "review", **_box(2, 0)},
         {"id": "c07", "type": "backend", "label": "07 Response", "sublabel": "response letter", **_box(2, 1)},
@@ -513,10 +513,10 @@ def workflow_ir() -> dict:
         node("p06", "produce", 5, "backend", "06 Review", "review"),
         node("p07", "produce", 6, "backend", "07 Response", "response letter"),
         node("p03", "literature", 2, "backend", "03 Literature", "evidence"),
-        node("lit05", "literature", 4, "security", "Lit05", "G-CIT-1 before Gate 05"),
-        node("lit06", "literature", 5, "security", "Lit06", "G-CIT-2 inside 06"),
+        node("lit05", "literature", 4, "security", "Lit05", "G-LIT before G-05"),
+        node("lit06", "literature", 5, "security", "Lit06", "G-LIT inside 06"),
         node("lit07", "literature", 3, "security", "Lit07", "G-LIT when cites"),
-        node("ga07", "literature", 6, "security", "Gate · 07", "G-07 response"),
+        node("ga07", "literature", 6, "security", "G-07", "G-07 response"),
         node("locate", "qc", 1, "security", "Locate", "failed node"),
         node("rework", "qc", 3, "security", "Rework", "local or rollback"),
         node("escalate", "qc", 5, "security", "Unresolved", "budget spent"),
@@ -537,10 +537,10 @@ def workflow_ir() -> dict:
         {"id": "e-dsingle", "from": "dispatch", "to": "single", "label": "named single domain", "role": "branch"},
         {"id": "e-02-stats", "from": "p02", "to": "p02_stats", "label": "02 exit PASS, not terminal", "role": "main"},
         {"id": "e-stats-05", "from": "p02_stats", "to": "p05", "label": "Gate 02 PASS, not terminal", "role": "main"},
-        {"id": "e-05-lit", "from": "p05", "to": "lit05", "label": "required before Gate 05", "role": "main"},
-        {"id": "e-lit-06", "from": "lit05", "to": "p06", "label": "Gate 05 PASS, not terminal", "role": "main"},
+        {"id": "e-05-lit", "from": "p05", "to": "lit05", "label": "required before G-05", "role": "main"},
+        {"id": "e-lit-06", "from": "lit05", "to": "p06", "label": "G-05 PASS, not terminal", "role": "main"},
         {"id": "e-06-lit", "from": "p06", "to": "lit06", "label": "required inside 06", "role": "main"},
-        {"id": "e-lit-done", "from": "lit06", "to": "done", "label": "Gate 06 PASS at terminal", "role": "main"},
+        {"id": "e-lit-done", "from": "lit06", "to": "done", "label": "G-06 PASS at terminal", "role": "main"},
         {"id": "e-06-07", "from": "p06", "to": "p07", "label": "optional response (06 to 07 conditional; not every review)", "role": "branch", "variant": "dashed"},
         {"id": "e-07-ga07", "from": "p07", "to": "ga07", "label": "no new cites", "role": "branch", "variant": "dashed"},
         {"id": "e-07-lit07", "from": "p07", "to": "lit07", "label": "cites appear", "role": "branch"},
@@ -551,7 +551,7 @@ def workflow_ir() -> dict:
         {"id": "e-02-done", "from": "p02", "to": "done", "label": "terminal PASS", "role": "branch"},
         {"id": "e-03-done", "from": "p03", "to": "done", "label": "terminal PASS", "role": "branch"},
         {"id": "e-stats-done", "from": "p02_stats", "to": "done", "label": "terminal PASS", "role": "branch"},
-        {"id": "e-lit05-done", "from": "lit05", "to": "done", "label": "Gate 05 terminal PASS", "role": "branch"},
+        {"id": "e-lit05-done", "from": "lit05", "to": "done", "label": "G-05 terminal PASS", "role": "branch"},
         {"id": "e-single-done", "from": "single", "to": "done", "label": "target gate PASS", "role": "branch"},
         {"id": "e-fail-02", "from": "p02", "to": "locate", "label": "02 exit FAIL", "role": "error"},
         {"id": "e-fail-03", "from": "p03", "to": "locate", "label": "03 exit FAIL", "role": "error"},
@@ -1231,7 +1231,7 @@ def build() -> dict:
         "<p>This page is generated from in-repo IR with no external renderer. Fields below come from the same IR."
         " IR file: <a href=\"runtime.workflow.json\"><code>runtime.workflow.json</code></a>."
         f" schema_version {wf['schema_version']}. Fields: lanes / phases / groups / mainPath / nodes / edges."
-        " 03, 07 Response, Gate · 07 / G-07, Lit05, Lit06, and mid-entry appear on nodes and edges.</p>"
+        " 03, 07 Response, G-07, Lit05, Lit06, and mid-entry appear on nodes and edges.</p>"
     )
     home_body = (
         "<div class=\"grid\">"
