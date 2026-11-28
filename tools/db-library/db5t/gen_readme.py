@@ -7,9 +7,10 @@
 写法约束（lead m04269）：
   1. 只写白名单文件（<fam>db / 目录说明.md），不碰 _DataBase；
   2. 内容全部现读现算（表清单+行数、src 数、built_at、门禁结果、PHI 边界），不手填；
-  3. 幂等：重复调用内容一致（门禁部分读 stage/gate.log 的最新片段）。
+  3. 幂等：重复调用内容一致（门禁部分读 {DEL}\\gates\\gate.log 的最新片段）。
 """
 import json
+import os
 import pathlib
 import sqlite3
 import sys
@@ -17,7 +18,9 @@ import sys
 import paths as _P  # DB5T_BATCH / DB5T_ROOT 可覆盖
 
 STAGE = _P.STAGE
-GATELOG = STAGE / 'gate.log'
+# 与 gates.py 同源：派生物落 DEL（DB5T_CSV_DIR 可覆盖）
+GATELOG = pathlib.Path(os.environ.get('DB5T_CSV_DIR', '').strip()
+                       or pathlib.Path(_P.BATCH).parent.parent / 'gates') / 'gate.log'
 PHI_FAMILY_TABLES = {'id', 'id_number'}
 
 

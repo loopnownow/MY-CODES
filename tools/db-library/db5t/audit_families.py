@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """12 家族跨库一致性审计（只读）：结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明。
 
-用法：python audit_families.py            -> 控制台 + stage/AUDIT-12.md
+用法：python audit_families.py            -> 控制台 + {DEL}\\gates\\AUDIT-12.md
       python audit_families.py --data     -> 同时审计已切库的 _DataBase 家族
 """
 import os
@@ -13,6 +13,8 @@ import paths as _P  # ROOT/STAGE 由 DB5T_BATCH / DB5T_ROOT 决定
 
 ROOT = _P.BATCH
 STAGE = _P.STAGE
+# 派生物一律落 DEL（只许在 DEL 内新建，库根/批次树不落报告）
+OUT = pathlib.Path(os.environ.get('DB5T_CSV_DIR', '').strip() or pathlib.Path(_P.BATCH).parent.parent / 'gates')
 DBROOT = pathlib.Path(os.environ.get('DB5T_DATA_ROOT') or r'D:\MyProjects\_DataBase')
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import ddl_drift  # noqa: E402
@@ -136,7 +138,8 @@ def main():
                '`漂移`=与 SCHEMA 不符的表/列项数；`边车`=目录内 -wal/-shm 文件数；'
                '`登记/在盘`=`ref_project` 行数 / 磁盘上带库文件的子工程目录数。')
     txt = '\n'.join(out)
-    (STAGE / 'AUDIT-12.md').write_text(txt, encoding='utf-8')
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / 'AUDIT-12.md').write_text(txt, encoding='utf-8')
     print(txt)
 
 

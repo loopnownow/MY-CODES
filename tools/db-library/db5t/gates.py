@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """机器门：integrity / FK / CHECK 逐条复验 / PHI 值级对账 / 语义门（§3、§8.4）。
-只读 stage 产物。用法: python gates.py  -> 写 stage/gate.log
+只读库产物。用法: python gates.py [家族] -> 输出打印 + 摘要写 {DEL}\\gates\\gate.log
+（派生物一律落 DEL：只许在 DEL 内新建，库根不建 _work）
 """
 import os
 import datetime
@@ -16,9 +17,23 @@ import paths as B  # 路径解析集中在这里；DB5T_ROOT 可指向 _DataBase
 import d82 as D82  # D82 按表分级与债务基线（cli 与 recorder 共用一份判据）
 
 STAGE = pathlib.Path(os.environ.get('DB5T_ROOT') or B.STAGE)
+
+
+def _csv_out_dir() -> pathlib.Path:
+    """派生物默认落 `{DEL}\\gates\\`（只许在 DEL 内新建；不许在库根造 _work）。
+
+    DEL = 批次根的爷爷目录（`<DEL>\\_by-function\\<批次>` 的爷），可用 DB5T_CSV_DIR 覆盖。
+    """
+    env = os.environ.get('DB5T_CSV_DIR', '').strip()
+    if env:
+        return pathlib.Path(env)
+    return pathlib.Path(B.BATCH).parent.parent / 'gates'
+
+
+OUT = _csv_out_dir()
 FAM = sys.argv[1] if len(sys.argv) > 1 else 'MCI'      # MCI | LC | SSD
 FAM_DB = STAGE / FAM / '_PHI' / f'{FAM}db'
-LOG = STAGE / 'gate.log'
+LOG = OUT / 'gate.log'
 # 子库清单从家族库 ref_project 读（不再硬编码），保持门禁对新家族通用
 PROJ = []
 if FAM_DB.exists():
@@ -1136,7 +1151,8 @@ def d34_registry(fam, fam_db):
     if not out:
         out.append(f'  D68 登记一致：磁盘 {len(on_disk)} 个库 / ref_project {len(reg)} 行 .')
     if miss:
-        p = STAGE / 'ref_project_missing.md'
+        p = OUT / 'ref_project_missing.md'
+        p.parent.mkdir(parents=True, exist_ok=True)
         old = p.read_text(encoding='utf-8') if p.exists() else '# ref_project 双向登记缺口\n'
         p.write_text(old.rstrip() + '\n' + '\n'.join(miss) + '\n', encoding='utf-8')
     return out
@@ -1317,17 +1333,6 @@ def d76_named_seg0(fam_db):
     out = [f'0 段无名标签身份 {u}（subject_label={sl or "-"}）' for u, sl in rows]
     return out, len(rows)
 
-
-
-def _csv_out_dir() -> pathlib.Path:
-    """派生物默认落 `{DEL}\\gates\\`（只许在 DEL 内新建；不许在库根造 _work）。
-
-    DEL = 批次根的爷爷目录（`<DEL>\\_by-function\\<批次>` 的爷），可用 DB5T_CSV_DIR 覆盖。
-    """
-    env = os.environ.get('DB5T_CSV_DIR', '').strip()
-    if env:
-        return pathlib.Path(env)
-    return pathlib.Path(B.BATCH).parent.parent / 'gates'
 
 
 def d77_orphan_ids(fam_dir, fam_db, write_csv=True):
@@ -2763,7 +2768,8 @@ def main():
                  f'- 违反（P0/P1）：{len(v)}', f'- 待修（换库前必修）：{len(_pending)}', '']
         lines += ['## 违反'] + ([f'- {a} | {b}.{c}' for a, b, c in v] or ['- 无'])
         lines += ['', '## 待修'] + ([f'- {a} | {b}.{c}' for a, b, c in _pending] or ['- 无'])
-        cb = Path(__file__).resolve().parent.parent.joinpath('cutover_blockers.md')
+        cb = OUT / 'cutover_blockers.md'
+        cb.parent.mkdir(parents=True, exist_ok=True)
         # 按家族分段维护：只替换本家族段，其它家族段原样保留（旧实现用 split[0] 会把后面全丢）
         prev = cb.read_text(encoding='utf-8') if cb.exists() else ''
         secs = {}
@@ -2780,7 +2786,7 @@ def main():
                                         ('MCI', 'LC', 'EC', 'SSD', 'EGVB', 'OTHERS', 'ACN', 'CID', 'MM', 'SCH', 'SCC', 'WML'))
         cb.write_text('\n\n'.join(f'# cutover blockers — {f}\n\n' + secs[f] for f in order) + '\n',
                       encoding='utf-8')
-        out.append(f'CUTOVER: 违反 {len(v)} / 待修 {len(_pending)} → stage/cutover_blockers.md')
+        out.append(f'CUTOVER: 违反 {len(v)} / 待修 {len(_pending)} → {cb}')
     # 自检：门禁必须真的产出检查段。2026-11-25 我把一个函数插进 main() 体内，
     # 整段检查被吞、打印为空、退出码仍 0——「空输出 = 通过」是这类工具最危险的失败模式。
     _secs = sum(1 for ln in '\n'.join(out).split('\n') if ln.startswith('== '))
@@ -2798,6 +2804,7 @@ def main():
         keep = prev.split(f'\n##### family={FAM} #####\n')[0].rstrip() + '\n'
     else:
         keep = prev.rstrip() + '\n' if prev.strip() else ''
+    LOG.parent.mkdir(parents=True, exist_ok=True)
     LOG.write_text(keep + head + '\n'.join(out) + '\n', encoding='utf-8')
     print('\n'.join(out))
 
