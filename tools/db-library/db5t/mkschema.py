@@ -128,7 +128,7 @@ def main(argv=None) -> int:
         return 1
 
     sql = render(a.md)
-    a.out.write_text(sql, encoding='utf-8')
+    a.out.write_bytes(sql.encode('utf-8'))  # 字节写：不让 Windows 把 \n 翻成 \r\n（eol=lf）
     fam_n = sql.count('CREATE TABLE')
     print(f'WROTE {a.out}  {len(sql.encode("utf-8")):,} B  CREATE TABLE×{fam_n}  mods={len(MODS)}')
     print(f'      source_sha256={want[:12]}…')

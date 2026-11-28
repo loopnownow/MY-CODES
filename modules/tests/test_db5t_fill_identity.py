@@ -181,7 +181,7 @@ def test_fill_and_mkid_end_to_end(tmp_path, schema_sql):
                         "sha256 from ref_project").fetchone()
         fam_meta = dict(f.execute("select k, v from meta"))
         f.close()
-        assert reg[0] == "s1" and reg[1] == 2 and reg[2] == 3
+        assert reg[0] == "s1" and reg[1] == 2 and reg[2] == 2  # clin_person_n 数不同人（3 行 / 2 人）
         assert reg[3] == 1  # 甲有 2 个不同月份
         assert reg[4] == 1  # 甲有 >1 条 clin 行
         assert reg[5] == FILL.sha256(proj)

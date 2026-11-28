@@ -1,7 +1,7 @@
 -- schema.sql — 由 schema-v1.md 反编译生成，不要手改。
 -- 生成器：tools/db-library/db5t/mkschema.py
 -- source: schema-v1.md
--- source_sha256: 78664694aa6d856c43c2830f0245a03ce164ae0207afcb33b91f714861c5745f
+-- source_sha256: b4d4e2dcd16d810bd0f5a1143bd2f204d49936c54b94c36462e9988cd51ace21
 -- 用法：newdb.py 按 @section 标记切分，家族库段落已剔除 dict 表（契 3）。
 -- @section family
 PRAGMA journal_mode=WAL;

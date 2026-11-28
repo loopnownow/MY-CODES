@@ -213,7 +213,7 @@ def test_fill_xlsx_with_missing_rule(tmp_path, schema_sql):
     # 带逗号的列名照常映射；NA → NULL（不再以文本落进 REAL 列）；空串 → NULL
     assert row[0] == ("TST-900001", "ESRD-CI", "UNK", "1", 56, 4.7, 83.9, "real")
     assert row[1] == ("TST-900002", "HC", "UNK", "0", 61, None, None, "null")
-    assert src[0] == "sheet" and src[1] == 2
+    assert src[0] == "workbook" and src[1] == 2
 
 
 def test_fill_stop_rule_writes_nothing(tmp_path, schema_sql):

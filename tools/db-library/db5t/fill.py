@@ -119,6 +119,18 @@ def value_of(map_row, src_row, mint: Mint):
         if is_missing:
             raise MissingValue(f'{scol} 为空，不能发号')
         return mint.uid(tr.split(':', 1)[1], v.strip() if isinstance(v, str) else v)
+    if tr.startswith('map:'):
+        # map:Male=M|Female=F —— 把源侧字面值译成库内受控词；未登记的键按原值保留（由门禁 D62 抓）
+        table = {}
+        for pair in tr[len('map:'):].split('|'):
+            if not pair.strip():
+                continue
+            k, _, val = pair.partition('=')
+            table[k.strip()] = val.strip() or None
+        if is_missing:
+            return None
+        key = v.strip() if isinstance(v, str) else v
+        return table.get(str(key), key)
     if mode == 'keep':
         return v.strip() if isinstance(v, str) else v
     if is_missing:
@@ -164,6 +176,8 @@ class Source:
         head = path.open('rb').read(16)
         # 家族库文件名不带后缀（<slug>db），按魔数认，别按扩展名猜
         self.kind = 'sqlite' if head.startswith(b'SQLite format 3') else 'sheet'
+        if self.kind == 'sheet' and path.suffix.lower() in ('.csv', '.tsv'):
+            self.kind = 'csv'
 
     def load(self, sheet: str, header_row: int):
         if self.kind == 'sqlite':
@@ -173,6 +187,18 @@ class Source:
             rows = [dict(zip(cols, r[1:]), _row=r[0]) for r in cur]
             c.close()
             return cols, rows
+        if self.kind == 'csv':
+            # 清洗副本按 CSV 交付（源文件不动）：sheet 名忽略，表头行与 xlsx 同义
+            delim = '\t' if self.path.suffix.lower() == '.tsv' else ','
+            with self.path.open(encoding='utf-8-sig', newline='') as fh:
+                it = csv.reader(fh, delimiter=delim)
+                for _ in range(max(header_row - 1, 0)):
+                    next(it, None)
+                header = [h.strip() for h in next(it)]
+                rows = []
+                for i, vals in enumerate(it, start=header_row + 1):
+                    rows.append({h: v for h, v in zip(header, vals) if h} | {'_row': i})
+            return header, rows
         import openpyxl
         wb = openpyxl.load_workbook(self.path, read_only=True, data_only=True)
         ws = wb[sheet]
@@ -279,14 +305,19 @@ def main(argv=None) -> int:
             conn.commit()
         src_total = {}
         for i, (key, rec) in enumerate(sorted(src_reg.items()), start=1):
-            kind = 'old_db_blob' if Source(rec['path']).kind == 'sqlite' else 'sheet'
+            skind = Source(rec['path']).kind
+            kind = 'old_db_blob' if skind == 'sqlite' else 'workbook'
             counts = {sheet: sheet_rows[(key[0], sheet)] for sheet in rec['sheets']}
             merged = sum(n for sheet, n in counts.items() if (key[0], sheet) in clin_sheets)
-            total = merged or sum(counts.values())
+            # map 里只要有 clin 目标，src.rows 就只记「并入 clin 的行数」；
+            # 全库没有 clin 目标时（纯模块库）才退回总行数，否则 D50 会拿非 clin 源凑数。
+            total = merged if clin_sheets else sum(counts.values())
             h = sha256(rec['path'])
             rel = rec['path'].name
             note = (f'{a.family}/{a.slug} 试点回填；sheets='
                     + ','.join(f'{s}:{n}' for s, n in counts.items()))
+            if skind == 'csv':
+                note += '；cleaned_copy=1（源文件见 dict.source/目录说明）'
             print(f'src {i}: {rel}  kind={kind}  sha256={h[:12]}…  rows={total}  {note}')
             if not a.dry_run:
                 conn.execute(f'INSERT INTO src({",".join(SRC_COLS)}) VALUES ({",".join("?" * len(SRC_COLS))})',

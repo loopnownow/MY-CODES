@@ -110,7 +110,7 @@ def main(argv=None) -> int:
             print(f'id_number +{n_num}')
 
         pid = p.execute('SELECT count(*) FROM person').fetchone()[0]
-        cid = p.execute('SELECT count(*) FROM clin').fetchone()[0]
+        cid = p.execute('SELECT count(DISTINCT family_uid) FROM clin').fetchone()[0]
         # 三个镜像值以「实时重算」为准：门的判据是三方相等，写死会变成第三套真值
         live_lon = p.execute(
             "SELECT count(*) FROM (SELECT family_uid FROM clin WHERE period_month<>'UNK' "
