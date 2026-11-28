@@ -251,7 +251,7 @@ def parent_gates(path):
     for (t,) in list(c.execute("select name from sqlite_master where type='table'")):
         if not _is_val_table(t):
             continue
-        mod = t[:-4]
+        mod = t[:-6] if t.endswith('_value') else t[:-4]
         parent = f'_modules_{mod}'
         if parent not in tabs:
             bad.append(('P0', f'{t} 存在但缺少父表 {parent}（§2 应按模态成对建表）', 1))
