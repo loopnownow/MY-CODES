@@ -1,7 +1,7 @@
 -- schema.sql — 由 schema-v1.md 反编译生成，不要手改。
 -- 生成器：tools/db-library/db5t/mkschema.py
 -- source: schema-v1.md
--- source_sha256: b4d4e2dcd16d810bd0f5a1143bd2f204d49936c54b94c36462e9988cd51ace21
+-- source_sha256: 7d8e150df78055a14ebb889d6d4db28a3d7c1498a24b3a219b1ca3f6b29b760c
 -- 用法：newdb.py 按 @section 标记切分，家族库段落已剔除 dict 表（契 3）。
 -- @section family
 PRAGMA journal_mode=WAL;
@@ -161,7 +161,7 @@ CREATE TABLE clin(                   -- v2：一人一时点一行；头 11 列�
   path_histology TEXT,   -- 组织学类型（清洗后标准词）
   path_grade     TEXT,   -- 病理分级（FIGO grade 1/2/3）
   path_mi        TEXT,   -- 肌层浸润：none | lt50 | ge50 | full | unk
-  path_mi_mm     INTEGER,-- 肌层浸润深度 mm（原文给出数值时）
+  path_mi_depth     INTEGER,-- 肌层浸润深度 mm（原文给出数值时）
   path_lvsi      TEXT,   -- 脉管癌栓：0 | 1 | unk
   path_csi       TEXT,   -- 宫颈间质受累：0 | 1 | unk
   path_ln_pos    INTEGER,-- 阳性淋巴结枚数

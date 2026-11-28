@@ -5,7 +5,7 @@
 
   DB5T_BATCH   批次根（默认 pilot 批次目录；含 SCHEMA-v1.md 与 stage/）
   DB5T_ROOT    库根（默认 <DB5T_BATCH>/stage；切库后指真库根）
-  DB5T_SCHEMA  SCHEMA 文件（默认 <DB5T_BATCH>/SCHEMA-v1.md；再退到本目录 schema-v1.md）
+  DB5T_SCHEMA  SCHEMA 文件（默认本目录 schema-v1.md＝仓库权威副本；退到批次副本）
   DB5T_DICT    全局 dict 库（默认 {RAW}\\Family\\dict.db；契约名 DB5T_DICT）
 
 为什么不在代码里写死路径：门禁要能对 stage 产物跑，也要能对切库后的真库跑，
@@ -22,14 +22,18 @@ import sys
 HERE = pathlib.Path(__file__).resolve().parent
 
 BATCH = pathlib.Path(os.environ.get('DB5T_BATCH') or r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124')
-STAGE = pathlib.Path(os.environ.get('DB5T_ROOT') or (BATCH / 'stage'))
+RAW = pathlib.Path(os.environ.get('DB5T_RAW') or r'D:\MyProjects\_DataBase')
+FAMILY = RAW / 'Family'
+# 默认库根：显式 DB5T_ROOT 优先；转正后真库根是 {RAW}\Family；都没有才回落到批次 stage
+STAGE = pathlib.Path(os.environ.get('DB5T_ROOT')
+                     or (FAMILY if FAMILY.exists() else BATCH / 'stage'))
 
 
 def _schema() -> pathlib.Path:
     env = os.environ.get('DB5T_SCHEMA')
     if env:
         return pathlib.Path(env)
-    for cand in (BATCH / 'SCHEMA-v1.md', HERE / 'schema-v1.md'):
+    for cand in (HERE / 'schema-v1.md', BATCH / 'SCHEMA-v1.md'):
         if cand.exists():
             return cand
     return HERE / 'schema-v1.md'
@@ -38,7 +42,7 @@ def _schema() -> pathlib.Path:
 SCHEMA = _schema()
 SCHEMA_MD = SCHEMA          # 老脚本按 SCHEMA_MD 引用
 ROOT = STAGE                # audit_families 按 ROOT 算相对路径
-DICT = pathlib.Path(os.environ.get('DB5T_DICT') or r'D:\MyProjects\_DataBase\Family\dict.db')
+DICT = pathlib.Path(os.environ.get('DB5T_DICT') or (FAMILY / 'dict.db'))
 
 
 def sha256(path) -> str:
@@ -55,6 +59,7 @@ def describe() -> str:
     dok = 'exists' if DICT.exists() else 'MISSING'
     return (
         f'BATCH  = {BATCH}\n'
+        f'FAMILY = {FAMILY}\n'
         f'STAGE  = {STAGE}  (DB5T_ROOT={"set" if os.environ.get("DB5T_ROOT") else "default"})\n'
         f'SCHEMA = {SCHEMA} [{ok}] sha256={digest}\n'
         f'DICT   = {DICT} [{dok}] (DB5T_DICT={"set" if os.environ.get("DB5T_DICT") else "default"})\n'

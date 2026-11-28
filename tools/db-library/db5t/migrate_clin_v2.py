@@ -63,7 +63,7 @@ MERGABLE = ['group_v', 'subgroup']
 ABSORB = ['schema_block']
 # 本轮只建列不填值；类型按规则：path_on=DATE，计数列 INTEGER，其余 TEXT
 PATH_COLS = [('path_kind', 'TEXT'), ('path_on', 'DATE'), ('path_histology', 'TEXT'),
-             ('path_grade', 'TEXT'), ('path_mi', 'TEXT'), ('path_mi_mm', 'INTEGER'),
+             ('path_grade', 'TEXT'), ('path_mi', 'TEXT'), ('path_mi_depth', 'INTEGER'),
              ('path_lvsi', 'TEXT'), ('path_csi', 'TEXT'), ('path_ln_pos', 'INTEGER'),
              ('path_ln_total', 'INTEGER'), ('path_lnm', 'TEXT'), ('path_eu', 'TEXT'),
              ('path_figo', 'TEXT'), ('path_dx', 'TEXT'), ('path_other', 'TEXT')]

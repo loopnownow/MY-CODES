@@ -203,7 +203,7 @@ CREATE TABLE clin(                   -- v2：一人一时点一行；头 11 列�
   path_histology TEXT,   -- 组织学类型（清洗后标准词）
   path_grade     TEXT,   -- 病理分级（FIGO grade 1/2/3）
   path_mi        TEXT,   -- 肌层浸润：none | lt50 | ge50 | full | unk
-  path_mi_mm     INTEGER,-- 肌层浸润深度 mm（原文给出数值时）
+  path_mi_depth     INTEGER,-- 肌层浸润深度 mm（原文给出数值时）
   path_lvsi      TEXT,   -- 脉管癌栓：0 | 1 | unk
   path_csi       TEXT,   -- 宫颈间质受累：0 | 1 | unk
   path_ln_pos    INTEGER,-- 阳性淋巴结枚数

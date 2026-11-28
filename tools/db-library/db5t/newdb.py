@@ -111,7 +111,7 @@ def build(db: pathlib.Path, ddl: str, meta: dict, dry: bool) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description='按 schema.sql 建空库')
     ap.add_argument('--family', required=True)
-    ap.add_argument('--slug', required=True)
+    ap.add_argument('--slug', default='', help='子工程 slug；--family-only 时可省略')
     ap.add_argument('--root', type=pathlib.Path, default=paths.STAGE)
     ap.add_argument('--schema', type=pathlib.Path, default=HERE / 'schema.sql')
     ap.add_argument('--schema-md', type=pathlib.Path, default=HERE / 'schema-v1.md')
@@ -120,6 +120,7 @@ def main(argv=None) -> int:
                     choices=['person', 'specimen', 'exam', 'sample', 'label', 'mixed'],
                     help='family_uid 指代什么（D72 必需；默认 person）')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--family-only', action='store_true', help='只建家族库，不建子库（如 VEGF 无数据）')
     ap.add_argument('--allow-stale', action='store_true', help='允许 schema.sql 与 schema-v1.md 不同步')
     a = ap.parse_args(argv)
 
@@ -146,6 +147,10 @@ def main(argv=None) -> int:
 
     print(f'root   = {root}')
     print(build(fam_db, fam_sql, fam_meta, a.dry_run))
+    if a.family_only:
+        return 0
+    if not a.slug:
+        ap.error('--slug 必填（除非 --family-only）')
     print(build(proj_db, proj_sql, proj_meta, a.dry_run))
     if a.dry_run:
         print(f'DRY  将写 {note}' if not note.exists() else f'SKIP 已存在 {note}')

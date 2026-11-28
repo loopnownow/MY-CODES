@@ -142,6 +142,15 @@ def render(d: dict, family: str, slug: str, root: pathlib.Path,
     gl = '\n'.join(f'<div class="gl{" bad" if "!!" in ln else ""}">{esc(ln)}</div>'
                    for ln in gate_lines) or '<div class="gl">（没有抓到门禁输出）</div>'
     refp = d['refp']
+    if refp:
+        ref_row = (f'<tr><td>{esc(refp[0])}</td><td class="num">{refp[1]:,}</td>'
+                   f'<td class="num">{refp[2]:,}</td><td>{esc(refp[3])}</td>'
+                   f'<td>{esc(refp[4])}</td>'
+                   f'<td><code class="sha">{esc((refp[5] or '')[:16])}…</code></td></tr>')
+    else:
+        ref_row = ('<tr><td colspan="6" class="bad">ref_project 未登记（跑 mkid.py 后才有一行）'
+                   '</td></tr>')
+
 
     return f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
@@ -218,9 +227,7 @@ background:var(--chip);color:var(--accent);margin-right:6px}}
 <h2>ref_project</h2>
 <table><tr><th>slug</th><th>person_count</th><th>clin_person_n</th><th>period_unit</th>
 <th>built_at</th><th>sha256</th></tr>
-<tr><td>{esc(refp[0])}</td><td class="num">{refp[1]:,}</td><td class="num">{refp[2]:,}</td>
-<td>{esc(refp[3])}</td><td>{esc(refp[4])}</td>
-<td><code class="sha">{esc((refp[5] or '')[:16])}…</code></td></tr></table>
+{ref_row}</table>
 
 <p class="foot">只读预览，由 preview.py 生成；库未做任何修改。root：<code>{esc(str(root))}</code></p>
 </div></body></html>"""
@@ -231,19 +238,21 @@ def main(argv=None) -> int:
     ap.add_argument('--root', type=pathlib.Path, default=paths.STAGE)
     ap.add_argument('--family', required=True)
     ap.add_argument('--slug', required=True)
-    ap.add_argument('--out', type=pathlib.Path, required=True)
+    ap.add_argument('--out', type=pathlib.Path, default=None,
+                    help='缺省落在子工程夹内：<root>/<family>/<slug>/<slug>-库预览.html')
     ap.add_argument('--gates', action='store_true', help='就地跑一遍 gates.py 抓摘要')
     ap.add_argument('--sample', type=int, default=14, help='clin 抽样行数')
     a = ap.parse_args(argv)
 
+    out = a.out or (a.root / a.family / a.slug / f'{a.slug}-库预览.html')
     d = gather(a.root, a.family, a.slug, a.sample)
     if a.gates:
         lines, status = gates_lines(a.root, a.family)
     else:
         lines, status = ['（未跑：加 --gates）'], '（未跑）'
-    a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(render(d, a.family, a.slug, a.root, lines, status), encoding='utf-8')
-    print(f'OK  {a.out}  ({a.out.stat().st_size:,} B)  门禁={status}')
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render(d, a.family, a.slug, a.root, lines, status), encoding='utf-8')
+    print(f'OK  {out}  ({out.stat().st_size:,} B)  门禁={status}')
     return 0
 
 

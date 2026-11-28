@@ -48,7 +48,7 @@ STRUCT_COLS = {
     # 15 个 path_*：schema 里的病理块列，根目录数据从零建库时必然存在（2026-11-28
     # sw_CI 试点里 dict_cov 把这一整块当「缺 dict」，18 条全是 schema 自己的列）
     'path_kind', 'path_on', 'path_histology', 'path_grade', 'path_mi',
-    'path_mi_mm', 'path_lvsi', 'path_csi', 'path_ln_pos', 'path_ln_total',
+    'path_mi_depth', 'path_lvsi', 'path_csi', 'path_ln_pos', 'path_ln_total',
     'path_lnm', 'path_eu', 'path_figo', 'path_dx', 'path_other',
 }
 
@@ -2136,6 +2136,34 @@ def _load_dict_index(dict_db):
     return idx
 
 
+
+_TEXT_ROLE_CACHE = {}
+
+
+def _text_role(scope_table_col):
+    """dict 里 role=text 的列 = 自由文本（病理描述/备注），允许中文；不进 D98 的业务串检查。"""
+    key = scope_table_col
+    if key in _TEXT_ROLE_CACHE:
+        return _TEXT_ROLE_CACHE[key]
+    val = False
+    try:
+        p = _dict_db_path()
+        if p is None:
+            return False
+        c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        try:
+            scopes = key[0]
+            row = c.execute(
+                'select role from dict where scope in (%s) and table_name=? and column_name=?' %
+                ','.join('?' * len(scopes)), (*scopes, key[1], key[2])).fetchone()
+            val = bool(row and row[0] == 'text')
+        finally:
+            c.close()
+    except sqlite3.Error:
+        pass
+    _TEXT_ROLE_CACHE[key] = val
+    return val
+
 def d93_ri_soft(*_a, **_k):
     """D93（report-only）：参考区间软门。基线不是失败阈值；本批不实现判据。"""
     return ['  · 本批 report-only，不判级（规则：对 ri_normal 软判 OUT_OF_RI / UNIT_SUSPECT / IMPLAUSIBLE；单侧区间不得判单位）'], 0
@@ -2316,7 +2344,8 @@ def d98_ascii_units(fam_db, projs):
                         # 大写 / 空格等：律 1 要求 ASCII snake_case
                         n_ident += 1
                         _note('ident', f'{prefix}{table}.{col}')
-                    if _col_embeds_unit(col):
+                    if _col_embeds_unit(col) and col not in STRUCT_COLS:
+                        # 结构列（period_month / month_ix 等）由 schema 定义，不是变量名
                         n_unitcol += 1
                         _note('unitcol', f'{prefix}{table}.{col}')
             if 'qc' in {r[0] for r in c.execute("select name from sqlite_master where type='table'")}:
@@ -2348,6 +2377,8 @@ def d98_ascii_units(fam_db, projs):
                 if not _business_table(table):
                     continue
                 for col, typ in _ti(c, table):
+                    if _text_role(((f'proj:{slug}', 'family', 'stage'), table, col)):
+                        continue   # 自由文本（role=text）允许中文
                     q = _qi(col)
                     tq = _qi(table)
                     try:

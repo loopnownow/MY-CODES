@@ -158,3 +158,38 @@ def test_mkdict_merges_and_dedupes(tmp_path, schema_sql):
     assert meta["conflicts"] == "1"
     assert report.exists() and "family\tid\tname" in report.read_text(encoding="utf-8")
     assert meta["stage_rows"] == str(len(stage))
+
+
+def test_newdb_family_only(tmp_path):
+    """VEGF 这类无子库的家族：--family-only 只建家族库，不建子库、不写目录说明。"""
+    rc = NEWDB.main(["--family", "VEGF", "--root", str(tmp_path), "--family-only",
+                     "--allow-stale"])
+    assert rc == 0
+    fam = tmp_path / "VEGF" / "_PHI" / "VEGFdb"
+    assert fam.exists()
+    with sqlite3.connect(fam) as c:
+        names = {r[0] for r in c.execute("select name from sqlite_master where type='table'")}
+    assert "id" in names and "dict" not in names
+    assert not (tmp_path / "VEGF" / "VEGF").exists()
+
+
+def test_preview_default_out_inside_leaf(tmp_path, schema_sql):
+    """preview --out 缺省时落在子工程叶内（可重建预览页），不再写 lab_root。"""
+    PREVIEW = _load("db5t_preview", DB5T / "preview.py")
+    assert NEWDB.main(["--family", "TST", "--slug", "s1", "--root", str(tmp_path),
+                       "--schema", str(schema_sql), "--allow-stale"]) == 0
+    rc = PREVIEW.main(["--root", str(tmp_path), "--family", "TST", "--slug", "s1"])
+    assert rc == 0
+    assert (tmp_path / "TST" / "s1" / "s1-库预览.html").exists()
+
+
+def test_paths_resolves_family_before_stage(tmp_path, monkeypatch):
+    """默认库根优先 {RAW}\\Family（转正后），没有才回落批次 stage。"""
+    import importlib
+    (tmp_path / "Family").mkdir()
+    monkeypatch.setenv("DB5T_RAW", str(tmp_path))
+    monkeypatch.delenv("DB5T_ROOT", raising=False)
+    paths = importlib.import_module("paths")
+    paths = importlib.reload(paths)
+    assert paths.STAGE == tmp_path / "Family"
+    assert paths.DICT == tmp_path / "Family" / "dict.db"

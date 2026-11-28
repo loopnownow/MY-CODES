@@ -7,7 +7,7 @@
 
 | 文件 | 作用 |
 |---|---|
-| `paths.py` | 路径解析的唯一入口（`DB5T_BATCH` / `DB5T_ROOT` / `DB5T_SCHEMA` / `DB5T_DICT`） |
+| `paths.py` | 路径解析的唯一入口（`DB5T_BATCH` / `DB5T_ROOT` / `DB5T_RAW` / `DB5T_SCHEMA` / `DB5T_DICT`）；默认库根 `DB5T_ROOT → {RAW}\Family → 批次 stage`，全局 dict 固定 `{RAW}\Family\dict.db` |
 | `gates.py` | 机器门 D35–D99（D95 / D96 / D98 代码已入、**默认 report-only**，`--strict` 或 `DB5T_GATES_STRICT=1` 才判 P1；D87–D94、D97、D99 恒 report-only）+ `--cutover`（换库前待修清单，现算不落盘） |
 | `mkschema.py` | `schema-v1.md` → `schema.sql`：只认两段 ```sql，7 个模态展开，家族库剔 `dict`，首行记 `source_sha256`；`--check` 校验过期 |
 | `newdb.py` | 按 `schema.sql` 建空库（家族库 + 子库 + `meta` + `目录说明.md`）；目标已存在就跳过，绝不覆盖 |
@@ -15,7 +15,7 @@
 | `mkid.py` | 阶段 3：从退役家族库搬 `id` / `id_number`，实时算 `longitudinal_n` / `multi_record_n`，写 `ref_project` 登记行与两库 `meta`（`subject_types` / `identity_grain`）；幂等 |
 | `mkphi.py` | 阶段 4（PHI）：把清洗副本里的姓名与号码写进家族库 `id` / `id_number`；身份证/电话/地址默认脱敏（前 3 + `*` + 后 4；地址截到第 3 级行政区）；脱敏后撞唯一索引只丢该字段、不并身份；写 `meta.phi_source` / `phi_sha256` / `phi_imported_at`；`--no-mask` 仅限离机环境 |
 | `fill.py` | 阶段 5：读 13 列 `map.csv`，按物理依赖序 src→person→clin→`_modules_*`→`*_value` 回填；源可 `.xlsx/.xls`（按 sheet + header_row）或 `.db`（按表名）；`transform` 支持 `const:<值>` / `mint:<茎>`（发顺序号，同一源值跨 sheet 复用）；`missing_rule` 按源侧标记判缺（`NA` → `NULL`，D97 的修法）；无 dict 行不 ALTER（契 2）；`--dry-run` 只报不做；重跑先清本 src 旧行 |
-| `preview.py` | 阶段 7：给刚建好的库出一张只读预览（单文件 HTML：KPI + src 登记 + 表清单 + clin 逐列 dict/NULL/样例 + 抽样 + 门禁摘要），默认不跑门禁，`--gates` 才就地跑 |
+| `preview.py` | 阶段 7：给刚建好的库出一张只读预览（单文件 HTML：KPI + src 登记 + 表清单 + clin 逐列 dict/NULL/样例 + 抽样 + 门禁摘要），默认不跑门禁，`--gates` 才就地跑；`--out` 可省，缺省落 `<root>\<FAM>\<slug>\<slug>-库预览.html` |
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |
@@ -63,8 +63,8 @@ python -B fill.py --map <批次>\_work\sw_CI\map.csv --root <stage> --family MCI
 python -B mkid.py --from-person --root <stage> --family MCI --slug sw_CI --id-status label_only
 
 # 10) 阶段 7：建完一个库先出预览给人看
-python -B preview.py --root <stage> --family MCI --slug sw_CI \
-                     --out {lab_root}\sw_CI-库预览.html --gates
+python -B preview.py --root {RAW}\Family --family MCI --slug sw_CI --gates
+# --out 缺省即 {RAW}\Family\MCI\sw_CI\sw_CI-库预览.html
 ```
 
 **未写 `map.csv` 前先看两件事**：源列名里的逗号（如 `Sex (1=M, 0=F)`）必须用 `csv.writer` 写 map，
