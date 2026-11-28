@@ -1,43 +1,190 @@
 code	severity	meaning	since
+ANALYSIS_COLUMN_EXCLUDED	P2	analysis-only column (model output/prediction) excluded from the library	2026-11-28
+ANIMAL_COHORT	P2	animal cohort (mice etc.); identity is a shelter/lab identifier	2026-11-28
+ARM_OVERRIDE	P2	arm/cohort overridden by a later sheet for some subjects	2026-11-28
+ASSAY_CODE_ONLY	P2	only the assay code was recorded, no measured value	2026-11-28
+BATCH_DATE_ONLY	P2	only batch/lot dates available	2026-11-28
+BLOCK_MISMATCH	P1	lab block does not match the patient block it was pasted into	2026-11-28
+BONE_VALUE_CONTRADICTION	P1	bone-related value contradicts another column for the same subject	2026-11-28
+BRIDGE_BY_ROW	P2	files bridged by row position rather than by a key	2026-11-28
+CASE_NO_AS_ID	P2	case number used as the identity key	2026-11-28
 CELL_MOVED	P2	单元格内容移到语义正确的列	2026-11-28
+CENSORED_VALUE	P2	censored value kept at its bound	2026-11-28
+CLIN_COPIED_ACROSS_EXAMS	P2	clin row copied onto every exam of the same person	2026-11-28
+CLIN_DROPPED_WITH_SRC	P2	clin row dropped while the source registration is kept	2026-11-28
+COHORT_AMBIGUOUS	P2	cohort label ambiguous; recorded and left as given	2026-11-28
+COHORT_SOURCE_ROLE	P2	source sheet role (training/validation/external) recorded per cohort	2026-11-28
+COHORT_SPLIT	P2	cohort split recorded (which source sheet maps to which cohort)	2026-11-28
+COHORT_UNLINKED	P2	cohort members without identity link	2026-11-28
 COLS_DROPPED	P2	整列删除（统计量、空列、重复号码列）	2026-11-28
 COLS_MERGED	P2	同指标两列互斥，coalesce 合并	2026-11-28
 COLS_RENAMED	P2	列名按内容改名	2026-11-28
 COLS_SPLIT	P2	一列混两种语义，拆成两列后删除原列	2026-11-28
+COLUMN_DUP	P2	duplicate column name in one sheet; kept both with suffixes	2026-11-28
 COLUMN_EMPTY	P2	源列 100% 空	2026-11-28
+COLUMN_SHIFT	P1	columns shifted relative to the header; realigned	2026-11-28
+COMPLEMENTARY_SHEETS	P2	two sheets hold complementary halves of one table	2026-11-28
 CONFLICT	P1	同一事实两处取值不一致，未合并	2026-11-28
+CONTROL_SUMMARY_ONLY	P2	sheet holds only a summary for the control group	2026-11-28
+CROSSWALK_CONFLICT	P2	two crosswalk tables disagree on the same mapping	2026-11-28
+CROSS_COHORT_UNLINKED	P2	rows from different cohorts could not be linked	2026-11-28
+CROSS_PROJECT_LINK	P2	rows linked across projects by a non-identity bridge	2026-11-28
+CROSS_PROJECT_NO_KEY	P2	cross-project rows without a shared key; left unlinked	2026-11-28
+CTA_TEXT_ABSENT	P2	CTA says a field exists but the source has no such text column	2026-11-28
 D98_COL_RENAMED	P2	列名含非 ASCII 或内嵌单位，已按语义改为英文 snake；原名进 dict.aliases	2026-11-28
 D98_ENUM_MAPPED	P2	中文/混合编码枚举值已转 ASCII 码，映射写入 dict.enum_values	2026-11-28
 D98_TEXT_ALLOWED	P2	自由文本列（病理/主诉/病史/备注），dict.role=text，中文允许	2026-11-28
+DATE_BATCH_EST	P2	date estimated from batch/lot information (day-level precision lost)	2026-11-28
+DATE_CONFLICT	P1	two source columns give different dates for the same event; kept the more specific one	2026-11-28
+DATE_CROSSCHECK	P2	date validated against a second column; note records which	2026-11-28
+DATE_INVALID	P2	date cell unparseable; downgraded to UNK	2026-11-28
+DATE_NO_YEAR	P2	date lacks a year and cannot be anchored; stored as month-day text	2026-11-28
 DATE_SEMANTICS	P2	日期列语义与列名不符，已改名并说明	2026-11-28
+DATE_YMD_TRAP	P2	ambiguous Y/M/D order detected and resolved before parse	2026-11-28
+DEMOGRAPHIC_BRIDGE_NOT_KEY	P2	demographics used to bridge files but explicitly not treated as a key	2026-11-28
+DERIVED_COLUMNS	P2	column derived by us (not present in the source)	2026-11-28
 DUP	P1	源中相邻完全复制行（如成对粘贴），未删，待作者核对	2026-11-28
+DUPLICATE_SHEET	P2	sheet is an exact subset copy of another sheet	2026-11-28
 DUP_BATCH_SUSPECT	P2	同批两表列名重叠 ≥50% 且可匹配	2026-11-28
+DUP_PATH_NO	P2	duplicate pathology numbers in the source	2026-11-28
+DUP_SCAN_PERSON	P2	same person scanned twice in the same file	2026-11-28
+DX_MULTILINE	P2	diagnosis spans several source lines; joined	2026-11-28
+EMR_RENDERED_DUP	P2	EMR export rendered the same record twice	2026-11-28
+ENTITY_SEMANTICS_UNKNOWN	P1	long-table entity (feature/subject) semantics unknown; recorded in dict	2026-11-28
+ENUM_AS_GIVEN	P2	free-text category kept as given (no canonical enum available)	2026-11-28
 ENUM_MAPPED	P2	枚举编码已归一（中英/大小写）	2026-11-28
 ENUM_PARSED	P2	枚举从自由文本解析后归一	2026-11-28
+ENUM_UNMAPPED	P1	categorical value not resolvable to the dictionary enum; left NULL	2026-11-28
+EXAM_LEVEL	P2	rows kept at exam/visit granularity because no person key exists	2026-11-28
+EXCLUDED_TABLE	P2	table excluded from load; reason recorded	2026-11-28
+FOLDER_SHARED	P2	one folder shared by several projects; provenance recorded	2026-11-28
+FREE_TEXT_STORED	P2	free-text narrative stored (role=text in dict) rather than dropped	2026-11-28
+GRADE_CODE_REMAP	P2	legacy grade code remapped by cross-check (e.g. 0 means G4); raw value kept in *_raw	2026-11-28
+GROUP_AS_GIVEN	P2	cohort/group label kept as given in the source	2026-11-28
+GROUP_INFERRED	P2	group assigned by inference from the sheet name or filename	2026-11-28
+HEADER_LOST	P2	header row lost or shifted; column names reconstructed from position	2026-11-28
+HEADER_MERGED	P2	merged header cells; names rebuilt by fill-right	2026-11-28
+HEADER_SOURCE_MISMATCH	P2	header does not match the data block it was taken from	2026-11-28
+IDENTITY_COMPOSITE	P2	identity assembled from several fields (e.g. name+age) as a last resort	2026-11-28
 IDENTITY_REPAIRED	P2	身份由回放修补（补 person 行或改段位）	2026-11-28
 IDENTITY_UNAVAILABLE	P2	id 0 行，身份不可得	2026-11-28
+IDENTITY_WITHOUT_DATA	P2	identity row exists but no clinical/module row links to it	2026-11-28
+IDENTITY_WITHOUT_NAME	P2	identity has a number but no name	2026-11-28
 IDNUM_DUP_CONFLICT	P2	同一 (kind,issuer,value) 在真身份上重复，保留首条、其余删除	2026-11-28
 ID_ATTRIB_UNSURE	P2	身份属性不确定（段位/类型），只记不判	2026-11-28
 ID_COLLISION	P2	键列与院号字面碰撞（非泄漏）	2026-11-28
+ID_KIND_INVALID	P2	id_number kind not in the whitelist; reclassified or dropped	2026-11-28
+ID_KIND_NOT_PERSONAL	P1	number is not a personal identifier (sample/imaging code) and was relocated	2026-11-28
+ID_MISSING	P1	row had no identity key in the source; placeholder identity created and marked	2026-11-28
+ID_REUSED	P1	one number reused for different records across files; kept as separate identities	2026-11-28
+IHC_CONFLICT	P2	IHC code column contradicts its text column; text wins, code only fills blanks	2026-11-28
+IHC_PLACEHOLDER	P2	IHC cell holds a placeholder word instead of a result	2026-11-28
 IMPLAUSIBLE	P2	值越过硬上限	2026-11-28
+INTERNAL_CONTRADICTION	P1	two columns of the same table contradict each other; kept the more reliable one	2026-11-28
+INVALID_ID_VALUE	P2	identity-like cell holds junk (X, 0); treated as missing	2026-11-28
+KEYLESS_SHEETS_EXCLUDED	P2	wide sheet without any key excluded from load	2026-11-28
 KEY_ABSENT_EQUAL_N	P2	两侧人数相等却无共享键	2026-11-28
+LABEL_FORMAT_SUSPECT	P2	subject label format deviates from the expected pattern	2026-11-28
+LAB_VALUES_NOT_PARSED	P2	lab block present but not parsed (multi-value cells); recorded as a stop	2026-11-28
 LONGITUDINAL_UNAVAILABLE	P2	有日期但 longitudinal_n=0	2026-11-28
+MERGED_IDENTITIES	P2	two source records identified as one person and merged; unk_seq keeps both rows	2026-11-28
+MISSING_CELL	P2	cell empty in the source	2026-11-28
+MIXED_COHORT	P2	one table carries several cohorts; distinguished by a cohort column	2026-11-28
 MODAL_ABSENT	P2	源工作簿没有该模态的数据，check 表 0 行；项目级登记（table_name/column_name 置 NULL）	2026-11-28
+MODEL_MATRIX_EXCLUDED	P2	model design matrix excluded	2026-11-28
+MODEL_OUTPUT_EXCLUDED	P2	model output column excluded (not raw data)	2026-11-28
+MONTH_PRECISION_LOST	P2	day precision lost; period_month kept at month level	2026-11-28
+MULTI_DATE_CELL	P2	one cell held several dates; the meaningful one was chosen and recorded	2026-11-28
+MULTI_VISIT_KEY	P2	same identity has repeat visits at different dates; kept as separate module rows	2026-11-28
+NAME_AS_LABEL	P1	person name used where a label is expected; moved to id.name	2026-11-28
+NAME_COLUMN_MIXED	P1	name column mixes names with numbers/codes; values split before load	2026-11-28
+NAME_CONFLICT	P1	same key carries different names; identity split kept and flagged	2026-11-28
+NAME_CROSS_COHORT	P2	same name appears in two cohorts; treated as two identities unless a number links them	2026-11-28
+NAME_DUP	P2	duplicate names across records; disambiguated by number/age	2026-11-28
+NAME_FILLDOWN	P2	name filled down from a merged cell above	2026-11-28
+NAME_INVALID	P2	name cell unparseable or obviously not a person name	2026-11-28
+NAME_IN_LABEL_COLUMN	P1	a person name found inside a non-PHI label column; relocated to id.name	2026-11-28
+NAME_IS_CODE	P2	name cell holds a code instead of a person name	2026-11-28
+NAME_IS_LABEL	P2	the 'name' is really a subject label/placeholder	2026-11-28
+NAME_LINK	P1	identity linked through a controlled name mapping (name is not a key)	2026-11-28
+NAME_MASKED	P2	name masked into id.name; business cell cleared	2026-11-28
+NAME_ONLY_IDENTITY	P2	identity established from name only (deduplicated after normalisation)	2026-11-28
+NAME_PHONE_SPLIT_FAIL	P2	combined 'name(phone)' cell could not be split cleanly	2026-11-28
+NO_ADMISSION_BLOCK	P2	no admission-level block in the source	2026-11-28
+NO_INDIVIDUAL_KEY	P2	source has no individual-level key; rows kept at exam/specimen level	2026-11-28
+NO_TIME_AXIS	P2	project has no date column at all	2026-11-28
+NO_USABLE_DATE	P2	dates exist but none usable as an index; rows land in UNK	2026-11-28
+NUMBER_NOT_IN_NAMES	P2	number in the name text does not match the id_number column	2026-11-28
+OUTCOME_ORPHAN	P2	outcome row without a matching identity/exam	2026-11-28
 OUT_OF_RI	P2	值越出参考区间	2026-11-28
+PANEL_LONG	P2	lab panel expanded into a long table	2026-11-28
+PATH_CONFLICT	P2	pathology narrative contradicts a coded pathology column; narrative wins	2026-11-28
 PATH_DX_LONG	P2	病理长文本 >1000 字	2026-11-28
+PATIENT_INDEX_ONLY	P2	sheet is a patient index only (no variables)	2026-11-28
+PERIOD_UNK_ROWS	P2	rows whose period_month is UNK because no absolute date exists	2026-11-28
+PHI	P1	whole column held PHI (name/number); dropped from the sub-library	2026-11-28
 PHI_COLUMN	P2	PHI 列级登记（写前拦截）	2026-11-28
+PHI_FROM_ROWS	P1	PHI found inside data rows (not the header); relocated or masked	2026-11-28
 PHI_LEAK_DROPPED	P1	违规暴露 PHI 的列/值已删除	2026-11-28
 PHI_RELOCATED	P2	PHI 从业务列移入 id.*（姓名/号码/电话），原格置空或改名 *_masked	2026-11-28
+PHI_SOURCE_UNMASKED	P1	PHI carried in the source workbook unmasked; masked on load	2026-11-28
+PHONE_DUP	P2	phone number shared by several identities; unique constraint kept the first	2026-11-28
+PLATE_LEVEL	P2	rows at plate level	2026-11-28
+POSSIBLE_SAME_PERSON	P2	two identities look alike but could not be merged automatically	2026-11-28
+QPCR_CALC_RAW_BOTH	P2	both raw and calculated qPCR values stored, provenance flagged	2026-11-28
+QPCR_LINKED	P2	qPCR well linked to its sample/person	2026-11-28
+QPCR_PARTIAL_PARSE	P2	qPCR sheet only partly parsed (layout irregular)	2026-11-28
+RAD_VERSION_CHOSEN	P2	one of several radiomics versions chosen; reason recorded	2026-11-28
+RELATIVE_TIMEPOINT	P2	timepoint is relative (d7/d14), not a calendar date	2026-11-28
+REPEATED_HEADER_ROW	P2	header row repeated inside the data; skipped	2026-11-28
 ROWS_DROPPED	P2	源行无法满足目标表约束（如长表 feature 为空），整行丢弃并计数	2026-11-28
+ROW_ALIGNED	P2	continuation row of a multi-row matrix; attributed to its parent row	2026-11-28
+ROW_ALL_EMPTY	P2	fully empty row; skipped	2026-11-28
+ROW_ALL_EXCLUDED	P2	row kept in src bookkeeping but every column excluded	2026-11-28
 ROW_DROPPED	P2	单行丢弃（与 ROWS_DROPPED 同义，历史码）	2026-11-28
+ROW_LEVEL_IDENTITY	P2	identity established at row level (no person key in source)	2026-11-28
+ROW_LEVEL_PLACEHOLDER	P2	placeholder identity created for a row-level record	2026-11-28
+ROW_MERGED	P2	two source rows merged into one target row	2026-11-28
+ROW_PER_LESION	P2	one clin row per lesion/specimen rather than per person	2026-11-28
+SAME_MONTH_MULTI_ADMIT	P2	two admissions in the same month for one identity; unk_seq separates them	2026-11-28
+SAME_PHASE_DUP_PAIR	P2	two rows describing the same phase/scans duplicated	2026-11-28
+SCORE_ONLY	P2	only a composite score is present, no component variables	2026-11-28
+SHEET_SUBSET	P2	sheet holds a subset of another sheet's rows/columns	2026-11-28
+SIZE_IMG_UNRESOLVED	P2	lesion size in imaging could not be resolved to a numeric value	2026-11-28
 SNAPSHOT_CONTAINER_LOST	P2	快照容器整体丢失	2026-11-28
+SOURCE_ARCHIVE	P2	data came from an archive member inside __zip rather than a loose workbook	2026-11-28
+SOURCE_BATCH_DUP	P2	same workbook supplied twice (batch copy); loaded once	2026-11-28
 SOURCE_NOTE	P2	源口径说明（停列、未入库表、时间语义待核等）	2026-11-28
+SOURCE_ORIGINAL_ZIP	P2	source is the original zip/archive, not the extracted table	2026-11-28
 SOURCE_SNAPSHOT_ONLY	P2	原件已不在盘，只留快照指针	2026-11-28
+SPECIMEN_IDENTITY_SPLIT	P2	one person with several specimens split into several identities	2026-11-28
+SPECIMEN_LEVEL	P2	rows kept at specimen granularity	2026-11-28
+SRC_EXCLUDED	P2	table classified as non-patient x variable / curated / empty and not loaded	2026-11-28
 STAT_NULLED	P2	统计量（均值±SD、p 值）落在患者行，置 NULL	2026-11-28
 SURVIVAL_RECOMPUTED	P2	生存时间按日期重算（月精度取 15 日）	2026-11-28
+SYNTHETIC_SUBJECT_LABEL	P2	subject_label is synthetic (uid) because the source only had a sequential label	2026-11-28
+TEXT_EXCLUDED	P2	free-text column excluded from the sub-library (Chinese narrative)	2026-11-28
+TEXT_SCANNED	P2	free-text column scanned for name/number patterns; hits recorded here	2026-11-28
 TUPLE_PARSED	P2	元组串（错误透视残留）解析取首个非空值	2026-11-28
+TWO_ID_NAMESPACES	P2	two id namespaces coexisting in one table	2026-11-28
+TWO_NAMESPACES	P2	two id namespaces coexist in the source (e.g. hospital vs study numbering)	2026-11-28
+UNIQUE_ROW_COUNT	P2	row count after de-duplication differs from the raw count	2026-11-28
+UNIT_ASSUMED	P2	unit absent in the source and assumed from context; recorded in dict.unit	2026-11-28
+UNIT_CONVERTED	P2	value converted to the canonical unit; factor in dict.description	2026-11-28
+UNIT_IN_HEADER	P2	unit embedded in the column header; moved to dict.unit	2026-11-28
 UNIT_SUSPECT	P2	单位可疑（按已知因子反算落回）	2026-11-28
 UNK_MULTI_RECORD	P2	同人多条 clin 行但 period_month 全为 UNK；meta.multi_record_reason 说明口径	2026-11-28
+UNMAPPED_ROWS	P2	rows whose business key falls outside the cohort in scope; not created	2026-11-28
+VALUE_CENSORED	P2	censored expression (e.g. '>15000', '<0.01') stored as its numeric bound with this note	2026-11-28
 VALUE_CONFLICT	P2	同一病人同一时点两源冲突	2026-11-28
+VALUE_CONSTANT	P2	column constant across all rows; kept but recorded (single-cohort column)	2026-11-28
 VALUE_DIRTY	P2	旧库清洗残留脏值（历史码，退役库）	2026-11-28
+VALUE_MISSING	P2	source cell present but the mapped target cell is legitimately empty after cleaning	2026-11-28
+VALUE_NONNUMERIC	P2	non-numeric token found in a numeric column (e.g. '/', '0-1', '+'); set NULL	2026-11-28
+VALUE_NORMALIZED	P2	lossless type normalisation of a cell (e.g. '0.0' -> '0') before load	2026-11-28
 VALUE_NULLED	P2	单元格置空（无法判定或统计量）	2026-11-28
+VALUE_OUTLIER	P2	value outside physiological range or inconsistent with the column unit; set NULL	2026-11-28
+VALUE_SUSPECT	P2	value kept but flagged as suspicious; verify against the source document	2026-11-28
+VALUE_UNMAPPED	P2	cell shape not covered by the column's whitelist mapping; value not loaded	2026-11-28
+WELL_LEVEL	P2	rows at well/plate level (qPCR/ELISA), person = column	2026-11-28
+WELL_OMITTED	P2	well omitted in the source plate layout	2026-11-28

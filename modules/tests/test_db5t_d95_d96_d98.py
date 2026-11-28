@@ -318,3 +318,37 @@ def test_d94_flags_code_missing_from_registry(tmp_path, monkeypatch):
     assert "NOT_A_REAL_CODE" in joined
     assert "MODAL_ABSENT" not in joined
     assert not any("!!" in ln for ln in lines), lines
+
+
+def test_qc_registry_wellformed():
+    """词表每行都要有 severity(P0/P1/P2) 与非空 meaning，且码唯一、全大写。"""
+    import csv
+    import pathlib
+
+    reg = pathlib.Path(__file__).resolve().parents[2] / "tools/db-library/db5t/qc_codes.tsv"
+    rows = list(csv.DictReader(reg.open(encoding="utf-8", newline=""), delimiter="\t"))
+    assert rows, "qc_codes.tsv 不能为空"
+    codes = [r["code"] for r in rows]
+    assert len(codes) == len(set(codes)), "码重复"
+    bad = [r["code"] for r in rows
+           if r["severity"] not in ("P0", "P1", "P2") or not r["meaning"].strip() or r["code"] != r["code"].upper()]
+    assert not bad, bad
+
+
+def test_qc_retired_references_resolve():
+    """退役表里 superseded 的码必须指向词表里真实存在的码；retired 行必须带样例。"""
+    import csv
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "tools/db-library/db5t"
+    reg = {r["code"] for r in csv.DictReader(
+        (root / "qc_codes.tsv").open(encoding="utf-8", newline=""), delimiter="\t")}
+    rows = list(csv.DictReader(
+        (root / "qc_codes_retired.tsv").open(encoding="utf-8", newline=""), delimiter="\t"))
+    assert rows, "退役表不能为空"
+    for r in rows:
+        assert r["status"] in ("superseded", "retired"), r
+        if r["status"] == "superseded":
+            assert r["superseded_by"] in reg, r
+        else:
+            assert r["sample_detail"].strip(), r

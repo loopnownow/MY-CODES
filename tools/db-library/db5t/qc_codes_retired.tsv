@@ -1,0 +1,28 @@
+code	status	superseded_by	reason	rows_seen	libs_seen	last_seen	sample_detail
+BLOCK_FIELD_MISSING	retired		one-off ingest note from a single project; meaning preserved in the sample column	2	1	2026-11-28	入院诊断长文本按行拼接（role=text），未编码
+CROSS_CHECKED	retired		one-off ingest note from a single project; meaning preserved in the sample column	7	1	2026-11-28	文本无信号，由编码列 csi 补位 350 行（本列聚合 1 条；逐行溯源见 clin.src_id/src_row）
+CROSS_MONTH_SINGLE_ADMISSION	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	14 个文件跨月界（跨度 5–18 天），同一次住院，不拆第二时点；longitudinal_n 按 0
+DATE_BRIDGE_UNLINKED	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	24.xls 里 200 行未连：姓名不在 121 人队列（264 个连不上的人）或重名，不建身份
+DATE_IN_RECURRENCE_COL	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	dataorg 的『复发间隔（月）』列混入 Excel 序列号（37288 等），整列不用；只认卵巢癌!data 的文本版
+DUPLICATE_ROW	superseded	DUP	same meaning: duplicate row	1	1	2026-11-28	13/16 前 86 行内 43 个姓名各 2 行、值列完全相同的复制行，去重为 43 人（43×2 条被并）
+DUP_ROW_MERGED	superseded	DUP	same meaning: duplicate row merged	1	1	2026-11-28	main 队列 118 行 → 116 人：同缩写多行（ZJJ/ZDM 各 2 行，人口学一致）合并为一行 merged_n=2
+DUP_SHEET	superseded	DUPLICATE_SHEET	same meaning: duplicate sheet	1	1	2026-11-28	03b 与 03 同批（42/43 姓名重合），status=duplicate
+GROUP_MISMATCH	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	cln 的 group 与 group 表 8 行不一致（撞码那批）
+HEADER_ROW_DROPPED	superseded	HEADER_LOST	same meaning: header row dropped	2	2	2026-11-28	首行为标题/说明行，表头在第 2 行
+HEADER_ROW_LOST	superseded	HEADER_LOST	same meaning: header row lost / reconstructed	6	6	2026-11-28	汇总_合并2.xlsx!患者指标提取 首行即数据（已判 duplicate 不入值列）
+ID_NUMBER_RELOCATED	retired		one-off ingest note from a single project; meaning preserved in the sample column	4	4	2026-11-28	0 段（有 clin 行）的样本/影像号搬进 clin aux：sample|DATAorg!Labels 393 行 → clin.label_id；sample|DATAorg!flowid 262 行 → clin.flow_id；imaging|DATAorg!CTid 254 行 → cl
+LESION_SEQ_NOTE	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	lesion_ix 只表示表内行序，不代表主/次病灶（源表无此信息）
+MISSING	superseded	VALUE_MISSING	same meaning: cell missing	2	1	2026-11-28	1 个 exam 的平扫 entity 104 特征全空（其余两个期相有值）
+NAME_AS_IDENT	superseded	NAME_IS_LABEL	same meaning: name used as identity/label	1	1	2026-11-28	无病人级号码，以 (姓名,性别,年龄) 为身份上界：7446 个签名身份 / 26484 条病理标本记录
+NAME_MISSING_LINK	superseded	ID_MISSING	same meaning: identity present but not linkable to a person	1	1	2026-11-28	14 行（EN_raw 7 + EN_calc 7）无姓名、无法链接 → 两边各留各发一号，未合并
+NMR_SAMPLE_PLACEHOLDER	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	_modules_nmr 115 + _modules_nmr2 115 个 exam 全部 9 段占位（样本列名非动物身份，无证据对应哪只鼠）
+NO_KEYED_ROWS	retired		one-off ingest note from a single project; meaning preserved in the sample column	6	6	2026-11-28	本项目无 样本编号/编号 键，clin 为空
+OMICS_KEY_UNMATCHED	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	411 条组学归属占位（id_status=OMICS_STATUS）：Labels/Ename 在 id 表复用，无法唯一落到患者，每键一条 9 段占位以承接组学值（radi 115 / cells 322 / lipid 316 / metab 334 各自归属明细见 meta）；占位人一律不计
+POSSIBLE_OVERLAP	retired		one-off ingest note from a single project; meaning preserved in the sample column	1	1	2026-11-28	rawdatanew 88 行与 lx_MHE_2/lx_MHE_1 均无法按 ≥15 列数值签名命中（lx_MHE_2 无共同测量列；lx_MHE_1 最多 2/10）→ 0 对，不合并
+REPEATED_HEADER_NAME	superseded	REPEATED_HEADER_ROW	same meaning: header repeated inside the data	1	1	2026-11-28	病史及滴度2.xlsx!华山48人病史 第 59 行是重复表头行（首格字面值「姓名」），已剔除，不入 person/clin
+SAMPLE_KEY_ONLY	retired		one-off ingest note from a single project; meaning preserved in the sample column	4	4	2026-11-28	跨批次无大鼠唯一号；每行一条记录，不跨表并人
+SEG9_PROMOTED	retired		one-off ingest note from a single project; meaning preserved in the sample column	6	6	2026-11-28	按 D72 v2（有名或有号的身份必须在 0 段）把有名无号的 9 段身份升到 0 段；id_status 仍 label_only；旧号不重用
+SOURCE_BLOB_ONLY	superseded	SOURCE_SNAPSHOT_ONLY	same meaning: data came only from the retired-db blob	16	16	2026-11-28	全部数据取自 EC 旧库 blob
+TS_FROM_TEXT	retired		one-off ingest note from a single project; meaning preserved in the sample column	2	2	2026-11-28	日期来自报告内采样时间字段（结构化），文本其余内容不入库
+UNK_ONLY	retired		one-off ingest note from a single project; meaning preserved in the sample column	4	4	2026-11-28	1497 行无检查日期（同人同月已聚行）
+VALUE_CONFLICT_CENSORED	superseded	VALUE_CONFLICT	censored variant of the same conflict	1	1	2026-11-28	212 格冲突中涉及删失下界：数值vs下界 1（一侧给数、一侧只给下界）、下界vs数值 5、双下界 0；其余 206 格为数值不同、0 格为文本不同；明细 wml_conflict_censored.csv
