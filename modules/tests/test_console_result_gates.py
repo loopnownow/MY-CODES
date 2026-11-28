@@ -258,7 +258,7 @@ def test_reference_name_age_matches_display_column(monkeypatch):
         group=pd.Series(["MCI"] * 30),
         rad=pd.DataFrame(),
     )
-    got = check_correlation(layer, egfr_col="Age", targets=["Score"], nboot=20, seed=1)
+    got = check_correlation(layer, ref_col="Age", targets=["Score"], nboot=20, seed=1)
     assert got.loc[0, "ref"] == "Age"
     assert np.isfinite(got.loc[0, "spearman_rho"])
     assert np.isfinite(got.loc[0, "p_value"])
@@ -266,7 +266,7 @@ def test_reference_name_age_matches_display_column(monkeypatch):
     assert np.isfinite(got.loc[0, "ci_upper"])
     assert resolve_named_column("Age", ["Age (years)", "Sex"]) == "Age (years)"
     with pytest.raises(ValueError, match="找不到列") as exc:
-        check_correlation(layer, egfr_col="eGFR", targets=["Score"], nboot=20, seed=1)
+        check_correlation(layer, ref_col="eGFR", targets=["Score"], nboot=20, seed=1)
     assert "Age (years)" in str(exc.value)
     with pytest.raises(ValueError, match="对上不止一列"):
         resolve_named_column("Age", ["Age (years)", "Age (months)"])
