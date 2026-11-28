@@ -1,7 +1,7 @@
 -- schema.sql — 由 schema-v1.md 反编译生成，不要手改。
 -- 生成器：tools/db-library/db5t/mkschema.py
 -- source: schema-v1.md
--- source_sha256: 379d1a52695e3a5a1552e2f08af461c3dedb3984733e76a74e2dc7a81d6e8cea
+-- source_sha256: 78664694aa6d856c43c2830f0245a03ce164ae0207afcb33b91f714861c5745f
 -- 用法：newdb.py 按 @section 标记切分，家族库段落已剔除 dict 表（契 3）。
 -- @section family
 PRAGMA journal_mode=WAL;
@@ -197,7 +197,7 @@ CREATE TABLE _modules_radiomics(            -- 检查级：mod = radiomics | us 
 );
 CREATE INDEX ix_modal_radiomics_month ON _modules_radiomics(family_uid, month_ix);
 
-CREATE TABLE radiomics_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE radiomics_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_radiomics(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -206,16 +206,16 @@ CREATE TABLE radiomics_val(              -- 通用组学长表：不建 1300 列
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 
 -- ---------- mod: us ----------
@@ -232,7 +232,7 @@ CREATE TABLE _modules_us(            -- 检查级：mod = radiomics | us | mri |
 );
 CREATE INDEX ix_modal_us_month ON _modules_us(family_uid, month_ix);
 
-CREATE TABLE us_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE us_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_us(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -241,16 +241,16 @@ CREATE TABLE us_val(              -- 通用组学长表：不建 1300 列宽表
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 
 -- ---------- mod: mri ----------
@@ -267,7 +267,7 @@ CREATE TABLE _modules_mri(            -- 检查级：mod = radiomics | us | mri 
 );
 CREATE INDEX ix_modal_mri_month ON _modules_mri(family_uid, month_ix);
 
-CREATE TABLE mri_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE mri_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_mri(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -276,16 +276,16 @@ CREATE TABLE mri_val(              -- 通用组学长表：不建 1300 列宽表
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 
 -- ---------- mod: ct ----------
@@ -302,7 +302,7 @@ CREATE TABLE _modules_ct(            -- 检查级：mod = radiomics | us | mri |
 );
 CREATE INDEX ix_modal_ct_month ON _modules_ct(family_uid, month_ix);
 
-CREATE TABLE ct_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE ct_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_ct(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -311,16 +311,16 @@ CREATE TABLE ct_val(              -- 通用组学长表：不建 1300 列宽表
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 
 -- ---------- mod: pet ----------
@@ -337,7 +337,7 @@ CREATE TABLE _modules_pet(            -- 检查级：mod = radiomics | us | mri 
 );
 CREATE INDEX ix_modal_pet_month ON _modules_pet(family_uid, month_ix);
 
-CREATE TABLE pet_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE pet_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_pet(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -346,16 +346,16 @@ CREATE TABLE pet_val(              -- 通用组学长表：不建 1300 列宽表
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 
 -- ---------- mod: path ----------
@@ -372,7 +372,7 @@ CREATE TABLE _modules_path(            -- 检查级：mod = radiomics | us | mri
 );
 CREATE INDEX ix_modal_path_month ON _modules_path(family_uid, month_ix);
 
-CREATE TABLE path_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE path_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_path(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -381,16 +381,16 @@ CREATE TABLE path_val(              -- 通用组学长表：不建 1300 列宽�
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 
 -- ---------- mod: report ----------
@@ -407,7 +407,7 @@ CREATE TABLE _modules_report(            -- 检查级：mod = radiomics | us | m
 );
 CREATE INDEX ix_modal_report_month ON _modules_report(family_uid, month_ix);
 
-CREATE TABLE report_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE report_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_report(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -416,16 +416,16 @@ CREATE TABLE report_val(              -- 通用组学长表：不建 1300 列宽
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 CREATE TABLE qc(
   qc_id        INTEGER PRIMARY KEY,

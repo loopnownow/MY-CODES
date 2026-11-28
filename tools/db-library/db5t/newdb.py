@@ -11,7 +11,7 @@
 
 建出来的东西（对照 db-build-contract.md 契 1 / zone-database.md:110）：
   <root>/<FAM>/_PHI/<FAM>db      家族库：meta / id / id_number / ref_project / ref_study / ref_batch
-  <root>/<FAM>/<slug>/<slug>db   子库：meta / src / person / clin / _modules_* / *_val / qc
+  <root>/<FAM>/<slug>/<slug>db   子库：meta / src / person / clin / _modules_* / *_value / qc
   <root>/<FAM>/<slug>/目录说明.md  叶内只留这两样；不再有散表 / 原始文件
 
 硬规矩：

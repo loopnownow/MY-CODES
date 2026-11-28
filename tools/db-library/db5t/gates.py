@@ -53,6 +53,12 @@ STRUCT_COLS = {
 }
 
 
+def _is_val_table(t: str) -> bool:
+    """值长表识别：新口径 `<mod>_value`（<mod> 见 schema 的 7 个模态）；
+    同时兼容退役库的旧名 `<mod>_val`，这样对 old-layout 库跑门禁不会把长表漏掉。"""
+    return t.endswith('_value') or t.endswith('_val')
+
+
 def sha(p):
     h = hashlib.sha256()
     with open(p, 'rb') as f:
@@ -190,16 +196,16 @@ def dict_cov(path, scope, fam_db):
     # 契 3：dict 全局化后家族库里没有 dict；proj 行 + family 行一起读（结构列登记在 family scope）
     rows = {(r[0], r[1]) for r in f.execute(
         "select table_name,column_name from dict where scope in (?, 'family')", (scope,))}
-    # 同名变量跨表共用一行是常态（与 D78 aname / D88 同口径）：`us_val` 的 feature 名往往
+    # 同名变量跨表共用一行是常态（与 D78 aname / D88 同口径）：`<mod>_value` 的 feature 名往往
     # 就是 clin 里已登记的列名（age/sex/shape…），只按 (表名,列名) 找会整批报缺。
     aname = {r[0] for r in f.execute("select column_name from dict")}
     cols = [r[1] for r in c.execute('pragma table_info(clin)')]
     missing = [x for x in cols if x.lower() not in STRUCT_COLS and ('clin', x) not in rows]
     extra = [x for x in rows if x[0] == 'clin' and x[1] not in cols]
     tabs = {r[0] for r in c.execute("select name from sqlite_master where type='table'")}
-    # 通用：任一 <mod>_val（裁决 3：按模态成对建表）其 feature 必须逐条 dict
+    # 通用：任一 <mod>_value（裁决 3：按模态成对建表）其 feature 必须逐条 dict
     for t in sorted(tabs):
-        if not t.endswith('_val'):
+        if not _is_val_table(t):
             continue
         feats = sorted({r[0] for r in c.execute(f'select distinct feature from "{t}"')})
         miss_f = [x for x in feats if x.lower() not in STRUCT_COLS
@@ -216,13 +222,13 @@ def dict_cov(path, scope, fam_db):
                              if x.lower() not in STRUCT_COLS and (t, x) not in rows]
         extra = extra + [f'{t}.{x}' for x in rows
                          if x[0] == t and x[1] not in mcols and x[1].lower() not in STRUCT_COLS]
-    if False and 'radiomics_val' in tabs:
-        feats = sorted({r[0] for r in c.execute('select distinct feature from radiomics_val')})
-        miss_f = [x for x in feats if ('radiomics_val', x) not in rows]
-        extra_f = [x for x in rows if x[0] == 'radiomics_val' and x[1] not in feats
+    if False and 'radiomics_value' in tabs:
+        feats = sorted({r[0] for r in c.execute('select distinct feature from radiomics_value')})
+        miss_f = [x for x in feats if ('radiomics_value', x) not in rows]
+        extra_f = [x for x in rows if x[0] == 'radiomics_value' and x[1] not in feats
                    and x[1] not in ('exam_uid', 'entity', 'feature', 'value', 'unit')]
-        missing = missing + [f'radiomics_val.feature:{x}' for x in miss_f]
-        extra = extra + [f'radiomics_val.feature:{x}' for x in extra_f]
+        missing = missing + [f'radiomics_value.feature:{x}' for x in miss_f]
+        extra = extra + [f'radiomics_value.feature:{x}' for x in extra_f]
     if '_modules_radiomics' in tabs:
         mcols = [r[1] for r in c.execute('pragma table_info(_modules_radiomics)')]
         missing = missing + [f'_modules_radiomics.{x}' for x in mcols
@@ -236,14 +242,14 @@ def dict_cov(path, scope, fam_db):
 
 
 def parent_gates(path):
-    """§2 顺序门：<mod>_val 有行但 _modules_<mod> 里没有对应 exam，说明重建顺序错了
-    （典型：先删 _modules_cells 再插 cells_val → 裸 FOREIGN KEY constraint failed）。
+    """§2 顺序门：<mod>_value 有行但 _modules_<mod> 里没有对应 exam，说明重建顺序错了
+    （典型：先删 _modules_cells 再插 cells_value → 裸 FOREIGN KEY constraint failed）。
     明确报「父表 exam 缺失，按 §2 顺序重建」，不要让人对着 FK 报错猜。"""
     c = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
     bad = []
     tabs = {t for (t,) in c.execute("select name from sqlite_master where type='table'")}
     for (t,) in list(c.execute("select name from sqlite_master where type='table'")):
-        if not t.endswith('_val'):
+        if not _is_val_table(t):
             continue
         mod = t[:-4]
         parent = f'_modules_{mod}'
@@ -257,7 +263,7 @@ def parent_gates(path):
                            f'(select 1 from "{parent}" m where m.exam_uid=v.exam_uid)').fetchone()[0]
         if orphan:
             bad.append(('P0', f'{t} 有 {orphan} 行的 exam_uid 在 {parent} 里不存在'
-                              f'（父表 exam 缺失，按 §2 顺序重建：先删 *_val 与非 cells modal → '
+                              f'（父表 exam 缺失，按 §2 顺序重建：先删 *_value 与非 cells modal → '
                               f'build him/proj 重建 _modules_cells → 再跑 omics）', orphan))
     c.close()
     return bad
@@ -531,7 +537,7 @@ def d51_d52(path):
     tabs = [r[0] for r in conn.execute("select name from sqlite_master where type='table'")]
     hits = []
     for t in tabs:
-        if not t.endswith('_val'):
+        if not _is_val_table(t):
             continue
         feats = [r[0] for r in conn.execute(f'select distinct feature from "{t}"')]
         groups = {}
@@ -1394,7 +1400,7 @@ def d78_dict_provenance(fam_db):
                 reg[(tn, cn)] = src
                 if not tn:
                     byname[cn] = src
-            # 第三层兜底：同名变量跨表共用一行是常态（D88 同理）。长表 `*_val` 的 feature
+            # 第三层兜底：同名变量跨表共用一行是常态（D88 同理）。长表 `*_value` 的 feature
             # 名往往就是 clin 里已登记过的变量名（age/size_mm…），只按 (表名,列名) 找会全判缺失
             # ——2026-11-28 试点 MM 的 15 个超声 feature 就是这么整批报红的。
             aname = {cn: src for cn, src in f.execute(
@@ -1406,7 +1412,8 @@ def d78_dict_provenance(fam_db):
             try:
                 tables = [r[0] for r in c.execute(
                     "select name from sqlite_master where type='table' and (name='clin' "
-                    "or (name glob '_modules_*' and name not glob '*_val'))")]
+                    "or (name glob '_modules_*' and name not glob '*_val' "
+                    "and name not glob '*_value'))")]
                 for t in tables:
                     cols = [r[1] for r in c.execute('pragma table_info("%s")' % t)]
                     miss = [col for col in cols
@@ -1416,11 +1423,12 @@ def d78_dict_provenance(fam_db):
                         bad += len(miss)
                         out.append('  !! P1 %s.%s：%d 个值列缺 dict.source（例 %s）'
                                    % (slug, t, len(miss), miss[0]))
-                # 长表：`<mod>_val` 的每一行是一个 feature，它不是「列」而是「行」，
+                # 长表：`<mod>_value` 的每一行是一个 feature，它不是「列」而是「行」，
                 # 所以 `pragma table_info` 永远看不到它——但 `feature` 才是真正承载变量的那一维。
                 # 不查它，等于「列都有溯源、唯独数值从哪来没人知道」（LC lipid 781 行实测）。
                 for (vt,) in c.execute(
-                        "select name from sqlite_master where type='table' and name glob '*_val'"):
+                        "select name from sqlite_master where type='table' "
+                        "and (name glob '*_val' or name glob '*_value')"):
                     try:
                         feats = {str(x[0]) for x in c.execute('select distinct feature from "%s"' % vt)
                                  if x[0] is not None}
@@ -1443,7 +1451,7 @@ def d78_dict_provenance(fam_db):
 def d82_source_format(fam_db):
     """D82（按表分级 + 债务基线）：`dict.source` 不能是占位词，且不可追形态不得超过已记账基线。
 
-    分级与基线口径见 d82.py：clin/src 只认「可追形态」与 `SCHEMA `；`*_val` 长表另允许
+    分级与基线口径见 d82.py：clin/src 只认「可追形态」与 `SCHEMA `；`*_value` 长表另允许
     `派生：`（NMR ppm 分箱、PyRadiomics 特征本就不是源列）；结构列（SYS，同 D78）不参与。
     债务基线存家族库 `meta.d82_debt_rows`（JSON），高了判 P1（新债），低了只提示刷新（待修）。
     因此既有 1.5 万行债不阻塞，但库再长出一行不可追 source 会立刻红——这是 C 路线的目的。
@@ -1466,7 +1474,7 @@ def d82_source_format(fam_db):
     out = ['  · 检查 %d 行（结构列除外）：可追 %d / SCHEMA %d / 派生 %d / 债 %d'
            % (stats['total'], stats['trace'], stats['schema'], stats['derived'],
               d.get('total', 0)),
-           '  · 债分布：clin %d · src %d · *_val %d · 其它 %d'
+           '  · 债分布：clin %d · src %d · *_value %d · 其它 %d'
            % (d.get('clin', 0), d.get('src', 0), d.get('val', 0), d.get('other', 0))]
     cd = stats.get('clin_derived', 0)
     if cd:
@@ -1599,7 +1607,7 @@ def d80_phi_composite(path):
     out, bad = [], 0
     try:
         for (t,) in c.execute("select name from sqlite_master where type='table'").fetchall():
-            if not (t == 'clin' or (t.startswith('_modules_') and not t.endswith('_val'))):
+            if not (t == 'clin' or (t.startswith('_modules_') and not _is_val_table(t))):
                 continue
             cols = [(r[1], (r[2] or '').upper()) for r in c.execute('pragma table_info("%s")' % t)]
             for cn, typ in cols:
@@ -2046,7 +2054,7 @@ def _skip_table(name):
 def _business_table(name):
     if name in ('clin', 'person', 'qc'):
         return True
-    if name.startswith('_modules_') or name.endswith('_val'):
+    if name.startswith('_modules_') or _is_val_table(name):
         return True
     return False
 
@@ -2546,7 +2554,7 @@ def main():
     out.extend('  ' + x for x in _l77)
     _l78, _n78 = d78_dict_provenance(FAM_DB)
     _l82, _n82, _t82, _s82 = d82_source_format(FAM_DB)
-    out.append(f'\n== D82 dict.source 按表分级（clin/src 需可追；*_val 允许派生；基线 meta.d82_debt_rows）：'
+    out.append(f'\n== D82 dict.source 按表分级（clin/src 需可追；*_value 允许派生；基线 meta.d82_debt_rows）：'
                f'检查 {_t82} 行，新债 {_n82} 行')
     out.extend(_l82)
     if _n82:

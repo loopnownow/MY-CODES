@@ -19,7 +19,7 @@
     留空 = 只把空串当缺（默认，不动其它文本）；`NA|NULL|.` = 这三个标记也当缺；
     `keep` = 不判缺，源值原样照写（空串也保留）；`stop` = 空就停（契 6，整组不写、rc=1）。
 - 目标列不在库里时必须先有 dict 行（proj:<slug> 或 stage），否则这一步只报不做（契 2）
-- 回填只写 person / clin / _modules_* / *_val / src / qc，不碰 meta（meta 归 newdb）
+- 回填只写 person / clin / _modules_* / *_value / src / qc，不碰 meta（meta 归 newdb）
 - 同一文库重跑：先按 src_id 删除旧行再写（幂等），不累积
 
 返回码：0 成功；1 有「该做没做」的缺列；2 参数/契约问题。
@@ -271,7 +271,7 @@ def main(argv=None) -> int:
             # 重跑前清库：按依赖倒序删（值 → 模态 → clin/qc → person → src）
             tabs = [r[0] for r in conn.execute(
                 "select name from sqlite_master where type='table' and name not like 'sqlite_%'")]
-            order = ([t for t in tabs if t.endswith('_val')]
+            order = ([t for t in tabs if t.endswith('_value') or t.endswith('_val')]
                      + [t for t in tabs if t.startswith('_modules')]
                      + [t for t in ('clin', 'qc', 'person', 'src') if t in tabs])
             for t in order:
@@ -307,7 +307,7 @@ def main(argv=None) -> int:
             tables = {}
             for r in grp:
                 tables.setdefault(r['target_table'], []).append(r)
-            # FK 顺序：src → person → clin → _modules_* → *_val（表内 FK 是 REFERENCES person/src）
+            # FK 顺序：src → person → clin → _modules_* → *_value（表内 FK 是 REFERENCES person/src）
             for table, items in sorted(tables.items(), key=lambda kv: (_rank(kv[0]), kv[0])):
                 want = [r['target_column'] for r in items]
                 try:

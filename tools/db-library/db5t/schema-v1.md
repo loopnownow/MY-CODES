@@ -6,7 +6,7 @@ v1.3 修正（据 21 库日期普查，census\CENSUS-REPORT.md）：① clin 主
 
 v1.2 修正（据 Aitor 草案复核）：① 组学长表改名，消掉 `_modules_radiomics_exam` 未定义的自引用；② 补旧库与新家族库**同名撞车**的并存方案；③ 记明 verify_db 实际只实现 D1–D9 / D19–D22，D10–D18 是人工注记码，新码从 D23 起编。
 
-v1.4 增补（影像库 AITEE，据用户「按设备切库 + 考虑 ComBat + 组学在范围内」）：① 家族库加 `ref_study`（研究目的与结局状态，D58）与 `ref_batch`（批次 = 设备 + 重建参数集，D59–D61）；② `_modules_<mod>` 加 `batch_id`，影像模态必填，扫描参数只落 `ref_batch` 不落子库；③ `qc.code` 补影像专有码；④ 组学 `radi_val.entity` 用 ROI 名、无 ROI 轴填 `'global'`。**建库前必须重读本节：v1.3 的 DDL 不含这三张影像表。**
+v1.4 增补（影像库 AITEE，据用户「按设备切库 + 考虑 ComBat + 组学在范围内」）：① 家族库加 `ref_study`（研究目的与结局状态，D58）与 `ref_batch`（批次 = 设备 + 重建参数集，D59–D61）；② `_modules_<mod>` 加 `batch_id`，影像模态必填，扫描参数只落 `ref_batch` 不落子库；③ `qc.code` 补影像专有码；④ 组学 `radi_value.entity` 用 ROI 名、无 ROI 轴填 `'global'`。**建库前必须重读本节：v1.3 的 DDL 不含这三张影像表。**
 
 ## 0. 文件布局
 
@@ -238,7 +238,7 @@ CREATE TABLE _modules_<mod>(            -- 检查级：mod = radiomics | us | mr
 );
 CREATE INDEX ix_modal_<mod>_month ON _modules_<mod>(family_uid, month_ix);
 
-CREATE TABLE <mod>_val(              -- 通用组学长表：不建 1300 列宽表
+CREATE TABLE <mod>_value(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_<mod>(exam_uid) ON DELETE CASCADE,
   entity   TEXT NOT NULL,            -- 该模态矩阵的分组轴；无分组轴时填 'global'
   feature  TEXT NOT NULL,            -- 该模态的测量项名称
@@ -247,17 +247,17 @@ CREATE TABLE <mod>_val(              -- 通用组学长表：不建 1300 列宽�
   PRIMARY KEY (exam_uid, entity, feature)
 );
 -- 实例：
---   radiomics_val  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
---   lipid_val      entity='global' 或脂质大类；feature=脂质种名（783 列）
---   metab_val      entity='global'；feature=代谢物名（59 列）
---   radi_val       entity='global'；feature=影像特征名（109 列）
--- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_val），不重名。
+--   radiomics_value  entity=ROI 名（列名 `指标__ROI` 的 `__` 之后）；无 ROI 的全局指标 entity='global'
+--   lipid_value      entity='global' 或脂质大类；feature=脂质种名（783 列）
+--   metab_value      entity='global'；feature=代谢物名（59 列）
+--   radi_value       entity='global'；feature=影像特征名（109 列）
+-- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
--- 一张模态一张 val 表，不共用：每个模态必须有自己的一对 _modules_<mod> + <mod>_val，
+-- 一张模态一张 val 表，不共用：每个模态必须有自己的一对 _modules_<mod> + <mod>_value，
 -- entity 的语义与 feature 的含义逐模态写进 dict。
--- 理由：radiomics_val.entity 的取值是 ROI 名，lipid_val.feature 的取值是脂质种名——
+-- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
--- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_val.feature 了事。
+-- 或更糟：把脂质名当成 ROI 混进统计。禁止把物种名塞进 radiomics_value.feature 了事。
 
 CREATE TABLE qc(
   qc_id        INTEGER PRIMARY KEY,
@@ -297,8 +297,8 @@ CREATE TABLE qc(
 | 旧 | 新 | 说明 |
 |---|---|---|
 | `person.person_id` | `id.family_uid` | 需人工/规则建映射；`person` 表为空的库要从行级 PHI 反推 |
-| `item.name` | `dict.column_name`（clin 列名）或 `radiomics_val.feature` | 组学类按长表，不进 clin |
-| `val.num/text` | `clin.<col>` / `radiomics_val.value` | 同 person 同月多行 → 合并 + `qc CONFLICT` |
+| `item.name` | `dict.column_name`（clin 列名）或 `radiomics_value.feature` | 组学类按长表，不进 clin |
+| `val.num/text` | `clin.<col>` / `radiomics_value.value` | 同 person 同月多行 → 合并 + `qc CONFLICT` |
 | `val.row_ix` + 日期 item | `period_month` | 日期缺失 → `UNK` |
 | `src` | `src`（同名沿用） | 保留 sha256 溯源 |
 | 旧 `qc` 工作表 | 仅作证据，不导入 | 新 qc 由机器门 + 人工裁决产生 |

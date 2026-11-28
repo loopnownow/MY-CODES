@@ -54,7 +54,7 @@ def strip_dict(block: str) -> str:
 
 
 def expand_mods(block: str) -> str:
-    """只把模态段（`_modules_<mod>` … `<mod>_val` 到下一个公共表前）复制 7 份。
+    """只把模态段（`_modules_<mod>` … `<mod>_value` 到下一个公共表前）复制 7 份。
 
     子工程库 DDL 的结构是：公共头（meta/src/person/clin）→ 模态段 → 公共尾（qc）。
     整段复制会把 meta/src/clin 也建 7 遍，所以按 `CREATE TABLE _modules_<mod>` 与

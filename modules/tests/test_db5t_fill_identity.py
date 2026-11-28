@@ -4,7 +4,7 @@
 - `src.rows` 记成「整份源 4 个 sheet 合计」→ D96 立刻 185≠6,637；
 - `ref_project.sha256` 在 WAL 落盘前算 → 镜像门永远差一版；
 - 家族库按契 3 不再有 dict → D95/D78 若还去家族库读 dict 会 OperationalError；
-- `_modules_<mod>` 的 13 个结构列 + `*_val` 的 5 个结构列不是源变量，不进 dict 也要放行。
+- `_modules_<mod>` 的 13 个结构列 + `*_value` 的 5 个结构列不是源变量，不进 dict 也要放行。
 """
 from __future__ import annotations
 
@@ -64,8 +64,8 @@ def _make_source(path: Path):
     c.executemany("INSERT INTO _modules_us VALUES (?,?,?,?)",
                   [("TST-000001", "TST-000001-1", "left", "12.5"),
                    ("TST-000002", "TST-000002-1", "right", "9.0")])
-    c.execute("CREATE TABLE us_val(exam_uid TEXT, entity TEXT, feature TEXT, value REAL, unit TEXT)")
-    c.executemany("INSERT INTO us_val VALUES (?,?,?,?,?)",
+    c.execute("CREATE TABLE us_value(exam_uid TEXT, entity TEXT, feature TEXT, value REAL, unit TEXT)")
+    c.executemany("INSERT INTO us_value VALUES (?,?,?,?,?)",
                   [("TST-000001-1", "lesion", "size_mm", 12.5, "mm"),
                    ("TST-000002-1", "lesion", "size_mm", 9.0, "mm")])
     c.commit()
@@ -105,7 +105,7 @@ def _map_csv(path: Path, src_rel: str):
     for sc in ["family_uid", "exam_uid", "site", "size_mm"]:
         rows.append([src_rel, "_modules_us", "0", "", sc, "_modules_us", sc, "text", "", "", "", "", "2"])
     for sc in ["exam_uid", "entity", "feature", "value", "unit"]:
-        rows.append([src_rel, "us_val", "0", "", sc, "us_val", sc, "text", "", "", "", "", "2"])
+        rows.append([src_rel, "us_value", "0", "", sc, "us_value", sc, "text", "", "", "", "", "2"])
     with path.open("w", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(cols)
@@ -134,12 +134,12 @@ def test_fill_and_mkid_end_to_end(tmp_path, schema_sql):
         c = sqlite3.connect(f"file:{proj}?mode=ro", uri=True)
         meta = dict(c.execute("select k, v from meta"))
         n = {t: c.execute(f'select count(*) from "{t}"').fetchone()[0]
-             for t in ("person", "clin", "_modules_us", "us_val", "src")}
+             for t in ("person", "clin", "_modules_us", "us_value", "src")}
         src_row = c.execute("select rows, kind, status from src").fetchone()
         prov = c.execute("select src_id, src_row, merged_n from clin order by src_row").fetchall()
         c.close()
 
-        assert n == {"person": 2, "clin": 3, "_modules_us": 2, "us_val": 2, "src": 1}
+        assert n == {"person": 2, "clin": 3, "_modules_us": 2, "us_value": 2, "src": 1}
         # src.rows 只记并入 clin 的行数（3），不是 4 个 sheet 合计（9）
         assert src_row[0] == 3 and src_row[1] == "old_db_blob" and src_row[2] == "active"
         # D50：Σmerged_n 与 meta.src_records_n 对齐
@@ -206,7 +206,7 @@ def test_gates_d95_and_d78_exempt_structural_columns(tmp_path, schema_sql):
         fam = root / "TST" / "_PHI" / "TSTdb"
         proj = root / "TST" / "s1" / "s1db"
         miss, extra = g.dict_cov(proj, "proj:s1", fam)
-        # `_modules_<mod>` / `*_val` 的结构列与 meta 等一律豁免
+        # `_modules_<mod>` / `*_value` 的结构列与 meta 等一律豁免
         assert not [m for m in miss if "exam_uid" in m or "family_uid" in m]
         lines, n = g.d95_dict_contract(dct, fam, [("s1", proj)])
         assert not [ln for ln in lines if "缺行" in ln and "exam_uid" in ln]

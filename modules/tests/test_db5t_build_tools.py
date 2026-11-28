@@ -50,7 +50,7 @@ def test_schema_sections_and_mods(schema_sql):
     # 7 个模态各一对表 + 各一条带模态名的索引
     for mod in ("radiomics", "us", "mri", "ct", "pet", "path", "report"):
         assert f"CREATE TABLE _modules_{mod}(" in proj
-        assert f"CREATE TABLE {mod}_val(" in proj
+        assert f"CREATE TABLE {mod}_value(" in proj
         assert f"CREATE INDEX ix_modal_{mod}_month" in proj
     assert proj.count("CREATE TABLE") == 19
 
