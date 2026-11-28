@@ -235,8 +235,10 @@ def ensure_columns(conn: sqlite3.Connection, table: str, want: list[str], idx: d
         info = idx.get((table, col))
         if not info:
             raise KeyError(f'{table}.{col} 不在库里也没有 dict 行（契 2：dict 先有行再 ALTER）')
-        typ = {'int': 'INTEGER', 'real': 'REAL', 'date': 'TEXT', 'text': 'TEXT',
-               'enum': 'TEXT', 'bool': 'INTEGER', 'phi': 'TEXT'}.get((info['dtype'] or 'text').lower(), 'TEXT')
+        typ = {'int': 'INTEGER', 'integer': 'INTEGER', 'bool': 'INTEGER',
+               'real': 'REAL', 'float': 'REAL', 'double': 'REAL',
+               'date': 'TEXT', 'text': 'TEXT', 'enum': 'TEXT', 'phi': 'TEXT',
+               }.get((info['dtype'] or 'text').strip().lower(), 'TEXT')
         conn.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {typ}')
         added.append(f'{table}.{col} {typ}')
     return added
