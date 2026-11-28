@@ -1,12 +1,20 @@
 # -*- coding: utf-8 -*-
 """mkid.py — 阶段 3：身份先于值。把家族库 id / id_number 与 ref_project 行补齐。
 
-本批只做「从退役库搬运」这一种来源（源 xlsx 的号码列在 blob 里拿不到）：
-  python -B tools/db-library/db5t/mkid.py --from-family-db <retired>/MM/_PHI/MMdb \\
-      --root <stage> --family MM --slug zy_MM [--dry-run]
+两种来源：
+
+1) 从退役库搬运（旧库回放，源 xlsx 的号码列只在 blob 里）：
+   python -B tools/db-library/db5t/mkid.py --from-family-db <retired>/MM/_PHI/MMdb \
+       --root <stage> --family MM --slug zy_MM [--dry-run]
+
+2) 从子库 person 表发身份（根目录数据从零建库，没有退役库可搬）：
+   python -B tools/db-library/db5t/mkid.py --from-person \
+       --root <stage> --family MCI --slug sw_CI [--id-status label_only] [--dry-run]
 
 做四件事：
-  id / id_number       按 family_uid 原样搬（D75/D71 的判据不变，搬完立刻能验）
+  id / id_number       按 family_uid 原样搬（D75/D71 的判据不变，搬完立刻能验）；
+                       --from-person 时只写 id（family_uid / subject_label / id_status），
+                       id_number 留空（根 xlsx 里没有号码列）
   ref_project          按子库实测重算 person_count / clin_person_n / sha256，写一行
   子库 meta            补 subject_types（D63 必需；本批按 --subject-types 传，默认 human）
   家族库 meta          补 subject_types（与子库一致）
@@ -47,7 +55,13 @@ def copy_table(src: sqlite3.Connection, dst: sqlite3.Connection, table: str, key
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description='阶段 3：身份搬运 + ref_project 登记')
-    ap.add_argument('--from-family-db', type=pathlib.Path, required=True)
+    ap.add_argument('--from-family-db', type=pathlib.Path, default=None)
+    ap.add_argument('--from-person', action='store_true',
+                    help='从子库 person 表发 id 行（根目录数据从零建，没有退役库可搬）')
+    ap.add_argument('--id-status', default='label_only',
+                    choices=['keyed_full', 'keyed_partial', 'keyed_animal',
+                             'label_only', 'label_only_omics'],
+                    help='--from-person 时写入 id.id_status 的默认值（person 表里没有就取它）')
     ap.add_argument('--root', type=pathlib.Path, default=paths.STAGE)
     ap.add_argument('--family', required=True)
     ap.add_argument('--slug', required=True)
@@ -60,21 +74,40 @@ def main(argv=None) -> int:
 
     fam_db = a.root / a.family / '_PHI' / f'{a.family}db'
     proj_db = a.root / a.family / a.slug / f'{a.slug}db'
-    for p in (a.from_family_db, fam_db, proj_db):
+    if not a.from_person and not a.from_family_db:
+        raise SystemExit('要么 --from-family-db，要么 --from-person')
+    need = [fam_db, proj_db] + ([] if a.from_person else [a.from_family_db])
+    for p in need:
         if not p.exists():
             raise SystemExit(f'{p} 不存在')
-    print(f'from   = {a.from_family_db}')
+    print(f'from   = {"子库 person 表" if a.from_person else a.from_family_db}')
     print(f'fam    = {fam_db}')
     print(f'proj   = {proj_db}')
 
-    s = sqlite3.connect(f'file:{a.from_family_db}?mode=ro', uri=True)
     f = sqlite3.connect(fam_db)
     p = sqlite3.connect(proj_db)
     try:
-        n_id, had = copy_table(s, f, 'id', 'family_uid')
-        n_num, _ = copy_table(s, f, 'id_number', 'family_uid')
-        print(f'id      +{n_id}（已有 {had}）')
-        print(f'id_number +{n_num}')
+        if a.from_person:
+            # 根目录数据从零建：person 里已经有 family_uid + subject_label，
+            # id 只需要把这些行「升格」成身份行；号码进 id_number 得等源里有号。
+            today = __import__('datetime').date.today().isoformat()
+            pcols = {r[1] for r in p.execute('PRAGMA table_info(person)')}
+            st_col = 'id_status' if 'id_status' in pcols else "NULL"
+            lab_col = 'subject_label' if 'subject_label' in pcols else 'NULL'
+            rows = p.execute(f'SELECT family_uid, {lab_col}, {st_col} FROM person').fetchall()
+            have = {r[0] for r in f.execute('SELECT family_uid FROM id')}
+            new = [(u, lab, (st or a.id_status), 'person:root-xlsx', today)
+                   for u, lab, st in rows if u not in have]
+            f.executemany('INSERT INTO id(family_uid, subject_label, id_status, source, created_on) '
+                          'VALUES (?,?,?,?,?)', new)
+            print(f'id      +{len(new)}（已有 {len(have)}）')
+        else:
+            s = sqlite3.connect(f'file:{a.from_family_db}?mode=ro', uri=True)
+            n_id, had = copy_table(s, f, 'id', 'family_uid')
+            n_num, _ = copy_table(s, f, 'id_number', 'family_uid')
+            s.close()
+            print(f'id      +{n_id}（已有 {had}）')
+            print(f'id_number +{n_num}')
 
         pid = p.execute('SELECT count(*) FROM person').fetchone()[0]
         cid = p.execute('SELECT count(*) FROM clin').fetchone()[0]
@@ -99,6 +132,14 @@ def main(argv=None) -> int:
                          ('identity_grain', a.identity_grain))
         print(f'meta[proj|family].subject_types = {st}  identity_grain = {a.identity_grain}')
 
+        # period_unit 的镜像：ref_project 与子库 meta 必须一致（镜像门 P0）。
+        # newdb 已经把 --period-unit 写进子库 meta，所以没显式传就跟着库里的走，
+        # 不要各自默认——那样两边必然分叉。
+        pu = a.period_unit
+        if pu is None:
+            row = p.execute("SELECT v FROM meta WHERE k='period_unit'").fetchone()
+            pu = row[0] if row else None
+
         # sha256 必须在 WAL 落盘后算：先提交再 checkpoint（TRUNCATE）再读文件，
         # 否则 ref_project.sha256 永远差一版（2026-11-28 首次跑 MM 时踩到）。
         if not a.dry_run:
@@ -110,13 +151,12 @@ def main(argv=None) -> int:
                       'clin_person_n, longitudinal_n, multi_record_n, period_unit, built_at, sha256) '
                       'VALUES (?,?,?,?,?,?,?,?,?)',
                       (a.slug, rel, pid, cid, live_lon, live_multi,
-                       int(a.period_unit) if a.period_unit else None,
+                       int(pu) if pu else None,
                        __import__('datetime').date.today().isoformat(), digest))
             f.commit()
             print(f'ref_project ← {a.slug}（person={pid}, clin={cid}, lon={live_lon}, '
                   f'multi={live_multi}, sha256={digest[:12]}…）')
     finally:
-        s.close()
         f.close()
         p.close()
     return 0

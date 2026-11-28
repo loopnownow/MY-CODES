@@ -43,6 +43,13 @@ STRUCT_COLS = {
     'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort',
     'exam_uid', 'sequence', 'batch_id', 'lesion_ix', 'specimen_ix',
     'entity', 'feature', 'value', 'unit', 'device', 'site', 'roi_n', 'note',
+    # clin 头剩余两列 + 块标识：同样是 SCHEMA 定的，不是源表变量
+    'group_v', 'subgroup', 'schema_block',
+    # 15 个 path_*：schema 里的病理块列，根目录数据从零建库时必然存在（2026-11-28
+    # sw_CI 试点里 dict_cov 把这一整块当「缺 dict」，18 条全是 schema 自己的列）
+    'path_kind', 'path_on', 'path_histology', 'path_grade', 'path_mi',
+    'path_mi_mm', 'path_lvsi', 'path_csi', 'path_ln_pos', 'path_ln_total',
+    'path_lnm', 'path_eu', 'path_figo', 'path_dx', 'path_other',
 }
 
 

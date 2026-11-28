@@ -10,6 +10,14 @@
 - map.csv 13 列：src_file / src_sheet / src_header_row / src_header / src_column /
   target_table / target_column / dtype / unit / enum_values / missing_rule / transform / expect_rows
 - 源：.xlsx/.xls 按 sheet + header_row 定位；.db 按表名（src_sheet 当表名，src_header_row 忽略）
+- transform 列（可空）：
+    const:<值>  目标列写固定值（如 period_month='UNK'、id_status='label_only'）
+    mint:<茎>   目标列写顺序号；茎 `<前缀>-<起始号>`，发 `<前缀>-<起始号+n:06d>`
+                （如 `mint:MCI-0` → MCI-000001；`mint:MCI-900000` → MCI-900001，9 段占位）
+                同一源值只发一个号，跨 sheet 复用（person 先发，clin 拿到同一个）
+- missing_rule 列（可空）：这一列里哪些值算「缺」，写成 | 或 , 分隔的标记，命中即写 NULL。
+    留空 = 只把空串当缺（默认，不动其它文本）；`NA|NULL|.` = 这三个标记也当缺；
+    `keep` = 不判缺，源值原样照写（空串也保留）；`stop` = 空就停（契 6，整组不写、rc=1）。
 - 目标列不在库里时必须先有 dict 行（proj:<slug> 或 stage），否则这一步只报不做（契 2）
 - 回填只写 person / clin / _modules_* / *_val / src / qc，不碰 meta（meta 归 newdb）
 - 同一文库重跑：先按 src_id 删除旧行再写（幂等），不累积
@@ -23,6 +31,7 @@ import csv
 import hashlib
 import json
 import pathlib
+import re
 import sqlite3
 import sys
 
@@ -39,6 +48,84 @@ STRUCT_EXCLUDE = {'src_id', 'src_row', 'merged_n', 'unk_seq', 'month_ix',
                   'period_month', 'period_source', 'period_origin', 'observed_on',
                   'family_uid', 'exam_uid', 'feature', 'value', 'unit'}
 DATA_TABLES = ('person', 'clin', 'src', 'qc')
+
+
+class Mint:
+    """`transform=mint:<茎>` 的发号器：同一源值只发一次号，跨 sheet 复用。
+
+    根目录数据（xlsx）常常连 family_uid 都没有，只能按行序发号；行序跟源表一致，
+    所以重跑同一个源得到的号也一致（幂等靠这个性质）。
+    """
+
+    def __init__(self):
+        self.seq = {}
+        self.issued = {}
+
+    def uid(self, stem: str, key) -> str:
+        """stem 形如 `MCI-0` / `MCI-900000`：发 `<前缀>-<起始号+n, 6 位>`。
+
+        起始号写在 stem 里，是为了让「段位」可声明：0 段正常身份、9 段占位身份
+        （schema 的 CHECK 要求 dash 后正好 6 位，所以不能靠字符串拼接凑位数）。
+        """
+        k = (stem, str(key))
+        if k not in self.issued:
+            pre, _, base = stem.rpartition('-')
+            pre = pre or stem
+            start = int(base or 0)
+            n = self.seq.get(stem, 0) + 1
+            self.seq[stem] = n
+            self.issued[k] = f'{pre}-{start + n:06d}'
+        return self.issued[k]
+
+
+class MissingValue(Exception):
+    """missing_rule=stop 命中：按契 6「不确定就停」，整组不写。"""
+
+
+def parse_rule(rule) -> tuple[str, set[str]]:
+    """missing_rule → (mode, tokens)。
+
+    mode 三档：
+      default 只把空串当缺（留空时的默认）
+      keep    不判缺，源值原样照写（空串也保留）
+      stop    空串或标记命中就停（契 6：不确定就停）
+      tokens  指定标记（`NA|NULL|.`）与空串都当缺
+    """
+    rule = (rule or '').strip()
+    low = rule.lower()
+    if low in ('keep', 'raw', 'asis', 'as-is'):
+        return 'keep', set()
+    if low in ('stop', 'halt'):
+        return 'stop', {''}
+    if not rule:
+        return 'default', {''}
+    toks = {t.strip().lower() for t in re.split(r'[|,;]', rule) if t.strip()}
+    return 'tokens', toks | {''}
+
+
+def value_of(map_row, src_row, mint: Mint):
+    """一格的值：先判缺（missing_rule），再 transform（const / mint），最后取源列原值。"""
+    tr = (map_row.get('transform') or '').strip()
+    scol = map_row.get('src_column')
+    mode, toks = parse_rule(map_row.get('missing_rule'))
+    v = src_row.get(scol)
+    is_missing = v is None or (isinstance(v, str) and not v.strip())
+    if not is_missing and isinstance(v, str) and mode == 'tokens' and v.strip().lower() in toks:
+        is_missing = True
+    if tr.startswith('const:'):
+        return tr.split(':', 1)[1] or None
+    if tr.startswith('mint:'):
+        # 发号必须有键：空键发号会把所有空值并成一个人，比不建更坏
+        if is_missing:
+            raise MissingValue(f'{scol} 为空，不能发号')
+        return mint.uid(tr.split(':', 1)[1], v.strip() if isinstance(v, str) else v)
+    if mode == 'keep':
+        return v.strip() if isinstance(v, str) else v
+    if is_missing:
+        if mode == 'stop':
+            raise MissingValue(f'{scol} 为空')
+        return None
+    return v.strip() if isinstance(v, str) else v
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -207,6 +294,7 @@ def main(argv=None) -> int:
             src_total[key] = total
             rec['src_id'] = i
         src_id_of = {f: r['src_id'] for (f,), r in src_reg.items()}
+        mint = Mint()   # 跨 sheet 共用：person 先发号，clin 用同一源值拿到同一个 family_uid
 
         def _rank(t: str) -> int:
             return {'src': 0, 'person': 1, 'clin': 2}.get(t, 3 if t.startswith('_modules') else 4)
@@ -230,8 +318,10 @@ def main(argv=None) -> int:
                     return rc
                 for line in added:
                     print(f'ALTER {line}')
-                src_cols = [(r['target_column'], r['src_column']) for r in items]
-                missing_src = [s for _, s in src_cols if s not in cols]
+                src_cols = [(r['target_column'], r['src_column'], r['transform'], r['missing_rule'])
+                            for r in items]
+                missing_src = [s for _, s, tr, _ in src_cols
+                               if s not in cols and not (tr or '').strip().startswith('const:')]
                 if missing_src:
                     print(f'STOP {table}: 源列不存在 {missing_src}')
                     rc = 1
@@ -249,11 +339,15 @@ def main(argv=None) -> int:
                         rec['src_row'] = sr if sr is not None else s['_row']
                     if 'merged_n' in have_cols:
                         rec['merged_n'] = 1  # 一行源行 → 一行目标行；多源合并时再累加
-                    for tcol, scol in src_cols:
-                        v = s.get(scol)
-                        if isinstance(v, str):
-                            v = v.strip() or None
-                        rec[tcol] = v
+                    for tcol, scol, tr, mr in src_cols:
+                        try:
+                            rec[tcol] = value_of({'src_column': scol, 'transform': tr,
+                                                  'missing_rule': mr}, s, mint)
+                        except MissingValue as e:
+                            print(f'STOP {table}: missing_rule=stop 命中'
+                                  f'（源 {src_file}#{sheet} 第 {s["_row"]} 行：{e}）')
+                            rc = 1
+                            return rc
                     # 源里若也带 src_id（旧库回放常见），那是「原登记的源编号」，
                     # 不是本次登记的行；溯源一律以 src 表为准，覆盖回去。
                     if 'src_id' in have_cols:
