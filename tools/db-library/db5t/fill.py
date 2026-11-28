@@ -303,6 +303,7 @@ def main(argv=None) -> int:
             for t in order:
                 conn.execute(f'DELETE FROM "{t}"')
             conn.commit()
+        cleaned = set()   # (table, src_id)：同一源的多张表可能并进同一张目标表，只清一次
         src_total = {}
         for i, (key, rec) in enumerate(sorted(src_reg.items()), start=1):
             skind = Source(rec['path']).kind
@@ -387,13 +388,28 @@ def main(argv=None) -> int:
                 if a.dry_run:
                     print(f'DRY  {table}: +{len(records)} 行 × {len(src_cols)} 列（源 {src_file}#{sheet}）')
                     continue
-                if 'src_id' in have_cols:
+                if 'src_id' in have_cols and (table, sid) not in cleaned:
                     conn.execute(f'DELETE FROM "{table}" WHERE src_id=?', (sid,))
-                tcols = list(records[0].keys()) if records else []
+                    cleaned.add((table, sid))
+                if not records:
+                    print(f'SKIP {table}: 源 {src_file}#{sheet} 没有数据行')
+                    continue
+                tcols = list(records[0].keys())
+                if not tcols:
+                    print(f'SKIP {table}: map 里没有目标表实际存在的列（源 {src_file}#{sheet}）')
+                    continue
                 ph = ','.join('?' * len(tcols))
-                conn.executemany(
-                    f'INSERT INTO "{table}"({",".join(chr(34) + c + chr(34) for c in tcols)}) VALUES ({ph})',
-                    [tuple(r[c] for c in tcols) for r in records])
+                try:
+                    conn.executemany(
+                        f'INSERT INTO "{table}"({",".join(chr(34) + c + chr(34) for c in tcols)}) VALUES ({ph})',
+                        [tuple(r[c] for c in tcols) for r in records])
+                except sqlite3.IntegrityError:
+                    import os as _os
+                    if _os.environ.get('FILL_DEBUG'):
+                        for r in records:
+                            print('DBG', table, {k: r.get(k) for k in ('family_uid','src_id','exam_uid')})
+                            break
+                    raise
                 print(f'FILL {table}: {len(records)} 行 × {len(src_cols)} 列（源 {src_file}#{sheet}，src_id={sid}）')
         if not a.dry_run:
             # D50 / D52：这两个数必须写进 meta —— 下一个人问「源有多少条记录、哪些列没进来」

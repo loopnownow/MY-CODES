@@ -13,6 +13,7 @@
 | `newdb.py` | 按 `schema.sql` 建空库（家族库 + 子库 + `meta` + `目录说明.md`）；目标已存在就跳过，绝不覆盖 |
 | `mkdict.py` | 旧家族 `dict`（11 列）→ 全局 `{RAW}\Family\dict.db`（14 列），补 `scope='stage'` 骨架行，同键异写出冲突报告 |
 | `mkid.py` | 阶段 3：从退役家族库搬 `id` / `id_number`，实时算 `longitudinal_n` / `multi_record_n`，写 `ref_project` 登记行与两库 `meta`（`subject_types` / `identity_grain`）；幂等 |
+| `mkphi.py` | 阶段 4（PHI）：把清洗副本里的姓名与号码写进家族库 `id` / `id_number`；身份证/电话/地址默认脱敏（前 3 + `*` + 后 4；地址截到第 3 级行政区）；脱敏后撞唯一索引只丢该字段、不并身份；写 `meta.phi_source` / `phi_sha256` / `phi_imported_at`；`--no-mask` 仅限离机环境 |
 | `fill.py` | 阶段 5：读 13 列 `map.csv`，按物理依赖序 src→person→clin→`_modules_*`→`*_value` 回填；源可 `.xlsx/.xls`（按 sheet + header_row）或 `.db`（按表名）；`transform` 支持 `const:<值>` / `mint:<茎>`（发顺序号，同一源值跨 sheet 复用）；`missing_rule` 按源侧标记判缺（`NA` → `NULL`，D97 的修法）；无 dict 行不 ALTER（契 2）；`--dry-run` 只报不做；重跑先清本 src 旧行 |
 | `preview.py` | 阶段 7：给刚建好的库出一张只读预览（单文件 HTML：KPI + src 登记 + 表清单 + clin 逐列 dict/NULL/样例 + 抽样 + 门禁摘要），默认不跑门禁，`--gates` 才就地跑 |
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |

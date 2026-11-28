@@ -125,6 +125,17 @@ def main(argv=None) -> int:
 
         rel = f'{a.family}/{a.slug}/{a.slug}db'
         st = a.subject_types % a.slug
+        # 家族库的 subject_types 是全家族并集：逐个 slug 跑 mkid 时不能互相覆盖
+        import json as _json
+        old = f.execute("SELECT v FROM meta WHERE k='subject_types'").fetchone()
+        merged = {}
+        if old and old[0]:
+            try:
+                merged = _json.loads(old[0]) or {}
+            except ValueError:
+                merged = {}
+        merged.update(_json.loads(st))
+        st = _json.dumps(merged, ensure_ascii=False)
         f.execute('INSERT OR REPLACE INTO meta(k, v) VALUES (?, ?)', ('subject_types', st))
         p.execute('INSERT OR REPLACE INTO meta(k, v) VALUES (?, ?)', ('subject_types', st))
         for conn in (f, p):

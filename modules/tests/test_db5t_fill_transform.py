@@ -301,3 +301,135 @@ def test_preview_renders_kpi(tmp_path, schema_sql):
     assert "<b>2</b><span>clin 行</span>" in t
     assert "TST-900001" in t                      # 抽样里有真身份号
     assert "（未跑：加 --gates）" in t            # 默认不跑门禁，避免预览拖慢
+
+
+# ---------- 回放新踩点（2026-11-28 全库回放） ----------
+
+def _make_two_sheets(path: Path):
+    from openpyxl import Workbook
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb = Workbook()
+    a = wb.active
+    a.title = "A"
+    a.append(["SID", "HB"])
+    a.append(["P1", "10.0"])
+    a.append(["P2", "11.0"])
+    b = wb.create_sheet("B")
+    b.append(["SID", "HB"])
+    b.append(["P1", "12.5"])
+    wb.save(path)
+
+
+MAP_COLS = ["src_file", "src_sheet", "src_header_row", "src_header", "src_column",
+            "target_table", "target_column", "dtype", "unit", "enum_values",
+            "missing_rule", "transform", "expect_rows"]
+
+
+def _write_map_csv(path: Path, rows):
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh)
+        w.writerow(MAP_COLS)
+        w.writerows(rows)
+
+
+def test_fill_two_sheets_into_one_table_keeps_both(tmp_path, schema_sql):
+    """同一源的 A、B 两个 sheet 并进 clin：第二遍不能把第一遍的行按 src_id 删掉。"""
+    root = _build(tmp_path, schema_sql)
+    dct = tmp_path / "dict.db"
+    _write_dict(dct)
+    rel = "archived/TST/s1/FinalData_s1.xlsx"
+    _make_two_sheets(tmp_path / rel)
+
+    rows = [
+        [rel, "A", "1", "", "SID", "person", "family_uid", "text", "", "", "stop",
+         "mint:TST-900000", "2"],
+        [rel, "A", "1", "", "SID", "person", "subject_label", "text", "", "", "keep", "", "2"],
+        [rel, "A", "1", "", "", "person", "id_status", "text", "", "", "",
+         "const:label_only", "2"],
+    ]
+    for sheet, unk in (("A", "0"), ("B", "1")):
+        rows += [
+            [rel, sheet, "1", "", "SID", "clin", "family_uid", "text", "", "", "stop",
+             "mint:TST-900000", "2"],
+            [rel, sheet, "1", "", "", "clin", "period_month", "text", "", "", "",
+             "const:UNK", "2"],
+            [rel, sheet, "1", "", "", "clin", "unk_seq", "int", "", "", "",
+             "const:" + unk, "2"],
+            [rel, sheet, "1", "", "HB", "clin", "hemoglobin", "real", "g/L", "", "NA", "", "2"],
+        ]
+    mp = tmp_path / "map2.csv"
+    _write_map_csv(mp, rows)
+
+    old = FILL.paths.DICT
+    try:
+        FILL.paths.DICT = dct
+        assert FILL.main(["--map", str(mp), "--root", str(root), "--family", "TST",
+                          "--slug", "s1", "--src-root", str(tmp_path)]) == 0
+    finally:
+        FILL.paths.DICT = old
+
+    c = sqlite3.connect(f"file:{root / 'TST' / 's1' / 's1db'}?mode=ro", uri=True)
+    got = c.execute("select family_uid, unk_seq from clin order by 1, 2").fetchall()
+    c.close()
+    assert len(got) == 3
+    assert sorted(x[1] for x in got) == [0, 0, 1]
+
+
+def test_fill_empty_sheet_skips_instead_of_crashing(tmp_path, schema_sql):
+    """只有表头、没有数据行：打印 SKIP，不抛 near ")": syntax error。"""
+    root = _build(tmp_path, schema_sql)
+    dct = tmp_path / "dict.db"
+    _write_dict(dct)
+    src = tmp_path / "archived" / "TST" / "s1" / "FinalData_s1.xlsx"
+    _make_xlsx(src, rows=[])
+    mp = tmp_path / "map3.csv"
+    _write_map(mp, "archived/TST/s1/FinalData_s1.xlsx")
+    old = FILL.paths.DICT
+    try:
+        FILL.paths.DICT = dct
+        assert FILL.main(["--map", str(mp), "--root", str(root), "--family", "TST",
+                          "--slug", "s1", "--src-root", str(tmp_path)]) == 0
+    finally:
+        FILL.paths.DICT = old
+    c = sqlite3.connect(f"file:{root / 'TST' / 's1' / 's1db'}?mode=ro", uri=True)
+    assert c.execute("select count(*) from clin").fetchone()[0] == 0
+    c.close()
+
+
+def _add_dict_scope(path: Path, slug: str):
+    c = sqlite3.connect(path)
+    c.execute("insert into dict(scope, table_name, column_name, role, dtype, source, added_on) "
+              "select ?, table_name, column_name, role, dtype, source, added_on "
+              "from dict where scope='proj:s1'", (f"proj:{slug}",))
+    c.commit()
+    c.close()
+
+
+def test_mkid_subject_types_merges_slugs(tmp_path, schema_sql):
+    """同一家族多个子库：meta.subject_types 要并集，后一个不能把前一个覆盖掉。"""
+    root = _build(tmp_path, schema_sql, slug="s1")
+    NEWDB.main(["--family", "TST", "--slug", "s2", "--root", str(root),
+                "--schema", str(schema_sql), "--schema-md", str(MD), "--period-unit", "1"])
+    dct = tmp_path / "dict.db"
+    _write_dict(dct)
+    old = FILL.paths.DICT
+    src = tmp_path / "archived" / "TST" / "s1" / "FinalData_s1.xlsx"
+    _make_xlsx(src)
+    try:
+        FILL.paths.DICT = dct
+        for slug in ("s1", "s2"):
+            _add_dict_scope(dct, slug) if slug != "s1" else None
+            mp = tmp_path / f"map_{slug}.csv"
+            _write_map(mp, "archived/TST/s1/FinalData_s1.xlsx")
+            assert FILL.main(["--map", str(mp), "--root", str(root), "--family", "TST",
+                              "--slug", slug, "--src-root", str(tmp_path)]) == 0
+            assert MKID.main(["--from-person", "--root", str(root), "--family", "TST",
+                              "--slug", slug]) == 0
+    finally:
+        FILL.paths.DICT = old
+    import json
+    f = sqlite3.connect(f"file:{root / 'TST' / '_PHI' / 'TSTdb'}?mode=ro", uri=True)
+    types = json.loads(f.execute("select v from meta where k='subject_types'").fetchone()[0])
+    f.close()
+    assert set(types) == {"s1", "s2"}
