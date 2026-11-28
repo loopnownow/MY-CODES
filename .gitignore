@@ -22,3 +22,42 @@ modules/console/console.projects.json
 
 # rollback snapshots (durable originals, keep out of git)
 _rollback/
+
+
+# ---- 数据兜底（公开仓：患者数据与影像一律不入库）----
+# 先盘点已跟踪文件，再加忽略；白名单必须覆盖当前夹具/台账，避免误伤。
+# 当前已跟踪且会被下方规则挡住的文件：test/test.xlsx
+# 当前已跟踪但不被这些规则挡住（未加 *.tsv）：CODE-MANIFEST.tsv、
+# tools/MOVED-tools-20261101.tsv、tools/db-library/db5t/qc_codes.tsv、
+# tools/db-library/db5t/qc_codes_retired.tsv
+*.nii
+*.nii.gz
+*.dcm
+*.nrrd
+*.mha
+*.mat
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.xlsx
+*.xls
+*.csv
+*.sav
+
+# 白名单：已跟踪或测试夹具必须保持可提交
+!test/test.xlsx
+!test/**/*.xlsx
+!test/**/*.csv
+!modules/tests/fixtures/**
+!modules/tests/**/*.csv
+!modules/tests/**/*.xlsx
+!modules/tests/**/*.pkl
+
+# ---- 工具缓存 ----
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+.coverage
+htmlcov/
