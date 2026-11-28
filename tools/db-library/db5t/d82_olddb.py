@@ -26,10 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import d82 as D82  # noqa: E402
 
 ROOT = Path(os.environ.get('DB5T_ROOT') or r'D:\MyProjects\_DataBase')
-WORK = Path(os.environ.get('D82_WORK')
-            or r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124\_work')
-SNAP = Path(os.environ.get('D82_SNAP')
-            or r'D:\MyProjects\.Del\_by-function\t2250u-db-merge\ledger8\backup\20261124-181106')
+WORK = Path(os.environ.get('D82_WORK') or r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124\_work')
+SNAP = Path(os.environ.get('D82_SNAP') or r'D:\MyProjects\.Del\_by-function\t2250u-db-merge\ledger8\backup\20261124-181106')
 SNAP_DATE = '2026-11-24'
 BACKUP_DIR = WORK / 'd82_olddb_bak'
 PLAN_CSV = WORK / 'd82_olddb_plan.csv'

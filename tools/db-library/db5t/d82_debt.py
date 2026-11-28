@@ -12,7 +12,7 @@
   python -B d82_debt.py --all              # 干跑：打印每家债务与基线差异
   python -B d82_debt.py --all --go         # 写 meta.d82_debt_rows
   python -B d82_debt.py MHE_AN LC --go     # 只点名几家
-  DB5T_ROOT=D:/MyProjects/_DataBase ...    # 默认对批次 stage 跑；切库后要指真库
+  DB5T_ROOT=<库根> ...    # 默认对批次 stage 跑；切库后要指真库
 
 只改家族库自身 meta，不动子库内容，因此不需要重跑 fix_sha.py。
 """

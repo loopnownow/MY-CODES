@@ -27,17 +27,17 @@ python -B paths.py
 python -B gates.py MCI
 
 # 3) 对切库后的真库跑门禁（同一份判据）
-DB5T_ROOT="D:/MyProjects/_DataBase" python -B gates.py MCI
+DB5T_ROOT=<库根> python -B gates.py MCI
 
 # 4) 换库前的待修清单（现算，不落 meta——落盘必漂移）
-DB5T_ROOT="D:/MyProjects/_DataBase" python -B gates.py MCI --cutover
+DB5T_ROOT=<库根> python -B gates.py MCI --cutover
 
 # 5) 跨家族审计
 python -B audit_families.py          # 只 stage
 python -B audit_families.py --data   # 含已切库的真库
 
 # 6) 写完全库后再刷 sha
-DB5T_ROOT="D:/MyProjects/stage_root" python -B fix_sha.py MCI|all
+DB5T_ROOT=<库根> python -B fix_sha.py MCI|all
 ```
 
 ## 三条硬约束（都是踩过的坑）

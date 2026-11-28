@@ -624,12 +624,12 @@ def main(argv=None):
         return 2
     stamp = datetime.now().strftime('%Y%m%d-%H%M')
     bdir = Path(a.backup_dir) if a.backup_dir else (
-        Path(r'D:/MyProjects/.Del/_by-function/db5t-clin-v2-20261127')
+        Path(os.environ.get('DEL_ROOT') or r'D:/MyProjects/.Del') / '_by-function/db5t-clin-v2-20261127'
         / ('clin_v2_backup_' + stamp))
     rdir = None
     if not a.apply and not a.no_rehearse:
         rdir = Path(a.rehearse_dir) if a.rehearse_dir else (
-            Path(r'D:/MyProjects/.Del/_by-function/db5t-clin-v2-20261127')
+            Path(os.environ.get('DEL_ROOT') or r'D:/MyProjects/.Del') / '_by-function/db5t-clin-v2-20261127'
             / ('rehearse_' + stamp))
 
     print('== %s%s == %d 个子库；备份目录 %s；演练副本 %s'

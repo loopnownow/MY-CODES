@@ -4,6 +4,7 @@
 用法：python audit_families.py            -> 控制台 + stage/AUDIT-12.md
       python audit_families.py --data     -> 同时审计已切库的 _DataBase 家族
 """
+import os
 import sqlite3
 import pathlib
 import sys
@@ -12,7 +13,7 @@ import paths as _P  # ROOT/STAGE 由 DB5T_BATCH / DB5T_ROOT 决定
 
 ROOT = _P.BATCH
 STAGE = _P.STAGE
-DBROOT = pathlib.Path(r'D:\MyProjects\_DataBase')
+DBROOT = pathlib.Path(os.environ.get('DB5T_DATA_ROOT') or r'D:\MyProjects\_DataBase')
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import ddl_drift  # noqa: E402
 

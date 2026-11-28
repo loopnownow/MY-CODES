@@ -4,7 +4,7 @@
 三个可覆盖项，按优先级从环境变量读，读不到才用默认值：
 
   DB5T_BATCH   批次根（默认 pilot 批次目录；含 SCHEMA-v1.md 与 stage/）
-  DB5T_ROOT    库根（默认 <DB5T_BATCH>/stage；切库后指 D:/MyProjects/_DataBase）
+  DB5T_ROOT    库根（默认 <DB5T_BATCH>/stage；切库后指真库根）
   DB5T_SCHEMA  SCHEMA 文件（默认 <DB5T_BATCH>/SCHEMA-v1.md；再退到本目录 schema-v1.md）
 
 为什么不在代码里写死路径：门禁要能对 stage 产物跑，也要能对切库后的真库跑，
@@ -20,9 +20,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 
-_DEF_BATCH = pathlib.Path(r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124')
-
-BATCH = pathlib.Path(os.environ.get('DB5T_BATCH') or _DEF_BATCH)
+BATCH = pathlib.Path(os.environ.get('DB5T_BATCH') or r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124')
 STAGE = pathlib.Path(os.environ.get('DB5T_ROOT') or (BATCH / 'stage'))
 
 

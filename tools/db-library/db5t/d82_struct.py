@@ -12,9 +12,9 @@
 
 用法：
   python -B d82_struct.py --all                        # 干跑，只打印
-  DB5T_ROOT=D:/MyProjects/_DataBase python -B d82_struct.py --all
-  DB5T_ROOT=D:/MyProjects/_DataBase python -B d82_struct.py --all --go
-  python -B d82_struct.py --db D:/MyProjects/_DataBase/HZ --go
+  DB5T_ROOT=<库根> python -B d82_struct.py --all
+  DB5T_ROOT=<库根> python -B d82_struct.py --all --go
+  python -B d82_struct.py --db <库根>/<家族> --go
 
 `--go`：写前整库 copy 到 `_work/d82_struct_bak/`（同名复用），一家一个事务，
 写完重扫并与「写前债 − 本次写入行数」对账，不一致即回滚。

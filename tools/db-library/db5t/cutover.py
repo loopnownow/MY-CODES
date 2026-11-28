@@ -3,7 +3,7 @@
 
 用法::
 
-    set DB5T_BATCH=D:\\MyProjects\\.Del\\_by-function\\db5t-pilot-20261124
+    set DB5T_BATCH=<批次根>
     python -B cutover.py MCI            # 干跑，只印计划
     python -B cutover.py MCI --go       # 真做（默认仍是干跑）
 

@@ -777,7 +777,7 @@ def d70(path, is_proj):
 
 
 
-DBROOT = pathlib.Path(r'D:\MyProjects\_DataBase')
+DBROOT = pathlib.Path(os.environ.get('DB5T_DATA_ROOT') or r'D:\MyProjects\_DataBase')
 
 _BLOB_PTR = re.compile(r'^blob:(?P<cont>[^@]+)@(?P<date>[^:]*):src_id=(?P<sid>\d+)#(?P<sheet>.*)$')
 

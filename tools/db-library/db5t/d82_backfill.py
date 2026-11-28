@@ -44,12 +44,12 @@ D82 也不把它们计入债务（C 路线），这类行属于顺手修、不�
              25/28 家有 6t；LAA/UGIB/VEGF 的 dict 是空的，不影响。
 
 用法：
-  python -B d82_backfill.py --db D:/MyProjects/_DataBase/MHE_AN
-  python -B d82_backfill.py --all --db-root D:/MyProjects/_DataBase
-  python -B d82_backfill.py --all --db-root D:/MyProjects/_DataBase --out d82_backfill_plan.csv
+  python -B d82_backfill.py --db <库根>/<家族>
+  python -B d82_backfill.py --all --db-root <库根>
+  python -B d82_backfill.py --all --db-root <库根> --out d82_backfill_plan.csv
   DB5T_ROOT=... python -B d82_backfill.py --all          # 只给根、不给 --db-root 时用它
   python -B d82_backfill.py --db <家族库> --old-db <FAM>db_6t   # 手工指旧库
-  python -B d82_backfill.py --db D:/MyProjects/_DataBase/MHE_AN --go   # 落库（逐家备份）
+  python -B d82_backfill.py --db <库根>/<家族> --go   # 落库（逐家备份）
   python -B d82_backfill.py --all --picks <_work>/d82_header_picks.tsv --go  # 人工挑选
   python -B d82_backfill.py --all --buildonly --go     # 只剩构建产物表头的 *_val 写派生句
 
@@ -631,7 +631,7 @@ def run_one(db_path, old_db=None, examples=2, verbose=True):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description='D82 B 路线：dict.source 回填计划（纯干跑，不写库）')
-    ap.add_argument('--db', help='家族库路径，或家族目录（D:/MyProjects/_DataBase/MHE_AN）')
+    ap.add_argument('--db', help='家族库路径，或家族目录（<库根>/<家族>）')
     ap.add_argument('--all', action='store_true', help='遍历库根下所有家族')
     ap.add_argument('--db-root', default=os.environ.get('DB5T_ROOT') or str(DATA_ROOT),
                     help='库根（含 <FAM>/_PHI/<FAM>db）')

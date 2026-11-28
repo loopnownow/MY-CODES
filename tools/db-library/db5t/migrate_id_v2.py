@@ -224,7 +224,7 @@ def migrate(path, backup_dir, apply_):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument('--root', default=None, help='_DataBase 根（默认 DB5T_ROOT 或 D:/MyProjects/_DataBase）')
+    ap.add_argument('--root', default=None, help='_DataBase 根（默认 DB5T_ROOT 或内置库根）')
     ap.add_argument('--family', action='append', default=None, help='只做这些家族（可多次）')
     ap.add_argument('--apply', action='store_true', help='真的写盘；缺省 dry-run')
     ap.add_argument('--backup-dir', default=None)
@@ -241,7 +241,7 @@ def main(argv=None):
         return 2
     stamp = datetime.now().strftime('%Y%m%d-%H%M')
     bdir = Path(a.backup_dir) if a.backup_dir else \
-        Path(r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124\_work') / f'id_v2_backup_{stamp}'
+        Path(os.environ.get('D82_WORK') or r'D:\MyProjects\.Del\_by-function\db5t-pilot-20261124\_work') / f'id_v2_backup_{stamp}'
 
     print(f'{"== 写盘 ==" if a.apply else "== dry-run =="} {len(dbs)} 个家族库；'
           f'备份目录 {bdir if a.apply else "(dry-run 不备份)"}')
