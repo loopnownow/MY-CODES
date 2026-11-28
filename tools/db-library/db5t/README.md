@@ -8,14 +8,18 @@
 | 文件 | 作用 |
 |---|---|
 | `paths.py` | 路径解析的唯一入口（`DB5T_BATCH` / `DB5T_ROOT` / `DB5T_SCHEMA` / `DB5T_DICT`） |
-| `gates.py` | 机器门 D35–D99（D95 / D96 / D98 为 P1；D87–D94、D97、D99 report-only，只报数不改判级）+ `--cutover`（换库前待修清单，现算不落盘） |
+| `gates.py` | 机器门 D35–D99（D95 / D96 / D98 代码已入、**默认 report-only**，`--strict` 或 `DB5T_GATES_STRICT=1` 才判 P1；D87–D94、D97、D99 恒 report-only）+ `--cutover`（换库前待修清单，现算不落盘） |
+| `mkschema.py` | `schema-v1.md` → `schema.sql`：只认两段 ```sql，7 个模态展开，家族库剔 `dict`，首行记 `source_sha256`；`--check` 校验过期 |
+| `newdb.py` | 按 `schema.sql` 建空库（家族库 + 子库 + `meta` + `目录说明.md`）；目标已存在就跳过，绝不覆盖 |
+| `mkdict.py` | 旧家族 `dict`（11 列）→ 全局 `{RAW}\Family\dict.db`（14 列），补 `scope='stage'` 骨架行，同键异写出冲突报告 |
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |
 | `migrate_id_v2.py` | `id` 12 列 → 24 列重建迁移（`ALTER` 改不了列序，只能建新表抄数据；缺省 dry-run，`--apply` 才写盘并先备份） |
 | `migrate_clin_v2.py` | `clin` 旧头 → v2 头（11 列头 + legacy 三元组 + 15 空 `path_*`）重建迁移；`group_v`/`subgroup` 同名变量并值进头列、`--clean` 才清违例库；缺省 dry-run，`--apply` 先备份 |
 | `gen_readme.py` | 生成 `<leaf>/目录说明.md`（幂等，由各 build 收尾调用） |
-| `schema-v1.md` | SCHEMA 的兜底副本；权威版本仍在批次目录，`paths.py` 优先用它 |
+| `schema-v1.md` | SCHEMA 的仓库副本（权威版在批次目录时 `paths.py` 优先用批次）；`mkschema.py` 默认从这里生成 `schema.sql` |
+| `schema.sql` | `schema-v1.md` 的机器可读产物（`@section family` / `@section project`），`newdb.py` 据此建库；**不要手改** |
 
 ## 用法
 
@@ -38,6 +42,11 @@ python -B audit_families.py --data   # 含已切库的真库
 
 # 6) 写完全库后再刷 sha
 DB5T_ROOT=<库根> python -B fix_sha.py MCI|all
+
+# 7) 建库三件套（schema → 空库 → 全局 dict）
+python -B mkschema.py && python -B mkschema.py --check
+python -B newdb.py --family MM --slug zy_MM --dry-run
+python -B mkdict.py --dry-run
 ```
 
 ## 三条硬约束（都是踩过的坑）

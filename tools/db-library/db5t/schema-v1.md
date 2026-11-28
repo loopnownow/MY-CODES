@@ -236,7 +236,7 @@ CREATE TABLE _modules_<mod>(            -- 检查级：mod = radiomics | us | mr
   src_row INTEGER,
   note TEXT
 );
-CREATE INDEX ix_modal_month ON _modules_<mod>(family_uid, month_ix);
+CREATE INDEX ix_modal_<mod>_month ON _modules_<mod>(family_uid, month_ix);
 
 CREATE TABLE <mod>_val(              -- 通用组学长表：不建 1300 列宽表
   exam_uid TEXT NOT NULL REFERENCES _modules_<mod>(exam_uid) ON DELETE CASCADE,

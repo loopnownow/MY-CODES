@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -12,21 +13,35 @@ REPO = Path(__file__).resolve().parents[2]
 DB5T = REPO / "tools" / "db-library" / "db5t"
 
 
-def _load(name: str, path: Path):
+def _load(name: str, path: Path, strict: bool = False):
     # gates.py does `import paths as B`; keep db5t on sys.path like a script run.
     root = str(path.parent)
     if root not in sys.path:
         sys.path.insert(0, root)
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(mod)
+    if strict:
+        os.environ["DB5T_GATES_STRICT"] = "1"
+    else:
+        os.environ.pop("DB5T_GATES_STRICT", None)
+    try:
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(mod)
+    finally:
+        os.environ.pop("DB5T_GATES_STRICT", None)
     return mod
 
 
 @pytest.fixture(scope="module")
 def gates():
-    return _load("db5t_gates_under_test", DB5T / "gates.py")
+    """严格模式：D95 / D96 / D98 判 P1（只有翻牌后才是业务默认）。"""
+    return _load("db5t_gates_under_test", DB5T / "gates.py", strict=True)
+
+
+@pytest.fixture(scope="module")
+def gates_ro():
+    """默认模式：D95 / D96 / D98 report-only。"""
+    return _load("db5t_gates_ro_under_test", DB5T / "gates.py", strict=False)
 
 
 def _dict_schema(conn: sqlite3.Connection) -> None:
@@ -167,6 +182,7 @@ def test_d95_missing_dict_db_is_p1(tmp_path, gates):
     lines, n = gates.d95_dict_contract(missing, fam_db, projs)
     assert n == 1
     assert any("dict.db" in ln or "缺" in ln for ln in lines)
+    assert any("!! P1" in ln for ln in lines), lines
 
 
 def test_d96_mismatch_fails(tmp_path, gates):
@@ -219,6 +235,30 @@ def test_d93_d94_d97_d99_are_report_only(gates):
         lines, n = fn([])
         assert n == 0
         assert all("!!" not in ln for ln in lines)
+
+
+def test_d95_d96_d98_report_only_by_default(tmp_path, gates_ro):
+    """默认模式（不设 DB5T_GATES_STRICT）不判级：不出 '!!'，计数照出。"""
+    assert gates_ro.STRICT is False
+    dict_db, fam_db, projs = _write_ok_tree(tmp_path)
+    # 三种违规各来一处，计数必须一样，只是不带 '!!'
+    lines, n = gates_ro.d95_dict_contract(tmp_path / "no-such-dict.db", fam_db, projs)
+    assert n == 1 and not any("!!" in ln for ln in lines), lines
+    slug, path = projs[0]
+    c = sqlite3.connect(path)
+    c.execute("UPDATE src SET rows=99 WHERE src_id=1")
+    c.execute("ALTER TABLE clin ADD COLUMN 疼痛时长 TEXT")
+    c.commit()
+    c.close()
+    lines, n = gates_ro.d96_count_conservation(projs)
+    assert n == 1 and not any("!!" in ln for ln in lines), lines
+    lines, n = gates_ro.d98_ascii_units(fam_db, projs)
+    assert n >= 1 and not any("!!" in ln for ln in lines), lines
+
+
+def test_strict_mode_marks_p1(gates):
+    """严格模式（DB5T_GATES_STRICT=1 / --strict）才写 '!! P1'。"""
+    assert gates.STRICT is True
 
 
 def test_db5t_dict_env_override(tmp_path, monkeypatch):

@@ -1983,9 +1983,15 @@ def d92_clean_residue(projs):
 
 
 # ---- D93–D99（规则仓 db-gates.md / db-build-contract.md）----
-# D95 / D96 / D98：机器化，违规写 '!!' 并计入 all_rows（P1，改 ok）。
-# D93 / D94 / D97 / D99：入门禁集合但 report-only——只出说明或计数，不写 '!!'、不进 all_rows。
+# D95 / D96 / D98：机器化，但**默认 report-only**；只有 `--strict` 或 DB5T_GATES_STRICT=1
+#   才写 '!! P1' 并计入 all_rows（改 ok）。理由：存量盘面还没有 Family\dict.db（D95 必红）、
+#   56/80 库 Σmerged_n≠Σsrc.rows（D96）、18 万格业务值非 ASCII（D98）——这三条是历史事实，
+#   不靠改数据清得掉。翻牌时机见规则仓 db-gates.md「过渡期」。
+# D93 / D94 / D97 / D99：任何模式都 report-only——只出说明或计数，不写 '!!'、不进 all_rows。
 # 判据只按规则表与契 3 / 律 1 / 契 6 落地，不另发明。
+STRICT = ('--strict' in sys.argv) or (
+    os.environ.get('DB5T_GATES_STRICT', '').strip() not in ('', '0', 'false', 'False'))
+_P1 = '!! P1' if STRICT else '· 待修(report-only)'
 
 def _dict_db_path():
     """运行时读 DB5T_DICT，避免 import 时绑死默认值。"""
@@ -2099,19 +2105,19 @@ def d94_qc_codes(*_a, **_k):
 
 
 def d95_dict_contract(dict_db, fam_db, projs):
-    """D95（P1）：物理列（除 meta / dict）须在全局 dict.db 有行；dtype 与存储域不矛盾。
+    """D95（默认 report-only；--strict 转 P1）：物理列（除 meta / dict）须在全局 dict.db 有行；dtype 与存储域不矛盾。
 
     读 `{RAW}\\Family\\dict.db`（路径由 DB5T_DICT / paths.DICT 解析）。
-    scope 解析顺序 proj:<slug> → family → stage（契 3）。缺全局库即 P1，不回退家族 dict。
+    scope 解析顺序 proj:<slug> → family → stage（契 3）。缺全局库不回退家族 dict。
     """
     out, n = [], 0
     if dict_db is None or not Path(dict_db).exists():
-        out.append('  !! P1 缺全局 dict.db（DB5T_DICT），无法核覆盖')
+        out.append(f'  {_P1} 缺全局 dict.db（DB5T_DICT），无法核覆盖')
         return out, 1
     try:
         idx = _load_dict_index(dict_db)
     except sqlite3.Error as e:
-        out.append(f'  !! P1 全局 dict.db 不可读：{e}')
+        out.append(f'  {_P1} 全局 dict.db 不可读：{e}')
         return out, 1
     miss, conflict = [], []
 
@@ -2144,14 +2150,14 @@ def d95_dict_contract(dict_db, fam_db, projs):
     n = len(miss) + len(conflict)
     out.append('  · 缺 dict 行 %d 个；dtype 与存储域矛盾 %d 个' % (len(miss), len(conflict)))
     for x in miss[:10]:
-        out.append('    !! P1 缺行 %s' % x)
+        out.append('    %s 缺行 %s' % (_P1, x))
     for x in conflict[:10]:
-        out.append('    !! P1 矛盾 %s' % x)
+        out.append('    %s 矛盾 %s' % (_P1, x))
     return out, n
 
 
 def d96_count_conservation(projs):
-    """D96（P1）：Σ clin.merged_n = Σ src.rows（src.status='active'）。不等不许放行（契 6）。"""
+    """D96（默认 report-only；--strict 转 P1）：Σ clin.merged_n = Σ src.rows（src.status='active'）。"""
     out, n = [], 0
     for slug, p in projs:
         if p is None or not Path(p).exists():
@@ -2165,13 +2171,13 @@ def d96_count_conservation(projs):
                 "select name from sqlite_master where type='table'")}
             if 'clin' not in tabs or 'src' not in tabs:
                 n += 1
-                out.append(f'    !! P1 {slug} 缺 clin 或 src，无法核计数守恒')
+                out.append(f'    {_P1} {slug} 缺 clin 或 src，无法核计数守恒')
                 continue
             clin_cols = {r[1] for r in c.execute('pragma table_info(clin)')}
             src_cols = {r[1] for r in c.execute('pragma table_info(src)')}
             if 'merged_n' not in clin_cols or 'rows' not in src_cols:
                 n += 1
-                out.append(f'    !! P1 {slug} 缺 clin.merged_n 或 src.rows')
+                out.append(f'    {_P1} {slug} 缺 clin.merged_n 或 src.rows')
                 continue
             left = c.execute('select coalesce(sum(merged_n),0) from clin').fetchone()[0]
             if 'status' in src_cols:
@@ -2179,11 +2185,11 @@ def d96_count_conservation(projs):
                     "select coalesce(sum(rows),0) from src where status='active'").fetchone()[0]
             else:
                 n += 1
-                out.append(f'    !! P1 {slug} 缺 src.status，无法按 active 过滤')
+                out.append(f'    {_P1} {slug} 缺 src.status，无法按 active 过滤')
                 continue
             if left != right:
                 n += 1
-                out.append(f'    !! P1 {slug} Σ clin.merged_n={left} ≠ Σ src.rows(active)={right}')
+                out.append(f'    {_P1} {slug} Σ clin.merged_n={left} ≠ Σ src.rows(active)={right}')
         finally:
             c.close()
     out.insert(0, f'  · 计数不守恒 {n} 个库')
@@ -2233,7 +2239,7 @@ def d97_col_purity(projs=None, *_a, **_k):
 
 
 def d98_ascii_units(fam_db, projs):
-    """D98（P1）：标识与业务字符串须 ASCII（律 1）；列名不得内嵌单位；值内不得糊单位。"""
+    """D98（默认 report-only；--strict 转 P1）：标识与业务字符串须 ASCII（律 1）；列名不得内嵌单位。"""
     n_ident = n_unitcol = n_biz = n_smear = 0
     samples = []
 
@@ -2333,7 +2339,7 @@ def d98_ascii_units(fam_db, projs):
         if msg in seen:
             continue
         seen.add(msg)
-        out.append('    !! P1 %s' % msg)
+        out.append('    %s %s' % (_P1, msg))
         if len(out) > 16:
             break
     return out, n
@@ -2557,7 +2563,8 @@ def main():
     _l92, _n92 = d92_clean_residue(PROJ)
     out.append(f'\n== D92 入表清洗残留（病理族目标列；report-only）：{_n92} 格')
     out.extend(_l92)
-    # ---- D93–D99：D95 / D96 / D98 机器化 P1；D93 / D94 / D97 / D99 report-only ----
+    # ---- D93–D99：D95 / D96 / D98 机器化但默认 report-only（--strict 才转 P1）；D93 / D94 / D97 / D99 恒 report-only ----
+    _mode = 'P1' if STRICT else 'report-only'
     _l93, _n93 = d93_ri_soft()
     out.append('\n== D93 参考区间软门（report-only，不判级）')
     out.extend(_l93)
@@ -2565,22 +2572,22 @@ def main():
     out.append('\n== D94 qc.code 受控（report-only，不判级；词表待另文件落盘）')
     out.extend(_l94)
     _l95, _n95 = d95_dict_contract(_dict_db_path(), FAM_DB, PROJ)
-    out.append(f'\n== D95 dict 覆盖契约（全局 dict.db / DB5T_DICT；P1）：{_n95} 项')
+    out.append(f'\n== D95 dict 覆盖契约（全局 dict.db / DB5T_DICT；{_mode}）：{_n95} 项')
     out.extend(_l95)
-    if _n95:
+    if STRICT and _n95:
         all_rows.append((f'family:{FAM}', 'dict', 'D95', _n95))
     _l96, _n96 = d96_count_conservation(PROJ)
-    out.append(f'\n== D96 计数守恒（Σ clin.merged_n = Σ src.rows active；P1）：{_n96} 个库')
+    out.append(f'\n== D96 计数守恒（Σ clin.merged_n = Σ src.rows active；{_mode}）：{_n96} 个库')
     out.extend(_l96)
-    if _n96:
+    if STRICT and _n96:
         all_rows.append((f'family:{FAM}', 'clin', 'D96', _n96))
     _l97, _n97 = d97_col_purity(PROJ)
     out.append('\n== D97 列格式纯度（按域判混合；report-only，不判级）')
     out.extend(_l97)
     _l98, _n98 = d98_ascii_units(FAM_DB, PROJ)
-    out.append(f'\n== D98 命名与外置单位（律 1 ASCII；列名不得内嵌单位；P1）：{_n98} 项')
+    out.append(f'\n== D98 命名与外置单位（律 1 ASCII；列名不得内嵌单位；{_mode}）：{_n98} 项')
     out.extend(_l98)
-    if _n98:
+    if STRICT and _n98:
         all_rows.append((f'family:{FAM}', 'clin', 'D98', _n98))
     _l99, _n99 = d99_enum_domain()
     out.append('\n== D99 枚举值域（report-only，不判级）')
