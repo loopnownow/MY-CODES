@@ -1982,6 +1982,368 @@ def d92_clean_residue(projs):
     return out, nplace + nzero + nform + nsent
 
 
+# ---- D93–D99（规则仓 db-gates.md / db-build-contract.md）----
+# D95 / D96 / D98：机器化，违规写 '!!' 并计入 all_rows（P1，改 ok）。
+# D93 / D94 / D97 / D99：入门禁集合但 report-only——只出说明或计数，不写 '!!'、不进 all_rows。
+# 判据只按规则表与契 3 / 律 1 / 契 6 落地，不另发明。
+
+def _dict_db_path():
+    """运行时读 DB5T_DICT，避免 import 时绑死默认值。"""
+    env = os.environ.get('DB5T_DICT')
+    if env:
+        return pathlib.Path(env)
+    return getattr(B, 'DICT', None)
+
+
+def _is_ascii(s):
+    return s is None or str(s).isascii()
+
+
+def _skip_table(name):
+    return name.startswith('sqlite_') or name in ('meta', 'dict')
+
+
+def _business_table(name):
+    if name in ('clin', 'person', 'qc'):
+        return True
+    if name.startswith('_modules_') or name.endswith('_val'):
+        return True
+    return False
+
+
+# 列名中的单位段：完整的下划线分段或括号内标记。不用单字母（d / l / g / m），以免误伤。
+_UNIT_SEGS = frozenset({
+    'mm', 'cm', 'kg', 'mg', 'ug', 'ng', 'ml', 'ul',
+    'mmol', 'umol', 'iu', 'hu', 'bpm', 'mmhg', 'kpa',
+    'pct', 'percent', 'yr', 'mo', 'wk', 'hr', 'min', 'sec',
+    'mg_l', 'g_l', 'mg_dl', 'mmol_l',
+})
+_COL_UNIT_MARK = re.compile(r'[%]|(\d+(mm|cm|kg|mg|ml))$', re.I)
+_VALUE_UNIT = re.compile(
+    r'^\s*[<>≤≥]?\s*\d+(?:\.\d+)?\s*(mm|cm|kg|mg|ug|ng|ml|ul|mmol|d|w|h|wk|mo|yr|%|周)\s*$',
+    re.I,
+)
+
+
+def _col_embeds_unit(name):
+    if not name:
+        return False
+    if '%' in name or _COL_UNIT_MARK.search(name):
+        return True
+    segs = [s.lower() for s in re.split(r'[_\W]+', name) if s]
+    if any(s in _UNIT_SEGS for s in segs):
+        return True
+    # 复合单位段：mg_l 作为连续两段
+    for a, b in zip(segs, segs[1:]):
+        if f'{a}_{b}' in _UNIT_SEGS:
+            return True
+    return False
+
+
+def _dtype_domain(dtype):
+    d = (dtype or '').strip().upper()
+    if d in ('REAL', 'INTEGER', 'INT', 'NUMERIC', 'FLOAT', 'DOUBLE'):
+        return 'num'
+    if d in ('DATE', 'ENUM', 'TEXT', 'CHAR', 'CLOB', ''):
+        return 'text'
+    return 'text'
+
+
+def _decl_domain(typ):
+    t = (typ or '').strip().upper()
+    if not t:
+        return None  # 未声明类型：不判矛盾
+    if any(k in t for k in ('INT', 'REAL', 'FLOA', 'DOUB', 'NUM')):
+        return 'num'
+    return 'text'
+
+
+def _iter_user_tables(conn):
+    return [n for (n,) in conn.execute(
+        "select name from sqlite_master where type='table' and name not like 'sqlite_%'")]
+
+
+def _resolve_dict(index, table, column, slug):
+    """scope 优先级：proj:<slug> → family → stage（契 3）。"""
+    order = []
+    if slug:
+        order.append(f'proj:{slug}')
+    order.extend(('family', 'stage'))
+    for scope in order:
+        row = index.get((scope, table, column))
+        if row is not None:
+            return row
+    return None
+
+
+def _load_dict_index(dict_db):
+    c = sqlite3.connect(f'file:{dict_db}?mode=ro', uri=True)
+    idx = {}
+    try:
+        for scope, table, col, dtype in c.execute(
+                'select scope, table_name, column_name, dtype from dict'):
+            idx[(scope, table, col)] = dtype
+    finally:
+        c.close()
+    return idx
+
+
+def d93_ri_soft(*_a, **_k):
+    """D93（report-only）：参考区间软门。基线不是失败阈值；本批不实现判据。"""
+    return ['  · 本批 report-only，不判级（规则：对 ri_normal 软判 OUT_OF_RI / UNIT_SUSPECT / IMPLAUSIBLE；单侧区间不得判单位）'], 0
+
+
+def d94_qc_codes(*_a, **_k):
+    """D94（report-only）：qc.code 须在 qc_codes.tsv 登记。词表待另文件落盘，本批不判。"""
+    return ['  · 本批 report-only，不判级（qc_codes.tsv 完整词表待另文件落盘）'], 0
+
+
+def d95_dict_contract(dict_db, fam_db, projs):
+    """D95（P1）：物理列（除 meta / dict）须在全局 dict.db 有行；dtype 与存储域不矛盾。
+
+    读 `{RAW}\\Family\\dict.db`（路径由 DB5T_DICT / paths.DICT 解析）。
+    scope 解析顺序 proj:<slug> → family → stage（契 3）。缺全局库即 P1，不回退家族 dict。
+    """
+    out, n = [], 0
+    if dict_db is None or not Path(dict_db).exists():
+        out.append('  !! P1 缺全局 dict.db（DB5T_DICT），无法核覆盖')
+        return out, 1
+    try:
+        idx = _load_dict_index(dict_db)
+    except sqlite3.Error as e:
+        out.append(f'  !! P1 全局 dict.db 不可读：{e}')
+        return out, 1
+    miss, conflict = [], []
+
+    def _scan(db_path, slug):
+        if db_path is None or not Path(db_path).exists():
+            return
+        try:
+            c = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+        except sqlite3.Error:
+            return
+        try:
+            for table in _iter_user_tables(c):
+                if _skip_table(table):
+                    continue
+                for col, typ in _ti(c, table):
+                    rec = _resolve_dict(idx, table, col, slug)
+                    tag = f'{slug + "." if slug else ""}{table}.{col}'
+                    if rec is None:
+                        miss.append(tag)
+                        continue
+                    want, have = _dtype_domain(rec), _decl_domain(typ)
+                    if have and want != have:
+                        conflict.append('%s dict.dtype=%s 存储=%s' % (tag, rec or '<空>', typ or '<空>'))
+        finally:
+            c.close()
+
+    _scan(fam_db, None)
+    for slug, p in projs:
+        _scan(p, slug)
+    n = len(miss) + len(conflict)
+    out.append('  · 缺 dict 行 %d 个；dtype 与存储域矛盾 %d 个' % (len(miss), len(conflict)))
+    for x in miss[:10]:
+        out.append('    !! P1 缺行 %s' % x)
+    for x in conflict[:10]:
+        out.append('    !! P1 矛盾 %s' % x)
+    return out, n
+
+
+def d96_count_conservation(projs):
+    """D96（P1）：Σ clin.merged_n = Σ src.rows（src.status='active'）。不等不许放行（契 6）。"""
+    out, n = [], 0
+    for slug, p in projs:
+        if p is None or not Path(p).exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        try:
+            tabs = {r[0] for r in c.execute(
+                "select name from sqlite_master where type='table'")}
+            if 'clin' not in tabs or 'src' not in tabs:
+                n += 1
+                out.append(f'    !! P1 {slug} 缺 clin 或 src，无法核计数守恒')
+                continue
+            clin_cols = {r[1] for r in c.execute('pragma table_info(clin)')}
+            src_cols = {r[1] for r in c.execute('pragma table_info(src)')}
+            if 'merged_n' not in clin_cols or 'rows' not in src_cols:
+                n += 1
+                out.append(f'    !! P1 {slug} 缺 clin.merged_n 或 src.rows')
+                continue
+            left = c.execute('select coalesce(sum(merged_n),0) from clin').fetchone()[0]
+            if 'status' in src_cols:
+                right = c.execute(
+                    "select coalesce(sum(rows),0) from src where status='active'").fetchone()[0]
+            else:
+                n += 1
+                out.append(f'    !! P1 {slug} 缺 src.status，无法按 active 过滤')
+                continue
+            if left != right:
+                n += 1
+                out.append(f'    !! P1 {slug} Σ clin.merged_n={left} ≠ Σ src.rows(active)={right}')
+        finally:
+            c.close()
+    out.insert(0, f'  · 计数不守恒 {n} 个库')
+    return out, n
+
+
+def d97_col_purity(projs=None, *_a, **_k):
+    """D97（report-only）：按域判混合（律 2）。INTEGER+REAL 合规；不用 typeof 四类占比。本批不改判级。"""
+    projs = projs or []
+    mixed, nchk = [], 0
+    for slug, p in projs:
+        if p is None or not Path(p).exists():
+            continue
+        try:
+            c = sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+        except sqlite3.Error:
+            continue
+        try:
+            for table in _iter_user_tables(c):
+                if not _business_table(table):
+                    continue
+                for col, typ in _ti(c, table):
+                    nchk += 1
+                    q = _qi(col)
+                    try:
+                        vals = [v for (v,) in c.execute(
+                            f'select {q} from { _qi(table) } where {q} is not null')]
+                    except sqlite3.Error:
+                        continue
+                    num = non = False
+                    for v in vals:
+                        s = str(v).strip()
+                        if not s:
+                            continue
+                        if NUM_RE.match(s):
+                            num = True
+                        else:
+                            non = True
+                    if num and non:
+                        mixed.append(f'{slug}.{table}.{col}')
+        finally:
+            c.close()
+    out = [f'  · 本批 report-only，不判级；已扫描 {nchk} 列，真混合 {len(mixed)} 列（INTEGER+REAL 不计）']
+    for x in mixed[:8]:
+        out.append('    > %s' % x)
+    return out, 0  # report-only：不把混合数当作失败计数
+
+
+def d98_ascii_units(fam_db, projs):
+    """D98（P1）：标识与业务字符串须 ASCII（律 1）；列名不得内嵌单位；值内不得糊单位。"""
+    n_ident = n_unitcol = n_biz = n_smear = 0
+    samples = []
+
+    def _note(kind, msg):
+        samples.append((kind, msg))
+
+    def _scan_ident(db_path, slug):
+        nonlocal n_ident, n_unitcol
+        if db_path is None or not Path(db_path).exists():
+            return
+        try:
+            c = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+        except sqlite3.Error:
+            return
+        try:
+            prefix = (slug + '.') if slug else ''
+            for table in _iter_user_tables(c):
+                if not _is_ascii(table) or not NAME_RE.match(table):
+                    # sqlite 业务表名通常是合法 snake；meta/dict 已在列扫描外。表名非 ASCII 也报。
+                    if table not in ('meta', 'dict') and (not _is_ascii(table) or table != table.lower()):
+                        n_ident += 1
+                        _note('ident', f'{prefix}表名 {table}')
+                for col, typ in _ti(c, table):
+                    if table in ('meta', 'dict'):
+                        continue
+                    if not _is_ascii(col):
+                        n_ident += 1
+                        _note('ident', f'{prefix}{table}.{col}')
+                    elif not NAME_RE.match(col) and col != col.lower():
+                        # 大写 / 空格等：律 1 要求 ASCII snake_case
+                        n_ident += 1
+                        _note('ident', f'{prefix}{table}.{col}')
+                    if _col_embeds_unit(col):
+                        n_unitcol += 1
+                        _note('unitcol', f'{prefix}{table}.{col}')
+            if 'qc' in {r[0] for r in c.execute("select name from sqlite_master where type='table'")}:
+                qcols = {r[1] for r in c.execute('pragma table_info(qc)')}
+                if 'code' in qcols:
+                    for (code,) in c.execute('select code from qc where code is not null'):
+                        if not _is_ascii(code):
+                            n_ident += 1
+                            _note('ident', f'{prefix}qc.code={code}')
+            if 'meta' in {r[0] for r in c.execute("select name from sqlite_master where type='table'")}:
+                for k, v in c.execute('select k, v from meta'):
+                    if not _is_ascii(k) or not _is_ascii(v):
+                        n_ident += 1
+                        _note('ident', f'{prefix}meta {k}={v}')
+        finally:
+            c.close()
+
+    def _scan_values(db_path, slug):
+        nonlocal n_biz, n_smear
+        if db_path is None or not Path(db_path).exists():
+            return
+        try:
+            c = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
+        except sqlite3.Error:
+            return
+        try:
+            prefix = (slug + '.') if slug else ''
+            for table in _iter_user_tables(c):
+                if not _business_table(table):
+                    continue
+                for col, typ in _ti(c, table):
+                    q = _qi(col)
+                    tq = _qi(table)
+                    try:
+                        rows = c.execute(
+                            f'select {q}, count(*) from {tq} where {q} is not null group by 1'
+                        ).fetchall()
+                    except sqlite3.Error:
+                        continue
+                    for v, cnt in rows:
+                        s = '' if v is None else str(v)
+                        if not s:
+                            continue
+                        if not _is_ascii(s):
+                            n_biz += cnt
+                            _note('biz', f'{prefix}{table}.{col}={s[:40]}')
+                        if _VALUE_UNIT.match(s.strip()):
+                            n_smear += cnt
+                            _note('smear', f'{prefix}{table}.{col}={s}')
+        finally:
+            c.close()
+
+    _scan_ident(fam_db, None)
+    _scan_values(fam_db, None)
+    for slug, p in projs:
+        _scan_ident(p, slug)
+        _scan_values(p, slug)
+
+    n = n_ident + n_unitcol + n_biz + n_smear
+    out = ['  · 非 ASCII 标识 %d；列名内嵌单位 %d；业务字符串非 ASCII %d 格；值内糊单位 %d 格'
+           % (n_ident, n_unitcol, n_biz, n_smear)]
+    seen = set()
+    for kind, msg in samples:
+        if msg in seen:
+            continue
+        seen.add(msg)
+        out.append('    !! P1 %s' % msg)
+        if len(out) > 16:
+            break
+    return out, n
+
+
+def d99_enum_domain(*_a, **_k):
+    """D99（report-only）：取值须落在 dict.enum_values。本批不判级。"""
+    return ['  · 本批 report-only，不判级（取值须落在 dict enum_values；id.sex 入库时归一为 M/F/U）'], 0
+
+
 def main():
     if not FAM_DB.exists():
         # 家族库不在 = 桶名没切或库没搬。直接说清楚，别让 sqlite 抛 traceback 掩盖原因。
@@ -2195,6 +2557,34 @@ def main():
     _l92, _n92 = d92_clean_residue(PROJ)
     out.append(f'\n== D92 入表清洗残留（病理族目标列；report-only）：{_n92} 格')
     out.extend(_l92)
+    # ---- D93–D99：D95 / D96 / D98 机器化 P1；D93 / D94 / D97 / D99 report-only ----
+    _l93, _n93 = d93_ri_soft()
+    out.append('\n== D93 参考区间软门（report-only，不判级）')
+    out.extend(_l93)
+    _l94, _n94 = d94_qc_codes()
+    out.append('\n== D94 qc.code 受控（report-only，不判级；词表待另文件落盘）')
+    out.extend(_l94)
+    _l95, _n95 = d95_dict_contract(_dict_db_path(), FAM_DB, PROJ)
+    out.append(f'\n== D95 dict 覆盖契约（全局 dict.db / DB5T_DICT；P1）：{_n95} 项')
+    out.extend(_l95)
+    if _n95:
+        all_rows.append((f'family:{FAM}', 'dict', 'D95', _n95))
+    _l96, _n96 = d96_count_conservation(PROJ)
+    out.append(f'\n== D96 计数守恒（Σ clin.merged_n = Σ src.rows active；P1）：{_n96} 个库')
+    out.extend(_l96)
+    if _n96:
+        all_rows.append((f'family:{FAM}', 'clin', 'D96', _n96))
+    _l97, _n97 = d97_col_purity(PROJ)
+    out.append('\n== D97 列格式纯度（按域判混合；report-only，不判级）')
+    out.extend(_l97)
+    _l98, _n98 = d98_ascii_units(FAM_DB, PROJ)
+    out.append(f'\n== D98 命名与外置单位（律 1 ASCII；列名不得内嵌单位；P1）：{_n98} 项')
+    out.extend(_l98)
+    if _n98:
+        all_rows.append((f'family:{FAM}', 'clin', 'D98', _n98))
+    _l99, _n99 = d99_enum_domain()
+    out.append('\n== D99 枚举值域（report-only，不判级）')
+    out.extend(_l99)
     # 只报数：零引用行可能是「数据只在 excluded_sheets 里」的正常留痕，判级交人工定性。
     d63, b63 = d63_uid_segments()
     out.append(f'\n== D63 三段 uid 映射（0 human / 8 animal / 9 占位）：{b63} 条')
