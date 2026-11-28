@@ -17,7 +17,7 @@ branch anchors against that map; semantic drift still needs human review.
 
 Usage (moved to MY-CODES tools/visualization on 2026-11-01, t1521u P3-A):
 
-    $env:SKILLS_ROOT = "<MY-SKILLS>"     # registry / runtime-flow / gates / ARCHITECTURE / contract
+    $env:SKILLS_ROOT = "<MY-SKILLS>"     # registry / runtime-flow / gates / README / contract
     python {code_stats}\tools\visualization\gen_visualization.py --out DIR
     python {code_stats}\tools\visualization\gen_visualization.py --check
     python {code_stats}\tools\visualization\gen_visualization.py \
@@ -66,7 +66,7 @@ REGISTRY = ROOT / "00_orchestrator" / "registry.yaml"
 RUNTIME_MMD = ROOT / "00_orchestrator" / "runtime-flow.mmd"
 RUNTIME_MD = ROOT / "00_orchestrator" / "runtime-flow.md"
 GATES = ROOT / "00_orchestrator" / "gates.md"
-ARCH_MD = ROOT / "ARCHITECTURE.md"
+ARCH_MD = ROOT / "README.md"
 CONTRACT = ROOT / CONTRACT_REL
 
 
@@ -348,7 +348,7 @@ def require_anchors(mmd: str, gates: str, architecture: str, runtime_md: str = "
         )
     for folder in SKILL_TOPS:
         if folder not in architecture:
-            raise GateFailure("G-VIZ-01", f"ARCHITECTURE.md missing {folder}")
+            raise GateFailure("G-VIZ-01", f"README.md missing {folder}")
         if not (ROOT / folder).is_dir():
             raise GateFailure("G-VIZ-01", f"missing directory {folder}")
     for entry in ROOT.iterdir():
@@ -1294,7 +1294,7 @@ def build() -> dict:
         "index.html": shell("MY-SKILLS", home_body, version, digest, nav_for(**home_links)),
         "architecture/status.html": render_status(
             "Architecture IR status",
-            "Stable system components from ARCHITECTURE.md and the 00-07 directories.",
+            "Stable system components from README.md and the 00-07 directories.",
             comp_rows,
             arch_extra,
             version,
