@@ -193,7 +193,8 @@ def dict_cov(path, scope, fam_db):
         mcols = [r[1] for r in c.execute('pragma table_info(_modules_radiomics)')]
         missing = missing + [f'_modules_radiomics.{x}' for x in mcols if ('_modules_radiomics', x) not in rows]
         extra = extra + [f'_modules_radiomics.{x}' for x in rows if x[0] == '_modules_radiomics' and x[1] not in mcols]
-    c.close(); f.close()
+    c.close()
+    f.close()
     return missing, extra
 
 
@@ -603,14 +604,17 @@ def d54_phi_valueset(path, fam_db, scope=None):
                 "select family_uid, 'id_number', value from id_number where value is not null"):
             v = str(v).strip()
             if len(v) >= 4:
-                own.setdefault(uid, set()).add(v); every.add(v)
+                own.setdefault(uid, set()).add(v)
+                every.add(v)
         for col in ('phone', 'id_card', 'address'):
             for uid, v in fc.execute(f'select family_uid, {col} from id where {col} is not null and {col}<>""'):
                 v = str(v).strip()
                 if len(v) >= 4:
-                    own.setdefault(uid, set()).add(v); every.add(v)
+                    own.setdefault(uid, set()).add(v)
+                    every.add(v)
     except sqlite3.Error as e:
-        fc.close(); return [f'D54 读家族库失败：{e} !!']
+        fc.close()
+        return [f'D54 读家族库失败：{e} !!']
     fc.close()
     # 键列：dict.role='key'
     keycol = set()
@@ -639,7 +643,8 @@ def d54_phi_valueset(path, fam_db, scope=None):
                 rows = conn.execute(f'select family_uid, "{c}" from "{t}" where "{c}" is not null').fetchall()
             except sqlite3.Error:
                 continue
-            n0 = 0; n2 = 0
+            n0 = 0
+            n2 = 0
             for uid, v in rows:
                 if not isinstance(v, str):
                     continue
@@ -654,7 +659,8 @@ def d54_phi_valueset(path, fam_db, scope=None):
             if n0:
                 p0.append((t, c, n0))
             if n2:
-                coincidence += n2; coin_cols[c] = coin_cols.get(c, 0) + n2
+                coincidence += n2
+                coin_cols[c] = coin_cols.get(c, 0) + n2
     conn.close()
     out.append(f'D54 行级对齐：家族库号码值 {len(every)} 个、一人一名下集合 {len(own)} 人')
     if p0:
@@ -822,7 +828,6 @@ def d62_blob_ptr(path):
         return out, bad, p0
     f = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
     rows = f.execute("select src_id,rel_path,sha256 from src where rel_path like 'blob:%'").fetchall()
-    qc_codes = {}
     try:
         for sid, det in f.execute("select src_id, detail from qc where code='SOURCE_SNAPSHOT_ONLY'"):
             pass
@@ -852,10 +857,13 @@ def d62_blob_ptr(path):
                 # 原件不在 → 旧库快照
                 odb = _old_container(fam)
                 if not odb or not odb.exists():
-                    out.append(f'src {sid} 旧库不存在，无法验快照：{odb}'); bad += 1; continue
+                    out.append(f'src {sid} 旧库不存在，无法验快照：{odb}')
+                    bad += 1
+                    continue
                 if fam not in caches:
                     oc = sqlite3.connect(f'file:{odb}?mode=ro', uri=True)
-                    import hashlib, zlib
+                    import hashlib
+                    import zlib
                     got = []
                     for r in oc.execute('select src_id, sha256, blob from src'):
                         got.append((r[0], r[1], 0))
@@ -883,12 +891,16 @@ def d62_blob_ptr(path):
                     if sid in lost:
                         out.append(f'~  src {sid} 快照容器已丢失（qc 已记账，不可复验）：{raw}#{sheet}')
                         continue
-                    out.append(f'src {sid} 快照 sha 在旧库查不到：{raw}#{sheet}'); bad += 1; continue
+                    out.append(f'src {sid} 快照 sha 在旧库查不到：{raw}#{sheet}')
+                    bad += 1
+                    continue
                 snap += 1
                 if not any(str(sid) in (q[4] or '') for q in qc_rows):
                     snap_noqc += 1
                 continue
-            out.append(f'src {sid} 指针不合法：{rel[:80]}'); bad += 1; continue
+            out.append(f'src {sid} 指针不合法：{rel[:80]}')
+            bad += 1
+            continue
         cont, old = m.group('cont'), int(m.group('sid'))
         cfam = cont[:-2] if cont.endswith('db') else cont
         cpath = DBROOT / cfam / '_PHI' / cont
@@ -899,16 +911,21 @@ def d62_blob_ptr(path):
             if alt.exists() and _has_src(alt):
                 cpath = alt
         if not cpath.exists():
-            out.append(f'src {sid} 容器缺失：{cpath}'); bad += 1; continue
+            out.append(f'src {sid} 容器缺失：{cpath}')
+            bad += 1
+            continue
         if cont not in caches:
             c = sqlite3.connect(f'file:{cpath}?mode=ro', uri=True)
             caches[cont] = [r for r in c.execute('select src_id, sha256 from src')]
             c.close()
         hit = [r for r in caches[cont] if r[0] == old]
         if not hit:
-            out.append(f'src {sid} 容器 {cont} 无 src_id={old}'); bad += 1; continue
+            out.append(f'src {sid} 容器 {cont} 无 src_id={old}')
+            bad += 1
+            continue
         if s_sha and hit[0][1] and s_sha != hit[0][1]:
-            out.append(f'src {sid} sha 不一致：本库 {s_sha[:10]}… vs 容器 {hit[0][1][:10]}…'); bad += 1
+            out.append(f'src {sid} sha 不一致：本库 {s_sha[:10]}… vs 容器 {hit[0][1][:10]}…')
+            bad += 1
     out.append(f'blob 指针 {len(rows)} 条：跨族 {len(rows) - snap - snap_noqc if False else len(rows) - snap}，'
                f'同族快照 {snap}（其中缺 SOURCE_SNAPSHOT_ONLY qc {snap_noqc}）'
                + (f'，不符 {bad}' if bad else '，一致') + (f'，P0 {p0}' if p0 else ' .'))
@@ -939,7 +956,8 @@ def _registered_id_collisions():
             try:
                 c = sqlite3.connect(f'file:{db}?mode=ro', uri=True)
                 if not c.execute("select 1 from sqlite_master where name='qc'").fetchone():
-                    c.close(); continue
+                    c.close()
+                    continue
                 for (val,) in c.execute(
                         "select column_name from qc where code='ID_COLLISION'"
                         " and scope='id_number' and column_name is not null"
@@ -1040,8 +1058,9 @@ def d63_uid_segments():
             else:
                 okk = False
             if not okk:
-                out.append(f'{slug} uid={u} 段={seg} subject_type={typ} status={st}'); bad += 1
-    out.append(f'三段映射检查：{'符合' if not bad else f'{bad} 条不符 !!'}'
+                out.append(f'{slug} uid={u} 段={seg} subject_type={typ} status={st}')
+                bad += 1
+    out.append(f"三段映射检查：{'符合' if not bad else f'{bad} 条不符 !!'}"
                + (f'；0 段仅标签身份 {soft} 人（只报数：既无号码，也无姓名/拉丁名之外的标识）' if soft else ''))
     return out, bad
 
@@ -1049,7 +1068,6 @@ def d63_uid_segments():
 
 def d34_registry(fam, fam_db):
     """D68 双向登记门：库在账不在 / 账在库不在 → P0。"""
-    from pathlib import Path as _P
     base = STAGE / fam
     if not base.exists():
         return []
@@ -1104,7 +1122,7 @@ def d71_seg9_idnum():
             return [f'  D71 跳过（{e}）'], 0
     checked = sum(r[2] for r in rows)
     if not rows:
-        return [f'  D71 9 段人物持有患者级号码：检查 0 行，违规 0 行 .'], 0
+        return ['  D71 9 段人物持有患者级号码：检查 0 行，违规 0 行 .'], 0
     for kind, iss, n, nu in rows:
         bad += n
         if len(out) < 8:
@@ -1162,7 +1180,8 @@ def d72_identity_grain():
                     "select distinct family_uid from id_number where kind in (%s)" % ','.join('?'*len(PAT)), PAT)}
         except sqlite3.Error:
             continue
-        seg = lambda u: (u.split('-')[1][:1] if '-' in u and len(u.split('-')[1]) >= 6 else '?')
+        def seg(u):
+            return (u.split('-')[1][:1] if '-' in u and len(u.split('-')[1]) >= 6 else '?')
         ppl = [u for u in uids if u in named or u in nummed]
         if grain == 'person':
             wrong = [u for u in ppl if seg(u) in ('9', '?')]
@@ -1212,7 +1231,8 @@ def d74_meta_keys(path):
     c = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
     t = {r[0] for r in c.execute("select name from sqlite_master where type='table'")}
     if 'meta' not in t:
-        c.close(); return [], 0
+        c.close()
+        return [], 0
     mk = dict(c.execute('select k,v from meta').fetchall())
     c.close()
     if mk.get('no_data') == '1':
@@ -1966,7 +1986,7 @@ def main():
     if not FAM_DB.exists():
         # 家族库不在 = 桶名没切或库没搬。直接说清楚，别让 sqlite 抛 traceback 掩盖原因。
         print(f'FAIL {FAM}：缺家族库 {FAM_DB}')
-        print(f'     家族库桶只认 _PHI，子工程库在 <family>/<slug>/<slug>db；先跑迁移再验。')
+        print('     家族库桶只认 _PHI，子工程库在 <family>/<slug>/<slug>db；先跑迁移再验。')
         sys.exit(2)
     out = [f'# gate.log  built={datetime.datetime.now():%Y-%m-%d %H:%M:%S}  python={sys.version.split()[0]}']
     phis = phi_values()
@@ -2051,7 +2071,7 @@ def main():
                 out.append('  ' + ln)
             if b64:
                 all_rows.append((tag, 'src', 'D64', b64))
-                d65 = d65_origin_unknown(path)
+                d65 = d65_origin_unknown(p)
                 for ln in d65:
                     print('    ' + ln)
                 all_rows.append((tag, 'clin', 'D65', 0))
@@ -2212,7 +2232,7 @@ def main():
     if '--cutover' in sys.argv:
         # 换库前一次性判定：现算「违反 + 待修」，不落任何库存字段（能算出来的不落盘）
         v = [r for r in all_rows if not (isinstance(r[3], int) and r[3] == 0)]
-        lines = [f'# cutover blockers — {FAM}', f'',
+        lines = [f'# cutover blockers — {FAM}', '',
                  f'- 生成时间：{datetime.datetime.now().isoformat(timespec="seconds")}',
                  f'- 违反（P0/P1）：{len(v)}', f'- 待修（换库前必修）：{len(_pending)}', '']
         lines += ['## 违反'] + ([f'- {a} | {b}.{c}' for a, b, c in v] or ['- 无'])

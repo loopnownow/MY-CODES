@@ -7,7 +7,6 @@
 import sqlite3
 import pathlib
 import sys
-import json
 
 import paths as _P  # ROOT/STAGE 由 DB5T_BATCH / DB5T_ROOT 决定
 

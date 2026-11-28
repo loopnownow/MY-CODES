@@ -47,8 +47,8 @@ def stmts(sql):
     只剔「行首」是说明的行；行内出现 ** 的合法 DDL（如 `person_count INTEGER, -- **不是队列人数**`）
     不能整行删——那会静默丢列（2026-11-25：ref_project 少了 person_count）。
     """
-    lines = [l for l in sql.split('\n')
-             if not l.lstrip().startswith(('|', '>', '`', '**'))]
+    lines = [line for line in sql.split('\n')
+             if not line.lstrip().startswith(('|', '>', '`', '**'))]
     body = '\n'.join(lines)
     return [s.strip() + ';' for s in body.split(';') if s.strip()]
 

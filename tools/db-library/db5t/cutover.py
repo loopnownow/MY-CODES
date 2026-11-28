@@ -158,7 +158,7 @@ def main() -> int:
     subprocess.run([sys.executable, "-B", str(HERE / "fix_sha.py"), a.family], env=env2)
     rc2, out2 = gate(env2)
     print(f"[4] 真库门禁 rc={rc2}")
-    for ln in [l for l in out2.splitlines() if "CHECK 全库汇总" in l][:3]:
+    for ln in [line for line in out2.splitlines() if "CHECK 全库汇总" in line][:3]:
         print("    " + ln)
 
     LEDGER.parent.mkdir(parents=True, exist_ok=True)

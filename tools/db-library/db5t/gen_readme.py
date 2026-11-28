@@ -11,7 +11,6 @@
 """
 import json
 import pathlib
-import re
 import sqlite3
 import sys
 
@@ -81,7 +80,7 @@ def write_family(fam):
         f'# {fam} 家族库（`{fam}db`）',
         '',
         '## 库角色',
-        f'- 家族库：身份（`id`/`id_number`）与字典（`dict`）的唯一落点，**PHI 只允许出现在 `id` 表**。',
+        '- 家族库：身份（`id`/`id_number`）与字典（`dict`）的唯一落点，**PHI 只允许出现在 `id` 表**。',
         f'- 建库脚本：`stage/_work/` 下对应的 build 脚本；生成时间 {m.get("built_at", "未记录")}。',
         f'- 受试者类型：{json.dumps(st, ensure_ascii=False)}',
         f'- uid 段：{m.get("uid_ranges", "未记录")}',
