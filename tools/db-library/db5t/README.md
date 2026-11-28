@@ -12,13 +12,15 @@
 | `mkschema.py` | `schema-v1.md` → `schema.sql`：只认两段 ```sql，7 个模态展开，家族库剔 `dict`，首行记 `source_sha256`；`--check` 校验过期 |
 | `newdb.py` | 按 `schema.sql` 建空库（家族库 + 子库 + `meta` + `目录说明.md`）；目标已存在就跳过，绝不覆盖 |
 | `mkdict.py` | 旧家族 `dict`（11 列）→ 全局 `{RAW}\Family\dict.db`（14 列），补 `scope='stage'` 骨架行，同键异写出冲突报告 |
+| `mkid.py` | 阶段 3：从退役家族库搬 `id` / `id_number`，实时算 `longitudinal_n` / `multi_record_n`，写 `ref_project` 登记行与两库 `meta`（`subject_types` / `identity_grain`）；幂等 |
+| `fill.py` | 阶段 5：读 13 列 `map.csv`，按物理依赖序 src→person→clin→`_modules_*`→`*_val` 回填；无 dict 行不 ALTER（契 2）；`--dry-run` 只报不做；重跑先清本 src 旧行 |
 | `ddl_drift.py` | D58 用：把 SCHEMA 的两个 sql 块在空内存库里跑一遍取 `pragma`，不手写 DDL 解析 |
 | `audit_families.py` | 跨家族只读审计（结构漂移 / 计数镜像 / qc 存量 / 日志模式 / 目录说明） |
 | `fix_sha.py` | 刷新 `ref_project.sha256`（**必须在写完全部 meta 之后**跑） |
 | `migrate_id_v2.py` | `id` 12 列 → 24 列重建迁移（`ALTER` 改不了列序，只能建新表抄数据；缺省 dry-run，`--apply` 才写盘并先备份） |
 | `migrate_clin_v2.py` | `clin` 旧头 → v2 头（11 列头 + legacy 三元组 + 15 空 `path_*`）重建迁移；`group_v`/`subgroup` 同名变量并值进头列、`--clean` 才清违例库；缺省 dry-run，`--apply` 先备份 |
 | `gen_readme.py` | 生成 `<leaf>/目录说明.md`（幂等，由各 build 收尾调用） |
-| `schema-v1.md` | SCHEMA 的仓库副本（权威版在批次目录时 `paths.py` 优先用批次）；`mkschema.py` 默认从这里生成 `schema.sql` |
+| `schema-v1.md` | SCHEMA 的仓库权威副本；`mkschema.py` 默认从这里生成 `schema.sql`（不再读批次副本——`.Del` 下那份是历史快照，DDL 相同时只差注释） |
 | `schema.sql` | `schema-v1.md` 的机器可读产物（`@section family` / `@section project`），`newdb.py` 据此建库；**不要手改** |
 
 ## 用法
@@ -47,6 +49,11 @@ DB5T_ROOT=<库根> python -B fix_sha.py MCI|all
 python -B mkschema.py && python -B mkschema.py --check
 python -B newdb.py --family MM --slug zy_MM --dry-run
 python -B mkdict.py --dry-run
+
+# 8) 阶段 3/5（MM 试点实测命令，换家族只换 --family/--slug）
+python -B mkid.py --from-family-db <退役家族库> --root <stage> --family MM --slug zy_MM
+python -B fill.py --map <批次>\_work\map.csv --root <stage> --family MM --slug zy_MM \
+                  --src-root <批次父目录> [--dry-run]
 ```
 
 ## 三条硬约束（都是踩过的坑）

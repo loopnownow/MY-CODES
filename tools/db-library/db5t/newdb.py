@@ -80,6 +80,15 @@ def write_meta(db: pathlib.Path, rows: dict):
         c.close()
 
 
+def tidy_sidecars(db: pathlib.Path):
+    """WAL 库关连接后若 -wal 已空，顺手清掉 -wal/-shm：叶内只留 db 与目录说明.md（S26）。"""
+    wal, shm = db.with_name(db.name + '-wal'), db.with_name(db.name + '-shm')
+    if wal.exists() and wal.stat().st_size == 0:
+        wal.unlink()
+        if shm.exists():
+            shm.unlink()
+
+
 def build(db: pathlib.Path, ddl: str, meta: dict, dry: bool) -> str:
     if db.exists():
         return f'SKIP 已存在 {db}（不覆盖）'
@@ -93,6 +102,7 @@ def build(db: pathlib.Path, ddl: str, meta: dict, dry: bool) -> str:
     finally:
         c.close()
     write_meta(db, meta)
+    tidy_sidecars(db)
     n = len([r for r in sqlite3.connect(db).execute(
         "select name from sqlite_master where type='table' and name not like 'sqlite_%'")])
     return f'NEW  {db}  tables={n}'
@@ -106,6 +116,9 @@ def main(argv=None) -> int:
     ap.add_argument('--schema', type=pathlib.Path, default=HERE / 'schema.sql')
     ap.add_argument('--schema-md', type=pathlib.Path, default=HERE / 'schema-v1.md')
     ap.add_argument('--period-unit', default='singleton', help='整数（月）或 singleton')
+    ap.add_argument('--identity-grain', default='person',
+                    choices=['person', 'specimen', 'exam', 'sample', 'label', 'mixed'],
+                    help='family_uid 指代什么（D72 必需；默认 person）')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--allow-stale', action='store_true', help='允许 schema.sql 与 schema-v1.md 不同步')
     a = ap.parse_args(argv)
@@ -121,9 +134,11 @@ def main(argv=None) -> int:
     now = dt.datetime.now().astimezone().isoformat(timespec='seconds')
 
     fam_meta = {'schema_version': '5t/1', 'kind': 'family', 'family': a.family,
-                'built_at': now, 'rule': 'db-build-contract.md'}
+                'built_at': now, 'rule': 'db-build-contract.md',
+                'identity_grain': a.identity_grain}
     proj_meta = {'schema_version': '5t/1', 'kind': 'project', 'family': a.family,
                  'slug': a.slug, 'built_at': now, 'rule': 'db-build-contract.md',
+                 'identity_grain': a.identity_grain,
                  'dict_owner': str(paths.DICT)}
     if a.period_unit not in ('', 'singleton'):
         proj_meta['period_unit'] = str(int(a.period_unit))

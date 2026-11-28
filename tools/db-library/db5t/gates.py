@@ -27,6 +27,25 @@ if FAM_DB.exists():
 SCHEMA = (B.SCHEMA_MD).read_text(encoding='utf-8')
 
 
+def _dict_ro():
+    """全局 dict（契 3）：5t 家族库不再带 dict，所有读 dict 的门都改读 DB5T_DICT / paths.DICT。"""
+    p = pathlib.Path(os.environ.get('DB5T_DICT') or B.DICT)
+    if not p.exists():
+        raise sqlite3.OperationalError(f'缺全局 dict.db：{p}')
+    return sqlite3.connect(f'file:{p}?mode=ro', uri=True)
+
+
+# 结构列：由 SCHEMA 定义、不是源表变量，dict 里不必逐项目登记（family/stage 骨架各一行就够）。
+# 2026-11-28 试点 MM：D95 报 126 条「缺 dict 行」，逐条查下来全是这 13+5 个结构列 × 7 个模态，
+# 与 D78 早就在豁免的是同一批（那年 MCI 漏登记 device 把 27 家判红，是同一个坑）。
+STRUCT_COLS = {
+    'family_uid', 'period_month', 'month_ix', 'period_source', 'period_origin',
+    'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort',
+    'exam_uid', 'sequence', 'batch_id', 'lesion_ix', 'specimen_ix',
+    'entity', 'feature', 'value', 'unit', 'device', 'site', 'roi_n', 'note',
+}
+
+
 def sha(p):
     h = hashlib.sha256()
     with open(p, 'rb') as f:
@@ -160,10 +179,15 @@ def phi_scan(path, phis):
 
 def dict_cov(path, scope, fam_db):
     c = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
-    f = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
-    rows = {(r[0], r[1]) for r in f.execute('select table_name,column_name from dict where scope=?', (scope,))}
+    f = _dict_ro()
+    # 契 3：dict 全局化后家族库里没有 dict；proj 行 + family 行一起读（结构列登记在 family scope）
+    rows = {(r[0], r[1]) for r in f.execute(
+        "select table_name,column_name from dict where scope in (?, 'family')", (scope,))}
+    # 同名变量跨表共用一行是常态（与 D78 aname / D88 同口径）：`us_val` 的 feature 名往往
+    # 就是 clin 里已登记的列名（age/sex/shape…），只按 (表名,列名) 找会整批报缺。
+    aname = {r[0] for r in f.execute("select column_name from dict")}
     cols = [r[1] for r in c.execute('pragma table_info(clin)')]
-    missing = [x for x in cols if ('clin', x) not in rows]
+    missing = [x for x in cols if x.lower() not in STRUCT_COLS and ('clin', x) not in rows]
     extra = [x for x in rows if x[0] == 'clin' and x[1] not in cols]
     tabs = {r[0] for r in c.execute("select name from sqlite_master where type='table'")}
     # 通用：任一 <mod>_val（裁决 3：按模态成对建表）其 feature 必须逐条 dict
@@ -171,7 +195,8 @@ def dict_cov(path, scope, fam_db):
         if not t.endswith('_val'):
             continue
         feats = sorted({r[0] for r in c.execute(f'select distinct feature from "{t}"')})
-        miss_f = [x for x in feats if (t, x) not in rows]
+        miss_f = [x for x in feats if x.lower() not in STRUCT_COLS
+                  and (t, x) not in rows and x not in aname]
         extra_f = [x for x in rows if x[0] == t and x[1] not in feats
                    and x[1] not in ('exam_uid', 'entity', 'feature', 'value', 'unit')]
         missing = missing + [f'{t}.feature:{x}' for x in miss_f]
@@ -180,8 +205,10 @@ def dict_cov(path, scope, fam_db):
         if not t.startswith('_modules_'):
             continue
         mcols = [r[1] for r in c.execute(f'pragma table_info("{t}")')]
-        missing = missing + [f'{t}.{x}' for x in mcols if (t, x) not in rows]
-        extra = extra + [f'{t}.{x}' for x in rows if x[0] == t and x[1] not in mcols]
+        missing = missing + [f'{t}.{x}' for x in mcols
+                             if x.lower() not in STRUCT_COLS and (t, x) not in rows]
+        extra = extra + [f'{t}.{x}' for x in rows
+                         if x[0] == t and x[1] not in mcols and x[1].lower() not in STRUCT_COLS]
     if False and 'radiomics_val' in tabs:
         feats = sorted({r[0] for r in c.execute('select distinct feature from radiomics_val')})
         miss_f = [x for x in feats if ('radiomics_val', x) not in rows]
@@ -191,8 +218,11 @@ def dict_cov(path, scope, fam_db):
         extra = extra + [f'radiomics_val.feature:{x}' for x in extra_f]
     if '_modules_radiomics' in tabs:
         mcols = [r[1] for r in c.execute('pragma table_info(_modules_radiomics)')]
-        missing = missing + [f'_modules_radiomics.{x}' for x in mcols if ('_modules_radiomics', x) not in rows]
-        extra = extra + [f'_modules_radiomics.{x}' for x in rows if x[0] == '_modules_radiomics' and x[1] not in mcols]
+        missing = missing + [f'_modules_radiomics.{x}' for x in mcols
+                             if x.lower() not in STRUCT_COLS and ('_modules_radiomics', x) not in rows]
+        extra = extra + [f'_modules_radiomics.{x}' for x in rows
+                         if x[0] == '_modules_radiomics' and x[1] not in mcols
+                         and x[1].lower() not in STRUCT_COLS]
     c.close()
     f.close()
     return missing, extra
@@ -619,7 +649,7 @@ def d54_phi_valueset(path, fam_db, scope=None):
     # 键列：dict.role='key'
     keycol = set()
     try:
-        fc = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+        fc = _dict_ro()
         # 键列：项目 scope + 家族 scope 都要读（id.subject_label 等结构列登记在 family scope）
         if scope:
             keycol = {r[0].lower() for r in fc.execute("select column_name from dict where role='key' and scope in (?, 'family')", (scope,))}
@@ -714,7 +744,7 @@ def d55_relative_time(path):
     """D55：相对时间列（postop_day/followup_month/relative_*）dict 必须写 unit 与 time_origin；
     若 meta.date_time_mode 声明 only-relative 而 clin 里有非 UNK 的 period_month → P0（自相矛盾）。"""
     conn = sqlite3.connect(f'file:{path}?mode=ro', uri=True)
-    fam = sqlite3.connect(f'file:{FAM_DB}?mode=ro', uri=True)
+    fam = _dict_ro()
     rows, bad = [], 0
     cols = [r[1] for r in conn.execute('pragma table_info(clin)')]
     rel = [c for c in cols if c in ('postop_day', 'followup_month') or c.startswith('relative_')]
@@ -1333,17 +1363,11 @@ def d78_dict_provenance(fam_db):
     `source` 全 NULL。合并列没有 `source`，下一个读库的人无法回答「这列从哪张表来、覆盖了哪几个
     源列」，只能回去读 build 脚本——而 build 脚本不随库走。
     """
-    SYS = {'family_uid', 'period_month', 'month_ix', 'period_source', 'period_origin',
-           'unk_seq', 'observed_on', 'merged_n', 'src_id', 'src_row', 'cohort',
-           'exam_uid', 'sequence', 'batch_id', 'lesion_ix', 'specimen_ix',
-           'entity', 'feature', 'value', 'unit',
-           # SCHEMA §2 的 _modules_<mod> 结构列：它们描述「这次检查怎么来的」，不是源表的变量，
-           # 没有源列可溯源。漏登记的代价是把 27 家都判红（2026-11-25 MCI 的 device 等）。
-           'device', 'site', 'roi_n', 'note'}
+    SYS = STRUCT_COLS
     if not fam_db.exists():
         return [], 0
     try:
-        f = sqlite3.connect('file:%s?mode=ro' % fam_db, uri=True)
+        f = _dict_ro()
     except sqlite3.Error:
         return [], 0
     out, bad = [], 0
@@ -1363,6 +1387,11 @@ def d78_dict_provenance(fam_db):
                 reg[(tn, cn)] = src
                 if not tn:
                     byname[cn] = src
+            # 第三层兜底：同名变量跨表共用一行是常态（D88 同理）。长表 `*_val` 的 feature
+            # 名往往就是 clin 里已登记过的变量名（age/size_mm…），只按 (表名,列名) 找会全判缺失
+            # ——2026-11-28 试点 MM 的 15 个超声 feature 就是这么整批报红的。
+            aname = {cn: src for cn, src in f.execute(
+                "select column_name, coalesce(source,'') from dict") if (src or '').strip()}
             try:
                 c = sqlite3.connect('file:%s?mode=ro' % p, uri=True)
             except sqlite3.Error:
@@ -1375,7 +1404,7 @@ def d78_dict_provenance(fam_db):
                     cols = [r[1] for r in c.execute('pragma table_info("%s")' % t)]
                     miss = [col for col in cols
                             if col not in SYS
-                            and not (reg.get((t, col)) or byname.get(col) or '').strip()]
+                            and not (reg.get((t, col)) or byname.get(col) or aname.get(col) or '').strip()]
                     if miss:
                         bad += len(miss)
                         out.append('  !! P1 %s.%s：%d 个值列缺 dict.source（例 %s）'
@@ -1392,7 +1421,7 @@ def d78_dict_provenance(fam_db):
                         continue
                     miss = [ft for ft in feats
                             if ft not in SYS
-                            and not (reg.get((vt, ft)) or byname.get(ft) or '').strip()]
+                            and not (reg.get((vt, ft)) or byname.get(ft) or aname.get(ft) or '').strip()]
                     if miss:
                         bad += len(miss)
                         out.append('  !! P1 %s.%s：%d 个 feature 行缺 dict.source（例 %s）'
@@ -1748,16 +1777,14 @@ def d87_fingerprint(fam_db, projs):
 
 
 def d88_dict_coverage(fam_db, projs):
-    """D88（report-only）：`clin` 变量列（去 v1/v2 头列）每列须在家族库 `dict` 有对应记录。
+    """D88（report-only）：`clin` 变量列（去 v1/v2 头列）每列须在全局 `dict` 有对应记录。
 
     按列名匹配（`dict.column_name`），不按 `scope` 分片：同名变量在多个项目里共用一行是常态，
     按 scope 卡会把已登记的列重复报成缺口。
     另报 `dict.description` 为空的行：行在、全称没写，等于「登记了但没人知道这列是什么」。
     """
-    if not fam_db.exists():
-        return ['  · 家族库不存在，跳过'], 0
     try:
-        c = sqlite3.connect(f'file:{fam_db}?mode=ro', uri=True)
+        c = _dict_ro()
         known, nodesc = set(), 0
         for cn, desc in c.execute("select column_name, coalesce(trim(description),'') from dict"):
             if cn:
@@ -2133,6 +2160,8 @@ def d95_dict_contract(dict_db, fam_db, projs):
                 if _skip_table(table):
                     continue
                 for col, typ in _ti(c, table):
+                    if col.lower() in STRUCT_COLS:
+                        continue
                     rec = _resolve_dict(idx, table, col, slug)
                     tag = f'{slug + "." if slug else ""}{table}.{col}'
                     if rec is None:
@@ -2621,6 +2650,12 @@ def main():
     if lon:
         all_rows.append((f'family:{FAM}', 'ref_project', 'LONGITUDINAL', len(lon)))
     ok = all((isinstance(r[3], int) and r[3] == 0) for r in all_rows) and '!!' not in '\n'.join(out)
+    if not ok:
+        # 汇总说「存在违反」就要点名：只写一句话等于让人回去逐行找（2026-11-28 试点 MM 踩过一次，
+        # 输出里一个 `!!` 都没有却报违规，查了半小时才发现是账本行非零）。
+        bad_rows = [f'{a}.{b}:{c}={d}' for a, b, c, d in all_rows
+                    if isinstance(d, int) and d != 0]
+        out.append('\n违规账本行：' + ('; '.join(bad_rows) if bad_rows else '（无账本行，见正文 !! 行）'))
     _pt = f'（待修 {len(_pending)}）' if _pending else ''
     if _pending:
         out.append('\n待修（P2/换库前必修，不计家级违规）：' +

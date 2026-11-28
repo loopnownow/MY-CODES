@@ -153,14 +153,20 @@ def test_d95_missing_column_and_dtype_conflict(tmp_path, gates):
     # drop the proj-level size_val row so coverage fails; also type-conflict note as INTEGER vs TEXT
     dc = sqlite3.connect(dict_db)
     dc.execute("DELETE FROM dict WHERE column_name='size_val'")
-    dc.execute("UPDATE dict SET dtype='INTEGER' WHERE table_name='clin' AND column_name='note'")
+    # 用真变量列造 dtype 矛盾：`note` 是 schema 声明的结构列，D95 已豁免，不能再当探针
+    dc.execute("INSERT INTO dict(scope, table_name, column_name, dtype) "
+               "VALUES ('proj:demo', 'clin', 'age', 'TEXT')")
     dc.commit()
     dc.close()
+    pc = sqlite3.connect(projs[0][1])
+    pc.execute("ALTER TABLE clin ADD COLUMN age REAL")
+    pc.commit()
+    pc.close()
     _lines, n = gates.d95_dict_contract(dict_db, fam_db, projs)
     assert n >= 2, _lines
     joined = "\n".join(_lines)
     assert "size_val" in joined
-    assert "note" in joined
+    assert "age" in joined
 
 
 def test_d95_scope_prefers_proj_over_stage(tmp_path, gates):

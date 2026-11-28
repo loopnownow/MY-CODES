@@ -71,6 +71,11 @@ def expected_sets():
         for (t,) in conn.execute("select name from sqlite_master where type='table' and name not like 'sqlite_%'"):
             exp[t.lower()] = {r[1]: norm_type(r[2]) for r in conn.execute(f'pragma table_info("{t}")')}
         conn.close()
+        if name == 'family':
+            # 契 3：dict 只住全局 `_DataBase\Family\dict.db`，家族库里不得再有 dict。
+            # schema-v1.md 的第一段仍留着这段 DDL（旧库历史形态），期望集必须剔掉，
+            # 否则 D70 会对每个 5t 家族库报 MISSING_TABLE dict —— 那正好是新口径要的形态。
+            exp.pop('dict', None)
         out[name] = exp
     # 模板表的期望列：从 build 的 project_ddl 生成的真实库里读不到，改用已知两份
     return out
