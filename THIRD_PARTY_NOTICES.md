@@ -1,0 +1,16 @@
+# Third-party notices
+
+This file summarizes third-party or externally absorbed code that already
+lives in this repository. It is a root-level index only. Original license
+files and intake notes stay in their directories and remain authoritative.
+
+| Path | Source | License | Copyright | Modified in this repo? |
+|---|---|---|---|---|
+| `tools/office/` | Anthropic skill materials | Anthropic terms (not an OSI license). Use is governed by the applicable Anthropic consumer or commercial agreement; additional restrictions in `tools/office/LICENSE.txt` prohibit extracting, redistributing, or creating derivative works of those materials. | © 2025 Anthropic, PBC. All rights reserved. | Vendored into `tools/office/`. Original `LICENSE.txt` is retained. Local layout/path adaptations may exist. |
+| `tools/verify-refs/` | [K-Dense-AI/scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) (`skills/citation-management/`); retraction stage from [aipoch/medical-research-skills](https://github.com/aipoch/medical-research-skills) | MIT (both portions) | Copyright (c) K-Dense-AI / scientific-agent-skills contributors; Copyright (c) 2026 AIpoch | Absorbed and adapted (2026-10-17 / 2026-10-30). MIT notices retained in `LICENSE_NOTE.txt`. |
+| `tools/lit-fulltext/` | [Aperivue/medsci-skills](https://github.com/Aperivue/medsci-skills/tree/main/skills/fulltext-retrieval) (`fetch_oa.py` vendored as `fetch.py`) | Upstream fetch client retains its notices (stdlib MIT-style pack); see the file header and `LICENSE_NOTE.txt` | As stated in the vendored file header | Renamed `fetch_oa.py` → `fetch.py`; OA-only retrieval policy documented in `LICENSE_NOTE.txt`. Upstream notices kept in the file header. |
+| `tools/response-qc/` | [Yuan1z0825/nature-skills](https://github.com/Yuan1z0825/nature-skills) (`skills/nature-response/`); absorbed tone assets from [aipoch/medical-research-skills](https://github.com/aipoch/medical-research-skills) | Apache-2.0 (nature-response body); MIT (tone assets) | Copyright (c) Yuan1z0825 / nature-skills (third-party; not Springer Nature official); Copyright (c) 2026 AIpoch | Absorbed and adapted (2026-10-17 / 2026-10-25). Notices retained in `LICENSE_NOTE.txt`. |
+| `tools/or-codes/` | Lab-local OR-CODES tree (unique code and documentation harvested in t2312u). Third-party subtrees from that source were **not** vendored. | Lab / project code (no separate SPDX file in this intake). Declared-but-not-vendored upstreams are noted in `tools/or-codes/INTAKE-t2312u.md` and `tools/or-codes/external/README.md` (e.g. MM-Skin; TimesFM Apache-2.0). | Lab authors of the OR-CODES source tree | Copied (not moved) and C1-sanitized for the public tree. Same-basename files vs `tools/habitat-pipeline/` are **not** byte-identical. |
+| `tools/habitat-pipeline/` | Lab Desktop.7z intake (t1727u): `habitat_pipeline`, `delta_habitat_pipeline`, and `utility` helpers | No separate upstream license file in this tree; treated as lab-origin code | Lab authors of the intake | Reorganized into `tools/habitat-pipeline/` as documented in `INTAKE-t1727u.md`. |
+
+If a new third-party tree is added, keep its original license file next to the code and add a row here.

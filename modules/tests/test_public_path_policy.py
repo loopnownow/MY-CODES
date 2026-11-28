@@ -217,5 +217,43 @@ class TestNoPatientPiiLeak(unittest.TestCase):
         )
 
 
+
+# Root dependency / env files (A2): already covered by SUFFIXES for .txt/.yml/.toml/.md.
+# paths.env.example is not in SUFFIXES; scan it only for retired lab names, not
+# for the documented example env assignments later in that file.
+ROOT_CONFIG_FILES = (
+    "requirements.txt",
+    "environment.yml",
+    "pyproject.toml",
+    "paths.env.example",
+)
+# Retired lab path / env names that must not return in root public config.
+STALE_ROOT_NAMES = re.compile(
+    r"0doc\\_code|0doc/_code|0script|zeradscripts",
+    re.I,
+)
+
+
+class TestRootConfigHasNoStaleLabNames(unittest.TestCase):
+    """A2: root requirement/env files must not revive 0doc\\_code / 0script / zeradscripts."""
+
+    def test_root_configs_omit_retired_lab_names(self) -> None:
+        offenders: list[str] = []
+        for rel in ROOT_CONFIG_FILES:
+            path = ROOT / rel
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            for i, line in enumerate(text.splitlines(), 1):
+                if STALE_ROOT_NAMES.search(line):
+                    offenders.append(f"{rel}:{i}: {line.strip()[:120]}")
+        self.assertEqual(
+            offenders,
+            [],
+            "retired lab names leaked into root config "
+            "(0doc\\_code / 0script / zeradscripts):\n" + "\n".join(offenders),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
