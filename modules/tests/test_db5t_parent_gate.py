@@ -11,8 +11,6 @@ import sqlite3
 import sys
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve().parents[2]
 DB5T = REPO / "tools" / "db-library" / "db5t"
 

@@ -269,6 +269,18 @@ def normalize(text: str) -> str:
     return TS_RE.sub("@@GENERATED_AT@@", text)
 
 
+def skill_is_non_routable(path: Path) -> bool:
+    """G-VIZ-01 skips routable: false bodies (qc / harvest / nested); they need no name:."""
+    text = read_text(path)
+    if not text.startswith("---"):
+        return False
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return False
+    data = yaml.safe_load(parts[1]) or {}
+    return isinstance(data, dict) and data.get("routable") is False
+
+
 def skill_files() -> list[Path]:
     found: list[Path] = []
     for path in ROOT.rglob("SKILL.md"):
@@ -277,6 +289,8 @@ def skill_files() -> list[Path]:
         top = path.relative_to(ROOT).parts[0]
         if top not in SKILL_TOPS:
             raise GateFailure("G-VIZ-01", f"SKILL.md outside 00-07: {path}")
+        if skill_is_non_routable(path):
+            continue
         found.append(path)
     return sorted(found, key=lambda p: (SKILL_TOPS.index(p.relative_to(ROOT).parts[0]), p.as_posix()))
 

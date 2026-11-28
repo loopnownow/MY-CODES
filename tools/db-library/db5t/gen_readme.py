@@ -117,7 +117,7 @@ def write_leaf(fam, slug):
         f'# {slug} 项目库（`{slug}db`）',
         '',
         '## 库角色',
-        '- 项目子库：分析用窄表（`person`/`clin`/`_modules_*`/`*_val`/`qc`），**不含 PHI**。',
+        '- 项目子库：分析用窄表（`person`/`clin`/`_modules_*`/`*_value`/`qc`），**不含 PHI**。',
         f'- 建库时间 {m.get("built_at", "未记录")}；源库 `{m.get("source_db", "未记录")}`。',
     ]
     if m.get('period_unit'):

@@ -253,7 +253,7 @@ CREATE TABLE <mod>_value(              -- 通用组学长表：不建 1300 列�
 --   radi_value       entity='global'；feature=影像特征名（109 列）
 -- 注：exam 级表名与长表名成对（_modules_radiomics ↔ radiomics_value），不重名。
 
--- 一张模态一张 val 表，不共用：每个模态必须有自己的一对 _modules_<mod> + <mod>_value，
+-- 一张模态一张 value 长表，不共用：每个模态必须有自己的一对 _modules_<mod> + <mod>_value，
 -- entity 的语义与 feature 的含义逐模态写进 dict。
 -- 理由：radiomics_value.entity 的取值是 ROI 名，lipid_value.feature 的取值是脂质种名——
 -- 两者形状相同但语义不同；硬塞一张表会让「按 ROI 汇总」在脂质数据上静默返回空表，
