@@ -2,7 +2,7 @@
 correlation.py — Spearman 相关性热图
 ═══════════════════════════════════════════════════════════════════
 功能：将影像组学特征与临床特征合并，计算 Spearman 秩相关系数矩阵，
-      并绘制带显著性标注的热图；同时提供针对单个目标变量（如 EGFR
+      并绘制带显著性标注的热图；同时提供针对单个参考变量（临床列
       或 Group）的相关性汇总表（含 Bootstrap CI）。
 
 统计方法：
@@ -14,6 +14,7 @@ correlation.py — Spearman 相关性热图
 
 from __future__ import annotations
 from typing import Optional, Sequence
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -476,21 +477,37 @@ def resolve_named_column(requested: str, columns, extras=None, *, allow_group_to
 
 
 def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
-                       egfr_col: str = "Estimated glomerular filtration rate",
+                       ref_col: Optional[str] = None,
                        targets: Optional[Sequence[str]] = None,
                        extra_predictors: Optional[dict] = None,
                        nboot: int = DEFAULT_NBOOT, conf_level: float = DEFAULT_CONF_LEVEL,
-                       seed: Optional[int] = None) -> pd.DataFrame:
+                       seed: Optional[int] = None,
+                       *,
+                       egfr_col: Optional[str] = None) -> pd.DataFrame:
     """
-    针对单个参考变量（egfr_col / Group / clin 列）与多个 predictor 计算
+    针对单个参考变量（ref_col / Group / clin 列）与多个 predictor 计算
     Spearman 相关及 Bootstrap CI。
 
     parameters
     ----------
+    ref_col : 参考变量名（临床列、Group，或 extra_predictors 中的键）。
+    egfr_col : 已弃用别名，等价于 ref_col；保留一个版本。
     targets : 预测变量名列表。支持 clin 列名，以及 RadScore / Clinical / Combined
               （后两者需通过 extra_predictors 提供向量）。
     extra_predictors : dict[str, array]，如 {"Clinical": ..., "Combined": ..., "RadScore": ...}
     """
+    if ref_col is None and egfr_col is None:
+        # Backward-compatible default used by older callers.
+        ref_col = "Estimated glomerular filtration rate"
+    elif ref_col is None:
+        warnings.warn(
+            "check_correlation(egfr_col=...) is deprecated; use ref_col= instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        ref_col = egfr_col
+    elif egfr_col is not None and str(egfr_col) != str(ref_col):
+        raise TypeError("ref_col and deprecated egfr_col both given and differ")
     if data_all is None or data_all.clin is None:
         raise ValueError("data_all and data_all.clin must be provided to check_correlation()")
     if seed is None:
@@ -511,26 +528,26 @@ def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
         extra_predictors.setdefault("RadScore", radscore)
     clin_cols = list(data_all.clin.columns)
     resolved_ref = resolve_named_column(
-        egfr_col, clin_cols, extras=extra_predictors, allow_group_token=True,
+        ref_col, clin_cols, extras=extra_predictors, allow_group_token=True,
     )
     if resolved_ref in data_all.clin.columns:
-        egfr_vec = pd.to_numeric(data_all.clin[resolved_ref], errors="coerce").to_numpy()
+        ref_vec = pd.to_numeric(data_all.clin[resolved_ref], errors="coerce").to_numpy()
     elif _key(resolved_ref) in extra_norm:
-        _disp, egfr_vec = extra_norm[_key(resolved_ref)]
-        egfr_vec = np.asarray(egfr_vec, dtype=float)
+        _disp, ref_vec = extra_norm[_key(resolved_ref)]
+        ref_vec = np.asarray(ref_vec, dtype=float)
     elif str(resolved_ref).lower() == "group":
         if getattr(data_all, "label", None) is not None:
-            egfr_vec = np.asarray(data_all.label, dtype=float)
+            ref_vec = np.asarray(data_all.label, dtype=float)
         elif data_all.group is not None:
-            egfr_vec = pd.factorize(data_all.group)[0].astype(float)
+            ref_vec = pd.factorize(data_all.group)[0].astype(float)
         else:
             raise ValueError(
-                f"找不到列 {egfr_col!r}。临床表没有 Group，这一层也没有分组标签。"
+                f"找不到列 {ref_col!r}。临床表没有 Group，这一层也没有分组标签。"
                 f"临床表实际列名: {', '.join(map(str, clin_cols))}"
             )
     else:
         raise ValueError(
-            f"找不到列 {egfr_col!r}。临床表实际列名: {', '.join(map(str, clin_cols))}"
+            f"找不到列 {ref_col!r}。临床表实际列名: {', '.join(map(str, clin_cols))}"
         )
 
     rows = []
@@ -560,22 +577,22 @@ def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
                 f"找不到列 {pred_name!r}。临床表实际列名: {', '.join(map(str, clin_cols))}"
             )
 
-        if x is not None and egfr_vec is not None:
+        if x is not None and ref_vec is not None:
             x = np.asarray(x, dtype=float).ravel()
-            if len(x) != len(egfr_vec):
+            if len(x) != len(ref_vec):
                 print(f"  ⚠ length mismatch for '{display_name}' "
-                      f"({len(x)} vs {len(egfr_vec)}) — skip")
+                      f"({len(x)} vs {len(ref_vec)}) — skip")
             else:
-                keep = np.isfinite(x) & np.isfinite(egfr_vec)
+                keep = np.isfinite(x) & np.isfinite(ref_vec)
                 npair = int(keep.sum())
                 n_val = npair
                 if npair >= 4:
-                    rho, pval = stats.spearmanr(x[keep], egfr_vec[keep])
+                    rho, pval = stats.spearmanr(x[keep], ref_vec[keep])
                     rng = np.random.RandomState(seed + i)
                     boots = []
                     for _ in range(nboot):
                         ii = rng.randint(0, npair, npair)
-                        xb, eb = x[keep][ii], egfr_vec[keep][ii]
+                        xb, eb = x[keep][ii], ref_vec[keep][ii]
                         if np.std(xb) == 0 or np.std(eb) == 0:
                             continue
                         boots.append(stats.spearmanr(xb, eb)[0])
@@ -585,7 +602,7 @@ def check_correlation(data_all, radscore: Optional[np.ndarray] = None,
 
         rows.append({
             "predictor": display_name,
-            "ref": egfr_col,
+            "ref": ref_col,
             "n": n_val,
             "spearman_rho": rho,
             "p_value": pval,

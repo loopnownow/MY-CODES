@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import io
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, TextIO
@@ -1850,7 +1851,7 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
         print("  Corr refs: （空）— skip Correlation with reference variables")
     else:
         print(f"  Corr refs (tables only): {corr_refs}")
-    corr_ref_tables = []
+    corr_ref_tables: dict[str, pd.DataFrame] = {}
     from dataclasses import replace
     corr_layer = data.all if corr_mask is None else replace(
         data.all,
@@ -1860,12 +1861,14 @@ def run_pipeline(input_file: Optional[str] = None) -> None:
     )
     for ref in corr_refs:
         # 列名对齐只在 check_correlation。这里不再单独把 Age 改成 Age/age。
-        corr_ref_tables.append(check_correlation(
-            corr_layer, radscore=radscore_all, egfr_col=ref,
+        corr_ref_tables[ref] = check_correlation(
+            corr_layer, radscore=radscore_all, ref_col=ref,
             targets=corr_predictors, extra_predictors=extra_pred, seed=cfg.SEED,
-        ))
-    corr_egfr_df = corr_ref_tables[0] if corr_ref_tables else None
-    corr_group_df = corr_ref_tables[1] if len(corr_ref_tables) > 1 else None
+        )
+    # One-version deprecated aliases (positional: first / second table).
+    _corr_values = list(corr_ref_tables.values())
+    corr_egfr_df = _corr_values[0] if _corr_values else None
+    corr_group_df = _corr_values[1] if len(_corr_values) > 1 else None
 
     # ── Kaplan–Meier（时间与 IPCW 共用；事件=状态列，空则当前结局）──
     if bool(getattr(cfg, "DO_SURVIVAL", False)):
@@ -2471,17 +2474,31 @@ def _run_external_eval(
     return out
 
 
+# Pair separator: whitespace-bounded "vs" / "vs.", case-insensitive.
+# Names that merely contain the substring "vs" (Canvas, Ravs) must not split.
+_PAIR_SEP = re.compile(r"\s+vs\.?\s+", flags=re.IGNORECASE)
+
+
+def _split_pair(text: str) -> tuple[str, str] | None:
+    parts = _PAIR_SEP.split(str(text).strip(), maxsplit=1)
+    if len(parts) != 2:
+        return None
+    a, b = parts[0].strip(), parts[1].strip()
+    return (a, b) if a and b and a != b else None
+
+
 def _parse_pairwise(raw) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     for item in list(raw or []):
         if isinstance(item, (list, tuple)) and len(item) >= 2:
             a, b = str(item[0]).strip(), str(item[1]).strip()
-        elif isinstance(item, str) and "vs" in item.lower():
-            a, b = [x.strip() for x in item.replace("VS", "vs").split("vs", 1)]
-        else:
+            if a and b and a != b:
+                pairs.append((a, b))
             continue
-        if a and b and a != b:
-            pairs.append((a, b))
+        if isinstance(item, str):
+            split = _split_pair(item)
+            if split:
+                pairs.append(split)
     return pairs
 
 

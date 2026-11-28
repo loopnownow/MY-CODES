@@ -2713,7 +2713,7 @@ def _partial_html(assoc: Optional[dict]) -> str:
 def generate_results_html(data, res_all, res_train=None, res_test=None,
                            corr_egfr_df: Optional[pd.DataFrame] = None,
                            corr_group_df: Optional[pd.DataFrame] = None,
-                           corr_ref_tables: Optional[list] = None,
+                           corr_ref_tables: Optional[dict | list] = None,
                            seed: Optional[int] = None, train_ratio: Optional[float] = None,
                            out_dir: Optional[str] = None,
                            combined_info: Optional[Dict[str, Any]] = None,
@@ -2902,18 +2902,28 @@ def generate_results_html(data, res_all, res_train=None, res_test=None,
         return default_ref
 
     corr_frames: List[pd.DataFrame] = []
+    dict_keys: list[str] = []
     if not bool(getattr(cfg, "DO_CORR", True)):
         tables = []
     else:
-        tables = list(corr_ref_tables or [])
+        if isinstance(corr_ref_tables, dict):
+            tables = list(corr_ref_tables.values())
+            dict_keys = [str(k) for k in corr_ref_tables.keys()]
+        else:
+            tables = list(corr_ref_tables or [])
+            dict_keys = []
         if not tables:
+            # Deprecated aliases: first table / second table (one-version compat).
             tables = [x for x in (corr_egfr_df, corr_group_df) if x is not None]
     fallback_refs = [str(x).strip() for x in (getattr(cfg, "CORR_REFS", None) or []) if str(x).strip()]
     for i, df_corr in enumerate(tables):
         disp = _prep_corr_disp(df_corr)
         if disp is None or len(disp) == 0:
             continue
-        default_ref = fallback_refs[i] if i < len(fallback_refs) else f"ref{i+1}"
+        if i < len(dict_keys):
+            default_ref = dict_keys[i]
+        else:
+            default_ref = fallback_refs[i] if i < len(fallback_refs) else f"ref{i+1}"
         ref = _ref_name(df_corr, default_ref)
         block = disp.copy()
         block.insert(1, "Reference", ref)
