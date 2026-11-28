@@ -146,7 +146,7 @@ def render(d: dict, family: str, slug: str, root: pathlib.Path,
         ref_row = (f'<tr><td>{esc(refp[0])}</td><td class="num">{refp[1]:,}</td>'
                    f'<td class="num">{refp[2]:,}</td><td>{esc(refp[3])}</td>'
                    f'<td>{esc(refp[4])}</td>'
-                   f'<td><code class="sha">{esc((refp[5] or '')[:16])}…</code></td></tr>')
+                   f'<td><code class="sha">{esc((refp[5] or "")[:16])}…</code></td></tr>')
     else:
         ref_row = ('<tr><td colspan="6" class="bad">ref_project 未登记（跑 mkid.py 后才有一行）'
                    '</td></tr>')
