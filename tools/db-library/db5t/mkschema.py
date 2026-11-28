@@ -29,11 +29,14 @@ MARK_PROJ = '-- @section project'
 
 
 def sha256(path) -> str:
-    h = hashlib.sha256()
-    with open(path, 'rb') as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b''):
-            h.update(chunk)
-    return h.hexdigest()
+    """Content hash with newlines normalized to LF.
+
+    schema-v1.md is text=auto; a CRLF worktree (or core.autocrlf=true) must
+    fingerprint the same as a LF checkout, otherwise source_sha256 drifts and
+    newdb.py / mkschema --check fail only on some machines.
+    """
+    data = pathlib.Path(path).read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
 
 
 def fence_blocks(text: str):

@@ -62,6 +62,14 @@ def test_check_flags_stale(tmp_path, schema_sql):
     assert MKS.main(["--md", str(md2), "--out", str(schema_sql), "--check"]) == 1
 
 
+def test_check_ignores_markdown_newline(tmp_path, schema_sql):
+    """CRLF copy of schema-v1.md must still match the recorded LF hash."""
+    md_crlf = tmp_path / "schema-v1.md"
+    lf = MD.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    md_crlf.write_bytes(lf.replace(b"\n", b"\r\n"))
+    assert MKS.main(["--md", str(md_crlf), "--out", str(schema_sql), "--check"]) == 0
+
+
 def test_newdb_builds_standard_structure(tmp_path, schema_sql):
     rc = NEWDB.main(["--family", "TST", "--slug", "s1", "--root", str(tmp_path),
                      "--schema", str(schema_sql), "--schema-md", str(MD)])
