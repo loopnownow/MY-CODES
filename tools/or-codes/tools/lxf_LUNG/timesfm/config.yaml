@@ -1,0 +1,154 @@
+# =============================================================================
+# config.yaml — 肺癌时序影像 TimesFM RECIST 预测流程 · 全局配置文件
+# 所有路径、阈值、模型参数均在此集中管理，代码中不硬编码任何数值
+# 修改此文件即可适配不同数据集、模型版本、临床阈值
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 【路径配置】
+# -----------------------------------------------------------------------------
+paths:
+  # 输入 manifest 文件路径（CSV，见下方 manifest 格式说明）
+  manifest: "data/manifest.csv"
+
+  # 特征提取输出文件（Step 1 产生，Step 2 读入）
+  features_out: "artifacts/lung_features_long.csv"
+
+  # 最终预测结果输出
+  predictions_out: "artifacts/predictions.csv"
+
+  # 统计验证报告输出目录
+  report_dir: "artifacts/report"
+
+  # 可视化图像输出目录
+  figures_dir: "artifacts/figures"
+
+# -----------------------------------------------------------------------------
+# 【TimesFM 模型配置】
+# 官方 HuggingFace 模型 ID：google/timesfm-2.5-200m-pytorch
+# -----------------------------------------------------------------------------
+model:
+  # HuggingFace Hub 模型 ID（或本地路径，e.g. "./models/timesfm-2.5-200m-pytorch"）
+  pretrained_id: "google/timesfm-2.5-200m-pytorch"
+
+  # 是否开启 torch.compile 加速（A100/H100 推荐 true；CPU 调试时设为 false）
+  torch_compile: true
+
+  # PyTorch matmul 精度（"high" 在 A100 上显著提升吞吐；"highest" 更保守）
+  matmul_precision: "high"
+
+  # ForecastConfig 参数
+  forecast_config:
+    # 模型最大接受的 context 长度（token 数）；短序列会自动 padding
+    max_context: 512
+    # 最大预测步长（horizon 不能超过此值）
+    max_horizon: 64
+    # 是否对输入序列进行 z-score 归一化（强烈建议 true，消除量纲差异）
+    normalize_inputs: true
+    # 是否使用连续分位数头（true 时输出更平滑的不确定性估计）
+    use_continuous_quantile_head: true
+    # 修正分位数交叉问题（保证 q10 < q50 < q90，建议 true）
+    fix_quantile_crossing: true
+    # 是否强制翻转不变性（对体积等非负序列可设 true）
+    force_flip_invariance: false
+    # 自动推断序列是否为正值（体积/直径序列建议 true）
+    infer_is_positive: true
+
+# -----------------------------------------------------------------------------
+# 【预测配置】
+# -----------------------------------------------------------------------------
+forecast:
+  # 预测步长（horizon=1 表示预测下一个时间点）
+  horizon: 1
+
+  # 使用的特征列（"volume_ml" 或 "max_diam_mm"，可扩展为列表）
+  feature_col: "volume_ml"
+
+  # 最少时间点要求（少于此值的患者跳过）
+  min_timepoints: 2
+
+  # leave-one-out 验证（true=用前 n-1 点预测第 n 点；false=预测真正未来点）
+  leave_one_out: true
+
+  # 多靶病灶聚合策略（"sum_diameter"=最长径之和；"sum_volume"=体积之和）
+  multi_lesion_agg: "sum_diameter"
+
+# -----------------------------------------------------------------------------
+# 【RECIST 1.1 分类阈值】
+# 参考：Eisenhauer EA, et al. Eur J Cancer. 2009;45(2):228-247.
+# -----------------------------------------------------------------------------
+recist:
+  # PR 阈值：最长径之和较基线减少 ≥ 此百分比（负数，RECIST 1.1 = -30）
+  pr_threshold: -30.0
+
+  # PD 阈值：最长径之和较基线增加 ≥ 此百分比（正数，RECIST 1.1 = 20）
+  pd_threshold: 20.0
+
+  # CR 体积阈值（ml）：预测 volume 低于此值视为完全缓解
+  # 注：严格 RECIST 需靶灶消失，此为 volume-based proxy
+  cr_volume_threshold_ml: 0.1
+
+  # CR 直径阈值（mm）：预测直径低于此值视为完全缓解（≤5mm 常用标准）
+  cr_diameter_threshold_mm: 5.0
+
+# -----------------------------------------------------------------------------
+# 【特征提取配置】
+# -----------------------------------------------------------------------------
+extraction:
+  # mask 二值化阈值（浮点，0.5 适用于概率 mask；整型 mask 设为 0.5 同样正确）
+  mask_binarize_threshold: 0.5
+
+  # 是否计算 axial 最长径（True）或跳过（False，仅计算 volume）
+  compute_diameter: true
+
+  # 是否跳过空 mask 切片（True：跳过；False：报错）
+  skip_empty_slices: true
+
+  # 最小肿瘤体积（ml），低于此值视为分割噪声并警告
+  min_tumor_volume_ml: 0.01
+
+# -----------------------------------------------------------------------------
+# 【统计验证配置】
+# -----------------------------------------------------------------------------
+stats:
+  # 与 TimesFM 比较的 baseline 方法
+  # "persistence"：预测值 = context 最后一个观测值（零阶外推）
+  # "linear"：用前 n-1 点做线性回归外推
+  baseline_methods:
+    - "persistence"
+    - "linear"
+
+  # Cohen's Kappa 权重方式（"linear"/"quadratic"/null）
+  kappa_weights: "linear"
+
+  # 分位数置信度输出列表（对应 quantile_forecast 的分位数索引）
+  # TimesFM 2.5 默认输出：[mean, 10th, 20th, ..., 90th] 共 10 列
+  # 索引 0=mean, 1=q10, 5=q50, 9=q90
+  quantile_indices:
+    low: 1    # q10（下界）
+    mid: 5    # q50（中位）
+    high: 9   # q90（上界）
+
+  # 图形 DPI（期刊投稿建议 ≥ 300）
+  figure_dpi: 300
+
+  # 是否输出 Bootstrap 置信区间（True 时耗时较长）
+  bootstrap_ci: true
+  bootstrap_n: 1000
+  bootstrap_seed: 42
+
+# -----------------------------------------------------------------------------
+# 【运行环境配置】
+# -----------------------------------------------------------------------------
+runtime:
+  # 随机种子（保证可复现性）
+  seed: 42
+
+  # 是否显示详细日志（True = DEBUG 级别；False = INFO 级别）
+  verbose: false
+
+  # 批处理大小（同时送入 TimesFM 的患者数；影响显存占用）
+  batch_size: 16
+
+  # 输出 CSV 小数位数
+  decimal_places: 4

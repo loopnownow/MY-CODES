@@ -79,3 +79,6 @@ ignore = ["E501"]
 "tools/habitat-pipeline/utility/expand_roi_5mm.py" = ["E402"]
 "tools/habitat-pipeline/utility/generate_global_habitat.py" = ["E402"]
 "tools/habitat-pipeline/utility/plot_global.py" = ["E402"]
+
+# t2312u: harvested lab scripts keep original style; do not auto-rewrite.
+"tools/or-codes/**" = ["E401", "E402", "E701", "E702", "E722", "E741", "F401", "F541", "F601", "F811", "F821", "F841"]

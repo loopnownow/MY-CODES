@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="console-token" content="__TOKEN__">
+<title>工程控制台</title>
+<style>
+:root{--blue:#2c6fbb;--blue-d:#1d4f8a;--bg:#f7f9fc;--line:#dde5ee;--ink:#222;--muted:#667;--ok:#2e7d32;--warn:#b26a00;--err:#c62828}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei",Segoe UI,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:3px solid var(--blue);padding:9px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+h1{font-size:17px;margin:0;color:var(--blue-d)}
+.meta{font-size:12px;color:var(--muted)}
+.meta code{background:#eef2f7;padding:1px 5px;border-radius:3px;font-family:Consolas,monospace}
+.tabs{display:flex;gap:6px;margin-left:auto}
+.tabs button{background:#fff;color:var(--blue-d);border:1px solid var(--line);border-radius:6px;padding:5px 14px;cursor:pointer;font-size:13px}
+.tabs button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+main{max-width:1160px;margin:0 auto;padding:14px 20px 20px;padding-bottom:calc(var(--panel-h,260px) + 24px)}
+section{background:#fff;border:1px solid var(--line);border-radius:8px;margin:10px 0;overflow:hidden}
+section>h2{font-size:14px;margin:0;padding:8px 14px;background:#eaf1f9;color:var(--blue-d);border-bottom:1px solid var(--line)}
+.row{display:grid;grid-template-columns:280px 1fr;gap:12px;padding:7px 14px;border-bottom:1px dashed #eef1f6;align-items:start}
+.row:last-child{border-bottom:0}
+.k b{display:block;font-family:Consolas,monospace;font-size:12.5px;color:var(--blue-d)}
+.k span{font-size:12px;color:var(--muted)}
+input[type=text],input[type=number],textarea{width:100%;border:1px solid #cfd8e3;border-radius:5px;padding:6px 8px;font-size:13px;font-family:Consolas,monospace;background:#fcfdff}
+textarea{min-height:56px;resize:vertical}
+.ro{background:#f2f4f7;color:#667}
+.row.changed{background:#fffdf0}
+.act{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px dashed #eef1f6}
+.act:last-child{border-bottom:0}
+button.go{font-size:13px;padding:5px 14px;border-radius:6px;border:1px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer}
+button.go:disabled{opacity:.45;cursor:not-allowed}
+button.ghost{background:#fff;color:var(--blue)}
+.badge{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:20px;margin-left:6px;border:1px solid transparent}
+.b-safe{background:#e8f5e9;color:var(--ok);border-color:#a5d6a7}
+.b-write{background:#fff4e5;color:var(--warn);border-color:#ffcc80}
+.b-nas{background:#fdecea;color:var(--err);border-color:#ef9a9a}
+.b-dry{background:#e3f2fd;color:#1565c0;border-color:#90caf9}
+.b-off{background:#eee;color:#777;border-color:#ddd}
+#panel{position:fixed;left:0;right:0;bottom:0;z-index:30;background:#0f1c2a;color:#d8e6f3;border-top:3px solid var(--blue);display:flex;flex-direction:column;height:var(--panel-h,260px)}
+#panel.collapsed{height:38px}
+#panelbar{display:flex;gap:10px;align-items:center;padding:6px 14px;background:#13263a;font-size:12.5px;flex-wrap:wrap}
+#panelbar b{color:#fff}
+#panelbar .sp{margin-left:auto}
+#panelbar button{font-size:12px;padding:3px 10px;border-radius:5px;border:1px solid #2f4a68;background:#1b334d;color:#cfe3f7;cursor:pointer}
+#panelbar button:hover{background:#25415f}
+#log{margin:0;padding:8px 14px;overflow:auto;flex:1;white-space:pre-wrap;font-family:Consolas,monospace;font-size:var(--panel-fs,12px);line-height:1.45}
+#modal{position:fixed;inset:0;z-index:50;background:rgba(10,20,30,.45);display:none;align-items:center;justify-content:center}
+#modal.on{display:flex}
+.card{background:#fff;border-radius:10px;max-width:720px;width:calc(100% - 40px);max-height:86vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+.card h3{margin:0;padding:12px 18px;border-bottom:1px solid var(--line);font-size:15px;color:var(--blue-d)}
+.card .body{padding:14px 18px}
+.card .foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;align-items:center}
+pre.cmd{background:#f7f9fc;border:1px solid #dde5ee;border-left:4px solid var(--blue);padding:9px 12px;font-size:12px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.warnbox{background:#fff6e5;border-left:4px solid #e8a33d;padding:9px 12px;margin:8px 0;font-size:12.5px}
+.banner{background:#fff6e5;border-left:4px solid #e8a33d;padding:9px 13px;margin:10px 0;border-radius:6px;font-size:13px}
+.status{font-size:12px;padding:2px 9px;border-radius:20px;background:#eef2f7;color:#456}
+.status.on{background:#e6f5e6;color:var(--ok)}
+.status.off{background:#fdecea;color:var(--err)}
+#msg{font-size:13px}
+.ok{color:var(--ok)} .err{color:var(--err)}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">工程控制台</h1>
+  <div class="meta">ini <code id="inipath">…</code></div>
+  <div class="meta">策略 <code id="actionsini">…</code></div>
+  <div class="tabs">
+    <button data-tab="cfg" class="on">配置</button>
+    <button data-tab="run">运行</button>
+  </div>
+  <span class="meta">服务 <span id="svc" class="status">检测中</span></span>
+</header>
+<main>
+  <div id="banner" class="banner" hidden></div>
+  <div id="tab-cfg"></div>
+  <div id="tab-run" hidden></div>
+</main>
+<div id="panel">
+  <div id="panelbar">
+    <b id="p-name">输出</b>
+    <span id="p-state">空闲</span>
+    <span id="p-time"></span>
+    <span id="msg" style="font-size:12px"></span>
+    <span class="sp"></span>
+    <button id="p-stop" disabled>终止任务</button>
+    <button id="p-scroll">自动滚动：开</button>
+    <button id="p-clear">清屏</button>
+    <button id="p-copy">复制</button>
+    <button id="p-clean">清理旧日志</button>
+    <a id="p-download" href="/api/run/log?full=1" target="_blank" style="color:#8fc3f0;font-size:12px">下载完整日志</a>
+    <button id="p-fold">收起</button>
+  </div>
+  <pre id="log">（尚未运行）</pre>
+</div>
+
+<div id="modal">
+  <div class="card">
+    <h3 id="m-title">确认执行</h3>
+    <div class="body">
+      <div id="m-badges" style="margin-bottom:8px"></div>
+      <div id="m-risk" class="warnbox" hidden></div>
+      <p style="margin:6px 0 4px;font-size:12.5px;color:#667">将执行：</p>
+      <pre class="cmd" id="m-cmd"></pre>
+      <div id="m-confirmbox">
+        <p style="margin:10px 0 4px;font-size:13px">二次确认：请输入 <code id="m-phrase"></code></p>
+        <input type="text" id="m-input" autocomplete="off" spellcheck="false" placeholder="原样输入上面的文字">
+      </div>
+    </div>
+    <div class="foot">
+      <span id="m-msg" class="meta"></span>
+      <button class="go ghost" id="m-cancel">取消</button>
+      <button class="go" id="m-ok" disabled>确认执行</button>
+    </div>
+  </div>
+</div>
+<script src="static/app.js"></script>
+</body>
+</html>
