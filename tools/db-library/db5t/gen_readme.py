@@ -51,18 +51,28 @@ def kv(path):
 
 
 def gate_section(path):
-    """从 gate.log 取该库最新一段（按路径匹配）。"""
+    """从 gate.log 取该库最新一段：先按库路径匹配，退到 `##### family=<FAM> #####` 块。"""
     if not GATELOG.exists():
         return '未运行（gate.log 不存在）'
     txt = GATELOG.read_text(encoding='utf-8', errors='replace')
     key = str(path)
     idx = txt.rfind(key)
-    if idx < 0:
-        return '未在 gate.log 找到本库记录'
-    seg = txt[idx:]
-    nxt = seg.find('\n== ', 10)
-    if nxt > 0:
-        seg = seg[:nxt]
+    if idx >= 0:
+        seg = txt[idx:]
+        nxt = seg.find('\n== ', 10)
+        if nxt > 0:
+            seg = seg[:nxt]
+    else:
+        # gates.py 按家族成段（`##### family=<FAM> #####`），不打印库路径；取该家族最后一段
+        fam = pathlib.Path(path).parent.parent.name
+        marker = f'##### family={fam} #####'
+        idx = txt.rfind(marker)
+        if idx < 0:
+            return '未在 gate.log 找到本库记录'
+        seg = txt[idx + len(marker):]
+        nxt = seg.find('\n##### family=')
+        if nxt > 0:
+            seg = seg[:nxt]
     seg = seg.strip().splitlines()
     keep = [ln.strip() for ln in seg if ('CHECK' in ln or 'integrity' in ln or '全部通过' in ln
                                          or '存在违反' in ln or 'D48' in ln or 'D53' in ln
@@ -83,8 +93,13 @@ def write_family(fam):
         f'# {fam} 家族库（`{fam}db`）',
         '',
         '## 库角色',
-        '- 家族库：身份（`id`/`id_number`）与字典（`dict`）的唯一落点，**PHI 只允许出现在 `id` 表**。',
-        f'- 建库脚本：`stage/_work/` 下对应的 build 脚本；生成时间 {m.get("built_at", "未记录")}。',
+        '- 家族库：身份（`id`/`id_number`）的唯一落点，**PHI 只允许出现在 `id` 表**。'
+        '字典已升全局 `_DataBase\\Family\\dict.db`（2026-11-28），本库不含 `dict`。',
+        f'- 生成时间 {m.get("built_at", "未记录")}；建库脚本与派生物在 `{{DEL}}\\_by-function\\<batch>\\`，库内不留 `_work`。',
+    ]
+    if m.get('no_data') == '1':
+        lines.append(f'- **本家族无数据**（`no_data=1`）：{m.get("no_data_reason", "未记录原因")}')
+    lines += [
         f'- 受试者类型：{json.dumps(st, ensure_ascii=False)}',
         f'- uid 段：{m.get("uid_ranges", "未记录")}',
         '',
@@ -104,7 +119,7 @@ def write_family(fam):
               '- 住院号 / 门诊号 / 影像号 / 病理号：`id_number`（`kind` 成对使用，禁止裸号 join）。',
               '- 子库（`<slug>/<slug>db`）任何列与单元格都不得出现上述值。',
               '', '## 说明', '',
-              '- 本文件由 `stage/_work/gen_readme.py` 生成，勿手改；重跑 build 会刷新。']
+              '- 本文件由 `tools/db-library/db5t/gen_readme.py` 生成，勿手改；重跑 build 会刷新。']
     (STAGE / fam / '_PHI' / '目录说明.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return f'{fam}/_PHI'
 
@@ -116,12 +131,19 @@ def write_leaf(fam, slug):
     m = kv(dbfile)
     tb = tables(dbfile)
     srcs = q(dbfile, 'select status, count(*) from src group by status order by status')
+    src_rows = q(dbfile, 'select kind, rel_path from src where status = "active" order by src_id')
+    if m.get('source_db'):
+        src_desc = f'`{m["source_db"]}`'
+    elif src_rows:
+        src_desc = '、'.join(f'{k} `{p}`' for k, p in src_rows)
+    else:
+        src_desc = '`未记录`'
     lines = [
         f'# {slug} 项目库（`{slug}db`）',
         '',
         '## 库角色',
         '- 项目子库：分析用窄表（`person`/`clin`/`_modules_*`/`*_value`/`qc`），**不含 PHI**。',
-        f'- 建库时间 {m.get("built_at", "未记录")}；源库 `{m.get("source_db", "未记录")}`。',
+        f'- 建库时间 {m.get("built_at", "未记录")}；源库 {src_desc}。',
     ]
     if m.get('period_unit'):
         lines.append(f'- 时间轴：`period_unit={m["period_unit"]}` 月。')
@@ -136,7 +158,7 @@ def write_leaf(fam, slug):
     lines += [f'| `{s}` | {c} |' for s, c in srcs]
     lines += ['', f'- 源记录数 `src_records_n` = {m.get("src_records_n", "未记录")}（应等于 `Σ clin.merged_n`）。',
               '', '## 门禁结果', '', gate_section(dbfile), '',
-              '## 说明', '', '- 本文件由 `stage/_work/gen_readme.py` 生成，勿手改。']
+              '## 说明', '', '- 本文件由 `tools/db-library/db5t/gen_readme.py` 生成，勿手改。']
     (STAGE / fam / slug / '目录说明.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     return f'{fam}/{slug}'
 

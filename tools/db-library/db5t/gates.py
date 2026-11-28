@@ -2797,15 +2797,24 @@ def main():
         ok = False
     if not ok and os.environ.get('GATE_DEBUG'):
         out.append('DEBUG all_rows=' + repr([r for r in all_rows if not (isinstance(r[3], int) and r[3] == 0)]))
-    # 每个家族一段，追加而不是覆盖（MCI 的段不会因为跑 LC 而消失）
-    head = f'\n##### family={FAM} #####\n'
+    # 每个家族一段，原位替换而不是截断：重跑 ACN 不得让 ACY..WML 的段消失
+    # （旧实现 prev.split(marker)[0] 会丢弃该家族之后的所有段，2026-11-28 修）
+    head = f'##### family={FAM} #####'
     prev = LOG.read_text(encoding='utf-8') if LOG.exists() else ''
-    if f'##### family={FAM} #####' in prev:
-        keep = prev.split(f'\n##### family={FAM} #####\n')[0].rstrip() + '\n'
+    body = '\n'.join(out)
+    marker = f'\n{head}\n'
+    if marker in prev:
+        pre, rest = prev.split(marker, 1)
+        cut = rest.find('\n##### family=')
+        post = rest[cut:] if cut >= 0 else ''
     else:
-        keep = prev.rstrip() + '\n' if prev.strip() else ''
+        pre, post = prev.rstrip('\n'), ''
+    lead = pre.rstrip('\n')
+    new = (lead + '\n\n' if lead.strip() else '\n') + f'{head}\n' + body + '\n'
+    if post:
+        new += post.lstrip('\n') + '\n'
     LOG.parent.mkdir(parents=True, exist_ok=True)
-    LOG.write_text(keep + head + '\n'.join(out) + '\n', encoding='utf-8')
+    LOG.write_text(new, encoding='utf-8')
     print('\n'.join(out))
 
 
